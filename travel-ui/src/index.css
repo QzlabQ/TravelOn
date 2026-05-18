@@ -1,0 +1,69 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+:root {
+  --secondary-glow: conic-gradient(
+          from 10deg at 50% 50%,
+          #eb7494 0deg,
+          #ae77b2 55deg,
+          #97b5da 120deg,
+          #0099ca 160deg,
+          transparent 360deg
+  );
+
+  --tertiary-glow: conic-gradient(
+          from 90deg at 50% 50%,
+          #ff8b7e 0deg,
+          #e24e6b 160deg,
+          #7ed2da 120deg,
+          #8bdce0 55deg,
+          transparent 360deg
+  );
+}
+
+.homeContainer {
+    height: calc(100vh - 77px);
+}
+
+.homeContainer::before, .homeContainer::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  opacity: 0.3;
+}
+
+.homeContainer::before {
+  background: var(--tertiary-glow);
+  border-radius: 60%;
+  width: 50vw;
+  height: 50vw;
+  margin-left: -400px;
+  filter: blur(200px) brightness(1.3);
+  top: calc(50vh - 50vw/2);
+  left: calc(50vw );
+}
+
+.homeContainer::after {
+  background: var(--secondary-glow);
+  border-radius: 30%;
+  width: 500px;
+  height: 800px;
+  filter: blur(200px) brightness(1.1);
+  top: calc(50vh - 50vw/2);
+  left: calc(50vw - 50vw/2);
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

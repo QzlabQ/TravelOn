@@ -1,0 +1,158 @@
+# AI Arrange Service
+
+Independent pre-trip planning service for the intelligent travel flow.
+
+## Scope
+
+- Collect fixed trip slots before chat starts.
+- Use free-form AI chat after required slots are present.
+- Stream assistant text over WebSocket.
+- Persist conversations, messages, and versioned snapshots in MongoDB.
+- Push structured Markdown, place suggestions, and simple route data for the map panel.
+- Enrich generic AI places through Amap POI search when `AMAP_API_KEY` is configured.
+- Keep an internal hotel matching extension point for the later offer-provider booking phase.
+
+## Gateway Paths
+
+- REST: `/ai-arrange/api/conversations`
+- WebSocket: `/ai-arrange/ws/planner?conversationId=<uuid>&userId=<uuid>`
+
+The gateway keeps a separate `lb:ws://ai-arrange-service` route for WebSocket upgrade traffic and a normal `lb://ai-arrange-service` route for REST traffic.
+
+## Required Slots
+
+The frontend should collect these before opening the AI chat:
+
+- `city`
+- `travelStartDate`
+- `peopleCount`
+
+Optional slots:
+
+- `travelEndDate`
+- `budget`
+- `travelStyle`
+- `accommodationPreference`
+- `transportPreference`
+- `notes`
+- `mustVisitKeywords`
+- `avoidKeywords`
+
+## REST Contract
+
+Create a planning conversation:
+
+```http
+POST /ai-arrange/api/conversations
+Content-Type: application/json
+```
+
+```json
+{
+  "userId": "00000000-0000-0000-0000-000000000001",
+  "coreSlots": {
+    "city": "Shanghai",
+    "travelStartDate": "2026-06-01",
+    "travelEndDate": "2026-06-03",
+    "peopleCount": 2,
+    "travelStyle": "relaxed",
+    "mustVisitKeywords": ["museum"],
+    "avoidKeywords": ["night market"]
+  }
+}
+```
+
+Other endpoints:
+
+- `GET /ai-arrange/api/conversations?userId=<uuid>`
+- `GET /ai-arrange/api/conversations/{conversationId}?userId=<uuid>`
+- `PUT /ai-arrange/api/conversations/{conversationId}/core-slots`
+- `PUT /ai-arrange/api/conversations/{conversationId}/selection`
+- `GET /ai-arrange/api/conversations/{conversationId}/snapshots?userId=<uuid>`
+
+## WebSocket Messages
+
+Client sends chat text:
+
+```json
+{
+  "type": "PLANNER_CHAT_SEND",
+  "conversationId": "00000000-0000-0000-0000-000000000010",
+  "userId": "00000000-0000-0000-0000-000000000001",
+  "payload": {
+    "message": "Please optimize the route around the Bund and museums.",
+    "selectedPlaceIds": []
+  }
+}
+```
+
+Client sends map selection changes:
+
+```json
+{
+  "type": "PLANNER_PLACE_SELECTION",
+  "conversationId": "00000000-0000-0000-0000-000000000010",
+  "userId": "00000000-0000-0000-0000-000000000001",
+  "payload": {
+    "selectedPlaceIds": ["00000000-0000-0000-0000-000000000101"]
+  }
+}
+```
+
+Server streams assistant text:
+
+```json
+{
+  "type": "PLANNER_CHAT_STREAM",
+  "conversationId": "00000000-0000-0000-0000-000000000010",
+  "payload": {
+    "delta": "OK",
+    "done": false
+  }
+}
+```
+
+Server pushes refreshed structured data:
+
+```json
+{
+  "type": "PLANNER_DATA_REFRESH",
+  "conversationId": "00000000-0000-0000-0000-000000000010",
+  "payload": {
+    "status": "ACTIVE_CHAT",
+    "title": "Shanghai pre-trip plan",
+    "markdown": "# Shanghai pre-trip plan",
+    "snapshotVersion": 2,
+    "places": [],
+    "routes": [],
+    "selectedPlaceIds": []
+  }
+}
+```
+
+Errors are sent as `PLANNER_ERROR`.
+
+## Configuration
+
+- `DEEPSEEK_API_KEY`: enables real AI calls.
+- `DEEPSEEK_BASE_URL`: default `https://api.deepseek.com`.
+- `DEEPSEEK_MODEL`: default `deepseek-v4-pro`.
+- `AMAP_API_KEY`: enables Amap POI enrichment.
+- `MONGODB_URI` or `MONGO_HOST`: MongoDB persistence.
+- `RABBITMQ_HOST`: reserved for the later offer-provider integration phase.
+
+Without `DEEPSEEK_API_KEY`, the service still runs and returns a local placeholder answer so local development can proceed.
+
+## Smoke Test
+
+Run from the repository root in PowerShell:
+
+```powershell
+.\scripts\ai-arrange-smoke-test.ps1
+```
+
+To auto-select the first returned map point and verify the selection refresh:
+
+```powershell
+.\scripts\ai-arrange-smoke-test.ps1 -AutoSelectFirstPlace
+```

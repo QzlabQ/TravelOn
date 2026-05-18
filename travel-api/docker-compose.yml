@@ -1,0 +1,160 @@
+# version: "3.9"
+name: rsww_184249
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/data/rabbitmq:/var/lib/rabbitmq #here hardcoded path to store rabbitmq data, change it to your local path
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/rabbitmq:/var/log/rabbitmq
+    networks:
+      - backend
+
+  mongo:
+    image: mongo:7
+    hostname: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/data/mongo:/data/db
+    networks:
+      - backend
+
+  discovery:
+    hostname: discovery
+    build: ./discovery-service
+    ports:
+      - "8010:8010"
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/discovery:/logs
+    depends_on:
+      - rabbitmq
+    networks:
+      - backend
+
+  gateway:
+    build: ./api-gateway
+    ports:
+      - "8082:8082"
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/gateway:/logs
+    depends_on:
+      - rabbitmq
+      - discovery
+    networks:
+      - backend
+
+  # custom services
+  hotel:
+    build: ./hotel-service
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/hotel:/logs
+    depends_on:
+      - rabbitmq
+      - discovery
+      - gateway
+    networks:
+      - backend
+
+  offer-provider:
+    build: ./offer-provider-service
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/offer-provider:/logs
+    depends_on:
+      - rabbitmq
+      - discovery
+      - gateway
+    networks:
+      - backend
+
+  payment:
+    build: ./payment-service
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/payment:/logs
+    depends_on:
+      - rabbitmq
+      - discovery
+      - gateway
+    networks:
+      - backend
+
+  reservation:
+    build: ./reservation-service
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/reservation:/logs
+    depends_on:
+      - rabbitmq
+      - discovery
+      - gateway
+    networks:
+      - backend
+
+  transport:
+    build: ./transport-service
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/transport:/logs
+    depends_on:
+      - rabbitmq
+      - discovery
+      - gateway
+    networks:
+      - backend
+
+  user:
+    build: ./user-service
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/user:/logs
+    depends_on:
+      - rabbitmq
+      - discovery
+      - gateway
+    networks:
+      - backend
+
+  data-generator:
+    build: ./data-generator
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/data-generator:/logs
+    depends_on:
+      - rabbitmq
+      - discovery
+      - gateway
+      - hotel
+      - transport
+    networks:
+      - backend
+
+  ai-arrange-agent:
+    build: ./ai-arrange-agent-service
+    env_file:
+      - .env
+    ports:
+      - "8090:8090"
+    networks:
+      - backend
+
+  ai-arrange:
+    build: ./ai-arrange-service
+    env_file:
+      - .env
+    volumes:
+      - E:/2026spring/26NULLptr/repositories/travel-api/logs/ai-arrange:/logs
+    environment:
+      - MONGO_HOST=mongo
+      - RABBITMQ_HOST=rabbitmq
+      - AI_AGENT_ENABLED=true
+      - AI_AGENT_BASE_URL=http://ai-arrange-agent:8090
+    depends_on:
+      - rabbitmq
+      - mongo
+      - discovery
+      - gateway
+    networks:
+      - backend
+
+networks:
+  backend:

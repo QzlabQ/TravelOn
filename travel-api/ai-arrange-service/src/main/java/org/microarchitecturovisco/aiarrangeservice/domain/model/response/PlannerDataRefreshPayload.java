@@ -1,0 +1,44 @@
+package org.microarchitecturovisco.aiarrangeservice.domain.model.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapshot;
+import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerConversationStatus;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerPlaceSuggestion;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerRouteSegment;
+
+import java.util.List;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class PlannerDataRefreshPayload {
+
+    private PlannerConversationStatus status;
+    private String title;
+    private String summary;
+    private String markdown;
+    private String nextQuestion;
+    private Integer snapshotVersion;
+    private List<PlannerPlaceSuggestion> places;
+    private List<PlannerRouteSegment> routes;
+    private List<UUID> selectedPlaceIds;
+
+    public static PlannerDataRefreshPayload from(PlannerConversationStatus status, PlannerSnapshot snapshot) {
+        return PlannerDataRefreshPayload.builder()
+                .status(status)
+                .title(snapshot.getTitle())
+                .summary(snapshot.getSummary())
+                .markdown(snapshot.getMarkdown())
+                .nextQuestion(snapshot.getNextQuestion())
+                .snapshotVersion(snapshot.getVersion())
+                .places(snapshot.getPlaces())
+                .routes(snapshot.getRoutes())
+                .selectedPlaceIds(snapshot.getSelectedPlaceIds())
+                .build();
+    }
+}
