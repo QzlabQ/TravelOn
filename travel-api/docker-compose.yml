@@ -9,8 +9,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/data/rabbitmq:/var/lib/rabbitmq #here hardcoded path to store rabbitmq data, change it to your local path
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/rabbitmq:/var/log/rabbitmq
+      - ./data/rabbitmq:/var/lib/rabbitmq #here hardcoded path to store rabbitmq data, change it to your local path
+      - ./logs/rabbitmq:/var/log/rabbitmq
     networks:
       - backend
 
@@ -20,7 +20,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/data/mongo:/data/db
+      - ./data/mongo:/data/db
     networks:
       - backend
 
@@ -30,7 +30,7 @@ services:
     ports:
       - "8010:8010"
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/discovery:/logs
+      - ./logs/discovery:/logs
     depends_on:
       - rabbitmq
     networks:
@@ -41,7 +41,7 @@ services:
     ports:
       - "8082:8082"
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/gateway:/logs
+      - ./logs/gateway:/logs
     depends_on:
       - rabbitmq
       - discovery
@@ -52,7 +52,7 @@ services:
   hotel:
     build: ./hotel-service
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/hotel:/logs
+      - ./logs/hotel:/logs
     depends_on:
       - rabbitmq
       - discovery
@@ -63,7 +63,7 @@ services:
   offer-provider:
     build: ./offer-provider-service
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/offer-provider:/logs
+      - ./logs/offer-provider:/logs
     depends_on:
       - rabbitmq
       - discovery
@@ -74,7 +74,7 @@ services:
   payment:
     build: ./payment-service
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/payment:/logs
+      - ./logs/payment:/logs
     depends_on:
       - rabbitmq
       - discovery
@@ -85,7 +85,7 @@ services:
   reservation:
     build: ./reservation-service
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/reservation:/logs
+      - ./logs/reservation:/logs
     depends_on:
       - rabbitmq
       - discovery
@@ -96,7 +96,7 @@ services:
   transport:
     build: ./transport-service
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/transport:/logs
+      - ./logs/transport:/logs
     depends_on:
       - rabbitmq
       - discovery
@@ -107,7 +107,7 @@ services:
   user:
     build: ./user-service
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/user:/logs
+      - ./logs/user:/logs
     depends_on:
       - rabbitmq
       - discovery
@@ -118,7 +118,7 @@ services:
   data-generator:
     build: ./data-generator
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/data-generator:/logs
+      - ./logs/data-generator:/logs
     depends_on:
       - rabbitmq
       - discovery
@@ -142,7 +142,7 @@ services:
     env_file:
       - .env
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/ai-arrange:/logs
+      - ./logs/ai-arrange:/logs
     environment:
       - MONGO_HOST=mongo
       - RABBITMQ_HOST=rabbitmq
