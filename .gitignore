@@ -113,3 +113,4 @@ travel-ui/yarn-error.*
 # Ignore runtime DB and broker data
 travel-api/data/mongo
 travel-api/data/rabbitmq
+travel-api/data/rabbitmq/
