@@ -28,6 +28,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TransportsQueryService {
 
+    private static final String DOMESTIC_COUNTRY = "中国";
+
     private final TransportCourseRepository transportCourseRepository;
     private final TransportRepository transportRepository;
     private final LocationRepository locationRepository;
@@ -66,7 +68,7 @@ public class TransportsQueryService {
         List<Location> arrivals = new ArrayList<>();
 
         for (TransportCourse transportCourse : transportCourses) {
-            if (transportCourse.getDepartureFrom().getCountry().equals("Polska")) {
+            if (transportCourse.getDepartureFrom().getCountry().equals(DOMESTIC_COUNTRY)) {
                 if (transportCourse.getType().equals(TransportType.PLANE) && !departuresPlane.contains(transportCourse.getDepartureFrom())) {
                     departuresPlane.add(transportCourse.getDepartureFrom());
                 }

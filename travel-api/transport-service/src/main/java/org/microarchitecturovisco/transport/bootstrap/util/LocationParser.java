@@ -1,32 +1,20 @@
 package org.microarchitecturovisco.transport.bootstrap.util;
 
 import org.microarchitecturovisco.transport.model.dto.LocationDto;
-import org.microarchitecturovisco.transport.model.domain.Location;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 @Component
 public class LocationParser {
 
-    private final List<Location> locationsAvailableByBus = new ArrayList<>();
-
-    public LocationParser() {
-        locationsAvailableByBus.add(new Location("Albania", "Durres"));
-        locationsAvailableByBus.add(new Location("Turcja", "Kayseri"));
-        locationsAvailableByBus.add(new Location("Włochy", "Apulia"));
-        locationsAvailableByBus.add(new Location("Włochy", "Sycylia"));
-        locationsAvailableByBus.add(new Location("Włochy", "Kalabria"));
-    }
+    private static final String DOMESTIC_COUNTRY = "中国";
 
     public List<LocationDto> importLocationsAbroad(Resource resource, String transportType) {
         List<LocationDto> locationDtos = new ArrayList<>();
@@ -61,8 +49,8 @@ public class LocationParser {
             while ((line = br.readLine()) != null) {
                 String[] data = line.split("\t");
                 String region = data[1];
-                if (!Objects.equals(region, "Dojazd własny")) {
-                    LocationDto locationDto = createNewLocation(locationDtos, "Polska", region, null);
+                if (!isSelfArrangedTransport(region)) {
+                    LocationDto locationDto = createNewLocation(locationDtos, DOMESTIC_COUNTRY, region, null);
                     if (locationDto != null) {
                         locationDtos.add(locationDto);
                     }
@@ -77,7 +65,7 @@ public class LocationParser {
 
     private LocationDto createNewLocation(List<LocationDto> locationDtos, String country, String region, String transportType) {
         if (transportType != null && transportType.equals("BUS")) {
-            if (!locationAvailableByBus(country, region)) {
+            if (!locationAvailableByBus(country)) {
                 return null;
             }
         }
@@ -87,7 +75,7 @@ public class LocationParser {
         }
 
         return LocationDto.builder()
-                .idLocation(UUID.nameUUIDFromBytes((country+region).getBytes()))
+                .idLocation(UUID.nameUUIDFromBytes((country + region).getBytes()))
                 .country(country)
                 .region(region)
                 .build();
@@ -98,8 +86,11 @@ public class LocationParser {
                 .anyMatch(locationDto -> locationDto.getCountry().equals(country) && locationDto.getRegion().equals(region));
     }
 
-    private boolean locationAvailableByBus(String country, String region) {
-        return locationsAvailableByBus.stream()
-                .anyMatch(location -> location.getCountry().equals(country) && location.getRegion().equals(region));
+    private boolean locationAvailableByBus(String country) {
+        return DOMESTIC_COUNTRY.equals(country);
+    }
+
+    private boolean isSelfArrangedTransport(String region) {
+        return "自驾".equals(region) || region.startsWith("Dojazd");
     }
 }

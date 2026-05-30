@@ -9,6 +9,32 @@ import React, {memo, useEffect, useState} from "react";
 import {Location} from "../../core/domain/DomainInterfaces";
 import {ApiRequests} from "../../core/apiConfig";
 
+const getDefaultDateFrom = () => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + 7);
+    return date;
+}
+
+const getDefaultDateTo = () => {
+    const date = getDefaultDateFrom();
+    date.setDate(date.getDate() + 2);
+    return date;
+}
+
+const formatDateOnly = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+const isPastDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date < today;
+}
+
 // @ts-ignore
 const SearchBar = ({onSearch, hideClearSearch = false}) => {
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -33,8 +59,8 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
         infants: 0,
     });
 
-    const [selectedDateFrom, setSelectedDateFrom] = useState(new Date(2024, 4, 1,));
-    const [selectedDateTo, setSelectedDateTo] = useState(() => new Date(2024, 4, 3));
+    const [selectedDateFrom, setSelectedDateFrom] = useState(getDefaultDateFrom);
+    const [selectedDateTo, setSelectedDateTo] = useState(getDefaultDateTo);
 
     const handleClick = (event: React.MouseEvent<HTMLElement>, type: string) => {
         setAnchorEl(event.currentTarget);
@@ -132,8 +158,15 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
             kids: searchParams.kids,
             infants: searchParams.infants,
         });
-        setSelectedDateFrom(new Date(searchParams.dateFrom));
-        setSelectedDateTo(new Date(searchParams.dateTo));
+        const storedDateFrom = new Date(searchParams.dateFrom);
+        const storedDateTo = new Date(searchParams.dateTo);
+        if (isPastDate(storedDateFrom) || isPastDate(storedDateTo)) {
+            clearSearchParameters();
+            return;
+        }
+
+        setSelectedDateFrom(storedDateFrom);
+        setSelectedDateTo(storedDateTo);
     }
 
     useEffect(() => {
@@ -142,14 +175,16 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
     }, []);
 
     const clearSearchParameters = () => {
+        const defaultDateFrom = getDefaultDateFrom();
+        const defaultDateTo = getDefaultDateTo();
         localStorage.setItem('searchParams',
             JSON.stringify({
                 departurePlane: [],
                 departureBus: [],
                 departureTrain: [],
                 arrivals: [],
-                dateFrom: '2024-05-01',
-                dateTo: '2024-05-03',
+                dateFrom: formatDateOnly(defaultDateFrom),
+                dateTo: formatDateOnly(defaultDateTo),
                 adults: 2,
                 teens: 0,
                 kids: 0,
@@ -159,8 +194,8 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
         setSelectedBusDepartures([]);
         setSelectedTrainDepartures([]);
         setSelectedDestinations([]);
-        setSelectedDateTo(new Date(2024, 4, 3));
-        setSelectedDateFrom(new Date(2024, 4, 1));
+        setSelectedDateTo(defaultDateTo);
+        setSelectedDateFrom(defaultDateFrom);
         setSelectedGuests({
             adults: 2,
             teens: 0,

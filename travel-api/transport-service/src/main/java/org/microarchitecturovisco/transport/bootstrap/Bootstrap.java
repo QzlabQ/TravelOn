@@ -54,7 +54,12 @@ public class Bootstrap implements CommandLineRunner {
         List<TransportCourseDto> planeCourses = transportCoursesMap.get("PLANE");
         List<TransportCourseDto> busCourses = transportCoursesMap.get("BUS");
 
-        LocalDateTime bootstrapBeginDay = LocalDateTime.of(2024, Month.MAY, 1, 12, 0, 0);
+        LocalDateTime bootstrapBeginDay = LocalDateTime.now()
+                .plusDays(1)
+                .withHour(12)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0);
 
         int randomSeed = 12345678;
         Random random = new Random(randomSeed);
