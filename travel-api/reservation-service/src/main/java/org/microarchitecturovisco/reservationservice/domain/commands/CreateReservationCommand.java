@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,10 +29,17 @@ public class CreateReservationCommand {
     private int adultsQuantity;
     private float price;
     private boolean paid;
+    private ReservationStatus status;
+    private String bookingType;
     private UUID hotelId;
     @ElementCollection
     private List<UUID> roomReservationsIds;
     @ElementCollection
     private List<UUID> transportReservationsIds;
     private UUID userId;
+    private String title;
+    private String routeFrom;
+    private String routeTo;
+    private String provider;
+    private String bookingCode;
 }

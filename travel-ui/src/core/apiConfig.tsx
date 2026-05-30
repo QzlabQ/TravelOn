@@ -18,11 +18,11 @@ export class ApiRequests {
     }
 
     static getOffersBySearchQuery = async (params: GetOffersBySearchQueryParams) => {
-        return await axiosInstance.get(`offers/?departureBus=${params.departureBus}&departurePlane=${params.departurePlane}&arrivals=${params.arrivals}&date_from=${params.dateFrom}&date_to=${params.dateTo}&adults=${params.adults}&teens=${params.teens}&kids=${params.kids}&infants=${params.infants}`);
+        return await axiosInstance.get(`offers/?departureBus=${params.departureBus}&departurePlane=${params.departurePlane}&departureTrain=${params.departureTrain}&arrivals=${params.arrivals}&date_from=${params.dateFrom}&date_to=${params.dateTo}&adults=${params.adults}&teens=${params.teens}&kids=${params.kids}&infants=${params.infants}`);
     }
 
     static getOfferDetails = async (params: GetOfferDetailsParams) => {
-        return await axiosInstance.get(`offers/${params.idHotel}?departure_buses=${params.departureBus}&departure_planes=${params.departurePlane}&date_from=${params.dateFrom}&date_to=${params.dateTo}&adults=${params.adults}&teens=${params.teens}&kids=${params.kids}&infants=${params.infants}`)
+        return await axiosInstance.get(`offers/${params.idHotel}?departure_buses=${params.departureBus}&departure_planes=${params.departurePlane}&departure_trains=${params.departureTrain}&date_from=${params.dateFrom}&date_to=${params.dateTo}&adults=${params.adults}&teens=${params.teens}&kids=${params.kids}&infants=${params.infants}`)
     }
 
     static reserveOffer = async (payload: ReservationRequestPayload) => {
@@ -31,6 +31,48 @@ export class ApiRequests {
 
     static payForReservation = async (payload: PaymentPayload) => {
         return await axiosInstance.post('reservations/purchase', payload);
+    }
+
+    static getReservationsForUser = async (userId: string) => {
+        return await axiosInstance.get(`reservations/user/${userId}`);
+    }
+
+    static cancelReservation = async (reservationId: string) => {
+        return await axiosInstance.post(`reservations/${reservationId}/cancel`);
+    }
+
+    static createTicketReservation = async (payload: CreateTicketReservationPayload) => {
+        return await axiosInstance.post<ReservationResponse>('reservations/tickets', payload);
+    }
+
+    static createHotelReservation = async (payload: CreateHotelReservationPayload) => {
+        return await axiosInstance.post<ReservationResponse>('reservations/hotels', payload);
+    }
+
+    static login = async (payload: LoginPayload) => {
+        return await axiosInstance.post<AuthResponse>('users/auth/login', payload);
+    }
+
+    static register = async (payload: RegisterPayload) => {
+        return await axiosInstance.post<AuthResponse>('users/auth/register', payload);
+    }
+
+    static getCurrentUser = async (token: string) => {
+        return await axiosInstance.get<UserProfileResponse>('users/me', {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static updateCurrentUser = async (token: string, payload: UpdateProfilePayload) => {
+        return await axiosInstance.put<UserProfileResponse>('users/me', payload, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static logout = async (token: string) => {
+        return await axiosInstance.post('users/auth/logout', {}, {
+            headers: {'X-User-Token': token}
+        });
     }
 
     static createPlannerConversation = async (payload: CreatePlannerConversationPayload) => {
@@ -59,6 +101,7 @@ export interface GetOffersBySearchQueryOffer {
 export interface GetOffersBySearchQueryParams {
     departurePlane: string[],
     departureBus: string[],
+    departureTrain: string[],
     arrivals: string[],
     dateFrom: string,
     dateTo: string,
@@ -72,6 +115,7 @@ export interface GetOfferDetailsParams {
     idHotel: string,
     departurePlane: string[],
     departureBus: string[],
+    departureTrain: string[],
     dateFrom: string,
     dateTo: string,
     adults: number,
@@ -82,7 +126,8 @@ export interface GetOfferDetailsParams {
 
 export enum TransportType {
     Samolot = "Samolot",
-    Bus = "Bus"
+    Bus = "Bus",
+    Pociag = "Pociag"
 }
 
 export interface ReservationRequestPayload {
@@ -111,6 +156,98 @@ export interface ReservationRequestPayload {
 export interface PaymentPayload {
     reservationId: string,
     cardNumber: string,
+}
+
+export type ReservationStatus = 'PENDING_PAYMENT' | 'PAID' | 'CANCELLED' | 'EXPIRED';
+
+export interface ReservationResponse {
+    id: string,
+    hotelTimeFrom: string,
+    hotelTimeTo: string,
+    adultsQuantity: number,
+    childrenUnder3Quantity: number,
+    childrenUnder10Quantity: number,
+    childrenUnder18Quantity: number,
+    price: number,
+    paid: boolean,
+    status: ReservationStatus,
+    bookingType: 'PACKAGE' | 'FLIGHT' | 'TRAIN' | 'HOTEL' | string,
+    hotelId?: string | null,
+    roomReservationsIds: string[],
+    transportReservationsIds: string[],
+    userId: string,
+    title?: string | null,
+    routeFrom?: string | null,
+    routeTo?: string | null,
+    provider?: string | null,
+    bookingCode?: string | null,
+}
+
+export interface CreateTicketReservationPayload {
+    userId: string,
+    transportType: 'FLIGHT' | 'TRAIN',
+    routeFrom: string,
+    routeTo: string,
+    departureDate: string,
+    departureTime: string,
+    arrivalTime: string,
+    provider: string,
+    bookingCode: string,
+    passengerCount: number,
+    price: number,
+}
+
+export interface CreateHotelReservationPayload {
+    userId: string,
+    hotelId: string,
+    hotelName: string,
+    dateFrom: string,
+    dateTo: string,
+    adultsQuantity: number,
+    childrenUnder3Quantity: number,
+    childrenUnder10Quantity: number,
+    childrenUnder18Quantity: number,
+    price: number,
+    roomName?: string,
+}
+
+export interface LoginPayload {
+    email: string,
+    password: string,
+}
+
+export interface RegisterPayload {
+    email: string,
+    password: string,
+    name: string,
+    surname: string,
+    phone?: string,
+}
+
+export interface UpdateProfilePayload {
+    email?: string,
+    name?: string,
+    surname?: string,
+    phone?: string,
+    avatarUrl?: string,
+}
+
+export interface UserProfileResponse {
+    id: string,
+    email: string,
+    name: string,
+    surname: string,
+    phone?: string | null,
+    avatarUrl?: string | null,
+    loyaltyTier?: string | null,
+    createdAt?: string,
+    updatedAt?: string,
+    lastLoginAt?: string | null,
+}
+
+export interface AuthResponse {
+    token: string,
+    user: UserProfileResponse,
 }
 
 export interface PlannerCoreSlots {

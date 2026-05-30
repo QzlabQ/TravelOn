@@ -3,6 +3,7 @@ package org.microarchitecturovisco.userservice.bootstrap;
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.userservice.domain.User;
 import org.microarchitecturovisco.userservice.repositories.UserRepository;
+import org.microarchitecturovisco.userservice.services.UserService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
@@ -21,6 +22,7 @@ public class Bootstrap implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final ResourceLoader resourceLoader;
+    private final UserService userService;
 
     @Override
     public void run(String... args) {
@@ -28,7 +30,11 @@ public class Bootstrap implements CommandLineRunner {
 
         List<User> users = importUsersFromCSV(resourceLoader.getResource("classpath:initData/users.csv"));
 
-        userRepository.saveAll(users);
+        users.forEach(user -> {
+            if (!userRepository.existsByEmailIgnoreCase(user.getEmail())) {
+                userRepository.save(user);
+            }
+        });
 
         logger.info("Saved " + users.size() + " users");
     }
@@ -58,7 +64,14 @@ public class Bootstrap implements CommandLineRunner {
                 String lastName = data[3];
                 UUID userId = UUID.nameUUIDFromBytes((email + password + firstName + lastName).getBytes());
 
-                User user = new User(userId, email, password, firstName, lastName);
+                User user = User.builder()
+                        .id(userId)
+                        .email(email)
+                        .passwordHash(userService.hashPassword(password))
+                        .name(firstName)
+                        .surname(lastName)
+                        .loyaltyTier("Explorer")
+                        .build();
                 users.add(user);
             }
         } catch (IOException e) {

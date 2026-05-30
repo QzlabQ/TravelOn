@@ -2,12 +2,17 @@ package org.microarchitecturovisco.reservationservice.services;
 
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.reservationservice.domain.commands.CreateReservationCommand;
+import org.microarchitecturovisco.reservationservice.domain.commands.UpdateReservationCommand;
 import org.microarchitecturovisco.reservationservice.domain.dto.HotelInfo;
 import org.microarchitecturovisco.reservationservice.domain.dto.PaymentRequestDto;
 import org.microarchitecturovisco.reservationservice.domain.dto.PaymentResponseDto;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateHotelOnlyReservationRequest;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateTicketReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.ReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.UpdateReservationPaymentStatus;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.ReservationResponse;
 import org.microarchitecturovisco.reservationservice.domain.entity.Reservation;
+import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
 import org.microarchitecturovisco.reservationservice.domain.exceptions.PaymentProcessException;
 import org.microarchitecturovisco.reservationservice.domain.exceptions.PurchaseFailedException;
 import org.microarchitecturovisco.reservationservice.domain.exceptions.ReservationFailException;
@@ -26,9 +31,14 @@ import org.microarchitecturovisco.reservationservice.websockets.ReservationWebSo
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -70,13 +80,128 @@ public class ReservationService {
                 .adultsQuantity(adultsQuantity)
                 .price(price)
                 .paid(false)
+                .status(ReservationStatus.PENDING_PAYMENT)
+                .bookingType("PACKAGE")
                 .hotelId(hotelId)
-                .roomReservationsIds(roomReservationsIds)
-                .transportReservationsIds(transportReservationsIds)
+                .roomReservationsIds(emptyIfNull(roomReservationsIds))
+                .transportReservationsIds(emptyIfNull(transportReservationsIds))
                 .userId(userId)
+                .title("套餐预订")
                 .build();
         reservationAggregate.handleCreateReservationCommand(command);
         return reservationRepository.findById(reservationId).orElseThrow(RuntimeException::new);
+    }
+
+    public List<ReservationResponse> getReservationsForUser(UUID userId) {
+        return reservationRepository.findByUserIdOrderByHotelTimeFromDesc(userId).stream()
+                .map(ReservationResponse::from)
+                .toList();
+    }
+
+    public ReservationResponse getReservation(UUID reservationId) {
+        return reservationRepository.findById(reservationId)
+                .map(ReservationResponse::from)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+    }
+
+    public ReservationResponse cancelReservation(UUID reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            return ReservationResponse.from(reservation);
+        }
+
+        if (reservation.isPaid() || reservation.getStatus() == ReservationStatus.PAID) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Paid reservations cannot be cancelled here");
+        }
+
+        reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                .reservationId(reservationId)
+                .paid(false)
+                .status(ReservationStatus.CANCELLED)
+                .build());
+
+        return reservationRepository.findById(reservationId)
+                .map(ReservationResponse::from)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+    }
+
+    public ReservationResponse createTicketReservation(CreateTicketReservationRequest request) {
+        LocalDateTime departureAt = request.departureDate().atTime(parseTime(request.departureTime()));
+        LocalDateTime arrivalAt = request.departureDate().atTime(parseTime(request.arrivalTime()));
+        if (arrivalAt.isBefore(departureAt)) {
+            arrivalAt = arrivalAt.plusDays(1);
+        }
+
+        String bookingType = normalizeTicketType(request.transportType());
+        UUID reservationId = UUID.randomUUID();
+        UUID transportReservationId = UUID.nameUUIDFromBytes(
+                (bookingType + request.bookingCode() + request.routeFrom() + request.routeTo() + departureAt)
+                        .getBytes(StandardCharsets.UTF_8)
+        );
+
+        CreateReservationCommand command = CreateReservationCommand.builder()
+                .id(reservationId)
+                .hotelTimeFrom(departureAt)
+                .hotelTimeTo(arrivalAt)
+                .infantsQuantity(0)
+                .kidsQuantity(0)
+                .teensQuantity(0)
+                .adultsQuantity(request.passengerCount())
+                .price(request.price())
+                .paid(false)
+                .status(ReservationStatus.PENDING_PAYMENT)
+                .bookingType(bookingType)
+                .roomReservationsIds(Collections.emptyList())
+                .transportReservationsIds(List.of(transportReservationId))
+                .userId(request.userId())
+                .title((bookingType.equals("FLIGHT") ? "机票预订 " : "火车票预订 ") + request.bookingCode())
+                .routeFrom(request.routeFrom())
+                .routeTo(request.routeTo())
+                .provider(request.provider())
+                .bookingCode(request.bookingCode())
+                .build();
+
+        reservationAggregate.handleCreateReservationCommand(command);
+        return getReservation(reservationId);
+    }
+
+    public ReservationResponse createHotelOnlyReservation(CreateHotelOnlyReservationRequest request) {
+        if (!request.dateTo().isAfter(request.dateFrom())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateTo must be after dateFrom");
+        }
+
+        UUID reservationId = UUID.randomUUID();
+        String roomName = hasText(request.roomName()) ? request.roomName().trim() : "标准房";
+        UUID roomReservationId = UUID.nameUUIDFromBytes(
+                (request.hotelId() + roomName + request.dateFrom() + request.dateTo() + request.userId())
+                        .getBytes(StandardCharsets.UTF_8)
+        );
+
+        CreateReservationCommand command = CreateReservationCommand.builder()
+                .id(reservationId)
+                .hotelTimeFrom(request.dateFrom().atTime(14, 0))
+                .hotelTimeTo(request.dateTo().atTime(12, 0))
+                .infantsQuantity(request.childrenUnder3Quantity())
+                .kidsQuantity(request.childrenUnder10Quantity())
+                .teensQuantity(request.childrenUnder18Quantity())
+                .adultsQuantity(request.adultsQuantity())
+                .price(request.price())
+                .paid(false)
+                .status(ReservationStatus.PENDING_PAYMENT)
+                .bookingType("HOTEL")
+                .hotelId(request.hotelId())
+                .roomReservationsIds(List.of(roomReservationId))
+                .transportReservationsIds(Collections.emptyList())
+                .userId(request.userId())
+                .title(request.hotelName())
+                .provider(roomName)
+                .bookingCode("HOTEL-" + reservationId.toString().substring(0, 8).toUpperCase())
+                .build();
+
+        reservationAggregate.handleCreateReservationCommand(command);
+        return getReservation(reservationId);
     }
 
     public UUID bookOrchestration(ReservationRequest reservationRequest) throws ReservationFailException {
@@ -122,6 +247,12 @@ public class ReservationService {
     }
 
     public ReservationConfirmationResponse purchaseReservation(String reservationId, String cardNumber) {
+        Reservation existingReservation = reservationRepository.findById(UUID.fromString(reservationId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+        if (existingReservation.getStatus() == ReservationStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled reservations cannot be paid");
+        }
+
         boolean successfulPayment = false;
         String failedPaymentMessage = "";
         try {
@@ -196,6 +327,12 @@ public class ReservationService {
                 "", // Routing key is ignored for FanoutExchange
                 requestJson
         );
+
+        reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                .reservationId(UUID.fromString(reservationId))
+                .paid(true)
+                .status(ReservationStatus.PAID)
+                .build());
     }
 
     private void sendBoughtOfferWebsocketMessages(String message, String idHotel) {
@@ -203,10 +340,24 @@ public class ReservationService {
     }
 
     private HotelInfo getHotelInformation(UUID hotelId) {
+        if (hotelId == null) {
+            return HotelInfo.builder()
+                    .hotelPrice(0.0f)
+                    .name("票务订单")
+                    .roomTypes(Collections.emptyMap())
+                    .build();
+        }
         return HotelInfo.builder().hotelPrice(1500.0f).name("Hotel testowy").roomTypes(Map.of("Pokój dwuosobowy", 1)).build();
     }
 
     private TransportReservationResponse getTransportInformation(List<String> transportIds) {
+        if (transportIds == null || transportIds.isEmpty()) {
+            return TransportReservationResponse.builder()
+                    .type("None")
+                    .departureFrom(LocationReservationResponse.builder().country("").region("").build())
+                    .departureTo(LocationReservationResponse.builder().region("").country("").build())
+                    .build();
+        }
         return TransportReservationResponse.builder().type("Plane").departureFrom(LocationReservationResponse.builder().country("Polska").region("Gdańsk").build()).departureTo(LocationReservationResponse.builder().region("Marsa Alam").country("Egipt").build()).build();
     }
 
@@ -241,6 +392,33 @@ public class ReservationService {
         catch (AmqpException e) {
             throw new PaymentProcessException("Amqp exception was thrown");
         }
+    }
+
+    private LocalTime parseTime(String value) {
+        try {
+            return LocalTime.parse(value.trim());
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Time must use HH:mm format");
+        }
+    }
+
+    private String normalizeTicketType(String transportType) {
+        String value = transportType.trim().toUpperCase();
+        if (value.equals("FLIGHT") || value.equals("PLANE") || value.equals("SAMOLOT")) {
+            return "FLIGHT";
+        }
+        if (value.equals("TRAIN") || value.equals("POCIAG") || value.equals("RAIL")) {
+            return "TRAIN";
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported transport type");
+    }
+
+    private List<UUID> emptyIfNull(List<UUID> values) {
+        return values == null ? Collections.emptyList() : values;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
 }

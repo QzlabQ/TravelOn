@@ -2,6 +2,7 @@ package org.microarchitecturovisco.reservationservice.services;
 
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.reservationservice.domain.entity.Reservation;
+import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
 import org.microarchitecturovisco.reservationservice.domain.events.ReservationCreatedEvent;
 import org.microarchitecturovisco.reservationservice.domain.events.ReservationDeletedEvent;
 import org.microarchitecturovisco.reservationservice.domain.events.ReservationEvent;
@@ -41,17 +42,29 @@ public class ReservationProjector {
                 .adultsQuantity(event.getAdultsQuantity())
                 .price(event.getPrice())
                 .paid(event.isPaid())
+                .status(event.getStatus() == null ? ReservationStatus.PENDING_PAYMENT : event.getStatus())
+                .bookingType(event.getBookingType() == null ? "PACKAGE" : event.getBookingType())
                 .hotelId(event.getHotelId())
                 .roomReservationsIds(event.getRoomReservationsIds())
                 .transportReservationsIds(event.getTransportReservationsIds())
                 .userId(event.getUserId())
+                .title(event.getTitle())
+                .routeFrom(event.getRouteFrom())
+                .routeTo(event.getRouteTo())
+                .provider(event.getProvider())
+                .bookingCode(event.getBookingCode())
                 .build();
         reservationRepository.save(reservation);
     }
 
     public void apply(ReservationUpdateEvent event) {
         Reservation reservation = reservationRepository.findById(event.getIdReservation()).orElseThrow(RuntimeException::new);
-        reservation.setPaid(event.getPaid());
+        if (event.getPaid() != null) {
+            reservation.setPaid(event.getPaid());
+        }
+        if (event.getStatus() != null) {
+            reservation.setStatus(event.getStatus());
+        }
 
         reservationRepository.save(reservation);
     }

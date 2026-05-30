@@ -13,10 +13,10 @@ const SearchGuestQuantityPopper = ({selectedGuests, onGuestsSelection}) => {
         <Paper className='px-10 py-5 mt-2'>
             <div className='flex flex-col gap-4'>
                 {[
-                    { label: 'Dorośli', key: 'adults', value: adults, setter: setAdults },
-                    { label: 'Nastolatkowie', key: 'teens', value: teen, setter: setTeen },
-                    { label: 'Dzieci', key: 'kids', value: kids, setter: setKids },
-                    { label: 'Noworodki', key: 'infants', value: infants, setter: setInfants }
+                    { label: '成人', key: 'adults', value: adults, setter: setAdults },
+                    { label: '青少年', key: 'teens', value: teen, setter: setTeen },
+                    { label: '儿童', key: 'kids', value: kids, setter: setKids },
+                    { label: '婴幼儿', key: 'infants', value: infants, setter: setInfants }
                 ].map(({ label, key, setter }) => (
                     <div key={label} className='flex items-center justify-between gap-6'>
                         <Typography className='select-none'>{label}</Typography>

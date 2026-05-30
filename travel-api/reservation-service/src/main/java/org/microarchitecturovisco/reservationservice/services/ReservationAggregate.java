@@ -9,6 +9,7 @@ import org.microarchitecturovisco.reservationservice.domain.events.ReservationCr
 import org.microarchitecturovisco.reservationservice.domain.events.ReservationDeletedEvent;
 import org.microarchitecturovisco.reservationservice.domain.events.ReservationEvent;
 import org.microarchitecturovisco.reservationservice.domain.events.ReservationUpdateEvent;
+import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
 import org.microarchitecturovisco.reservationservice.repositories.ReservationEventStore;
 import org.microarchitecturovisco.reservationservice.repositories.ReservationRepository;
 import org.springframework.stereotype.Component;
@@ -36,10 +37,17 @@ public class ReservationAggregate {
                 .adultsQuantity(command.getAdultsQuantity())
                 .price(command.getPrice())
                 .paid(command.isPaid())
+                .status(command.getStatus() == null ? ReservationStatus.PENDING_PAYMENT : command.getStatus())
+                .bookingType(command.getBookingType())
                 .hotelId(command.getHotelId())
                 .roomReservationsIds(command.getRoomReservationsIds())
                 .transportReservationsIds(command.getTransportReservationsIds())
                 .userId(command.getUserId())
+                .title(command.getTitle())
+                .routeFrom(command.getRouteFrom())
+                .routeTo(command.getRouteTo())
+                .provider(command.getProvider())
+                .bookingCode(command.getBookingCode())
                 .build();
         reservationEventStore.save(event);
         reservationProjector.project(List.of(event));
@@ -76,7 +84,8 @@ public class ReservationAggregate {
 
         ReservationUpdateEvent event = ReservationUpdateEvent.builder()
                 .idReservation(command.getReservationId())
-                .paid(command.isPaid())
+                .paid(command.getPaid())
+                .status(command.getStatus())
                 .build();
         reservationEventStore.save(event);
         reservationProjector.project(List.of(event));

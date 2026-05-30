@@ -22,13 +22,13 @@ const OfferComponent: React.FC<OfferProps> = ({idHotel, name, location, rating, 
                     component="img"
                     sx={{width: 320, height: 180}}
                     image={photoURL ?? require('../../assets/holiday-assets/dahee-son-tMffGE7u1bI-unsplash.jpg')}
-                    alt="Ibiza Gwiździny"
+                    alt="旅行产品图片"
                 />
                 {bestSeller &&
                     <Paper elevation={2} className='absolute top-3 right-3'>
                         <div className='flex flex-row rounded-xl items-center bg-white px-1.5 py-0.5'>
                             <SentimentVerySatisfied style={{fontSize: 20}}/>
-                            <p className='text-sm ml-1 mr-0.5'>BESTSELLER</p>
+                            <p className='text-sm ml-1 mr-0.5'>热卖</p>
                         </div>
                     </Paper>
                 }
@@ -61,17 +61,17 @@ const OfferComponent: React.FC<OfferProps> = ({idHotel, name, location, rating, 
                         do
                     </p>
                     <p className='text-xl font-semibold'>
-                        {pricePerPerson.toLocaleString().replace(',', ' ')} zł
+                        {pricePerPerson.toLocaleString().replace(',', ' ')} 元
                     </p>
                     <p className='ml-1 text-sm'>
-                        /os
+                        /人
                     </p>
                 </div>
                 <Link
                     to='/offerDetails'
                     state={{idHotel: idHotel, name: name, hotelLocation: location, rating: rating, pricePerPerson: pricePerPerson, photoURL: photoURL}}>
                     <Button variant="contained" color="primary">
-                        Szczegóły
+                        查看详情
                     </Button>
                 </Link>
             </div>

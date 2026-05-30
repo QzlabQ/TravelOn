@@ -23,7 +23,8 @@ import {
     Lens,
     Money,
     Place,
-    Remove
+    Remove,
+    Train
 } from "@mui/icons-material";
 import { useNavigate } from 'react-router-dom';
 import {ApiRequests} from "../../core/apiConfig";
@@ -165,6 +166,7 @@ const OfferDetails = () => {
                 idHotel: offerDetails.idHotel,
                 departurePlanes: searchParams.departurePlane ? searchParams.departurePlane.map((dpt: Location) => dpt.idLocation) : [],
                 departureBuses: searchParams.departureBus ? searchParams.departureBus.map((dpt: Location) => dpt.idLocation) : [],
+                departureTrains: searchParams.departureTrain ? searchParams.departureTrain.map((dpt: Location) => dpt.idLocation) : [],
                 dateFrom: formatDate(selectedDateFrom),
                 dateTo: formatDate(selectedDateTo),
                 adults: selectedGuests.adults,
@@ -188,6 +190,7 @@ const OfferDetails = () => {
                 idHotel: offerDetails.idHotel,
                 departurePlanes: searchParams.departurePlane ? searchParams.departurePlane.map((dpt: Location) => dpt.idLocation) : [],
                 departureBuses: searchParams.departureBus ? searchParams.departureBus.map((dpt: Location) => dpt.idLocation) : [],
+                departureTrains: searchParams.departureTrain ? searchParams.departureTrain.map((dpt: Location) => dpt.idLocation) : [],
                 dateFrom: formatDate(searchParams.dateFrom ? new Date(searchParams.dateFrom) : new Date()),
                 dateTo: formatDate(searchParams.dateFrom ? new Date(searchParams.dateTo) : new Date()),
                 adults: searchParams.adults,
@@ -203,7 +206,7 @@ const OfferDetails = () => {
             const recvOfferDetails = JSON.parse(ev.data);
 
             if (recvOfferDetails.dataGeneratorUpdate) {
-                setSnackbarMessage("Organizator wycieczek zaktualizował swoją ofertę, odświeżam aktualnie wyświetlaną wycieczkę");
+                setSnackbarMessage("旅游运营商更新了产品，正在刷新当前显示的行程");
                 setSnackbarOpen(true);
             }
 
@@ -294,7 +297,7 @@ const OfferDetails = () => {
                         <div className='flex flex-row items-center mb-6 hover:text-gray-700 hover:cursor-pointer'
                              onClick={() => navigate(-1)}>
                             <ArrowBack style={{fontSize: 20}}/>
-                            <p className='ml-1'>Powrót do ofert</p>
+                            <p className='ml-1'>返回旅游产品列表</p>
                         </div>
                         <div className='flex flex-row items-center justify-between mb-8'>
                             <Paper style={{borderRadius: 8}} elevation={2}>
@@ -324,7 +327,7 @@ const OfferDetails = () => {
                         </div>
 
                         <div className='mb-12'>
-                            <h3 className='text-2xl mb-2'>Galeria</h3>
+                            <h3 className='text-2xl mb-2'>图库</h3>
                             <div className='grid gap-3'>
                                 {offerDetails.imageUrls.slice(1, offerDetails.imageUrls.length).map((url, index) => (
                                     <CardMedia
@@ -339,7 +342,7 @@ const OfferDetails = () => {
                         </div>
 
                         <div className='mb-8'>
-                            <h3 className='text-2xl mb-2'>Konfiguracje pokoi</h3>
+                            <h3 className='text-2xl mb-2'>房间配置</h3>
 
                             <div className='mb-6'>
                                 <FormControlLabel className='select-none' control={
@@ -349,7 +352,7 @@ const OfferDetails = () => {
                                             onRoomSelection(offerDetails.roomConfiguration)
                                         }}
                                     />
-                                } label={'Konfiguracja 1'}/>
+                                } label={'配置 1'}/>
 
                                 <div className='flex flex-col gap-2'>
                                     {offerDetails.roomConfiguration.rooms.map((room, index) => (
@@ -371,7 +374,7 @@ const OfferDetails = () => {
                                                     onRoomSelection(item)
                                                 }}
                                             />
-                                        } label={'Konfiguracja ' + (index + 2)}/>
+                                        } label={'配置 ' + (index + 2)}/>
 
                                         <div className='flex flex-col gap-2'>
                                             {item.rooms.map((room, index) => (
@@ -387,7 +390,7 @@ const OfferDetails = () => {
                         </div>
 
                         <div className='mb-8'>
-                            <h3 className='text-2xl mb-2'>Katering</h3>
+                            <h3 className='text-2xl mb-2'>餐饮</h3>
                             <div className=''>
                                 {offerDetails.cateringOptions.map((item, index) => (
                                     <div key={index} className='flex flex-row gap-3'>
@@ -419,13 +422,13 @@ const OfferDetails = () => {
                             <div className='flex flex-col gap-4 mb-4'>
 
                                 <DatePicker
-                                    label="Wyjazd"
+                                    label="出发"
                                     value={dayjs(selectedDateFrom)}
                                     onChange={(value) => onDateSelection(value ? value.toDate() : new Date(), 'FROM')}
                                 />
 
                                 <DatePicker
-                                    label="Powrót"
+                                    label="返回"
                                     value={dayjs(selectedDateTo)}
                                     onChange={(value) => onDateSelection(value ? value.toDate() : new Date(), 'TO')}
                                 />
@@ -434,7 +437,7 @@ const OfferDetails = () => {
                             {/* people selection */}
                             <div className='flex flex-col pl-2 mb-4'>
                                 <div className='flex items-center justify-between gap-6'>
-                                    <Typography className='select-none'>Dorośli</Typography>
+                                    <Typography className='select-none'>成人</Typography>
                                     <div className='flex items-center'>
                                         <IconButton onClick={() => onGuestsSelection('adults', 'DEC')}>
                                             <Remove/>
@@ -446,7 +449,7 @@ const OfferDetails = () => {
                                     </div>
                                 </div>
                                 <div className='flex items-center justify-between gap-6'>
-                                    <Typography className='select-none'>Nastolatkowie</Typography>
+                                    <Typography className='select-none'>青少年</Typography>
                                     <div className='flex items-center'>
                                         <IconButton onClick={() => onGuestsSelection('teens', 'DEC')}>
                                             <Remove/>
@@ -458,7 +461,7 @@ const OfferDetails = () => {
                                     </div>
                                 </div>
                                 <div className='flex items-center justify-between gap-6'>
-                                    <Typography className='select-none'>Dzieci</Typography>
+                                    <Typography className='select-none'>儿童</Typography>
                                     <div className='flex items-center'>
                                         <IconButton onClick={() => onGuestsSelection('kids', 'DEC')}>
                                             <Remove/>
@@ -470,7 +473,7 @@ const OfferDetails = () => {
                                     </div>
                                 </div>
                                 <div className='flex items-center justify-between gap-6'>
-                                    <Typography className='select-none'>Noworodki</Typography>
+                                    <Typography className='select-none'>婴幼儿</Typography>
                                     <div className='flex items-center'>
                                         <IconButton onClick={() => onGuestsSelection('infants', 'DEC')}>
                                             <Remove/>
@@ -485,7 +488,7 @@ const OfferDetails = () => {
 
                             {offerDetails.price >= 0 &&
                                 <div className='mb-6'>
-                                    <h3>Wylot / wyjazd</h3>
+                                    <h3>出发交通</h3>
 
                                     <div className='flex flex-row gap-1 items-center'>
                                         <FormControlLabel className='select-none' control={
@@ -503,6 +506,9 @@ const OfferDetails = () => {
                                         }
                                         {offerDetails.departure[0].transportCourse.type === 'BUS' &&
                                             <DirectionsBus style={{fontSize: 16}}/>
+                                        }
+                                        {offerDetails.departure[0].transportCourse.type === 'TRAIN' &&
+                                            <Train style={{fontSize: 16}}/>
                                         }
                                     </div>
 
@@ -525,10 +531,13 @@ const OfferDetails = () => {
                                                 {item.transportCourse.type === 'BUS' &&
                                                     <DirectionsBus style={{fontSize: 16, marginRight: 6,}}/>
                                                 }
+                                                {item.transportCourse.type === 'TRAIN' &&
+                                                    <Train style={{fontSize: 16, marginRight: 6,}}/>
+                                                }
 
                                                 <p className='text-sm'>
-                                                    + {Math.round((item.pricePerAdult + offerDetails.possibleDepartures[1][index].pricePerAdult) - (offerDetails.departure[0].pricePerAdult + offerDetails.departure[1].pricePerAdult))} zł
-                                                    / os
+                                                    + {Math.round((item.pricePerAdult + offerDetails.possibleDepartures[1][index].pricePerAdult) - (offerDetails.departure[0].pricePerAdult + offerDetails.departure[1].pricePerAdult))} 元
+                                                    / 人
                                                 </p>
                                             </div>
                                         ))}
@@ -536,8 +545,8 @@ const OfferDetails = () => {
 
                                     {finalPrice >= 0 && !unObtrusiveLoading &&
                                         <div className='flex flex-row gap-2'>
-                                            <p>Cena:</p>
-                                            <p>{finalPrice.toLocaleString().replace(',', ' ')} zł</p>
+                                            <p>价格：</p>
+                                            <p>{finalPrice.toLocaleString().replace(',', ' ')} 元</p>
                                         </div>
                                     }
                                 </div>
@@ -557,14 +566,14 @@ const OfferDetails = () => {
                             }}>
                                 {finalPrice >= 0 && offerDetails.price >= 0 && selectedDateTo >= selectedDateFrom && !unObtrusiveLoading &&
                                     <Button variant='contained' startIcon={<Bookmark/>}>
-                                        Zarezerwuj i kup ofertę
+                                        预订并购买
                                     </Button>
                                 }
                             </Link>
 
                             {(finalPrice < 0 || offerDetails.price < 0 || selectedDateTo < selectedDateFrom) &&
                                 <div className='flex flex-col'>
-                                    <p className='text-red-500 text-wrap'>Konfiguracja niedostępna</p>
+                                    <p className='text-red-500 text-wrap'>当前配置不可用</p>
                                 </div>
                             }
                         </Paper>

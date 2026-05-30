@@ -41,17 +41,41 @@ public class Reservation {
     @NotNull
     private boolean paid;
 
+    @Enumerated(EnumType.STRING)
     @NotNull
-    private UUID hotelId;
+    private ReservationStatus status;
 
     @NotNull
+    private String bookingType;
+
+    private UUID hotelId;
+
     @ElementCollection(fetch = FetchType.EAGER)
     private List<UUID> roomReservationsIds;
 
-    @NotNull
     @ElementCollection(fetch = FetchType.EAGER)
     private List<UUID> transportReservationsIds;
 
     @NotNull
     private UUID userId;
+
+    private String title;
+
+    private String routeFrom;
+
+    private String routeTo;
+
+    private String provider;
+
+    private String bookingCode;
+
+    @PrePersist
+    public void prePersist() {
+        if (status == null) {
+            status = paid ? ReservationStatus.PAID : ReservationStatus.PENDING_PAYMENT;
+        }
+        if (bookingType == null || bookingType.isBlank()) {
+            bookingType = "PACKAGE";
+        }
+    }
 }

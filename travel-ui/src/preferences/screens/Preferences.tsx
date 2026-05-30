@@ -11,6 +11,17 @@ type Reservation = {
     reservationTime: string;
 };
 
+const localizeTransportType = (transportType: string) => {
+    if (transportType === 'Samolot' || transportType === 'PLANE') return '飞机';
+    if (transportType === 'Bus' || transportType === 'BUS') return '巴士';
+    if (transportType === 'Pociag' || transportType === 'TRAIN') return '火车';
+    return transportType;
+};
+
+const localizePlaceName = (placeName: string) => {
+    return placeName.replaceAll('Polska', '波兰');
+};
+
 const Preferences = () => {
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const [topHotels, setTopHotels] = useState<string[]>([]);
@@ -84,7 +95,7 @@ const Preferences = () => {
                 <Paper elevation={2} className='flex flex-col justify-center items-center rounded-xl px-4 py-6'>
                     <div className='mb-5 flex flex-row gap-2 items-center'>
                         <Explore style={{fontSize: 18}}/>
-                        <h3 className='text-xl'>Popularne kierunki podróży</h3>
+                        <h3 className='text-xl'>热门旅行目的地</h3>
                     </div>
                     <ul className='flex flex-col gap-3'>
                         {topLocationNamesTo.map((location, index) => (
@@ -96,7 +107,7 @@ const Preferences = () => {
                 <Paper elevation={2} className='flex flex-col justify-center items-center rounded-xl px-4 py-6'>
                     <div className='mb-5 flex flex-row gap-2 items-center'>
                         <Hotel style={{fontSize: 18}}/>
-                        <h3 className='text-xl'>Popularne hotele</h3>
+                        <h3 className='text-xl'>热门酒店</h3>
                     </div>
                     <ul className='flex flex-col gap-3'>
                         {topHotels.map((hotel, index) => (
@@ -108,7 +119,7 @@ const Preferences = () => {
                 <Paper elevation={2} className='flex flex-col justify-center items-center rounded-xl px-4 py-6'>
                     <div className='mb-5 flex flex-row gap-2 items-center'>
                         <MeetingRoom style={{fontSize: 18}}/>
-                        <h3 className='text-xl'>Popularne pokoje</h3>
+                        <h3 className='text-xl'>热门房型</h3>
                     </div>
                     <ul className='flex flex-col gap-3'>
                         {topRoomTypes.map((roomType, index) => (
@@ -123,7 +134,7 @@ const Preferences = () => {
                 <Paper elevation={2} className='flex flex-col justify-center items-center rounded-xl px-4 py-6'>
                     <div className='mb-5 flex flex-row gap-2 items-center'>
                         <ConnectingAirports style={{fontSize: 18}}/>
-                        <h3 className='text-xl'>Popularne typy transportu</h3>
+                        <h3 className='text-xl'>热门交通类型</h3>
                     </div>
                     <ul className='flex flex-col gap-3'>
                         {topTransportTypes.map((transportType, index) => (
@@ -133,18 +144,18 @@ const Preferences = () => {
                 </Paper>
 
                 <div className='mt-8 col-span-2'>
-                    <h2 className='text-xl font-bold mb-4'>Nowe rezerwacje</h2>
+                    <h2 className='text-xl font-bold mb-4'>最新预订</h2>
                     <Paper elevation={3}>
                         <TableContainer>
                             <Table>
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell className='border border-gray-300 p-2'>Data i godzina</TableCell>
-                                        <TableCell className='border border-gray-300 p-2'>Hotel</TableCell>
-                                        <TableCell className='border border-gray-300 p-2'>Pokoje</TableCell>
-                                        <TableCell className='border border-gray-300 p-2'>Skąd</TableCell>
-                                        <TableCell className='border border-gray-300 p-2'>Dokąd</TableCell>
-                                        <TableCell className='border border-gray-300 p-2'>Typ transportu</TableCell>
+                                        <TableCell className='border border-gray-300 p-2'>日期和时间</TableCell>
+                                        <TableCell className='border border-gray-300 p-2'>酒店</TableCell>
+                                        <TableCell className='border border-gray-300 p-2'>房间</TableCell>
+                                        <TableCell className='border border-gray-300 p-2'>出发地</TableCell>
+                                        <TableCell className='border border-gray-300 p-2'>目的地</TableCell>
+                                        <TableCell className='border border-gray-300 p-2'>交通类型</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -153,9 +164,9 @@ const Preferences = () => {
                                             <TableCell className='border border-gray-300 p-2'>{reservation.reservationTime}</TableCell>
                                             <TableCell className='border border-gray-300 p-2'>{reservation.hotelName}</TableCell>
                                             <TableCell className='border border-gray-300 p-2'>{reservation.roomNames.join(', ')}</TableCell>
-                                            <TableCell className='border border-gray-300 p-2'>{reservation.locationFromNameRegionAndCountry}</TableCell>
-                                            <TableCell className='border border-gray-300 p-2'>{reservation.locationToNameRegionAndCountry}</TableCell>
-                                            <TableCell className='border border-gray-300 p-2'>{reservation.transportType}</TableCell>
+                                            <TableCell className='border border-gray-300 p-2'>{localizePlaceName(reservation.locationFromNameRegionAndCountry)}</TableCell>
+                                            <TableCell className='border border-gray-300 p-2'>{localizePlaceName(reservation.locationToNameRegionAndCountry)}</TableCell>
+                                            <TableCell className='border border-gray-300 p-2'>{localizeTransportType(reservation.transportType)}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>

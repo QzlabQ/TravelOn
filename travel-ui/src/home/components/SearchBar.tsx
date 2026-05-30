@@ -15,14 +15,16 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
     const [anchorType, setAnchorType] = useState('');
 
     const [arrivals, setArrivals] = useState([]);
-    const [departures, setDepartures] = useState<{plane: Location[], bus: Location[]}>({
+    const [departures, setDepartures] = useState<{plane: Location[], bus: Location[], train: Location[]}>({
         plane: [],
-        bus: []
+        bus: [],
+        train: []
     });
 
     const [selectedDestinations, setSelectedDestinations] = useState<Location[]>([]);
     const [selectedPlaneDepartures, setSelectedPlaneDepartures] = useState<Location[]>([]);
     const [selectedBusDepartures, setSelectedBusDepartures] = useState<Location[]>([]);
+    const [selectedTrainDepartures, setSelectedTrainDepartures] = useState<Location[]>([]);
 
     const [selectedGuests, setSelectedGuests] = useState({
         adults: 2,
@@ -44,7 +46,8 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
             .then(response => {
                 setDepartures({
                     plane: response.data.departures.plane,
-                    bus: response.data.departures.bus
+                    bus: response.data.departures.bus,
+                    train: response.data.departures.train ?? []
                 })
                 setArrivals(response.data.arrivals);
             })
@@ -64,10 +67,10 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
         setSelectedDestinations(newSelectedList);
     }
 
-    const onDepartureSelection = (depr: Location, type: 'PLANE' | 'BUS') => {
+    const onDepartureSelection = (depr: Location, type: 'PLANE' | 'BUS' | 'TRAIN') => {
         let newSelectedList;
 
-        const searchList = type === 'PLANE' ? selectedPlaneDepartures : selectedBusDepartures;
+        const searchList = type === 'PLANE' ? selectedPlaneDepartures : type === 'BUS' ? selectedBusDepartures : selectedTrainDepartures;
 
         const itemIndex = searchList.findIndex(loc => loc.idLocation === depr.idLocation);
         if (itemIndex >= 0) {
@@ -79,8 +82,11 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
         if (type == 'PLANE') {
             setSelectedPlaneDepartures(newSelectedList);
         }
-        else {
+        else if (type == 'BUS') {
             setSelectedBusDepartures(newSelectedList);
+        }
+        else {
+            setSelectedTrainDepartures(newSelectedList);
         }
     }
 
@@ -119,6 +125,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
         setSelectedDestinations(searchParams.arrivals);
         setSelectedPlaneDepartures(searchParams.departurePlane);
         setSelectedBusDepartures(searchParams.departureBus);
+        setSelectedTrainDepartures(searchParams.departureTrain ?? []);
         setSelectedGuests({
             adults: searchParams.adults,
             teens: searchParams.teens,
@@ -139,6 +146,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
             JSON.stringify({
                 departurePlane: [],
                 departureBus: [],
+                departureTrain: [],
                 arrivals: [],
                 dateFrom: '2024-05-01',
                 dateTo: '2024-05-03',
@@ -149,6 +157,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
             }));
         setSelectedPlaneDepartures([]);
         setSelectedBusDepartures([]);
+        setSelectedTrainDepartures([]);
         setSelectedDestinations([]);
         setSelectedDateTo(new Date(2024, 4, 3));
         setSelectedDateFrom(new Date(2024, 4, 1));
@@ -166,6 +175,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
             JSON.stringify({
                 departurePlane: selectedPlaneDepartures,
                 departureBus: selectedBusDepartures,
+                departureTrain: selectedTrainDepartures,
                 arrivals: selectedDestinations,
                 dateFrom: selectedDateFrom,
                 dateTo: selectedDateTo,
@@ -195,7 +205,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
                         onClick={event => handleClick(event, 'destination')}
                         endIcon={<ArrowDropDown/>}
                     >
-                        Cele podróży
+                        目的地
                     </Button>
                     <Popper open={Boolean(anchorEl) && anchorType == 'destination'} anchorEl={anchorEl}>
                         <SearchDestinationsPopper
@@ -216,7 +226,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
                         onClick={event => handleClick(event, 'guests')}
                         endIcon={<ArrowDropDown/>}
                     >
-                        Ile osób
+                        旅客人数
                     </Button>
                     <Popper open={Boolean(anchorEl) && anchorType == 'guests'} anchorEl={anchorEl}>
                         <SearchGuestQuantityPopper
@@ -236,7 +246,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
                         onClick={event => handleClick(event, 'when')}
                         endIcon={<ArrowDropDown/>}
                     >
-                        Kiedy
+                        出行时间
                     </Button>
                     <Popper open={Boolean(anchorEl) && anchorType == 'when'} anchorEl={anchorEl}>
                         <SearchDateRangePopper
@@ -257,13 +267,14 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
                         onClick={event => handleClick(event, 'from')}
                         endIcon={<ArrowDropDown/>}
                     >
-                        Skąd
+                        出发地
                     </Button>
                     <Popper open={Boolean(anchorEl) && anchorType == 'from'} anchorEl={anchorEl}>
                         <SearchDeparturesPopper
                             departures={departures}
                             selectedPlaneDepartures={selectedPlaneDepartures}
                             selectedBusDepartures={selectedBusDepartures}
+                            selectedTrainDepartures={selectedTrainDepartures}
                             onSelection={onDepartureSelection}
                         />
                     </Popper>
@@ -278,7 +289,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
                         <Button color='error' className='flex flex-row items-center gap-1'
                                 onClick={clearSearchParameters}>
                             <Close style={{fontSize: 18}}/>
-                            <p className='text-sm'>Wyczyść parametry wyszukiwania</p>
+                            <p className='text-sm'>清空搜索条件</p>
                         </Button>
                     </div>
                 }
