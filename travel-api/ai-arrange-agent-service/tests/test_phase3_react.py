@@ -59,7 +59,7 @@ def test_react_loop_reserves_capacity_for_fallback() -> None:
     assert len(evidence_tools) <= 4
     assert "fallback_plan_builder" in [call["tool"] for call in body["toolCalls"]]
     assert "TOOL_CALL_LIMIT_REACHED" not in warning_codes
-    assert "Budget estimate" in body["markdown"]
+    assert "预算估算" in body["markdown"]
 
 
 def test_runtime_policy_clamps_react_limits_from_settings() -> None:
@@ -74,6 +74,7 @@ def test_runtime_policy_clamps_react_limits_from_settings() -> None:
         deepseek_timeout_seconds=5,
         deepseek_retry_count=1,
         deepseek_retry_backoff_seconds=0.1,
+        deepseek_max_tokens=1200,
         amap_api_key="",
         amap_base_url="https://amap.test",
         amap_enabled=True,
@@ -88,6 +89,7 @@ def test_runtime_policy_clamps_react_limits_from_settings() -> None:
         agent_max_react_steps=9,
         agent_max_react_tool_calls=9,
         agent_max_runtime_seconds=12,
+        agent_model_timeout_seconds=5,
         agent_tool_timeout_seconds=4,
         agent_trace_enabled=False,
     )
@@ -97,4 +99,3 @@ def test_runtime_policy_clamps_react_limits_from_settings() -> None:
     assert policy.max_model_calls_per_turn == 2
     assert policy.max_react_steps == 3
     assert policy.max_react_tool_calls == 4
-

@@ -32,7 +32,7 @@ class WeatherTool:
                 warnings=[
                     ToolWarning(
                         code="WEATHER_DISABLED",
-                        message="Weather API is not configured.",
+                        message="天气 API 未配置。",
                         source="get_weather",
                     )
                 ],
@@ -48,7 +48,7 @@ class WeatherTool:
             warnings=[
                 ToolWarning(
                     code="MOCK_DATA_USED",
-                    message="Weather came from deterministic mock data.",
+                    message="天气信息来自本地模拟数据。",
                     source="get_weather",
                 )
             ]

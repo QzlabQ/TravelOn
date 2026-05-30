@@ -41,4 +41,7 @@ public class PlannerPlaceSuggestion {
 
     @Builder.Default
     private List<String> tags = new ArrayList<>();
+
+    @Builder.Default
+    private List<Integer> dayIndexes = new ArrayList<>();
 }

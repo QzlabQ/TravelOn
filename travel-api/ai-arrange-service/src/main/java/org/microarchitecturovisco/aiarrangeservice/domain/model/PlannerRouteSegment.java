@@ -20,4 +20,5 @@ public class PlannerRouteSegment {
     private Integer estimatedMinutes;
     private String polyline;
     private String summary;
+    private Integer dayIndex;
 }

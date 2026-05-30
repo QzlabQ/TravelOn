@@ -32,7 +32,7 @@ class TransportSearchTool:
                 warnings=[
                     ToolWarning(
                         code="TRANSPORT_CONNECTOR_NOT_IMPLEMENTED",
-                        message="search_flights currently supports mock mode only.",
+                        message="交通查询当前仅支持模拟模式。",
                         source="search_flights",
                     )
                 ],
@@ -51,7 +51,7 @@ class TransportSearchTool:
             warnings=[
                 ToolWarning(
                     code="MOCK_DATA_USED",
-                    message="Transport candidates came from deterministic mock data.",
+                    message="交通候选来自本地模拟数据。",
                     source="search_flights",
                 )
             ],

@@ -2,13 +2,19 @@ package org.microarchitecturovisco.aiarrangeservice.service;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.microarchitecturovisco.aiarrangeservice.client.PlannerAgentClient;
 import org.microarchitecturovisco.aiarrangeservice.client.PlannerAiClient;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerConversation;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapshot;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerConversationStatus;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerMessageType;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerSnapshotDraft;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunRequest;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunResponse;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerStreamEvent;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerDataRefreshPayload;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.request.PlannerChatSendPayload;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerConversationRepository;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerMessageRepository;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerSnapshotRepository;
@@ -22,12 +28,16 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,6 +57,9 @@ class PlannerConversationServiceTest {
 
     @Mock
     private PlannerAiClient plannerAiClient;
+
+    @Mock
+    private PlannerAgentClient plannerAgentClient;
 
     @Mock
     private PlannerSnapshotService snapshotService;
@@ -85,6 +98,7 @@ class PlannerConversationServiceTest {
                 snapshotRepository,
                 promptFactory,
                 plannerAiClient,
+                plannerAgentClient,
                 snapshotService,
                 webSocketSessionRegistry,
                 plannerExecutorService
@@ -97,6 +111,112 @@ class PlannerConversationServiceTest {
         PlannerDataRefreshPayload payload = (PlannerDataRefreshPayload) payloadCaptor.getValue();
         assertThat(payload.getSnapshotVersion()).isEqualTo(2);
         assertThat(payload.getSelectedPlaceIds()).containsExactly(placeId);
+    }
+
+    @Test
+    void runPlannerAgentCallsPythonAgentAndSavesJavaVersionedSnapshot() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = conversation(conversationId, userId);
+        PlannerSnapshot latest = PlannerSnapshot.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversationId)
+                .userId(userId)
+                .version(4)
+                .title("Old")
+                .markdown("# Old")
+                .createdAt(Instant.now())
+                .build();
+        AgentRunResponse response = agentResponse(4, 99, "snapshot-checksum");
+        PlannerSnapshot savedSnapshot = agentSnapshot(conversationId, userId, 5, 4, "snapshot-checksum");
+
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.of(conversation));
+        when(conversationRepository.save(any(PlannerConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).thenReturn(List.of());
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.of(latest));
+        when(plannerAgentClient.runPlanner(any(AgentRunRequest.class))).thenReturn(response);
+        when(snapshotService.createSnapshotFromAgentResponse(any(PlannerConversation.class), eq(response))).thenReturn(savedSnapshot);
+
+        PlannerConversationService service = new PlannerConversationService(
+                conversationRepository,
+                messageRepository,
+                snapshotRepository,
+                promptFactory,
+                plannerAiClient,
+                plannerAgentClient,
+                snapshotService,
+                webSocketSessionRegistry,
+                plannerExecutorService
+        );
+
+        PlannerSnapshot snapshot = service.runPlannerAgent(
+                conversationId,
+                userId,
+                PlannerChatSendPayload.builder().message("生成第二天").targetDayIndex(2).build()
+        );
+
+        ArgumentCaptor<AgentRunRequest> requestCaptor = ArgumentCaptor.forClass(AgentRunRequest.class);
+        verify(plannerAgentClient).runPlanner(requestCaptor.capture());
+        AgentRunRequest request = requestCaptor.getValue();
+        assertThat(request.getLatestSnapshot().getVersion()).isEqualTo(4);
+        assertThat(request.getPlanningMode()).isEqualTo("REFINE_WITH_SELECTION");
+        assertThat(request.getPlanningScope()).isEqualTo("DAY_REFINE");
+        assertThat(request.getTargetDayIndex()).isEqualTo(2);
+
+        assertThat(snapshot.getVersion()).isEqualTo(5);
+        assertThat(snapshot.getVersion()).isNotEqualTo(99);
+        assertThat(snapshot.getBaseVersion()).isEqualTo(4);
+        assertThat(snapshot.getTraceId()).isEqualTo("trace-1");
+        assertThat(snapshot.getChecksum()).isEqualTo("snapshot-checksum");
+        verify(snapshotService).createSnapshotFromAgentResponse(any(PlannerConversation.class), eq(response));
+        verify(webSocketSessionRegistry).send(eq(conversationId), eq(PlannerMessageType.PLANNER_SNAPSHOT_SAVED), any());
+    }
+
+    @Test
+    void handleChatMessageStreamsPythonAgentEvents() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = conversation(conversationId, userId);
+        AgentRunResponse response = agentResponse(null, 1, "stream-checksum");
+        PlannerSnapshot savedSnapshot = agentSnapshot(conversationId, userId, 1, null, "stream-checksum");
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.of(conversation));
+        when(conversationRepository.save(any(PlannerConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).thenReturn(List.of());
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.empty());
+        when(snapshotService.createSnapshotFromAgentResponse(any(PlannerConversation.class), eq(response))).thenReturn(savedSnapshot);
+        when(plannerAgentClient.streamPlanner(any(AgentRunRequest.class), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<PlannerStreamEvent> consumer = invocation.getArgument(1, Consumer.class);
+            consumer.accept(PlannerStreamEvent.builder()
+                    .traceId("trace-1")
+                    .conversationId(conversationId)
+                    .userId(userId)
+                    .type("RUN_STARTED")
+                    .status("RUNNING")
+                    .message("开始生成旅行规划。")
+                    .build());
+            return CompletableFuture.completedFuture(response);
+        });
+
+        PlannerConversationService service = new PlannerConversationService(
+                conversationRepository,
+                messageRepository,
+                snapshotRepository,
+                promptFactory,
+                plannerAiClient,
+                plannerAgentClient,
+                snapshotService,
+                webSocketSessionRegistry,
+                executorService
+        );
+
+        service.handleChatMessage(conversationId, userId, PlannerChatSendPayload.builder().message("生成第一天").build());
+
+        verify(webSocketSessionRegistry, timeout(1000)).send(eq(conversationId), eq(PlannerMessageType.PLANNER_TRACE_EVENT), any());
+        verify(webSocketSessionRegistry, timeout(1000)).send(eq(conversationId), eq(PlannerMessageType.PLANNER_SNAPSHOT_SAVED), any());
+        executorService.shutdownNow();
     }
 
     private PlannerConversation conversation(UUID conversationId, UUID userId) {
@@ -115,6 +235,46 @@ class PlannerConversationServiceTest {
                 .selectedPlaceIds(List.of())
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
+                .build();
+    }
+
+    private AgentRunResponse agentResponse(Integer baseVersion, Integer proposedVersion, String checksum) {
+        return AgentRunResponse.builder()
+                .traceId("trace-1")
+                .status("SUCCESS")
+                .assistantText("已生成规划。")
+                .title("Shanghai plan")
+                .summary("summary")
+                .markdown("# Shanghai plan")
+                .nextQuestion("是否确认当天？")
+                .nextAction("ASK_USER_SELECTION")
+                .snapshotDraft(PlannerSnapshotDraft.builder()
+                        .baseVersion(baseVersion)
+                        .proposedVersion(proposedVersion)
+                        .scope("DAY_PLAN")
+                        .targetDayIndex(1)
+                        .markdown("# Shanghai plan")
+                        .changeSummary("Generated by agent.")
+                        .checksum(checksum)
+                        .build())
+                .build();
+    }
+
+    private PlannerSnapshot agentSnapshot(UUID conversationId, UUID userId, Integer version, Integer baseVersion, String checksum) {
+        return PlannerSnapshot.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversationId)
+                .userId(userId)
+                .version(version)
+                .baseVersion(baseVersion)
+                .title("Shanghai plan")
+                .summary("summary")
+                .markdown("# Shanghai plan")
+                .nextQuestion("是否确认当天？")
+                .assistantText("已生成规划。")
+                .checksum(checksum)
+                .traceId("trace-1")
+                .createdAt(Instant.now())
                 .build();
     }
 }

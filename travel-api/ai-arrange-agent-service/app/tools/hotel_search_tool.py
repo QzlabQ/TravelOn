@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from app.config import AgentSettings
 from app.harness.tool_result import ToolResult, ToolStatus, ToolWarning
@@ -33,7 +33,7 @@ class HotelSearchTool:
                 warnings=[
                     ToolWarning(
                         code="HOTEL_CONNECTOR_NOT_IMPLEMENTED",
-                        message="search_hotels currently supports mock mode only.",
+                        message="酒店查询当前仅支持模拟模式。",
                         source="search_hotels",
                     )
                 ],
@@ -48,7 +48,7 @@ class HotelSearchTool:
         warnings.append(
             ToolWarning(
                 code="MOCK_DATA_USED",
-                message="Hotel candidates came from deterministic mock data.",
+                message="酒店候选来自本地模拟数据。",
                 source="search_hotels",
             )
         )
@@ -64,7 +64,7 @@ class HotelSearchTool:
     def _to_place(self, item: dict) -> PlannerPlaceSuggestion:
         internal_offer_id = item.get("internalOfferId")
         return PlannerPlaceSuggestion(
-            placeId=uuid4(),
+            placeId=uuid5(NAMESPACE_URL, f"hotel:{internal_offer_id or item['name']}"),
             name=item["name"],
             type=PlaceType.HOTEL,
             source=PlaceSource.INTERNAL_OFFER if internal_offer_id else PlaceSource.AI,
@@ -72,7 +72,7 @@ class HotelSearchTool:
             latitude=item.get("latitude"),
             longitude=item.get("longitude"),
             address=item.get("address"),
-            description=f"{item.get('area')} area, approx CNY {item.get('pricePerNight')}/night",
+            description=f"位于{item.get('area')}，约 CNY {item.get('pricePerNight')}/晚",
             selected=False,
             tags=list(item.get("tags", [])),
             pricePerNight=item.get("pricePerNight"),

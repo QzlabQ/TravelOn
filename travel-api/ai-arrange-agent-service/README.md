@@ -6,6 +6,50 @@ Python Agent service for pre-trip planning. It is intentionally internal: the Ja
 
 - `GET /agent/health`
 - `POST /agent/planner/run`
+- `POST /agent/planner/stream`
+
+## Current Capabilities
+
+`/agent/planner/run` currently supports:
+
+- interactive planning fields such as `planningMode`, `interaction`, `recommendationGroups`, and `snapshotDraft`;
+- day-scoped planning with `planningScope=DAY_PLAN` and `planningScope=DAY_REFINE`;
+- final assembly with `planningScope=TRIP_ASSEMBLE` after all day plans are confirmed;
+- stable snapshot draft data including `dayPlans`, `currentDayPlan`, `patchOps`, and `checksum`.
+
+The streaming endpoint is:
+
+- `POST /agent/planner/stream`
+
+It uses SSE for Java `WebClient` consumption, emits stage-status events, and ends with a full `AgentRunResponse`. The existing `/agent/planner/run` endpoint remains compatible.
+
+Runtime defaults for Java integration should follow the documented Stage 0 settings:
+
+```text
+DEEPSEEK_TIMEOUT_SECONDS=90
+AGENT_MODEL_TIMEOUT_SECONDS=90
+AGENT_MAX_RUNTIME_SECONDS=120
+DEEPSEEK_MAX_TOKENS=6000
+```
+
+Java should configure its Python Agent HTTP timeout above `AGENT_MAX_RUNTIME_SECONDS`; the current recommendation is 150 seconds.
+
+## Java Integration
+
+The first Java integration batch is implemented in `../ai-arrange-service`:
+
+- Java calls `/agent/planner/run` for synchronous planner execution.
+- Java consumes `/agent/planner/stream` with WebClient and forwards stage events over WebSocket.
+- Java saves the final `snapshotDraft` as the formal MongoDB `PlannerSnapshot`.
+- Java assigns the formal snapshot `version`; Python `proposedVersion` remains only a draft hint.
+
+Verified from `ai-arrange-service` with:
+
+```powershell
+mvn test
+```
+
+Current result: `Tests run: 6, Failures: 0, Errors: 0, Skipped: 0`.
 
 ## Local Run
 
@@ -25,6 +69,17 @@ pytest
 ```
 
 Without `DEEPSEEK_API_KEY` and `AMAP_API_KEY`, the service still returns a structured fallback plan. This keeps local development and Java integration tests deterministic.
+
+## Current Plan
+
+The next development plan is tracked in `NEXT-DEVELOPMENT-PLAN.md`. The current direction is:
+
+- update and freeze the Python / Java contract documentation first;
+- align runtime defaults with the documented settings;
+- keep the SSE streaming planner endpoint compatible while Java integration is added gradually;
+- continue Java integration in batches after the first `/run` + SSE + snapshot persistence batch;
+- use Chinese for user-facing text;
+- connect real adapters in this order: offer-provider hotels/products, Amap POI/routes, then weather and transport.
 
 ## Harness Phase 1
 

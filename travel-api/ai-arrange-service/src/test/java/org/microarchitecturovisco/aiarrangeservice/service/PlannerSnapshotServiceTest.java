@@ -13,6 +13,7 @@ import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerPlaceType
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerPlaceSuggestion;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerSnapshotDraft;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunResponse;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerMessageRepository;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerSnapshotRepository;
 import org.mockito.Mock;
@@ -121,5 +122,72 @@ class PlannerSnapshotServiceTest {
         assertThat(place.getLongitude()).isEqualTo(121.4998);
         assertThat(snapshot.getVersion()).isEqualTo(2);
         assertThat(snapshot.getNextQuestion()).isNotBlank();
+    }
+
+    @Test
+    void createSnapshotFromAgentResponseAssignsJavaVersionInsteadOfProposedVersion() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = PlannerConversation.builder()
+                .id(conversationId)
+                .userId(userId)
+                .status(PlannerConversationStatus.ACTIVE_CHAT)
+                .coreSlots(TripCoreSlots.builder()
+                        .city("Shanghai")
+                        .travelStartDate(LocalDate.of(2026, 6, 1))
+                        .peopleCount(2)
+                        .build())
+                .title("Shanghai plan")
+                .selectedPlaceIds(List.of())
+                .build();
+        PlannerSnapshot previousSnapshot = PlannerSnapshot.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversationId)
+                .userId(userId)
+                .version(4)
+                .title("Old")
+                .markdown("# Old")
+                .createdAt(Instant.now())
+                .build();
+        AgentRunResponse response = AgentRunResponse.builder()
+                .traceId("trace-1")
+                .status("SUCCESS")
+                .assistantText("已生成规划。")
+                .title("Shanghai plan")
+                .summary("summary")
+                .markdown("# Shanghai plan")
+                .nextQuestion("是否确认当天？")
+                .snapshotDraft(PlannerSnapshotDraft.builder()
+                        .baseVersion(4)
+                        .proposedVersion(99)
+                        .scope("DAY_PLAN")
+                        .targetDayIndex(2)
+                        .markdown("# Shanghai plan")
+                        .checksum("snapshot-checksum")
+                        .build())
+                .build();
+
+        when(snapshotRepository.findFirstByConversationIdAndChecksumOrderByVersionDesc(conversationId, "snapshot-checksum"))
+                .thenReturn(Optional.empty());
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.of(previousSnapshot));
+        when(snapshotRepository.save(any(PlannerSnapshot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PlannerSnapshotService service = new PlannerSnapshotService(
+                plannerAiClient,
+                promptFactory,
+                new PlannerMarkdownBuilder(),
+                new PlaceEnrichmentService(amapPoiClient, internalOfferHotelMatcher),
+                messageRepository,
+                snapshotRepository
+        );
+
+        PlannerSnapshot snapshot = service.createSnapshotFromAgentResponse(conversation, response);
+
+        assertThat(snapshot.getVersion()).isEqualTo(5);
+        assertThat(snapshot.getVersion()).isNotEqualTo(99);
+        assertThat(snapshot.getBaseVersion()).isEqualTo(4);
+        assertThat(snapshot.getTargetDayIndex()).isEqualTo(2);
+        assertThat(snapshot.getChecksum()).isEqualTo("snapshot-checksum");
+        assertThat(snapshot.getTraceId()).isEqualTo("trace-1");
     }
 }

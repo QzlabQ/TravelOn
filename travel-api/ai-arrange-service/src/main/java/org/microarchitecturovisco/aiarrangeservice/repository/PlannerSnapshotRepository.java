@@ -12,4 +12,6 @@ public interface PlannerSnapshotRepository extends MongoRepository<PlannerSnapsh
     List<PlannerSnapshot> findByConversationIdOrderByVersionDesc(UUID conversationId);
 
     Optional<PlannerSnapshot> findFirstByConversationIdOrderByVersionDesc(UUID conversationId);
+
+    Optional<PlannerSnapshot> findFirstByConversationIdAndChecksumOrderByVersionDesc(UUID conversationId, String checksum);
 }

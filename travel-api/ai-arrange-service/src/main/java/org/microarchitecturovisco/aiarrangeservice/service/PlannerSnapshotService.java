@@ -6,9 +6,11 @@ import org.microarchitecturovisco.aiarrangeservice.client.PlannerAiClient;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerConversation;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerMessage;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapshot;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerDayPlanRef;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerPlaceSuggestion;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerRouteSegment;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerSnapshotDraft;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunResponse;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerMessageRepository;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerSnapshotRepository;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -128,6 +131,61 @@ public class PlannerSnapshotService {
         return snapshotRepository.save(snapshot);
     }
 
+    public PlannerSnapshot createSnapshotFromAgentResponse(PlannerConversation conversation, AgentRunResponse response) {
+        if (response == null || response.getSnapshotDraft() == null) {
+            throw new IllegalArgumentException("Planner Agent 响应缺少 snapshotDraft");
+        }
+
+        PlannerSnapshotDraft draft = response.getSnapshotDraft();
+        if (hasText(draft.getChecksum())) {
+            Optional<PlannerSnapshot> existingSnapshot = snapshotRepository
+                    .findFirstByConversationIdAndChecksumOrderByVersionDesc(conversation.getId(), draft.getChecksum());
+            if (existingSnapshot.isPresent()) {
+                return existingSnapshot.get();
+            }
+        }
+
+        PlannerSnapshot latestSnapshot = snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversation.getId()).orElse(null);
+        Integer version = (latestSnapshot == null || latestSnapshot.getVersion() == null ? 0 : latestSnapshot.getVersion()) + 1;
+        List<PlannerPlaceSuggestion> places = !safeList(response.getPlaces()).isEmpty()
+                ? safeList(response.getPlaces())
+                : safeList(draft.getPlaces());
+        List<PlannerRouteSegment> routes = !safeList(response.getRoutes()).isEmpty()
+                ? safeList(response.getRoutes())
+                : safeList(draft.getRoutes());
+        List<PlannerDayPlanRef> dayPlans = safeList(draft.getDayPlans());
+
+        PlannerSnapshot snapshot = PlannerSnapshot.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversation.getId())
+                .userId(conversation.getUserId())
+                .version(version)
+                .baseVersion(draft.getBaseVersion())
+                .scope(draft.getScope())
+                .targetDayIndex(draft.getTargetDayIndex())
+                .currentDayIndex(resolveCurrentDayIndex(draft, latestSnapshot))
+                .completedDayIndexes(resolveCompletedDayIndexes(dayPlans, latestSnapshot))
+                .title(firstNonBlank(response.getTitle(), draft.getTitle(), defaultTitle(conversation)))
+                .summary(firstNonBlank(response.getSummary(), draft.getSummary(), response.getAssistantText()))
+                .markdown(firstNonBlank(response.getMarkdown(), draft.getMarkdown(), ""))
+                .nextQuestion(firstNonBlank(response.getNextQuestion(), draft.getNextQuestion(), defaultNextQuestion(conversation)))
+                .assistantText(response.getAssistantText())
+                .places(places)
+                .routes(routes)
+                .currentDayPlan(draft.getCurrentDayPlan())
+                .dayPlans(dayPlans)
+                .selectedPlaceIds(safeList(draft.getSelectedPlaceIds()))
+                .rejectedPlaceIds(safeList(draft.getRejectedPlaceIds()))
+                .changeSummary(draft.getChangeSummary())
+                .patchOps(safeList(draft.getPatchOps()))
+                .checksum(draft.getChecksum())
+                .traceId(response.getTraceId())
+                .createdAt(Instant.now())
+                .build();
+
+        return snapshotRepository.save(snapshot);
+    }
+
     private List<PlannerRouteSegment> buildRoutes(List<PlannerPlaceSuggestion> places, List<UUID> selectedPlaceIds, List<PlannerRouteSegment> fallbackRoutes) {
         List<UUID> safeSelectedPlaceIds = selectedPlaceIds == null ? List.of() : selectedPlaceIds;
         List<PlannerPlaceSuggestion> ordered = places.stream()
@@ -153,7 +211,7 @@ public class PlannerSnapshotService {
                     .transportMode("walk")
                     .distanceKm(distanceKm)
                     .estimatedMinutes((int) Math.max(5, Math.round(distanceKm * 14)))
-                    .summary(from.getName() + " -> " + to.getName())
+                    .summary(from.getName() + " 到 " + to.getName())
                     .build());
         }
 
@@ -244,5 +302,38 @@ public class PlannerSnapshotService {
 
     private String nonBlankOrDefault(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (hasText(value)) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private Integer resolveCurrentDayIndex(PlannerSnapshotDraft draft, PlannerSnapshot latestSnapshot) {
+        if (draft.getTargetDayIndex() != null) {
+            return draft.getTargetDayIndex();
+        }
+        return latestSnapshot == null ? null : latestSnapshot.getCurrentDayIndex();
+    }
+
+    private List<Integer> resolveCompletedDayIndexes(List<PlannerDayPlanRef> dayPlans, PlannerSnapshot latestSnapshot) {
+        if (dayPlans == null || dayPlans.isEmpty()) {
+            return latestSnapshot == null ? new ArrayList<>() : safeList(latestSnapshot.getCompletedDayIndexes());
+        }
+
+        return dayPlans.stream()
+                .filter(dayPlan -> "CONFIRMED".equals(dayPlan.getStatus()))
+                .map(PlannerDayPlanRef::getDayIndex)
+                .filter(dayIndex -> dayIndex != null)
+                .sorted()
+                .toList();
+    }
+
+    private <T> List<T> safeList(List<T> values) {
+        return values == null ? new ArrayList<>() : new ArrayList<>(values);
     }
 }

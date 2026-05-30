@@ -6,7 +6,8 @@ Independent pre-trip planning service for the intelligent travel flow.
 
 - Collect fixed trip slots before chat starts.
 - Use free-form AI chat after required slots are present.
-- Stream assistant text over WebSocket.
+- Forward planner status and final refresh events over WebSocket.
+- Consume the Python Agent SSE endpoint through `WebClient`.
 - Persist conversations, messages, and versioned snapshots in MongoDB.
 - Push structured Markdown, place suggestions, and simple route data for the map panel.
 - Enrich generic AI places through Amap POI search when `AMAP_API_KEY` is configured.
@@ -69,6 +70,7 @@ Other endpoints:
 - `PUT /ai-arrange/api/conversations/{conversationId}/core-slots`
 - `PUT /ai-arrange/api/conversations/{conversationId}/selection`
 - `GET /ai-arrange/api/conversations/{conversationId}/snapshots?userId=<uuid>`
+- `POST /ai-arrange/api/conversations/{conversationId}/planner/run`
 
 ## WebSocket Messages
 
@@ -99,15 +101,17 @@ Client sends map selection changes:
 }
 ```
 
-Server streams assistant text:
+Server pushes planner status while consuming Python Agent SSE:
 
 ```json
 {
-  "type": "PLANNER_CHAT_STREAM",
+  "type": "PLANNER_TRACE_EVENT",
   "conversationId": "00000000-0000-0000-0000-000000000010",
   "payload": {
-    "delta": "OK",
-    "done": false
+    "traceId": "trace-1",
+    "type": "RUN_STARTED",
+    "status": "RUNNING",
+    "message": "开始生成旅行规划。"
   }
 }
 ```
@@ -130,13 +134,15 @@ Server pushes refreshed structured data:
 }
 ```
 
-Errors are sent as `PLANNER_ERROR`.
+When the final Agent response is saved as a Java-owned snapshot, the server sends `PLANNER_SNAPSHOT_SAVED`. Recommendation groups are pushed through `PLANNER_OPTIONS_REFRESH`, and errors are sent as `PLANNER_ERROR`.
 
 ## Configuration
 
 - `DEEPSEEK_API_KEY`: enables real AI calls.
 - `DEEPSEEK_BASE_URL`: default `https://api.deepseek.com`.
 - `DEEPSEEK_MODEL`: default `deepseek-v4-pro`.
+- `AI_ARRANGE_AGENT_BASE_URL`: Python Agent base URL, default `http://ai-arrange-agent-service:8090`.
+- `AI_ARRANGE_AGENT_TIMEOUT_SECONDS`: Python Agent HTTP timeout, default `150`.
 - `AMAP_API_KEY`: enables Amap POI enrichment.
 - `MONGODB_URI` or `MONGO_HOST`: MongoDB persistence.
 - `RABBITMQ_HOST`: reserved for the later offer-provider integration phase.

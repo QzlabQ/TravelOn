@@ -40,6 +40,7 @@ class AgentSettings:
     deepseek_timeout_seconds: float
     deepseek_retry_count: int
     deepseek_retry_backoff_seconds: float
+    deepseek_max_tokens: int
     amap_api_key: str
     amap_base_url: str
     amap_enabled: bool
@@ -54,11 +55,13 @@ class AgentSettings:
     agent_max_react_steps: int
     agent_max_react_tool_calls: int
     agent_max_runtime_seconds: float
+    agent_model_timeout_seconds: float
     agent_tool_timeout_seconds: float
     agent_trace_enabled: bool
 
 
 def load_settings() -> AgentSettings:
+    deepseek_timeout_seconds = _as_float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS"), 90.0)
     return AgentSettings(
         app_name=os.getenv("AGENT_APP_NAME", "ai-arrange-agent-service"),
         app_version=os.getenv("AGENT_APP_VERSION", "0.1.0"),
@@ -67,9 +70,10 @@ def load_settings() -> AgentSettings:
         deepseek_chat_completions_path=os.getenv("DEEPSEEK_CHAT_COMPLETIONS_PATH", "/chat/completions"),
         deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro"),
         deepseek_temperature=_as_float(os.getenv("DEEPSEEK_TEMPERATURE"), 0.6),
-        deepseek_timeout_seconds=_as_float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS"), 90.0),
-        deepseek_retry_count=_as_int(os.getenv("DEEPSEEK_RETRY_COUNT"), 2),
+        deepseek_timeout_seconds=deepseek_timeout_seconds,
+        deepseek_retry_count=_as_int(os.getenv("DEEPSEEK_RETRY_COUNT"), 1),
         deepseek_retry_backoff_seconds=_as_float(os.getenv("DEEPSEEK_RETRY_BACKOFF_SECONDS"), 1.0),
+        deepseek_max_tokens=_as_int(os.getenv("DEEPSEEK_MAX_TOKENS"), 6000),
         amap_api_key=os.getenv("AMAP_API_KEY", ""),
         amap_base_url=os.getenv("AMAP_BASE_URL", "https://restapi.amap.com/v3"),
         amap_enabled=_as_bool(os.getenv("AMAP_ENABLED"), True),
@@ -83,7 +87,8 @@ def load_settings() -> AgentSettings:
         agent_max_model_calls_per_turn=_as_int(os.getenv("AGENT_MAX_MODEL_CALLS_PER_TURN"), 1),
         agent_max_react_steps=_as_int(os.getenv("AGENT_MAX_REACT_STEPS"), 3),
         agent_max_react_tool_calls=_as_int(os.getenv("AGENT_MAX_REACT_TOOL_CALLS"), 4),
-        agent_max_runtime_seconds=_as_float(os.getenv("AGENT_MAX_RUNTIME_SECONDS"), 30.0),
+        agent_max_runtime_seconds=_as_float(os.getenv("AGENT_MAX_RUNTIME_SECONDS"), 120.0),
+        agent_model_timeout_seconds=_as_float(os.getenv("AGENT_MODEL_TIMEOUT_SECONDS"), deepseek_timeout_seconds),
         agent_tool_timeout_seconds=_as_float(os.getenv("AGENT_TOOL_TIMEOUT_SECONDS"), 10.0),
         agent_trace_enabled=_as_bool(os.getenv("AGENT_TRACE_ENABLED"), True),
     )

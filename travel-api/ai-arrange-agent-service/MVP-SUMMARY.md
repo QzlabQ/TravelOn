@@ -1,5 +1,7 @@
 # AI Arrange Agent MVP 阶段任务总结
 
+> 本文是 MVP 阶段历史总结，用于回顾 Harness、工具和轻量 ReAct 的起点；它不是当前最新开发计划。当前最新计划请看 `NEXT-DEVELOPMENT-PLAN.md`，其中阶段 0 已要求对齐文档、配置默认值和后续 SSE 流式输出方向。
+
 ## 1. MVP 目标
 
 本阶段只聚焦 `ai-arrange-agent-service` Python Agent 模块，不接入 Java `ai-arrange-service`，也不做前端联调。目标是先验证一个可独立运行、可观测、可降级的 Travel Agent MVP，为后续 Java 编排、MongoDB 落库、WebSocket 推送和前端地图交互打基础。
@@ -168,8 +170,9 @@ MVP 阶段的 ReAct 不是完全开放式自主推理，而是有明确上限的
 | `DEEPSEEK_CHAT_COMPLETIONS_PATH` | Chat Completions path | `/chat/completions` |
 | `DEEPSEEK_MODEL` | 模型名 | `deepseek-v4-pro` |
 | `DEEPSEEK_TEMPERATURE` | 生成温度 | `0.6` |
-| `DEEPSEEK_TIMEOUT_SECONDS` | 模型请求超时 | `90` |
+| `DEEPSEEK_TIMEOUT_SECONDS` | DeepSeek HTTP 客户端请求超时 | `90` |
 | `DEEPSEEK_RETRY_COUNT` | 模型重试次数 | `2` |
+| `DEEPSEEK_MAX_TOKENS` | 模型最大输出 token 数；单日结构化 JSON 默认提高以避免内容被截断 | `6000` |
 | `AMAP_API_KEY` | 高德 API key | 为空时高德工具跳过或降级 |
 | `AMAP_ENABLED` | 是否启用高德 | `true` |
 | `AGENT_TOOL_MOCK_ENABLED` | 是否启用 mock 工具 | `true` |
@@ -177,7 +180,8 @@ MVP 阶段的 ReAct 不是完全开放式自主推理，而是有明确上限的
 | `AGENT_MAX_MODEL_CALLS_PER_TURN` | 单轮最大模型调用数 | `1` |
 | `AGENT_MAX_REACT_STEPS` | ReAct 最大步数 | `3` |
 | `AGENT_MAX_REACT_TOOL_CALLS` | ReAct 证据工具最大调用数 | `4` |
-| `AGENT_MAX_RUNTIME_SECONDS` | 单轮最大运行时间 | `30` |
+| `AGENT_MAX_RUNTIME_SECONDS` | Agent 单轮最大运行时间 | `120` |
+| `AGENT_MODEL_TIMEOUT_SECONDS` | Harness 模型工具调用超时；默认跟随 `DEEPSEEK_TIMEOUT_SECONDS` | `90` |
 | `AGENT_TOOL_TIMEOUT_SECONDS` | 工具默认超时 | `10` |
 | `AGENT_TRACE_ENABLED` | 是否输出 trace JSON log | `true` |
 

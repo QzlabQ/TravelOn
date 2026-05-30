@@ -8,6 +8,7 @@ import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapsh
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerConversationStatus;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerPlaceSuggestion;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerRouteSegment;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerOptionGroup;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,6 +28,7 @@ public class PlannerDataRefreshPayload {
     private List<PlannerPlaceSuggestion> places;
     private List<PlannerRouteSegment> routes;
     private List<UUID> selectedPlaceIds;
+    private List<PlannerOptionGroup> recommendationGroups;
 
     public static PlannerDataRefreshPayload from(PlannerConversationStatus status, PlannerSnapshot snapshot) {
         return PlannerDataRefreshPayload.builder()
@@ -40,5 +42,11 @@ public class PlannerDataRefreshPayload {
                 .routes(snapshot.getRoutes())
                 .selectedPlaceIds(snapshot.getSelectedPlaceIds())
                 .build();
+    }
+
+    public static PlannerDataRefreshPayload from(PlannerConversationStatus status, PlannerSnapshot snapshot, List<PlannerOptionGroup> recommendationGroups) {
+        PlannerDataRefreshPayload payload = from(status, snapshot);
+        payload.setRecommendationGroups(recommendationGroups);
+        return payload;
     }
 }

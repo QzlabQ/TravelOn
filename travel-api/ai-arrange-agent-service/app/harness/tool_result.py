@@ -33,6 +33,8 @@ class ToolResult(BaseModel):
     latencyMs: int = 0
     retryCount: int = 0
     userMessage: str | None = None
+    inputSummary: str | None = None
+    outputSummary: str | None = None
 
     @property
     def succeeded(self) -> bool:

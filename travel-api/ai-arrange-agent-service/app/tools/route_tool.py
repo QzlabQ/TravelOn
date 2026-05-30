@@ -29,7 +29,7 @@ class RoutePlanTool:
                     transportMode="walking" if distance_km <= 1.5 else "taxi_or_public_transport",
                     distanceKm=round(distance_km, 2),
                     estimatedMinutes=estimated_minutes,
-                    summary=f"{from_place.name} -> {to_place.name}, about {round(distance_km, 2)} km.",
+                    summary=f"{from_place.name} 到 {to_place.name}，约 {round(distance_km, 2)} 公里。",
                     dayIndex=(len(routes) % max(day_count, 1)) + 1,
                 )
             )

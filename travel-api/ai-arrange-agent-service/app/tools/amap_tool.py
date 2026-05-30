@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid5
 
 import httpx
 
@@ -34,7 +34,7 @@ class AmapPoiTool:
                 warnings=[
                     ToolWarning(
                         code="AMAP_DISABLED",
-                        message="Amap is not configured; AI-only places may be used.",
+                        message="高德地图未配置，可能只使用 AI 候选地点。",
                         source="amap",
                     )
                 ],
@@ -75,7 +75,7 @@ class AmapPoiTool:
                         warnings.append(
                             ToolWarning(
                                 code="AMAP_QUERY_FAILED",
-                                message=data.get("info", "Amap query failed"),
+                                message=data.get("info", "高德地图查询失败。"),
                                 source="amap",
                             )
                         )
@@ -94,7 +94,7 @@ class AmapPoiTool:
                     warnings.append(
                         ToolWarning(
                             code="AMAP_TIMEOUT_OR_ERROR",
-                            message=f"Amap query failed for keyword {keyword}: {error}",
+                            message=f"高德地图关键词“{keyword}”查询失败：{error}",
                             source="amap",
                         )
                     )
@@ -128,8 +128,8 @@ class AmapPoiTool:
                 image_url = first_photo.get("url")
 
         return PlannerPlaceSuggestion(
-            placeId=uuid4(),
-            name=poi.get("name") or "Unnamed place",
+            placeId=uuid5(NAMESPACE_URL, f"amap:{poi.get('id') or poi.get('name') or 'unnamed'}"),
+            name=poi.get("name") or "未命名地点",
             type=self._map_type(poi.get("typecode") or ""),
             source=PlaceSource.AMAP,
             amapPoiId=poi.get("id"),

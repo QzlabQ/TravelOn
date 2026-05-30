@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
+from typing import Any
+
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.clients.deepseek_client import DeepSeekClient
 from app.config import load_settings
 from app.harness.policy import RuntimePolicy
-from app.models import AgentRunRequest, AgentRunResponse, HealthResponse
+from app.models import AgentRunRequest, AgentRunResponse, HealthResponse, PlannerStreamEvent
 from app.services.fallback_plan_builder import FallbackPlanBuilder
 from app.services.planner_agent import PlannerAgent
 from app.tools.amap_tool import AmapPoiTool
@@ -15,6 +19,28 @@ from app.tools.internal_offer_tool import InternalOfferTool
 from app.tools.route_tool import RoutePlanTool
 from app.tools.transport_search_tool import TransportSearchTool
 from app.tools.weather_tool import WeatherTool
+
+
+class AsciiSafeJSONResponse(JSONResponse):
+    media_type = "application/json; charset=utf-8"
+
+    def render(self, content: Any) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=True,
+            allow_nan=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+
+def format_sse_event(event: PlannerStreamEvent) -> str:
+    payload = json.dumps(
+        event.model_dump(mode="json", exclude_none=True),
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+    )
+    return f"event: {event.type.value}\ndata: {payload}\n\n"
 
 
 settings = load_settings()
@@ -33,7 +59,11 @@ agent = PlannerAgent(
     policy=runtime_policy,
 )
 
-app = FastAPI(title=settings.app_name, version=settings.app_version)
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    default_response_class=AsciiSafeJSONResponse,
+)
 
 
 @app.get("/agent/health", response_model=HealthResponse)
@@ -52,3 +82,19 @@ async def health() -> HealthResponse:
 @app.post("/agent/planner/run", response_model=AgentRunResponse)
 async def run_planner(request: AgentRunRequest) -> AgentRunResponse:
     return await agent.run(request)
+
+
+@app.post("/agent/planner/stream")
+async def stream_planner(request: AgentRunRequest) -> StreamingResponse:
+    async def event_generator():
+        async for event in agent.stream(request):
+            yield format_sse_event(event)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream; charset=utf-8",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

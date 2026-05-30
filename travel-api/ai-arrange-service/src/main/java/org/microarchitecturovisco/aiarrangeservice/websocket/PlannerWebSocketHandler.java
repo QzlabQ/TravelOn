@@ -74,7 +74,7 @@ public class PlannerWebSocketHandler extends TextWebSocketHandler {
                     : (UUID) session.getAttributes().get("userId");
 
             if (conversationId == null || userId == null || envelope.getType() == null) {
-                sessionRegistry.sendError(conversationId, "INVALID_MESSAGE", "Missing conversationId, userId or type");
+                sessionRegistry.sendError(conversationId, "INVALID_MESSAGE", "消息缺少 conversationId、userId 或 type");
                 return;
             }
 
@@ -90,13 +90,13 @@ public class PlannerWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
 
-            sessionRegistry.sendError(conversationId, "UNSUPPORTED_MESSAGE", "Unsupported planner message type");
+            sessionRegistry.sendError(conversationId, "UNSUPPORTED_MESSAGE", "暂不支持该规划消息类型");
         } catch (Exception exception) {
             Object conversationId = session.getAttributes().get("conversationId");
             if (conversationId instanceof UUID uuid) {
-                sessionRegistry.sendError(uuid, "INVALID_MESSAGE", exception.getMessage());
+                sessionRegistry.sendError(uuid, "INVALID_MESSAGE", "消息格式不正确，请检查 payload。");
             } else {
-                sessionRegistry.sendError(null, "INVALID_MESSAGE", exception.getMessage());
+                sessionRegistry.sendError(null, "INVALID_MESSAGE", "消息格式不正确，请检查 payload。");
             }
         }
     }

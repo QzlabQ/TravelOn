@@ -2,6 +2,7 @@ package org.microarchitecturovisco.aiarrangeservice.service;
 
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.aiarrangeservice.client.AiChatMessage;
+import org.microarchitecturovisco.aiarrangeservice.client.PlannerAgentClient;
 import org.microarchitecturovisco.aiarrangeservice.client.PlannerAiClient;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerConversation;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerMessage;
@@ -9,6 +10,12 @@ import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapsh
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerConversationStatus;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerMessageRole;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerMessageType;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunRequest;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunResponse;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentHistoryMessage;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentSnapshotRef;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerInteractionInput;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerStreamEvent;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.PlannerChatSendPayload;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerChatStreamPayload;
@@ -20,6 +27,7 @@ import org.microarchitecturovisco.aiarrangeservice.repository.PlannerSnapshotRep
 import org.microarchitecturovisco.aiarrangeservice.websocket.PlannerWebSocketSessionRegistry;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -41,6 +49,7 @@ public class PlannerConversationService {
     private final PlannerSnapshotRepository snapshotRepository;
     private final PlannerPromptFactory promptFactory;
     private final PlannerAiClient plannerAiClient;
+    private final PlannerAgentClient plannerAgentClient;
     private final PlannerSnapshotService snapshotService;
     private final PlannerWebSocketSessionRegistry webSocketSessionRegistry;
     private final ExecutorService plannerExecutorService;
@@ -104,51 +113,73 @@ public class PlannerConversationService {
         return snapshotRepository.findByConversationIdOrderByVersionDesc(conversationId);
     }
 
+    public PlannerSnapshot runPlannerAgent(UUID conversationId, UUID userId, PlannerChatSendPayload payload) {
+        PlannerConversation conversation = getOwnedConversation(conversationId, userId);
+        PlannerChatSendPayload safePayload = payload == null ? new PlannerChatSendPayload() : payload;
+        applySelectedPlaces(conversation, safePayload);
+
+        if (StringUtils.hasText(safePayload.getMessage())) {
+            saveMessage(conversationId, userId, PlannerMessageRole.USER, safePayload.getMessage(), null, Map.of("source", "planner-agent-rest"));
+        }
+
+        List<PlannerMessage> history = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+        PlannerSnapshot latestSnapshot = snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId).orElse(null);
+        AgentRunRequest request = buildAgentRunRequest(conversation, userId, safePayload, latestSnapshot, history);
+        AgentRunResponse response = plannerAgentClient.runPlanner(request);
+        PlannerSnapshot snapshot = finalizeAgentTurnFromAgent(conversation, userId, response, "planner-agent-rest");
+        if (snapshot == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Planner Agent 未返回快照草稿，无法保存正式规划快照");
+        }
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_DATA_REFRESH,
+                PlannerDataRefreshPayload.from(conversation.getStatus(), snapshot, response.getRecommendationGroups()));
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
+                Map.of("version", snapshot.getVersion(), "traceId", response.getTraceId()));
+        return snapshot;
+    }
+
     public void handleChatMessage(UUID conversationId, UUID userId, PlannerChatSendPayload payload) {
         PlannerConversation conversation = getOwnedConversation(conversationId, userId);
         if (conversation.getStatus() == PlannerConversationStatus.COLLECTING_CORE_SLOTS) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Core slots are required before chat starts");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "开始对话前请先补充必要出行信息");
         }
         if (payload.getMessage() == null || payload.getMessage().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message cannot be blank");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "消息内容不能为空");
         }
 
-        if (payload.getSelectedPlaceIds() != null && !payload.getSelectedPlaceIds().isEmpty()) {
-            conversation.setSelectedPlaceIds(new ArrayList<>(payload.getSelectedPlaceIds()));
-            conversation.setUpdatedAt(Instant.now());
-            conversation = conversationRepository.save(conversation);
-        }
+        applySelectedPlaces(conversation, payload);
 
         saveMessage(conversationId, userId, PlannerMessageRole.USER, payload.getMessage(), null, Map.of("source", "websocket"));
 
         List<PlannerMessage> history = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
         PlannerConversation activeConversation = conversation;
         PlannerSnapshot latestSnapshot = snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId).orElse(null);
-        List<AiChatMessage> prompt = promptFactory.buildChatPrompt(activeConversation, latestSnapshot, history);
+        AgentRunRequest agentRequest = buildAgentRunRequest(activeConversation, userId, payload, latestSnapshot, history);
 
         webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_CHAT_STREAM,
                 PlannerChatStreamPayload.builder().delta("").done(false).build());
 
-        plannerAiClient.streamChatCompletion(prompt, delta ->
-                        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_CHAT_STREAM,
-                                PlannerChatStreamPayload.builder().delta(delta).done(false).build()))
-                .thenApplyAsync(assistantText -> finalizeAssistantTurn(activeConversation, userId, assistantText), plannerExecutorService)
+        plannerAgentClient.streamPlanner(agentRequest, event -> forwardAgentStreamEvent(conversationId, event))
+                .thenApplyAsync(response -> finalizeAgentTurnFromAgent(activeConversation, userId, response, "planner-agent-stream"), plannerExecutorService)
                 .thenAccept(snapshot -> {
                     webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_CHAT_STREAM,
                             PlannerChatStreamPayload.builder().delta("").done(true).build());
-                    webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_DATA_REFRESH,
-                            PlannerDataRefreshPayload.from(activeConversation.getStatus(), snapshot));
+                    if (snapshot != null) {
+                        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_DATA_REFRESH,
+                                PlannerDataRefreshPayload.from(activeConversation.getStatus(), snapshot));
+                        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
+                                Map.of("version", snapshot.getVersion()));
+                    }
                 })
                 .exceptionally(error -> {
                     logger.warning("Planner chat failed: " + error.getMessage());
-                    webSocketSessionRegistry.sendError(conversationId, "PLANNER_CHAT_FAILED", String.valueOf(error.getMessage()));
+                    webSocketSessionRegistry.sendError(conversationId, "PLANNER_CHAT_FAILED", "规划生成失败，请稍后重试或补充更明确的偏好。");
                     return null;
                 });
     }
 
     public PlannerConversation getOwnedConversation(UUID conversationId, UUID userId) {
         return conversationRepository.findByIdAndUserId(conversationId, userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到对应规划会话"));
     }
 
     public void assertAccess(UUID conversationId, UUID userId) {
@@ -158,6 +189,34 @@ public class PlannerConversationService {
     private PlannerSnapshot finalizeAssistantTurn(PlannerConversation conversation, UUID userId, String assistantText) {
         saveMessage(conversation.getId(), userId, PlannerMessageRole.ASSISTANT, assistantText, plannerAiClient.model(), Map.of("source", "ai"));
         PlannerSnapshot snapshot = snapshotService.createSnapshot(conversation, assistantText);
+        refreshConversationFromSnapshot(conversation, snapshot);
+        conversationRepository.save(conversation);
+        return snapshot;
+    }
+
+    private PlannerSnapshot finalizeAgentTurnFromAgent(PlannerConversation conversation, UUID userId, AgentRunResponse response, String source) {
+        if (response == null) {
+            throw new IllegalStateException("Planner Agent 返回了空响应");
+        }
+
+        saveMessage(conversation.getId(), userId, PlannerMessageRole.ASSISTANT,
+                StringUtils.hasText(response.getAssistantText()) ? response.getAssistantText() : response.getMarkdown(),
+                "ai-arrange-agent-service",
+                Map.of("source", source, "traceId", response.getTraceId() == null ? "" : response.getTraceId()));
+
+        if (response.getSnapshotDraft() == null) {
+            conversation.setTitle(nonBlank(response.getTitle(), conversation.getTitle()));
+            conversation.setCurrentMarkdown(nonBlank(response.getMarkdown(), conversation.getCurrentMarkdown()));
+            conversation.setNextQuestion(nonBlank(response.getNextQuestion(), conversation.getNextQuestion()));
+            conversation.setUpdatedAt(Instant.now());
+            conversationRepository.save(conversation);
+            return null;
+        }
+
+        PlannerSnapshot snapshot = snapshotService.createSnapshotFromAgentResponse(conversation, response);
+        if (snapshot == null) {
+            throw new IllegalStateException("Planner Agent 快照保存结果为空");
+        }
         refreshConversationFromSnapshot(conversation, snapshot);
         conversationRepository.save(conversation);
         return snapshot;
@@ -191,5 +250,111 @@ public class PlannerConversationService {
 
     private String defaultNextQuestion() {
         return "你想先从酒店区域、核心景点，还是餐厅偏好开始？";
+    }
+
+    private AgentRunRequest buildAgentRunRequest(
+            PlannerConversation conversation,
+            UUID userId,
+            PlannerChatSendPayload payload,
+            PlannerSnapshot latestSnapshot,
+            List<PlannerMessage> history
+    ) {
+        return AgentRunRequest.builder()
+                .conversationId(conversation.getId())
+                .userId(userId)
+                .planningMode(resolvePlanningMode(payload, latestSnapshot))
+                .planningScope(resolvePlanningScope(payload, latestSnapshot))
+                .targetDayIndex(payload.getTargetDayIndex())
+                .targetDate(payload.getTargetDate())
+                .coreSlots(conversation.getCoreSlots())
+                .userMessage(payload.getMessage() == null ? "" : payload.getMessage())
+                .selectedPlaceIds(selectedPlaceIdsForRequest(conversation, payload))
+                .interaction(resolveInteraction(payload))
+                .latestSnapshot(toAgentSnapshotRef(latestSnapshot))
+                .history(toAgentHistory(history))
+                .build();
+    }
+
+    private void applySelectedPlaces(PlannerConversation conversation, PlannerChatSendPayload payload) {
+        if (payload.getSelectedPlaceIds() != null && !payload.getSelectedPlaceIds().isEmpty()) {
+            conversation.setSelectedPlaceIds(new ArrayList<>(payload.getSelectedPlaceIds()));
+            conversation.setUpdatedAt(Instant.now());
+            conversationRepository.save(conversation);
+        }
+    }
+
+    private List<UUID> selectedPlaceIdsForRequest(PlannerConversation conversation, PlannerChatSendPayload payload) {
+        if (payload.getSelectedPlaceIds() != null && !payload.getSelectedPlaceIds().isEmpty()) {
+            return new ArrayList<>(payload.getSelectedPlaceIds());
+        }
+        return conversation.getSelectedPlaceIds() == null ? new ArrayList<>() : new ArrayList<>(conversation.getSelectedPlaceIds());
+    }
+
+    private PlannerInteractionInput resolveInteraction(PlannerChatSendPayload payload) {
+        if (payload.getInteraction() != null) {
+            return payload.getInteraction();
+        }
+        return PlannerInteractionInput.builder()
+                .selectedPlaceIds(payload.getSelectedPlaceIds() == null ? new ArrayList<>() : new ArrayList<>(payload.getSelectedPlaceIds()))
+                .freeText(payload.getMessage())
+                .build();
+    }
+
+    private String resolvePlanningMode(PlannerChatSendPayload payload, PlannerSnapshot latestSnapshot) {
+        if (StringUtils.hasText(payload.getPlanningMode())) {
+            return payload.getPlanningMode();
+        }
+        return latestSnapshot == null || latestSnapshot.getVersion() == null || latestSnapshot.getVersion() <= 0
+                ? "INITIAL_PLAN"
+                : "REFINE_WITH_SELECTION";
+    }
+
+    private String resolvePlanningScope(PlannerChatSendPayload payload, PlannerSnapshot latestSnapshot) {
+        if (StringUtils.hasText(payload.getPlanningScope())) {
+            return payload.getPlanningScope();
+        }
+        return latestSnapshot == null || latestSnapshot.getVersion() == null || latestSnapshot.getVersion() <= 0
+                ? "DAY_PLAN"
+                : "DAY_REFINE";
+    }
+
+    private PlannerAgentSnapshotRef toAgentSnapshotRef(PlannerSnapshot snapshot) {
+        if (snapshot == null) {
+            return null;
+        }
+        return PlannerAgentSnapshotRef.builder()
+                .version(snapshot.getVersion())
+                .markdown(snapshot.getMarkdown())
+                .places(snapshot.getPlaces() == null ? new ArrayList<>() : new ArrayList<>(snapshot.getPlaces()))
+                .routes(snapshot.getRoutes() == null ? new ArrayList<>() : new ArrayList<>(snapshot.getRoutes()))
+                .dayPlans(snapshot.getDayPlans() == null ? new ArrayList<>() : new ArrayList<>(snapshot.getDayPlans()))
+                .currentDayIndex(snapshot.getCurrentDayIndex())
+                .completedDayIndexes(snapshot.getCompletedDayIndexes() == null ? new ArrayList<>() : new ArrayList<>(snapshot.getCompletedDayIndexes()))
+                .build();
+    }
+
+    private List<PlannerAgentHistoryMessage> toAgentHistory(List<PlannerMessage> messages) {
+        if (messages == null) {
+            return new ArrayList<>();
+        }
+        return messages.stream()
+                .map(message -> PlannerAgentHistoryMessage.builder()
+                        .role(message.getRole() == null ? null : message.getRole().name().toLowerCase())
+                        .content(message.getContent())
+                        .model(message.getModel())
+                        .createdAt(message.getCreatedAt() == null ? null : message.getCreatedAt().toString())
+                        .build())
+                .toList();
+    }
+
+    private void forwardAgentStreamEvent(UUID conversationId, PlannerStreamEvent event) {
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_TRACE_EVENT, event);
+        if ("OPTIONS_READY".equals(event.getType())) {
+            webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_OPTIONS_REFRESH, event.getData());
+        }
+    }
+
+    private String nonBlank(String value, String fallback) {
+        return StringUtils.hasText(value) ? value : fallback;
     }
 }

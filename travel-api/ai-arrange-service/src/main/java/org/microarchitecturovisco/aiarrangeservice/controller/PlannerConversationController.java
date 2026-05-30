@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapshot;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.CreatePlannerConversationRequest;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.request.RunPlannerAgentRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.UpdatePlannerCoreSlotsRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.UpdatePlannerSelectionRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerConversationResponse;
@@ -55,5 +56,10 @@ public class PlannerConversationController {
     @GetMapping("/{conversationId}/snapshots")
     public List<PlannerSnapshot> listSnapshots(@PathVariable UUID conversationId, @RequestParam UUID userId) {
         return plannerConversationService.listSnapshots(conversationId, userId);
+    }
+
+    @PostMapping("/{conversationId}/planner/run")
+    public PlannerSnapshot runPlanner(@PathVariable UUID conversationId, @Valid @RequestBody RunPlannerAgentRequest request) {
+        return plannerConversationService.runPlannerAgent(conversationId, request.getUserId(), request.toChatPayload());
     }
 }
