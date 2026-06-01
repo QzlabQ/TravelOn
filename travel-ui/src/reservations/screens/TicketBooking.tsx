@@ -24,26 +24,13 @@ import {
     Train,
     Tune
 } from "@mui/icons-material";
-import {ApiRequests} from "../../core/apiConfig";
-import {Location} from "../../core/domain/DomainInterfaces";
+import {ApiRequests, TicketSearchOffer} from "../../core/apiConfig";
 import {getCurrentUserId} from "../../core/currentUser";
 
 type TicketMode = 'flight' | 'train';
 
 type TicketBookingProps = {
     mode: TicketMode;
-};
-
-type TicketOffer = {
-    id: string;
-    departureTime: string;
-    arrivalTime: string;
-    duration: string;
-    carrier: string;
-    code: string;
-    price: number;
-    successRate: string;
-    notice: string;
 };
 
 const modeConfig = {
@@ -53,8 +40,8 @@ const modeConfig = {
         icon: <Flight style={{fontSize: 18}}/>,
         fromLabel: '出发机场/城市',
         toLabel: '到达机场/城市',
-        lowPrice: 420,
-        highPrice: 1880,
+        lowPrice: 0,
+        highPrice: 3600,
         codePrefix: 'CA',
         hero: '比较直飞、联程与不同舱位价格',
         accent: '#2563eb',
@@ -65,8 +52,8 @@ const modeConfig = {
         icon: <Train style={{fontSize: 18}}/>,
         fromLabel: '出发站/城市',
         toLabel: '到达站/城市',
-        lowPrice: 80,
-        highPrice: 780,
+        lowPrice: 0,
+        highPrice: 2200,
         codePrefix: 'G',
         hero: '筛选高铁、动车与普速列车',
         accent: '#0f766e',
@@ -75,51 +62,17 @@ const modeConfig = {
 
 const today = new Date().toISOString().slice(0, 10);
 
-const buildOffers = (mode: TicketMode, from?: Location, to?: Location): TicketOffer[] => {
-    const config = modeConfig[mode];
-    const fromName = from?.region ?? '上海虹桥';
-    const toName = to?.region ?? '北京南';
-    const seed = `${fromName}-${toName}-${mode}`.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-
-    return Array.from({length: 9}).map((_, index) => {
-        const hour = 7 + index * 2;
-        const minute = (seed + index * 17) % 60;
-        const priceRange = config.highPrice - config.lowPrice;
-        const price = config.lowPrice + ((seed + index * 137) % priceRange);
-        const durationHour = mode === 'flight' ? 2 + (index % 3) : 4 + (index % 5);
-        const durationMinute = mode === 'flight' ? 10 + ((seed + index) % 40) : 20 + ((seed + index * 3) % 35);
-
-        return {
-            id: `${mode}-${index}-${seed}`,
-            departureTime: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-            arrivalTime: `${String((hour + durationHour) % 24).padStart(2, '0')}:${String((minute + durationMinute) % 60).padStart(2, '0')}`,
-            duration: `${durationHour}时${durationMinute}分`,
-            carrier: mode === 'flight'
-                ? ['中国国航', '东方航空', '南方航空', '海南航空'][index % 4]
-                : ['高速动车', '动车组', '城际列车', '普通列车'][index % 4],
-            code: `${config.codePrefix}${32 + index * 11}`,
-            price,
-            successRate: index < 3 ? '较高' : index < 6 ? '中等' : '较低',
-            notice: index < 5 ? '余票紧张，建议尽快预订' : '可候补，成功率中等',
-        };
-    });
-};
-
 const TicketCard = ({
     offer,
-    from,
-    to,
     mode,
     compact = false,
     onReserve,
     reserving = false
 }: {
-    offer: TicketOffer,
-    from?: Location,
-    to?: Location,
+    offer: TicketSearchOffer,
     mode: TicketMode,
     compact?: boolean,
-    onReserve?: (offer: TicketOffer) => void,
+    onReserve?: (offer: TicketSearchOffer) => void,
     reserving?: boolean
 }) => {
     const config = modeConfig[mode];
@@ -139,7 +92,7 @@ const TicketCard = ({
             <div className='mt-5 flex flex-row items-center gap-5'>
                 <div className='w-28'>
                     <p className='text-3xl font-bold' style={{color: config.accent}}>{offer.departureTime}</p>
-                    <p className='mt-1 text-sm font-semibold text-slate-800'>{from?.region ?? '上海虹桥'}</p>
+                    <p className='mt-1 text-sm font-semibold text-slate-800'>{offer.departureStation}</p>
                 </div>
                 <div className='flex-1 flex flex-col items-center text-slate-500'>
                     <p className='text-sm'>{offer.duration}</p>
@@ -148,15 +101,16 @@ const TicketCard = ({
                         <Chip size='small' label={offer.code} variant='outlined'/>
                         <div className='h-px bg-slate-300 flex-1'/>
                     </div>
-                    <p className='text-xs'>{offer.carrier}</p>
+                    <p className='text-xs'>{offer.carrier} · {offer.seatClass}</p>
                 </div>
                 <div className='w-28'>
                     <p className='text-3xl font-bold text-slate-900'>{offer.arrivalTime}</p>
-                    <p className='mt-1 text-sm font-semibold text-slate-800'>{to?.region ?? '北京南'}</p>
+                    <p className='mt-1 text-sm font-semibold text-slate-800'>{offer.arrivalStation}</p>
                 </div>
                 <div className='w-32 text-right'>
-                    <p className='text-sm text-slate-400'>含税参考价</p>
+                    <p className='text-sm text-slate-400'>样本参考价</p>
                     <p className='text-3xl font-bold text-orange-500'>¥{offer.price}</p>
+                    <a className='mt-1 block text-xs text-blue-600 hover:underline' href={offer.sourceUrl} target='_blank' rel='noreferrer'>查看样本来源</a>
                 </div>
                 <Button
                     variant='contained'
@@ -174,10 +128,10 @@ const TicketCard = ({
 
 const TicketBooking = ({mode}: TicketBookingProps) => {
     const config = modeConfig[mode];
-    const [departures, setDepartures] = useState<Location[]>([]);
-    const [arrivals, setArrivals] = useState<Location[]>([]);
-    const [from, setFrom] = useState<Location | undefined>();
-    const [to, setTo] = useState<Location | undefined>();
+    const [departures, setDepartures] = useState<string[]>([]);
+    const [arrivals, setArrivals] = useState<string[]>([]);
+    const [from, setFrom] = useState('');
+    const [to, setTo] = useState('');
     const [date, setDate] = useState(today);
     const [sortBy, setSortBy] = useState('departure');
     const [priceRange, setPriceRange] = useState<number[]>([config.lowPrice, config.highPrice]);
@@ -188,25 +142,52 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
     const [bookingId, setBookingId] = useState('');
     const [bookingMessage, setBookingMessage] = useState('');
     const [bookingError, setBookingError] = useState(false);
+    const [ticketOffers, setTicketOffers] = useState<TicketSearchOffer[]>([]);
 
-    const offers = useMemo(() => buildOffers(mode, from, to)
+    const offers = useMemo(() => ticketOffers
         .filter(offer => offer.price >= priceRange[0] && offer.price <= priceRange[1])
-        .sort((a, b) => sortBy === 'price' ? a.price - b.price : a.departureTime.localeCompare(b.departureTime)), [mode, from, to, priceRange, sortBy]);
-    const recommendedOffer = offers[0] ?? buildOffers(mode)[0];
-    const moreOffers = offers.filter(offer => offer.id !== recommendedOffer.id);
+        .filter(offer => !studentOnly || offer.studentEligible)
+        .filter(offer => !onlyAvailable || offer.remainingSeats > 0)
+        .sort((a, b) => sortBy === 'price' ? a.price - b.price : a.departureTime.localeCompare(b.departureTime)), [ticketOffers, priceRange, sortBy, studentOnly, onlyAvailable]);
+    const recommendedOffer = offers[0];
+    const moreOffers = recommendedOffer ? offers.filter(offer => offer.id !== recommendedOffer.id) : [];
+
+    const searchTickets = async (departureCity = from, arrivalCity = to, departureDate = date) => {
+        if (!departureCity || !arrivalCity) return;
+
+        setLoading(true);
+        setError(false);
+        try {
+            const response = await ApiRequests.searchTickets({
+                type: mode === 'flight' ? 'FLIGHT' : 'TRAIN',
+                departureCity,
+                arrivalCity,
+                departureDate,
+            });
+            setTicketOffers(response.data);
+        } catch (e) {
+            console.log(e);
+            setTicketOffers([]);
+            setError(true);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         setLoading(true);
         setError(false);
-        ApiRequests.getAvailableDestinations()
+        ApiRequests.getTicketOptions(mode === 'flight' ? 'FLIGHT' : 'TRAIN')
             .then(response => {
-                const departureKey = mode === 'flight' ? 'plane' : 'train';
-                const nextDepartures = response.data.departures?.[departureKey] ?? response.data.departures?.bus ?? [];
+                const nextDepartures = response.data.departures ?? [];
                 const nextArrivals = response.data.arrivals ?? [];
+                const nextFrom = nextDepartures[0] ?? '';
+                const nextTo = nextArrivals.find(item => item !== nextFrom) ?? nextArrivals[0] ?? '';
                 setDepartures(nextDepartures);
                 setArrivals(nextArrivals);
-                setFrom(nextDepartures[0]);
-                setTo(nextArrivals[0]);
+                setFrom(nextFrom);
+                setTo(nextTo);
+                return searchTickets(nextFrom, nextTo);
             })
             .catch(e => {
                 console.log(e);
@@ -238,7 +219,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
         setPriceRange(nextRange);
     };
 
-    const reserveTicket = async (offer: TicketOffer) => {
+    const reserveTicket = async (offer: TicketSearchOffer) => {
         setBookingId(offer.id);
         setBookingError(false);
         setBookingMessage('');
@@ -247,8 +228,8 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
             const response = await ApiRequests.createTicketReservation({
                 userId: getCurrentUserId(),
                 transportType: mode === 'flight' ? 'FLIGHT' : 'TRAIN',
-                routeFrom: from?.region ?? '出发地',
-                routeTo: to?.region ?? '目的地',
+                routeFrom: from || '出发地',
+                routeTo: to || '目的地',
                 departureDate: date,
                 departureTime: offer.departureTime,
                 arrivalTime: offer.arrivalTime,
@@ -276,13 +257,13 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                         <p className='mt-2 text-slate-500'>{config.hero}</p>
                     </div>
                     <div className='flex gap-2'>
-                        <Chip icon={<ArrowForward/>} label={`${from?.region ?? '-'} 到 ${to?.region ?? '-'}`}/>
+                        <Chip icon={<ArrowForward/>} label={`${from || '-'} 到 ${to || '-'}`}/>
                         <Chip icon={<Tune/>} label={`${offers.length} 个方案`}/>
                     </div>
                 </div>
             </div>
 
-            {error && <Alert severity='warning' className='mb-4'>后端地点数据暂时不可用，页面已保留示例方案用于预览。</Alert>}
+            {error && <Alert severity='warning' className='mb-4'>后端票务数据暂时不可用，请确认交通服务已启动。</Alert>}
             {bookingError && <Alert severity='error' className='mb-4'>创建预订失败，请确认后端服务已启动。</Alert>}
             {bookingMessage && <Alert severity='success' className='mb-4'>{bookingMessage}</Alert>}
 
@@ -293,8 +274,8 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                         <div className='grid grid-cols-[1fr_44px_1fr] items-center gap-2'>
                             <FormControl fullWidth size='small'>
                                 <InputLabel>{config.fromLabel}</InputLabel>
-                                <Select value={from?.idLocation ?? ''} label={config.fromLabel} onChange={event => setFrom(departures.find(item => item.idLocation === event.target.value))}>
-                                    {departures.map(item => <MenuItem key={item.idLocation} value={item.idLocation}>{item.region}</MenuItem>)}
+                                <Select value={from} label={config.fromLabel} onChange={event => setFrom(event.target.value)}>
+                                    {departures.map(item => <MenuItem key={item} value={item}>{item}</MenuItem>)}
                                 </Select>
                             </FormControl>
                             <Button onClick={swapLocations} variant='outlined' sx={{minWidth: 44, height: 40, borderRadius: 2}}>
@@ -302,8 +283,8 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                             </Button>
                             <FormControl fullWidth size='small'>
                                 <InputLabel>{config.toLabel}</InputLabel>
-                                <Select value={to?.idLocation ?? ''} label={config.toLabel} onChange={event => setTo(arrivals.find(item => item.idLocation === event.target.value))}>
-                                    {arrivals.map(item => <MenuItem key={item.idLocation} value={item.idLocation}>{item.region}</MenuItem>)}
+                                <Select value={to} label={config.toLabel} onChange={event => setTo(event.target.value)}>
+                                    {arrivals.map(item => <MenuItem key={item} value={item}>{item}</MenuItem>)}
                                 </Select>
                             </FormControl>
                         </div>
@@ -311,8 +292,8 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                             出行日期
                             <input className='mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900' type='date' value={date} onChange={event => setDate(event.target.value)}/>
                         </label>
-                        <Button fullWidth variant='contained' size='large' startIcon={<Search/>} sx={{mt: 2, borderRadius: 2}}>
-                            查询
+                        <Button fullWidth variant='contained' size='large' startIcon={<Search/>} sx={{mt: 2, borderRadius: 2}} onClick={() => searchTickets()} disabled={loading || !from || !to}>
+                            {loading ? '查询中' : '查询'}
                         </Button>
                     </section>
 
@@ -362,14 +343,15 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                             <h2 className='text-xl font-bold text-slate-950'>推荐方案</h2>
                             <span className='text-sm text-slate-500'>{date}</span>
                         </div>
-                        <TicketCard
-                            offer={recommendedOffer}
-                            from={from}
-                            to={to}
-                            mode={mode}
-                            onReserve={reserveTicket}
-                            reserving={bookingId === recommendedOffer.id}
-                        />
+                        {recommendedOffer
+                            ? <TicketCard
+                                offer={recommendedOffer}
+                                mode={mode}
+                                onReserve={reserveTicket}
+                                reserving={bookingId === recommendedOffer.id}
+                            />
+                            : <div className='rounded-lg border border-dashed border-slate-300 bg-slate-50 py-12 text-center text-slate-500'>暂无匹配班次，请调整出发地或目的地</div>
+                        }
                     </section>
 
                     <section className='mt-5 rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
@@ -383,8 +365,6 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                     <TicketCard
                                         key={offer.id}
                                         offer={offer}
-                                        from={from}
-                                        to={to}
                                         mode={mode}
                                         compact
                                         onReserve={reserveTicket}
@@ -403,15 +383,15 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                         <div className='mt-4 grid grid-cols-3 gap-4'>
                             <div className='rounded-lg bg-blue-50 p-4'>
                                 <p className='font-semibold text-blue-700'>价格实时性</p>
-                                <p className='mt-2 text-sm text-slate-600'>票价会随余票和供应商变化，确认页以前端刷新结果为准。</p>
+                                <p className='mt-2 text-sm text-slate-600'>当前展示的是可追溯历史样本，用于演示查询和下单，不代表实时销售价格。</p>
                             </div>
                             <div className='rounded-lg bg-orange-50 p-4'>
                                 <p className='font-semibold text-orange-700'>优惠获取</p>
-                                <p className='mt-2 text-sm text-slate-600'>后续可接入优惠券、学生票、会员价和第三方平台价格。</p>
+                                <p className='mt-2 text-sm text-slate-600'>铁路样本支持学生票筛选；后续可继续接入会员价和第三方平台价格。</p>
                             </div>
                             <div className='rounded-lg bg-emerald-50 p-4'>
                                 <p className='font-semibold text-emerald-700'>后续扩展</p>
-                                <p className='mt-2 text-sm text-slate-600'>这里可以继续接入真实余票接口和订单锁票流程。</p>
+                                <p className='mt-2 text-sm text-slate-600'>每条票务记录来自后端数据库，来源链接可在价格下方打开核对。</p>
                             </div>
                         </div>
                     </section>

@@ -17,6 +17,24 @@ export class ApiRequests {
         return await axiosInstance.get('transports/available');
     }
 
+    static getTicketOptions = async (type: TicketType) => {
+        return await axiosInstance.get<TicketOptions>('transports/tickets/options', {
+            params: {type}
+        });
+    }
+
+    static searchTickets = async (params: SearchTicketsParams) => {
+        return await axiosInstance.get<TicketSearchOffer[]>('transports/tickets', {
+            params
+        });
+    }
+
+    static searchHotels = async (params: SearchHotelsParams) => {
+        return await axiosInstance.get<HotelSearchOffer[]>('hotels/search', {
+            params
+        });
+    }
+
     static getOffersBySearchQuery = async (params: GetOffersBySearchQueryParams) => {
         return await axiosInstance.get(`offers/?departureBus=${params.departureBus}&departurePlane=${params.departurePlane}&departureTrain=${params.departureTrain}&arrivals=${params.arrivals}&date_from=${params.dateFrom}&date_to=${params.dateTo}&adults=${params.adults}&teens=${params.teens}&kids=${params.kids}&infants=${params.infants}`);
     }
@@ -209,6 +227,65 @@ export interface CreateHotelReservationPayload {
     childrenUnder18Quantity: number,
     price: number,
     roomName?: string,
+}
+
+export type TicketType = 'FLIGHT' | 'TRAIN';
+
+export interface TicketOptions {
+    departures: string[],
+    arrivals: string[],
+}
+
+export interface SearchTicketsParams {
+    type: TicketType,
+    departureCity: string,
+    arrivalCity: string,
+    departureDate: string,
+}
+
+export interface TicketSearchOffer {
+    id: string,
+    type: TicketType,
+    departureCity: string,
+    arrivalCity: string,
+    departureStation: string,
+    arrivalStation: string,
+    departureTime: string,
+    arrivalTime: string,
+    duration: string,
+    carrier: string,
+    code: string,
+    seatClass: string,
+    price: number,
+    remainingSeats: number,
+    studentEligible: boolean,
+    successRate: string,
+    notice: string,
+    departureDate: string,
+    referenceDate: string,
+    sourceUrl: string,
+    sourceNote: string,
+}
+
+export interface SearchHotelsParams {
+    destinationId: string,
+    dateFrom: string,
+    dateTo: string,
+    adults?: number,
+}
+
+export interface HotelSearchOffer {
+    hotelId: string,
+    name: string,
+    rating: number,
+    description: string,
+    location: {
+        idLocation: string,
+        region: string,
+        country: string,
+    },
+    photos: string[],
+    pricePerAdult: number,
 }
 
 export interface LoginPayload {

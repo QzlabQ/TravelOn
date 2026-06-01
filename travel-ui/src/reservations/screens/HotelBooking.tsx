@@ -62,19 +62,23 @@ const HotelBooking = () => {
         setLoading(true);
         setError(false);
         try {
-            const response = await ApiRequests.getOffersBySearchQuery({
-                departurePlane: [],
-                departureBus: [],
-                departureTrain: [],
-                arrivals: destination ? [destination.idLocation] : destinations.map(item => item.idLocation),
+            if (!destination) return;
+
+            const response = await ApiRequests.searchHotels({
+                destinationId: destination.idLocation,
                 dateFrom,
                 dateTo,
                 adults: 2,
-                teens: 0,
-                kids: 0,
-                infants: 0,
             });
-            setOffers(response.data);
+            setOffers(response.data.map(hotel => ({
+                idHotel: hotel.hotelId,
+                hotelName: hotel.name,
+                description: hotel.description,
+                price: hotel.pricePerAdult,
+                destination: `${hotel.location.region}, ${hotel.location.country}`,
+                rating: hotel.rating,
+                imageUrl: hotel.photos[0] ?? '',
+            })));
         } catch (e) {
             console.log(e);
             setError(true);
@@ -293,7 +297,7 @@ const HotelResultCard = ({
                 <p className='mt-3 text-sm text-emerald-600'>订单确认后 30 分钟内免费取消</p>
             </div>
             <div className='flex flex-col items-end justify-end border-l border-slate-200 p-5 text-right'>
-                <p className='text-xs text-orange-500'>优惠价</p>
+                <p className='text-xs text-orange-500'>历史展示参考价</p>
                 <p className='mt-2 text-slate-400 line-through'>¥{Math.ceil(offer.price * 1.18).toLocaleString()}</p>
                 <p className='text-3xl font-bold text-blue-600'>¥{Math.ceil(offer.price).toLocaleString()} <span className='text-sm'>起</span></p>
                 <div className='mt-2 flex flex-col gap-2'>

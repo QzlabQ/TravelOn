@@ -10,14 +10,20 @@ import org.microarchitecturovisco.transport.model.dto.response.AvailableTranspor
 import org.microarchitecturovisco.transport.model.dto.response.AvailableTransportsDto;
 import org.microarchitecturovisco.transport.model.dto.response.GetTransportsBetweenLocationsResponseDto;
 import org.microarchitecturovisco.transport.model.dto.response.GetTransportsBySearchQueryResponseDto;
+import org.microarchitecturovisco.transport.model.dto.response.TicketOfferDto;
+import org.microarchitecturovisco.transport.model.dto.response.TicketOptionsDto;
 import org.microarchitecturovisco.transport.model.mappers.LocationMapper;
 import org.microarchitecturovisco.transport.model.mappers.TransportMapper;
 import org.microarchitecturovisco.transport.repositories.LocationRepository;
+import org.microarchitecturovisco.transport.repositories.TicketOfferTemplateRepository;
 import org.microarchitecturovisco.transport.repositories.TransportCourseRepository;
 import org.microarchitecturovisco.transport.repositories.TransportEventStore;
 import org.microarchitecturovisco.transport.repositories.TransportRepository;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +37,7 @@ public class TransportsQueryService {
     private static final String DOMESTIC_COUNTRY = "中国";
 
     private final TransportCourseRepository transportCourseRepository;
+    private final TicketOfferTemplateRepository ticketOfferTemplateRepository;
     private final TransportRepository transportRepository;
     private final LocationRepository locationRepository;
     private final TransportEventSourcingHandler transportEventSourcingHandler;
@@ -82,6 +89,74 @@ public class TransportsQueryService {
         }
 
         return buildAvailableTransports(departuresPlane, departuresBus, arrivals);
+    }
+
+    public TicketOptionsDto getTicketOptions(TicketType type) {
+        List<TicketOfferTemplate> offers = ticketOfferTemplateRepository.findByTypeOrderByDepartureTimeAsc(type);
+
+        return TicketOptionsDto.builder()
+                .departures(offers.stream()
+                        .map(TicketOfferTemplate::getDepartureCity)
+                        .distinct()
+                        .sorted()
+                        .toList())
+                .arrivals(offers.stream()
+                        .map(TicketOfferTemplate::getArrivalCity)
+                        .distinct()
+                        .sorted()
+                        .toList())
+                .build();
+    }
+
+    public List<TicketOfferDto> searchTicketOffers(
+            TicketType type,
+            String departureCity,
+            String arrivalCity,
+            LocalDate departureDate
+    ) {
+        return ticketOfferTemplateRepository
+                .findByTypeAndDepartureCityAndArrivalCityOrderByDepartureTimeAsc(type, departureCity, arrivalCity)
+                .stream()
+                .map(offer -> mapTicketOffer(offer, departureDate))
+                .toList();
+    }
+
+    private TicketOfferDto mapTicketOffer(TicketOfferTemplate offer, LocalDate departureDate) {
+        Duration duration = Duration.between(offer.getDepartureTime(), offer.getArrivalTime());
+        if (duration.isNegative() || duration.isZero()) {
+            duration = duration.plusDays(1);
+        }
+
+        String successRate = offer.getRemainingSeats() >= 15
+                ? "较高"
+                : offer.getRemainingSeats() >= 5 ? "中等" : "较低";
+        String notice = offer.getRemainingSeats() > 0
+                ? "剩余 " + offer.getRemainingSeats() + " 张，历史样本参考价"
+                : "当前样本无余票，可候补";
+
+        return TicketOfferDto.builder()
+                .id(UUID.nameUUIDFromBytes((offer.getId() + departureDate.toString()).getBytes(StandardCharsets.UTF_8)).toString())
+                .type(offer.getType().name())
+                .departureCity(offer.getDepartureCity())
+                .arrivalCity(offer.getArrivalCity())
+                .departureStation(offer.getDepartureStation())
+                .arrivalStation(offer.getArrivalStation())
+                .departureTime(offer.getDepartureTime().toString())
+                .arrivalTime(offer.getArrivalTime().toString())
+                .duration(duration.toHours() + "时" + duration.toMinutesPart() + "分")
+                .carrier(offer.getCarrier())
+                .code(offer.getCode())
+                .seatClass(offer.getSeatClass())
+                .price(offer.getPrice())
+                .remainingSeats(offer.getRemainingSeats())
+                .studentEligible(offer.isStudentEligible())
+                .successRate(successRate)
+                .notice(notice)
+                .departureDate(departureDate)
+                .referenceDate(offer.getReferenceDate())
+                .sourceUrl(offer.getSourceUrl())
+                .sourceNote(offer.getSourceNote())
+                .build();
     }
 
     public AvailableTransportsDto buildAvailableTransports(

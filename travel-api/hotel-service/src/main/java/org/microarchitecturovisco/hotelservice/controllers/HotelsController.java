@@ -9,6 +9,7 @@ import org.microarchitecturovisco.hotelservice.model.cqrs.commands.DeleteRoomRes
 import org.microarchitecturovisco.hotelservice.model.domain.Hotel;
 import org.microarchitecturovisco.hotelservice.model.domain.Room;
 import org.microarchitecturovisco.hotelservice.model.dto.RoomReservationDto;
+import org.microarchitecturovisco.hotelservice.model.dto.HotelResponseDto;
 import org.microarchitecturovisco.hotelservice.model.dto.data_generator.DataUpdateType;
 import org.microarchitecturovisco.hotelservice.model.dto.data_generator.RoomUpdateRequest;
 import org.microarchitecturovisco.hotelservice.model.dto.request.CheckHotelAvailabilityQueryRequestDto;
@@ -25,8 +26,12 @@ import org.microarchitecturovisco.hotelservice.utils.JsonConverter;
 import org.microarchitecturovisco.hotelservice.utils.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +45,16 @@ public class HotelsController {
 
     private final HotelsService hotelsService;
     private final HotelsCommandService hotelsCommandService;
+
+    @GetMapping("/search")
+    public List<HotelResponseDto> searchHotels(
+            @RequestParam UUID destinationId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(defaultValue = "2") int adults
+    ) {
+        return hotelsService.searchHotels(destinationId, dateFrom, dateTo, adults);
+    }
 
     @RabbitListener(queues = "hotels.requests.hotelsBySearchQuery")
     public String consumeGetHotelsRequest(String requestDtoJson) {

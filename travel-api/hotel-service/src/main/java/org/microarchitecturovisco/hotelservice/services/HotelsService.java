@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.hotelservice.model.domain.*;
 
 import org.microarchitecturovisco.hotelservice.model.dto.RoomsConfigurationDto;
+import org.microarchitecturovisco.hotelservice.model.dto.HotelResponseDto;
 import org.microarchitecturovisco.hotelservice.model.dto.request.*;
 import org.microarchitecturovisco.hotelservice.model.dto.response.GetHotelsBySearchQueryResponseDto;
 import org.microarchitecturovisco.hotelservice.model.dto.response.GetHotelDetailsResponseDto;
@@ -18,7 +19,10 @@ import org.microarchitecturovisco.hotelservice.repositories.HotelRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomRepository;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -30,6 +34,23 @@ public class HotelsService {
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
     private final HotelEventProjector hotelEventProjector;
+
+    public List<HotelResponseDto> searchHotels(UUID destinationId, LocalDate dateFrom, LocalDate dateTo, int adults) {
+        if (!dateTo.isAfter(dateFrom)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateTo must be after dateFrom");
+        }
+
+        return GetHotelsBySearchQuery(GetHotelsBySearchQueryRequestDto.builder()
+                .dateFrom(dateFrom.atStartOfDay())
+                .dateTo(dateTo.atTime(23, 59, 59))
+                .arrivalLocationIds(List.of(destinationId))
+                .adults(adults)
+                .childrenUnderThree(0)
+                .childrenUnderTen(0)
+                .childrenUnderEighteen(0)
+                .build())
+                .getHotels();
+    }
 
     public GetHotelDetailsResponseDto getHotelDetails(GetHotelDetailsRequestDto requestDto){
         LocalDateTime dateFrom = requestDto.getDateFrom();
