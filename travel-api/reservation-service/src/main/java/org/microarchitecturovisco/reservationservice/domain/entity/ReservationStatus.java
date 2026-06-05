@@ -4,5 +4,7 @@ public enum ReservationStatus {
     PENDING_PAYMENT,
     PAID,
     CANCELLED,
-    EXPIRED
+    EXPIRED,
+    REFUND_PROCESSING,
+    REFUNDED
 }

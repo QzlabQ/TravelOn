@@ -85,9 +85,24 @@ public class TransportsQueryController {
             @RequestParam TicketType type,
             @RequestParam String departureCity,
             @RequestParam String arrivalCity,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate departureDate
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate departureDate,
+            @RequestParam(required = false) Integer minPrice,
+            @RequestParam(required = false) Integer maxPrice,
+            @RequestParam(defaultValue = "false") boolean studentOnly,
+            @RequestParam(defaultValue = "false") boolean onlyAvailable,
+            @RequestParam(defaultValue = "departure") String sortBy
     ) {
-        return transportsQueryService.searchTicketOffers(type, departureCity, arrivalCity, departureDate);
+        return transportsQueryService.searchTicketOffers(
+                type,
+                departureCity,
+                arrivalCity,
+                departureDate,
+                minPrice,
+                maxPrice,
+                studentOnly,
+                onlyAvailable,
+                sortBy
+        );
     }
 
     @GetMapping("/test")

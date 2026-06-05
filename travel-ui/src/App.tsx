@@ -16,6 +16,7 @@ import Reservations from "./reservations/screens/Reservations";
 import TicketBooking from "./reservations/screens/TicketBooking";
 import HotelBooking from "./reservations/screens/HotelBooking";
 import Account from "./account/screens/Account";
+import ReservationDetails from "./reservations/screens/ReservationDetails";
 
 function App() {
     useEffect(() => {
@@ -32,6 +33,7 @@ function App() {
                     <Route path='/offerDetails' element={<OfferDetails/>}/>
                     <Route path='/buyOffer' element={<BuyOffer/>}/>
                     <Route path='/reservations' element={<Reservations/>}/>
+                    <Route path='/reservations/:reservationId' element={<ReservationDetails/>}/>
                     <Route path='/reservations/flights' element={<TicketBooking mode='flight'/>}/>
                     <Route path='/reservations/trains' element={<TicketBooking mode='train'/>}/>
                     <Route path='/reservations/hotels' element={<HotelBooking/>}/>

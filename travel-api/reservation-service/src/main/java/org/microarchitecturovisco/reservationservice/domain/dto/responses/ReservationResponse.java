@@ -26,7 +26,15 @@ public record ReservationResponse(
         String routeFrom,
         String routeTo,
         String provider,
-        String bookingCode
+        String bookingCode,
+        List<BookingPersonResponse> travelers,
+        String createdAt,
+        String paymentDeadline,
+        String paidAt,
+        String cancelledAt,
+        String refundRequestedAt,
+        String refundedAt,
+        String cancellationReason
 ) {
     public static ReservationResponse from(Reservation reservation) {
         return new ReservationResponse(
@@ -49,7 +57,19 @@ public record ReservationResponse(
                 reservation.getRouteFrom(),
                 reservation.getRouteTo(),
                 reservation.getProvider(),
-                reservation.getBookingCode()
+                reservation.getBookingCode(),
+                reservation.getTravelers() == null ? List.of() : reservation.getTravelers().stream().map(BookingPersonResponse::from).toList(),
+                format(reservation.getCreatedAt()),
+                format(reservation.getPaymentDeadline()),
+                format(reservation.getPaidAt()),
+                format(reservation.getCancelledAt()),
+                format(reservation.getRefundRequestedAt()),
+                format(reservation.getRefundedAt()),
+                reservation.getCancellationReason()
         );
+    }
+
+    private static String format(java.time.LocalDateTime value) {
+        return value == null ? null : value.toString();
     }
 }

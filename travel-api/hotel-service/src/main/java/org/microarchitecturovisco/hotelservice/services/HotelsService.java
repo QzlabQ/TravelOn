@@ -35,21 +35,110 @@ public class HotelsService {
     private final HotelRepository hotelRepository;
     private final HotelEventProjector hotelEventProjector;
 
-    public List<HotelResponseDto> searchHotels(UUID destinationId, LocalDate dateFrom, LocalDate dateTo, int adults) {
+    public List<HotelResponseDto> searchHotels(
+            UUID destinationId,
+            LocalDate dateFrom,
+            LocalDate dateTo,
+            int adults,
+            String hotelName,
+            Float minPrice,
+            Float maxPrice,
+            Float minRating,
+            String hotelType,
+            String roomType,
+            String sortBy
+    ) {
         if (!dateTo.isAfter(dateFrom)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateTo must be after dateFrom");
         }
 
-        return GetHotelsBySearchQuery(GetHotelsBySearchQueryRequestDto.builder()
-                .dateFrom(dateFrom.atStartOfDay())
-                .dateTo(dateTo.atTime(23, 59, 59))
-                .arrivalLocationIds(List.of(destinationId))
-                .adults(adults)
-                .childrenUnderThree(0)
-                .childrenUnderTen(0)
-                .childrenUnderEighteen(0)
-                .build())
-                .getHotels();
+        LocalDateTime start = dateFrom.atStartOfDay();
+        LocalDateTime end = dateTo.atTime(23, 59, 59);
+        int numberOfGuests = Math.max(1, adults);
+
+        Map<Hotel, List<Room>> roomsByHotel = roomRepository
+                .findAvailableRoomsByLocationAndDate(List.of(destinationId), start, end)
+                .stream()
+                .filter(room -> matchesRoomType(room, roomType))
+                .collect(Collectors.groupingBy(Room::getHotel));
+
+        List<HotelResponseDto> hotels = new ArrayList<>();
+        for (Map.Entry<Hotel, List<Room>> entry : roomsByHotel.entrySet()) {
+            Hotel hotel = entry.getKey();
+            if (!matchesHotelName(hotel, hotelName) || !matchesHotelType(hotel, hotelType) || !matchesRating(hotel, minRating)) {
+                continue;
+            }
+
+            Pair<List<Room>, Float> pair = getRoomConfigurationForAmountOfPeople(entry.getValue(), numberOfGuests);
+            if (pair.getSecond() == 0) {
+                continue;
+            }
+
+            float price = pair.getSecond();
+            if ((minPrice != null && price < minPrice) || (maxPrice != null && price > maxPrice)) {
+                continue;
+            }
+
+            hotels.add(HotelMapper.map(hotel, price));
+        }
+
+        return hotels.stream()
+                .sorted(hotelComparator(sortBy))
+                .toList();
+    }
+
+    private boolean matchesRoomType(Room room, String roomType) {
+        return switch (normalizeFilter(roomType)) {
+            case "DOUBLE" -> room.getGuestCapacity() <= 2;
+            case "FAMILY" -> room.getGuestCapacity() >= 3;
+            default -> true;
+        };
+    }
+
+    private boolean matchesHotelName(Hotel hotel, String hotelName) {
+        if (hotelName == null || hotelName.isBlank()) {
+            return true;
+        }
+        return hotel.getName() != null && hotel.getName().toLowerCase().contains(hotelName.trim().toLowerCase());
+    }
+
+    private boolean matchesRating(Hotel hotel, Float minRating) {
+        return minRating == null || hotel.getRating() >= minRating;
+    }
+
+    private boolean matchesHotelType(Hotel hotel, String hotelType) {
+        String normalizedType = normalizeFilter(hotelType);
+        if ("ALL".equals(normalizedType)) {
+            return true;
+        }
+
+        String text = ((hotel.getName() == null ? "" : hotel.getName()) + " " +
+                (hotel.getDescription() == null ? "" : hotel.getDescription())).toLowerCase();
+        boolean looksLikeHomestay = text.contains("民宿") || text.contains("客栈") || text.contains("公寓")
+                || text.contains("homestay") || text.contains("inn") || text.contains("apartment");
+
+        if ("HOMESTAY".equals(normalizedType)) {
+            return looksLikeHomestay;
+        }
+        if ("HOTEL".equals(normalizedType)) {
+            return !looksLikeHomestay;
+        }
+        return true;
+    }
+
+    private Comparator<HotelResponseDto> hotelComparator(String sortBy) {
+        return switch (normalizeFilter(sortBy)) {
+            case "RATING" -> Comparator.comparingDouble(HotelResponseDto::getRating).reversed()
+                    .thenComparingDouble(HotelResponseDto::getPricePerAdult);
+            case "PRICE_DESC" -> Comparator.comparingDouble(HotelResponseDto::getPricePerAdult).reversed()
+                    .thenComparing(Comparator.comparingDouble(HotelResponseDto::getRating).reversed());
+            default -> Comparator.comparingDouble(HotelResponseDto::getPricePerAdult)
+                    .thenComparing(Comparator.comparingDouble(HotelResponseDto::getRating).reversed());
+        };
+    }
+
+    private String normalizeFilter(String value) {
+        return value == null ? "ALL" : value.trim().toUpperCase();
     }
 
     public GetHotelDetailsResponseDto getHotelDetails(GetHotelDetailsRequestDto requestDto){

@@ -26,6 +26,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -112,13 +113,35 @@ public class TransportsQueryService {
             TicketType type,
             String departureCity,
             String arrivalCity,
-            LocalDate departureDate
+            LocalDate departureDate,
+            Integer minPrice,
+            Integer maxPrice,
+            boolean studentOnly,
+            boolean onlyAvailable,
+            String sortBy
     ) {
         return ticketOfferTemplateRepository
                 .findByTypeAndDepartureCityAndArrivalCityOrderByDepartureTimeAsc(type, departureCity, arrivalCity)
                 .stream()
+                .filter(offer -> minPrice == null || offer.getPrice() >= minPrice)
+                .filter(offer -> maxPrice == null || offer.getPrice() <= maxPrice)
+                .filter(offer -> !studentOnly || offer.isStudentEligible())
+                .filter(offer -> !onlyAvailable || offer.getRemainingSeats() > 0)
+                .sorted(ticketOfferComparator(sortBy))
                 .map(offer -> mapTicketOffer(offer, departureDate))
                 .toList();
+    }
+
+    private Comparator<TicketOfferTemplate> ticketOfferComparator(String sortBy) {
+        return switch (sortBy == null ? "departure" : sortBy.toLowerCase()) {
+            case "price" -> Comparator.comparingInt(TicketOfferTemplate::getPrice)
+                    .thenComparing(TicketOfferTemplate::getDepartureTime);
+            case "seats" -> Comparator.comparingInt(TicketOfferTemplate::getRemainingSeats)
+                    .reversed()
+                    .thenComparing(TicketOfferTemplate::getDepartureTime);
+            default -> Comparator.comparing(TicketOfferTemplate::getDepartureTime)
+                    .thenComparingInt(TicketOfferTemplate::getPrice);
+        };
     }
 
     private TicketOfferDto mapTicketOffer(TicketOfferTemplate offer, LocalDate departureDate) {

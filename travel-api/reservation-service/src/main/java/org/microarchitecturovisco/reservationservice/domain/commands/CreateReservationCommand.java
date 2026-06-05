@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
+import org.microarchitecturovisco.reservationservice.domain.entity.BookingPersonSnapshot;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,4 +43,6 @@ public class CreateReservationCommand {
     private String routeTo;
     private String provider;
     private String bookingCode;
+    @ElementCollection
+    private List<BookingPersonSnapshot> travelers;
 }

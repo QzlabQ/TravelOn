@@ -7,8 +7,11 @@ import org.microarchitecturovisco.reservationservice.domain.commands.UpdateReser
 import org.microarchitecturovisco.reservationservice.domain.dto.ReservationPreference;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateHotelOnlyReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateTicketReservationRequest;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.CancelReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.ReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.UpdateReservationPaymentStatus;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.PaymentTransactionResponse;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.RefundRecordResponse;
 import org.microarchitecturovisco.reservationservice.domain.dto.responses.ReservationResponse;
 import org.microarchitecturovisco.reservationservice.domain.entity.Reservation;
 import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
@@ -54,8 +57,26 @@ public class ReservationController {
     }
 
     @PostMapping("/{reservationId}/cancel")
-    public ReservationResponse cancelReservation(@PathVariable UUID reservationId) {
-        return reservationService.cancelReservation(reservationId);
+    public ReservationResponse cancelReservation(
+            @PathVariable UUID reservationId,
+            @Valid @RequestBody(required = false) CancelReservationRequest request
+    ) {
+        return reservationService.cancelReservation(reservationId, request == null ? null : request.reason());
+    }
+
+    @GetMapping("/{reservationId}/payments")
+    public List<PaymentTransactionResponse> getPaymentTransactions(@PathVariable UUID reservationId) {
+        return reservationService.getPaymentTransactions(reservationId);
+    }
+
+    @GetMapping("/{reservationId}/refunds")
+    public List<RefundRecordResponse> getRefundRecords(@PathVariable UUID reservationId) {
+        return reservationService.getRefundRecords(reservationId);
+    }
+
+    @PostMapping("/{reservationId}/refunds/complete")
+    public ReservationResponse completeRefund(@PathVariable UUID reservationId) {
+        return reservationService.completeRefund(reservationId);
     }
 
     @PostMapping("/tickets")

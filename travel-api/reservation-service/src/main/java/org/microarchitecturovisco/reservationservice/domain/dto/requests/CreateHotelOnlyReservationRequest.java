@@ -3,8 +3,10 @@ package org.microarchitecturovisco.reservationservice.domain.dto.requests;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.Valid;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public record CreateHotelOnlyReservationRequest(
@@ -18,6 +20,7 @@ public record CreateHotelOnlyReservationRequest(
         @Min(0) int childrenUnder10Quantity,
         @Min(0) int childrenUnder18Quantity,
         @Min(0) float price,
-        String roomName
+        String roomName,
+        List<@Valid BookingPersonRequest> travelers
 ) {
 }

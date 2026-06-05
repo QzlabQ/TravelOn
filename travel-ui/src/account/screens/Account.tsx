@@ -3,10 +3,13 @@ import {
     Alert,
     Avatar,
     Button,
+    Checkbox,
     Chip,
     Divider,
+    FormControlLabel,
     InputAdornment,
     LinearProgress,
+    MenuItem,
     Paper,
     TextField,
     Typography
@@ -15,10 +18,13 @@ import {
     AccountCircle,
     Badge,
     Bookmarks,
+    Delete,
+    Edit,
     Email,
     Logout,
     Phone,
     Save,
+    PersonAdd,
     TravelExplore
 } from "@mui/icons-material";
 import {Link, useNavigate} from "react-router-dom";
@@ -31,6 +37,7 @@ import {
     UserSession
 } from "../../core/currentUser";
 import {ApiRequests} from "../../core/apiConfig";
+import {TravelerPayload, TravelerResponse, TravelerType} from "../../core/apiConfig";
 
 const emptyProfileForm = {
     name: "",
@@ -38,6 +45,16 @@ const emptyProfileForm = {
     email: "",
     phone: "",
     avatarUrl: ""
+};
+
+const emptyTravelerForm: TravelerPayload = {
+    name: "",
+    travelerType: "ADULT",
+    documentType: "身份证",
+    documentNumber: "",
+    phone: "",
+    student: false,
+    defaultTraveler: false
 };
 
 export default function Account() {
@@ -49,6 +66,10 @@ export default function Account() {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
+    const [travelers, setTravelers] = useState<TravelerResponse[]>([]);
+    const [travelerForm, setTravelerForm] = useState<TravelerPayload>(emptyTravelerForm);
+    const [editingTravelerId, setEditingTravelerId] = useState("");
+    const [travelerEditorOpen, setTravelerEditorOpen] = useState(false);
 
     const profile = session?.user;
 
@@ -87,10 +108,21 @@ export default function Account() {
         }
     };
 
+    const loadTravelers = async (currentSession = session) => {
+        if (!currentSession) return;
+        try {
+            const response = await ApiRequests.listTravelers(currentSession.token);
+            setTravelers(response.data);
+        } catch {
+            setErrorMessage("常用出行人读取失败，请稍后再试。");
+        }
+    };
+
     useEffect(() => {
         if (profile) {
             syncProfileForm(profile);
             refreshProfile().then(r => r);
+            loadTravelers().then(r => r);
         }
     }, []);
 
@@ -99,6 +131,7 @@ export default function Account() {
         syncProfileForm(nextSession.user);
         setMessage("登录成功，欢迎回来。");
         setErrorMessage("");
+        loadTravelers(nextSession).then(r => r);
     };
 
     const saveProfile = async () => {
@@ -136,6 +169,58 @@ export default function Account() {
         setSession(null);
         setProfileForm(emptyProfileForm);
         navigate("/");
+    };
+
+    const openCreateTraveler = () => {
+        setEditingTravelerId("");
+        setTravelerForm(emptyTravelerForm);
+        setTravelerEditorOpen(true);
+    };
+
+    const openEditTraveler = (traveler: TravelerResponse) => {
+        setEditingTravelerId(traveler.id);
+        setTravelerForm({
+            name: traveler.name,
+            travelerType: traveler.travelerType,
+            documentType: traveler.documentType || "身份证",
+            documentNumber: traveler.documentNumber || "",
+            phone: traveler.phone || "",
+            student: traveler.student,
+            defaultTraveler: traveler.defaultTraveler
+        });
+        setTravelerEditorOpen(true);
+    };
+
+    const saveTraveler = async () => {
+        if (!session || !travelerForm.name.trim()) return;
+        setSaving(true);
+        setErrorMessage("");
+        try {
+            if (editingTravelerId) {
+                await ApiRequests.updateTraveler(session.token, editingTravelerId, travelerForm);
+            } else {
+                await ApiRequests.createTraveler(session.token, travelerForm);
+            }
+            setTravelerEditorOpen(false);
+            setMessage(editingTravelerId ? "常用出行人已更新。" : "常用出行人已添加。");
+            await loadTravelers();
+        } catch {
+            setErrorMessage("常用出行人保存失败，请检查填写内容。");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const deleteTraveler = async (travelerId: string) => {
+        if (!session) return;
+        setErrorMessage("");
+        try {
+            await ApiRequests.deleteTraveler(session.token, travelerId);
+            setMessage("常用出行人已删除。");
+            await loadTravelers();
+        } catch {
+            setErrorMessage("删除失败，请稍后再试。");
+        }
     };
 
     if (!session || !profile) {
@@ -291,6 +376,64 @@ export default function Account() {
                             <Button variant="contained" startIcon={<Save/>} disabled={saving} onClick={saveProfile}>
                                 {saving ? "保存中..." : "保存资料"}
                             </Button>
+                        </div>
+                    </Paper>
+
+                    <Paper elevation={0} className="border border-gray-200 p-6">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <Typography variant="h5" className="font-semibold">常用出行人</Typography>
+                                <Typography variant="body2" color="text.secondary">预订机票、火车票和酒店时可以直接勾选。</Typography>
+                            </div>
+                            <Button variant="contained" startIcon={<PersonAdd/>} onClick={openCreateTraveler}>新增</Button>
+                        </div>
+
+                        {travelerEditorOpen &&
+                            <div className="mt-5 rounded-lg border border-gray-200 bg-[#f8fafc] p-4">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <TextField label="姓名" value={travelerForm.name} onChange={event => setTravelerForm({...travelerForm, name: event.target.value})}/>
+                                    <TextField select label="人员类型" value={travelerForm.travelerType} onChange={event => setTravelerForm({...travelerForm, travelerType: event.target.value as TravelerType})}>
+                                        <MenuItem value="ADULT">成人</MenuItem>
+                                        <MenuItem value="CHILD">儿童</MenuItem>
+                                        <MenuItem value="STUDENT">学生</MenuItem>
+                                    </TextField>
+                                    <TextField label="证件类型" value={travelerForm.documentType} onChange={event => setTravelerForm({...travelerForm, documentType: event.target.value})}/>
+                                    <TextField label="证件号码" value={travelerForm.documentNumber} onChange={event => setTravelerForm({...travelerForm, documentNumber: event.target.value})}/>
+                                    <TextField label="手机号" value={travelerForm.phone} onChange={event => setTravelerForm({...travelerForm, phone: event.target.value})}/>
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <FormControlLabel control={<Checkbox checked={travelerForm.student} onChange={event => setTravelerForm({...travelerForm, student: event.target.checked})}/>} label="学生身份"/>
+                                        <FormControlLabel control={<Checkbox checked={travelerForm.defaultTraveler} onChange={event => setTravelerForm({...travelerForm, defaultTraveler: event.target.checked})}/>} label="默认出行人"/>
+                                    </div>
+                                </div>
+                                <div className="mt-4 flex justify-end gap-2">
+                                    <Button onClick={() => setTravelerEditorOpen(false)}>取消</Button>
+                                    <Button variant="contained" startIcon={<Save/>} disabled={saving || !travelerForm.name.trim()} onClick={saveTraveler}>保存</Button>
+                                </div>
+                            </div>
+                        }
+
+                        <div className="mt-5 grid gap-3">
+                            {travelers.map(traveler => (
+                                <div key={traveler.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3">
+                                    <div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <p className="font-semibold text-gray-900">{traveler.name}</p>
+                                            <Chip size="small" label={traveler.travelerType === "CHILD" ? "儿童" : traveler.travelerType === "STUDENT" ? "学生" : "成人"}/>
+                                            {traveler.defaultTraveler && <Chip size="small" color="primary" label="默认"/>}
+                                        </div>
+                                        <p className="mt-1 text-xs text-gray-500">{traveler.documentType || "证件未填写"} {traveler.documentNumber || ""} {traveler.phone ? ` · ${traveler.phone}` : ""}</p>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <Button size="small" startIcon={<Edit/>} onClick={() => openEditTraveler(traveler)}>编辑</Button>
+                                        <Button size="small" color="error" startIcon={<Delete/>} onClick={() => deleteTraveler(traveler.id)}>删除</Button>
+                                    </div>
+                                </div>
+                            ))}
+                            {travelers.length === 0 &&
+                                <div className="rounded-lg border border-dashed border-gray-300 py-8 text-center text-sm text-gray-500">
+                                    暂无常用出行人，添加后预订会更快。
+                                </div>
+                            }
                         </div>
                     </Paper>
                 </div>

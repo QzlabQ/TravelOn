@@ -48,6 +48,7 @@ public class ReservationAggregate {
                 .routeTo(command.getRouteTo())
                 .provider(command.getProvider())
                 .bookingCode(command.getBookingCode())
+                .travelers(command.getTravelers())
                 .build();
         reservationEventStore.save(event);
         reservationProjector.project(List.of(event));
@@ -86,6 +87,11 @@ public class ReservationAggregate {
                 .idReservation(command.getReservationId())
                 .paid(command.getPaid())
                 .status(command.getStatus())
+                .cancellationReason(command.getCancellationReason())
+                .cancelledAt(command.getCancelledAt())
+                .refundRequestedAt(command.getRefundRequestedAt())
+                .paidAt(command.getPaidAt())
+                .refundedAt(command.getRefundedAt())
                 .build();
         reservationEventStore.save(event);
         reservationProjector.project(List.of(event));

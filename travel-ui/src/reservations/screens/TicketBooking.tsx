@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useEffect, useState} from "react";
 import {
     Alert,
     Box,
@@ -25,7 +25,10 @@ import {
     Tune
 } from "@mui/icons-material";
 import {ApiRequests, TicketSearchOffer} from "../../core/apiConfig";
+import {BookingPersonPayload} from "../../core/apiConfig";
 import {getCurrentUserId} from "../../core/currentUser";
+import TravelerSelector from "../../account/components/TravelerSelector";
+import {Link} from "react-router-dom";
 
 type TicketMode = 'flight' | 'train';
 
@@ -67,18 +70,22 @@ const TicketCard = ({
     mode,
     compact = false,
     onReserve,
-    reserving = false
+    reserving = false,
+    canReserve = true,
+    selected = false
 }: {
     offer: TicketSearchOffer,
     mode: TicketMode,
     compact?: boolean,
     onReserve?: (offer: TicketSearchOffer) => void,
     reserving?: boolean
+    canReserve?: boolean
+    selected?: boolean
 }) => {
     const config = modeConfig[mode];
 
     return (
-        <div className={`bg-white rounded-lg border border-slate-200 ${compact ? 'w-full' : 'min-w-[760px]'} p-5 shadow-sm hover:shadow-md transition-shadow`}>
+        <div className={`bg-white rounded-lg border ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'} ${compact ? 'w-full' : 'min-w-[760px]'} p-5 shadow-sm hover:shadow-md transition-shadow`}>
             <div className='flex items-start justify-between gap-5'>
                 <Chip
                     size='small'
@@ -116,10 +123,10 @@ const TicketCard = ({
                     variant='contained'
                     size='large'
                     sx={{borderRadius: 2}}
-                    disabled={reserving}
+                    disabled={reserving || !canReserve}
                     onClick={() => onReserve?.(offer)}
                 >
-                    {reserving ? '预订中' : '预订'}
+                    {reserving ? '提交中' : selected ? '已选择' : '选择'}
                 </Button>
             </div>
         </div>
@@ -142,15 +149,17 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
     const [bookingId, setBookingId] = useState('');
     const [bookingMessage, setBookingMessage] = useState('');
     const [bookingError, setBookingError] = useState(false);
+    const [reservationId, setReservationId] = useState('');
+    const [selectedTravelers, setSelectedTravelers] = useState<BookingPersonPayload[]>([]);
     const [ticketOffers, setTicketOffers] = useState<TicketSearchOffer[]>([]);
+    const [selectedOffer, setSelectedOffer] = useState<TicketSearchOffer | null>(null);
+    const [hasLoadedOptions, setHasLoadedOptions] = useState(false);
 
-    const offers = useMemo(() => ticketOffers
-        .filter(offer => offer.price >= priceRange[0] && offer.price <= priceRange[1])
-        .filter(offer => !studentOnly || offer.studentEligible)
-        .filter(offer => !onlyAvailable || offer.remainingSeats > 0)
-        .sort((a, b) => sortBy === 'price' ? a.price - b.price : a.departureTime.localeCompare(b.departureTime)), [ticketOffers, priceRange, sortBy, studentOnly, onlyAvailable]);
+    const offers = ticketOffers;
     const recommendedOffer = offers[0];
     const moreOffers = recommendedOffer ? offers.filter(offer => offer.id !== recommendedOffer.id) : [];
+    const selectedPassengerCount = selectedTravelers.length;
+    const selectedTotalPrice = selectedOffer ? selectedOffer.price * selectedPassengerCount : 0;
 
     const searchTickets = async (departureCity = from, arrivalCity = to, departureDate = date) => {
         if (!departureCity || !arrivalCity) return;
@@ -163,8 +172,14 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                 departureCity,
                 arrivalCity,
                 departureDate,
+                minPrice: priceRange[0],
+                maxPrice: priceRange[1],
+                studentOnly,
+                onlyAvailable,
+                sortBy,
             });
             setTicketOffers(response.data);
+            setSelectedOffer(current => current ? response.data.find(offer => offer.id === current.id) ?? null : null);
         } catch (e) {
             console.log(e);
             setTicketOffers([]);
@@ -175,6 +190,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
     };
 
     useEffect(() => {
+        setHasLoadedOptions(false);
         setLoading(true);
         setError(false);
         ApiRequests.getTicketOptions(mode === 'flight' ? 'FLIGHT' : 'TRAIN')
@@ -193,8 +209,21 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                 console.log(e);
                 setError(true);
             })
-            .finally(() => setLoading(false));
+            .finally(() => {
+                setHasLoadedOptions(true);
+                setLoading(false);
+            });
     }, [mode]);
+
+    useEffect(() => {
+        if (!hasLoadedOptions || !from || !to) return;
+
+        const timeoutId = window.setTimeout(() => {
+            searchTickets().then(r => r);
+        }, 350);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [priceRange, studentOnly, onlyAvailable, sortBy, date]);
 
     const swapLocations = () => {
         const oldFrom = from;
@@ -219,8 +248,29 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
         setPriceRange(nextRange);
     };
 
-    const reserveTicket = async (offer: TicketSearchOffer) => {
-        setBookingId(offer.id);
+    const selectTicket = (offer: TicketSearchOffer) => {
+        setSelectedOffer(offer);
+        setBookingError(false);
+        setBookingMessage('');
+    };
+
+    const reserveTicket = async () => {
+        if (!selectedOffer) {
+            setBookingError(true);
+            setBookingMessage('请先选择一个可预订方案。');
+            return;
+        }
+        if (selectedTravelers.length === 0) {
+            setBookingError(true);
+            setBookingMessage('请先选择或填写至少一位出行人。');
+            return;
+        }
+        if (selectedOffer.remainingSeats > 0 && selectedTravelers.length > selectedOffer.remainingSeats) {
+            setBookingError(true);
+            setBookingMessage('选择的出行人数超过当前余票数量。');
+            return;
+        }
+        setBookingId(selectedOffer.id);
         setBookingError(false);
         setBookingMessage('');
 
@@ -231,14 +281,16 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                 routeFrom: from || '出发地',
                 routeTo: to || '目的地',
                 departureDate: date,
-                departureTime: offer.departureTime,
-                arrivalTime: offer.arrivalTime,
-                provider: offer.carrier,
-                bookingCode: offer.code,
-                passengerCount: 1,
-                price: offer.price,
+                departureTime: selectedOffer.departureTime,
+                arrivalTime: selectedOffer.arrivalTime,
+                provider: selectedOffer.carrier,
+                bookingCode: selectedOffer.code,
+                passengerCount: selectedTravelers.length,
+                price: selectedOffer.price * selectedTravelers.length,
+                travelers: selectedTravelers,
             });
-            setBookingMessage(`已创建预订 ${response.data.id}，可到“我的预订”继续支付或取消。`);
+            setReservationId(response.data.id);
+            setBookingMessage(`已创建预订 ${response.data.id}，请在订单详情中完成支付。`);
         } catch (e) {
             console.log(e);
             setBookingError(true);
@@ -265,7 +317,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
 
             {error && <Alert severity='warning' className='mb-4'>后端票务数据暂时不可用，请确认交通服务已启动。</Alert>}
             {bookingError && <Alert severity='error' className='mb-4'>创建预订失败，请确认后端服务已启动。</Alert>}
-            {bookingMessage && <Alert severity='success' className='mb-4'>{bookingMessage}</Alert>}
+            {bookingMessage && <Alert severity={bookingError ? 'warning' : 'success'} className='mb-4' action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}`} color='inherit' size='small'>订单详情</Button> : undefined}>{bookingMessage}</Alert>}
 
             <div className='grid grid-cols-[360px_1fr] gap-6 items-start'>
                 <aside className='sticky top-24 self-start flex max-h-[calc(100vh-7rem)] flex-col gap-5 overflow-y-auto pr-1'>
@@ -295,6 +347,50 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                         <Button fullWidth variant='contained' size='large' startIcon={<Search/>} sx={{mt: 2, borderRadius: 2}} onClick={() => searchTickets()} disabled={loading || !from || !to}>
                             {loading ? '查询中' : '查询'}
                         </Button>
+                    </section>
+
+                    <TravelerSelector title={mode === 'flight' ? '选择乘机人' : '选择乘车人'} onChange={setSelectedTravelers}/>
+
+                    <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
+                        <h2 className='text-lg font-bold text-slate-900 mb-4'>订单填写</h2>
+                        {selectedOffer ? (
+                            <div className='space-y-3'>
+                                <div className='rounded-lg bg-slate-50 p-3'>
+                                    <p className='text-sm font-semibold text-slate-900'>{selectedOffer.carrier} {selectedOffer.code}</p>
+                                    <p className='mt-1 text-sm text-slate-600'>{from} {selectedOffer.departureTime} - {to} {selectedOffer.arrivalTime}</p>
+                                    <p className='mt-1 text-xs text-slate-500'>{selectedOffer.seatClass} · 余票 {selectedOffer.remainingSeats}</p>
+                                </div>
+                                <div className='flex items-center justify-between text-sm text-slate-600'>
+                                    <span>出行人</span>
+                                    <span>{selectedPassengerCount} 人</span>
+                                </div>
+                                <div className='flex items-center justify-between text-sm text-slate-600'>
+                                    <span>单价</span>
+                                    <span>¥{selectedOffer.price}</span>
+                                </div>
+                                <div className='flex items-center justify-between border-t border-slate-200 pt-3'>
+                                    <span className='font-semibold text-slate-900'>应付金额</span>
+                                    <span className='text-2xl font-bold text-orange-500'>¥{selectedTotalPrice}</span>
+                                </div>
+                                <Button
+                                    fullWidth
+                                    variant='contained'
+                                    size='large'
+                                    sx={{borderRadius: 2}}
+                                    disabled={bookingId === selectedOffer.id || selectedPassengerCount === 0}
+                                    onClick={reserveTicket}
+                                >
+                                    {bookingId === selectedOffer.id ? '提交中' : '提交订单'}
+                                </Button>
+                                {selectedPassengerCount === 0 &&
+                                    <p className='text-xs text-orange-500'>请先在上方选择或填写出行人。</p>
+                                }
+                            </div>
+                        ) : (
+                            <div className='rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500'>
+                                先在右侧选择一个班次，再填写出行人并提交订单。
+                            </div>
+                        )}
                     </section>
 
                     <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
@@ -333,6 +429,9 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                             <ToggleButton value='departure'>出发时间</ToggleButton>
                             <ToggleButton value='price'>价格</ToggleButton>
                         </ToggleButtonGroup>
+                        <Button fullWidth variant='outlined' sx={{mt: 2, borderRadius: 2}} onClick={() => searchTickets()} disabled={loading || !from || !to}>
+                            应用筛选
+                        </Button>
                     </section>
                 </aside>
 
@@ -347,8 +446,10 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                             ? <TicketCard
                                 offer={recommendedOffer}
                                 mode={mode}
-                                onReserve={reserveTicket}
+                                onReserve={selectTicket}
                                 reserving={bookingId === recommendedOffer.id}
+                                canReserve={recommendedOffer.remainingSeats > 0}
+                                selected={selectedOffer?.id === recommendedOffer.id}
                             />
                             : <div className='rounded-lg border border-dashed border-slate-300 bg-slate-50 py-12 text-center text-slate-500'>暂无匹配班次，请调整出发地或目的地</div>
                         }
@@ -367,8 +468,10 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                         offer={offer}
                                         mode={mode}
                                         compact
-                                        onReserve={reserveTicket}
+                                        onReserve={selectTicket}
                                         reserving={bookingId === offer.id}
+                                        canReserve={offer.remainingSeats > 0}
+                                        selected={selectedOffer?.id === offer.id}
                                     />
                                 ))}
                                 {moreOffers.length === 0 &&

@@ -17,9 +17,11 @@ import {
 import {Bed, Hotel, LocalOffer, Search, Star} from "@mui/icons-material";
 import {Link} from "react-router-dom";
 import {ApiRequests, GetOffersBySearchQueryOffer} from "../../core/apiConfig";
+import {BookingPersonPayload} from "../../core/apiConfig";
 import {Location} from "../../core/domain/DomainInterfaces";
 import {formatDate} from "../../core/utils";
 import {getCurrentUserId} from "../../core/currentUser";
+import TravelerSelector from "../../account/components/TravelerSelector";
 
 const today = new Date();
 const nextDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
@@ -34,6 +36,7 @@ const HotelBooking = () => {
     const [stars, setStars] = useState(0);
     const [hotelType, setHotelType] = useState('ALL');
     const [roomType, setRoomType] = useState('ALL');
+    const [sortBy, setSortBy] = useState('price');
     const [hotelNameQuery, setHotelNameQuery] = useState('');
     const [offers, setOffers] = useState<GetOffersBySearchQueryOffer[]>([]);
     const [loading, setLoading] = useState(false);
@@ -41,6 +44,18 @@ const HotelBooking = () => {
     const [bookingHotelId, setBookingHotelId] = useState('');
     const [bookingMessage, setBookingMessage] = useState('');
     const [bookingError, setBookingError] = useState(false);
+    const [reservationId, setReservationId] = useState('');
+    const [selectedTravelers, setSelectedTravelers] = useState<BookingPersonPayload[]>([]);
+    const [selectedOffer, setSelectedOffer] = useState<GetOffersBySearchQueryOffer | null>(null);
+    const [hasLoadedDestinations, setHasLoadedDestinations] = useState(false);
+
+    const normalizedPriceFrom = priceFrom.trim() === '' ? 0 : Number(priceFrom);
+    const normalizedPriceTo = priceTo.trim() === '' ? Number.POSITIVE_INFINITY : Number(priceTo);
+    const hasInvalidPriceRange = Number.isNaN(normalizedPriceFrom) ||
+        Number.isNaN(normalizedPriceTo) ||
+        normalizedPriceFrom < 0 ||
+        normalizedPriceTo < 0 ||
+        normalizedPriceFrom > normalizedPriceTo;
 
     const loadDestinations = async () => {
         setLoading(true);
@@ -68,9 +83,16 @@ const HotelBooking = () => {
                 destinationId: destination.idLocation,
                 dateFrom,
                 dateTo,
-                adults: 2,
+                adults: Math.max(1, selectedTravelers.filter(traveler => traveler.travelerType !== 'CHILD').length || 2),
+                hotelName: hotelNameQuery.trim() || undefined,
+                minPrice: priceFrom.trim() === '' ? undefined : normalizedPriceFrom,
+                maxPrice: priceTo.trim() === '' ? undefined : normalizedPriceTo,
+                minRating: stars || undefined,
+                hotelType,
+                roomType,
+                sortBy,
             });
-            setOffers(response.data.map(hotel => ({
+            const mappedOffers = response.data.map(hotel => ({
                 idHotel: hotel.hotelId,
                 hotelName: hotel.name,
                 description: hotel.description,
@@ -78,7 +100,9 @@ const HotelBooking = () => {
                 destination: `${hotel.location.region}, ${hotel.location.country}`,
                 rating: hotel.rating,
                 imageUrl: hotel.photos[0] ?? '',
-            })));
+            }));
+            setOffers(mappedOffers);
+            setSelectedOffer(current => current ? mappedOffers.find(offer => offer.idHotel === current.idHotel) ?? null : null);
         } catch (e) {
             console.log(e);
             setError(true);
@@ -95,45 +119,62 @@ const HotelBooking = () => {
     useEffect(() => {
         if (destinations.length > 0) {
             searchHotels().then(r => r);
+            setHasLoadedDestinations(true);
         }
     }, [destination]);
 
-    const normalizedPriceFrom = priceFrom.trim() === '' ? 0 : Number(priceFrom);
-    const normalizedPriceTo = priceTo.trim() === '' ? Number.POSITIVE_INFINITY : Number(priceTo);
-    const hasInvalidPriceRange = Number.isNaN(normalizedPriceFrom) ||
-        Number.isNaN(normalizedPriceTo) ||
-        normalizedPriceFrom < 0 ||
-        normalizedPriceTo < 0 ||
-        normalizedPriceFrom > normalizedPriceTo;
+    const visibleOffers = offers;
+    const selectedGuestCount = selectedTravelers.length;
+    const selectedTotalPrice = selectedOffer ? selectedOffer.price * selectedGuestCount : 0;
 
-    const filteredOffers = offers
-        .filter(offer => offer.hotelName.toLowerCase().includes(hotelNameQuery.trim().toLowerCase()))
-        .filter(offer => hasInvalidPriceRange || (offer.price >= normalizedPriceFrom && offer.price <= normalizedPriceTo))
-        .filter(offer => stars === 0 || offer.rating >= stars)
-        .sort((a, b) => a.price - b.price);
+    useEffect(() => {
+        if (!hasLoadedDestinations || !destination || hasInvalidPriceRange) return;
 
-    const visibleOffers = filteredOffers;
+        const timeoutId = window.setTimeout(() => {
+            searchHotels().then(r => r);
+        }, 350);
 
-    const quickBookHotel = async (offer: GetOffersBySearchQueryOffer) => {
-        setBookingHotelId(offer.idHotel);
+        return () => window.clearTimeout(timeoutId);
+    }, [hotelNameQuery, priceFrom, priceTo, stars, hotelType, roomType, sortBy, dateFrom, dateTo, selectedTravelers]);
+
+    const selectHotel = (offer: GetOffersBySearchQueryOffer) => {
+        setSelectedOffer(offer);
+        setBookingError(false);
+        setBookingMessage('');
+    };
+
+    const submitHotelReservation = async () => {
+        if (!selectedOffer) {
+            setBookingError(true);
+            setBookingMessage('请先选择一家可预订酒店。');
+            return;
+        }
+        if (selectedTravelers.length === 0) {
+            setBookingError(true);
+            setBookingMessage('请先选择或填写至少一位入住人。');
+            return;
+        }
+        setBookingHotelId(selectedOffer.idHotel);
         setBookingError(false);
         setBookingMessage('');
 
         try {
             const response = await ApiRequests.createHotelReservation({
                 userId: getCurrentUserId(),
-                hotelId: offer.idHotel,
-                hotelName: offer.hotelName,
+                hotelId: selectedOffer.idHotel,
+                hotelName: selectedOffer.hotelName,
                 dateFrom,
                 dateTo,
-                adultsQuantity: 2,
+                adultsQuantity: selectedTravelers.filter(traveler => traveler.travelerType !== 'CHILD').length,
                 childrenUnder3Quantity: 0,
                 childrenUnder10Quantity: 0,
-                childrenUnder18Quantity: 0,
-                price: offer.price,
+                childrenUnder18Quantity: selectedTravelers.filter(traveler => traveler.travelerType === 'CHILD').length,
+                price: selectedOffer.price * selectedTravelers.length,
                 roomName: roomType === 'DOUBLE' ? '大床房' : roomType === 'FAMILY' ? '家庭房' : '标准房',
+                travelers: selectedTravelers,
             });
-            setBookingMessage(`已创建酒店预订 ${response.data.id}，可到“我的预订”继续支付或取消。`);
+            setReservationId(response.data.id);
+            setBookingMessage(`已创建酒店预订 ${response.data.id}，请在订单详情中完成支付。`);
         } catch (e) {
             console.log(e);
             setBookingError(true);
@@ -160,7 +201,7 @@ const HotelBooking = () => {
 
             {error && <Alert severity='warning' className='mb-4'>后端酒店数据暂时不可用，请启动服务后重试。</Alert>}
             {bookingError && <Alert severity='error' className='mb-4'>创建酒店预订失败，请检查日期或后端服务。</Alert>}
-            {bookingMessage && <Alert severity='success' className='mb-4'>{bookingMessage}</Alert>}
+            {bookingMessage && <Alert severity={bookingError ? 'warning' : 'success'} className='mb-4' action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}`} color='inherit' size='small'>订单详情</Button> : undefined}>{bookingMessage}</Alert>}
 
             <div className='grid grid-cols-[360px_1fr] gap-6 items-start'>
                 <aside className='sticky top-24 self-start flex max-h-[calc(100vh-7rem)] flex-col gap-5 overflow-y-auto pr-1'>
@@ -191,6 +232,50 @@ const HotelBooking = () => {
                         <Button fullWidth variant='contained' size='large' startIcon={<Search/>} sx={{mt: 2, borderRadius: 2}} onClick={searchHotels}>
                             查询
                         </Button>
+                    </section>
+
+                    <TravelerSelector title='选择入住人' onChange={setSelectedTravelers}/>
+
+                    <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
+                        <h2 className='text-lg font-bold text-slate-900 mb-4'>订单填写</h2>
+                        {selectedOffer ? (
+                            <div className='space-y-3'>
+                                <div className='rounded-lg bg-slate-50 p-3'>
+                                    <p className='text-sm font-semibold text-slate-900'>{selectedOffer.hotelName}</p>
+                                    <p className='mt-1 text-sm text-slate-600'>{dateFrom} 入住，{dateTo} 离店</p>
+                                    <p className='mt-1 text-xs text-slate-500'>{selectedOffer.destination} · {roomType === 'DOUBLE' ? '大床优先' : roomType === 'FAMILY' ? '家庭房优先' : '房型不限'}</p>
+                                </div>
+                                <div className='flex items-center justify-between text-sm text-slate-600'>
+                                    <span>入住人</span>
+                                    <span>{selectedGuestCount} 人</span>
+                                </div>
+                                <div className='flex items-center justify-between text-sm text-slate-600'>
+                                    <span>参考单价</span>
+                                    <span>¥{Math.ceil(selectedOffer.price)}</span>
+                                </div>
+                                <div className='flex items-center justify-between border-t border-slate-200 pt-3'>
+                                    <span className='font-semibold text-slate-900'>应付金额</span>
+                                    <span className='text-2xl font-bold text-blue-600'>¥{Math.ceil(selectedTotalPrice)}</span>
+                                </div>
+                                <Button
+                                    fullWidth
+                                    variant='contained'
+                                    size='large'
+                                    sx={{borderRadius: 2}}
+                                    disabled={bookingHotelId === selectedOffer.idHotel || selectedGuestCount === 0}
+                                    onClick={submitHotelReservation}
+                                >
+                                    {bookingHotelId === selectedOffer.idHotel ? '提交中' : '提交订单'}
+                                </Button>
+                                {selectedGuestCount === 0 &&
+                                    <p className='text-xs text-orange-500'>请先在上方选择或填写入住人。</p>
+                                }
+                            </div>
+                        ) : (
+                            <div className='rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500'>
+                                先在右侧选择一家酒店，再填写入住人并提交订单。
+                            </div>
+                        )}
                     </section>
 
                     <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
@@ -236,6 +321,17 @@ const HotelBooking = () => {
                             <ToggleButton value='DOUBLE'>大床</ToggleButton>
                             <ToggleButton value='FAMILY'>家庭</ToggleButton>
                         </ToggleButtonGroup>
+
+                        <p className='mt-5 mb-2 text-sm font-semibold text-slate-700'>排序</p>
+                        <ToggleButtonGroup fullWidth color='primary' size='small' value={sortBy} exclusive onChange={(_, value) => value && setSortBy(value)}>
+                            <ToggleButton value='price'>低价优先</ToggleButton>
+                            <ToggleButton value='rating'>评分优先</ToggleButton>
+                            <ToggleButton value='price_desc'>高价优先</ToggleButton>
+                        </ToggleButtonGroup>
+
+                        <Button fullWidth variant='outlined' sx={{mt: 2, borderRadius: 2}} onClick={searchHotels} disabled={loading || !destination || hasInvalidPriceRange}>
+                            应用筛选
+                        </Button>
                     </section>
                 </aside>
 
@@ -252,8 +348,10 @@ const HotelBooking = () => {
                                     key={offer.idHotel}
                                     offer={offer}
                                     roomType={roomType}
-                                    onBook={quickBookHotel}
+                                    onBook={selectHotel}
                                     reserving={bookingHotelId === offer.idHotel}
+                                    canBook
+                                    selected={selectedOffer?.idHotel === offer.idHotel}
                                 />
                             ))}
                             {visibleOffers.length === 0 && !loading &&
@@ -271,14 +369,18 @@ const HotelResultCard = ({
     offer,
     roomType,
     onBook,
-    reserving
+    reserving,
+    canBook,
+    selected = false
 }: {
     offer: GetOffersBySearchQueryOffer,
     roomType: string,
     onBook: (offer: GetOffersBySearchQueryOffer) => void,
     reserving: boolean
+    canBook: boolean
+    selected?: boolean
 }) => (
-    <section className='mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md'>
+    <section className={`mb-4 overflow-hidden rounded-lg border ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'} bg-white shadow-sm transition-shadow hover:shadow-md`}>
         <div className='grid grid-cols-[220px_1fr_190px]'>
             <img src={offer.imageUrl} alt={offer.hotelName} className='h-full min-h-[190px] w-full object-cover'/>
             <div className='p-5'>
@@ -305,10 +407,10 @@ const HotelResultCard = ({
                         variant='contained'
                         sx={{borderRadius: 2}}
                         startIcon={<LocalOffer/>}
-                        disabled={reserving}
+                        disabled={reserving || !canBook}
                         onClick={() => onBook(offer)}
                     >
-                        {reserving ? '预订中' : '快速预订'}
+                        {reserving ? '提交中' : selected ? '已选择' : '选择'}
                     </Button>
                     <Link to='/offerDetails' state={{idHotel: offer.idHotel, price: offer.price}}>
                         <Button fullWidth variant='outlined' sx={{borderRadius: 2}}>查看酒店</Button>

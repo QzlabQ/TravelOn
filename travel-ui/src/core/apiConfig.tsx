@@ -55,8 +55,24 @@ export class ApiRequests {
         return await axiosInstance.get(`reservations/user/${userId}`);
     }
 
-    static cancelReservation = async (reservationId: string) => {
-        return await axiosInstance.post(`reservations/${reservationId}/cancel`);
+    static getReservation = async (reservationId: string) => {
+        return await axiosInstance.get<ReservationResponse>(`reservations/${reservationId}`);
+    }
+
+    static cancelReservation = async (reservationId: string, reason?: string) => {
+        return await axiosInstance.post<ReservationResponse>(`reservations/${reservationId}/cancel`, {reason});
+    }
+
+    static getReservationPayments = async (reservationId: string) => {
+        return await axiosInstance.get<PaymentTransactionResponse[]>(`reservations/${reservationId}/payments`);
+    }
+
+    static getReservationRefunds = async (reservationId: string) => {
+        return await axiosInstance.get<RefundRecordResponse[]>(`reservations/${reservationId}/refunds`);
+    }
+
+    static completeRefund = async (reservationId: string) => {
+        return await axiosInstance.post<ReservationResponse>(`reservations/${reservationId}/refunds/complete`);
     }
 
     static createTicketReservation = async (payload: CreateTicketReservationPayload) => {
@@ -89,6 +105,30 @@ export class ApiRequests {
 
     static logout = async (token: string) => {
         return await axiosInstance.post('users/auth/logout', {}, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static listTravelers = async (token: string) => {
+        return await axiosInstance.get<TravelerResponse[]>('users/me/travelers', {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static createTraveler = async (token: string, payload: TravelerPayload) => {
+        return await axiosInstance.post<TravelerResponse>('users/me/travelers', payload, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static updateTraveler = async (token: string, travelerId: string, payload: TravelerPayload) => {
+        return await axiosInstance.put<TravelerResponse>(`users/me/travelers/${travelerId}`, payload, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static deleteTraveler = async (token: string, travelerId: string) => {
+        return await axiosInstance.delete(`users/me/travelers/${travelerId}`, {
             headers: {'X-User-Token': token}
         });
     }
@@ -176,7 +216,7 @@ export interface PaymentPayload {
     cardNumber: string,
 }
 
-export type ReservationStatus = 'PENDING_PAYMENT' | 'PAID' | 'CANCELLED' | 'EXPIRED';
+export type ReservationStatus = 'PENDING_PAYMENT' | 'PAID' | 'CANCELLED' | 'EXPIRED' | 'REFUND_PROCESSING' | 'REFUNDED';
 
 export interface ReservationResponse {
     id: string,
@@ -199,6 +239,37 @@ export interface ReservationResponse {
     routeTo?: string | null,
     provider?: string | null,
     bookingCode?: string | null,
+    travelers: BookingPersonResponse[],
+    createdAt?: string | null,
+    paymentDeadline?: string | null,
+    paidAt?: string | null,
+    cancelledAt?: string | null,
+    refundRequestedAt?: string | null,
+    refundedAt?: string | null,
+    cancellationReason?: string | null,
+}
+
+export interface PaymentTransactionResponse {
+    id: string,
+    reservationId: string,
+    amount: number,
+    cardLast4?: string | null,
+    approved: boolean,
+    status: 'SUCCESS' | 'FAILED' | string,
+    failureReason?: string | null,
+    createdAt?: string | null,
+}
+
+export type RefundStatus = 'PROCESSING' | 'COMPLETED' | 'REJECTED';
+
+export interface RefundRecordResponse {
+    id: string,
+    reservationId: string,
+    amount: number,
+    reason?: string | null,
+    status: RefundStatus,
+    requestedAt?: string | null,
+    completedAt?: string | null,
 }
 
 export interface CreateTicketReservationPayload {
@@ -213,6 +284,7 @@ export interface CreateTicketReservationPayload {
     bookingCode: string,
     passengerCount: number,
     price: number,
+    travelers: BookingPersonPayload[],
 }
 
 export interface CreateHotelReservationPayload {
@@ -227,6 +299,43 @@ export interface CreateHotelReservationPayload {
     childrenUnder18Quantity: number,
     price: number,
     roomName?: string,
+    travelers: BookingPersonPayload[],
+}
+
+export type TravelerType = 'ADULT' | 'CHILD' | 'STUDENT';
+
+export interface TravelerPayload {
+    name: string,
+    travelerType: TravelerType,
+    documentType?: string,
+    documentNumber?: string,
+    phone?: string,
+    student: boolean,
+    defaultTraveler: boolean,
+}
+
+export interface TravelerResponse extends TravelerPayload {
+    id: string,
+    createdAt?: string,
+    updatedAt?: string,
+}
+
+export interface BookingPersonPayload {
+    travelerId?: string,
+    name: string,
+    travelerType: TravelerType,
+    documentType?: string,
+    documentNumber?: string,
+    phone?: string,
+}
+
+export interface BookingPersonResponse {
+    travelerId?: string | null,
+    name: string,
+    travelerType: TravelerType,
+    documentType?: string | null,
+    maskedDocumentNumber?: string | null,
+    maskedPhone?: string | null,
 }
 
 export type TicketType = 'FLIGHT' | 'TRAIN';
@@ -241,6 +350,11 @@ export interface SearchTicketsParams {
     departureCity: string,
     arrivalCity: string,
     departureDate: string,
+    minPrice?: number,
+    maxPrice?: number,
+    studentOnly?: boolean,
+    onlyAvailable?: boolean,
+    sortBy?: 'departure' | 'price' | 'seats' | string,
 }
 
 export interface TicketSearchOffer {
@@ -272,6 +386,13 @@ export interface SearchHotelsParams {
     dateFrom: string,
     dateTo: string,
     adults?: number,
+    hotelName?: string,
+    minPrice?: number,
+    maxPrice?: number,
+    minRating?: number,
+    hotelType?: 'ALL' | 'HOTEL' | 'HOMESTAY' | string,
+    roomType?: 'ALL' | 'DOUBLE' | 'FAMILY' | string,
+    sortBy?: 'price' | 'price_desc' | 'rating' | string,
 }
 
 export interface HotelSearchOffer {

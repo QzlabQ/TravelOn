@@ -51,9 +51,28 @@ public class HotelsController {
             @RequestParam UUID destinationId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-            @RequestParam(defaultValue = "2") int adults
+            @RequestParam(defaultValue = "2") int adults,
+            @RequestParam(required = false) String hotelName,
+            @RequestParam(required = false) Float minPrice,
+            @RequestParam(required = false) Float maxPrice,
+            @RequestParam(required = false) Float minRating,
+            @RequestParam(defaultValue = "ALL") String hotelType,
+            @RequestParam(defaultValue = "ALL") String roomType,
+            @RequestParam(defaultValue = "price") String sortBy
     ) {
-        return hotelsService.searchHotels(destinationId, dateFrom, dateTo, adults);
+        return hotelsService.searchHotels(
+                destinationId,
+                dateFrom,
+                dateTo,
+                adults,
+                hotelName,
+                minPrice,
+                maxPrice,
+                minRating,
+                hotelType,
+                roomType,
+                sortBy
+        );
     }
 
     @RabbitListener(queues = "hotels.requests.hotelsBySearchQuery")
@@ -170,7 +189,8 @@ public class HotelsController {
         try {
             hotel = hotelsService.getHotel(request.getHotelId());
         } catch (HotelNoFoundException e) {
-            e.printStackTrace();
+            logger.warning("Skip room update because hotel was not found: " + request.getHotelId());
+            return;
         }
 
         // create room
@@ -186,7 +206,13 @@ public class HotelsController {
         if (request.getUpdateType() == DataUpdateType.UPDATE) {
             System.out.println("Updated room: " + request);
 
-            Room roomToUpdate = hotelsService.getRoomById(request.getId());
+            Room roomToUpdate;
+            try {
+                roomToUpdate = hotelsService.getRoomById(request.getId());
+            } catch (RuntimeException e) {
+                logger.warning("Skip room update because room was not found: " + request.getId());
+                return;
+            }
             if(hotelsService.doesRoomHaveAnyReservationsInFuture(roomToUpdate)) return;
 
             hotelsService.updateRoomFromHotel(request.getHotelId(), request.getId(), request.getName(),

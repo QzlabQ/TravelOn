@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -69,6 +70,24 @@ public class Reservation {
 
     private String bookingCode;
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    private List<BookingPersonSnapshot> travelers;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime paymentDeadline;
+
+    private LocalDateTime paidAt;
+
+    private LocalDateTime cancelledAt;
+
+    private LocalDateTime refundRequestedAt;
+
+    private LocalDateTime refundedAt;
+
+    @Column(length = 240)
+    private String cancellationReason;
+
     @PrePersist
     public void prePersist() {
         if (status == null) {
@@ -76,6 +95,15 @@ public class Reservation {
         }
         if (bookingType == null || bookingType.isBlank()) {
             bookingType = "PACKAGE";
+        }
+        if (travelers == null) {
+            travelers = new ArrayList<>();
+        }
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (paymentDeadline == null) {
+            paymentDeadline = createdAt.plusMinutes(15);
         }
     }
 }

@@ -4,6 +4,7 @@ import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import lombok.*;
 import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
+import org.microarchitecturovisco.reservationservice.domain.entity.BookingPersonSnapshot;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,4 +39,6 @@ public class ReservationCreatedEvent extends ReservationEvent {
     private String routeTo;
     private String provider;
     private String bookingCode;
+    @ElementCollection
+    private List<BookingPersonSnapshot> travelers;
 }

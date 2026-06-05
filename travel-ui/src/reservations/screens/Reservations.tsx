@@ -13,20 +13,24 @@ import {
     TableHead,
     TableRow
 } from "@mui/material";
-import {Cancel, Refresh} from "@mui/icons-material";
+import {Cancel, Refresh, Visibility} from "@mui/icons-material";
 import {ApiRequests, ReservationResponse} from "../../core/apiConfig";
 import {getCurrentUserId, getCurrentUserMode} from "../../core/currentUser";
+import {Link} from "react-router-dom";
 
 const statusLabel = (reservation: ReservationResponse) => {
-    if (reservation.status === 'PAID' || reservation.paid) return '已支付';
+    if (reservation.status === 'REFUND_PROCESSING') return '退款处理中';
+    if (reservation.status === 'REFUNDED') return '已退款';
     if (reservation.status === 'CANCELLED') return '已取消';
     if (reservation.status === 'EXPIRED') return '已过期';
+    if (reservation.status === 'PAID' || reservation.paid) return '已支付';
     return '待支付';
 };
 
 const statusColor = (reservation: ReservationResponse): "default" | "success" | "warning" | "error" => {
+    if (reservation.status === 'REFUND_PROCESSING') return 'warning';
+    if (reservation.status === 'CANCELLED' || reservation.status === 'EXPIRED' || reservation.status === 'REFUNDED') return 'default';
     if (reservation.status === 'PAID' || reservation.paid) return 'success';
-    if (reservation.status === 'CANCELLED' || reservation.status === 'EXPIRED') return 'default';
     return 'warning';
 };
 
@@ -62,7 +66,7 @@ const Reservations = () => {
     const cancelReservation = async (reservationId: string) => {
         setCancellingId(reservationId);
         try {
-            await ApiRequests.cancelReservation(reservationId);
+            await ApiRequests.cancelReservation(reservationId, '从订单列表取消');
             await loadReservations();
         } catch (e) {
             console.log(e);
@@ -140,16 +144,23 @@ const Reservations = () => {
                                             <Chip size='small' color={statusColor(reservation)} label={statusLabel(reservation)}/>
                                         </TableCell>
                                         <TableCell align='right'>
-                                            <Button
-                                                color='error'
-                                                variant='outlined'
-                                                size='small'
-                                                startIcon={<Cancel/>}
-                                                disabled={reservation.paid || reservation.status === 'CANCELLED' || cancellingId === reservation.id}
-                                                onClick={() => cancelReservation(reservation.id)}
-                                            >
-                                                取消
-                                            </Button>
+                                            <div className='flex justify-end gap-2'>
+                                                <Button component={Link} to={`/reservations/${reservation.id}`} variant='outlined' size='small' startIcon={<Visibility/>}>
+                                                    详情
+                                                </Button>
+                                                {!reservation.paid &&
+                                                    <Button
+                                                        color='error'
+                                                        variant='outlined'
+                                                        size='small'
+                                                        startIcon={<Cancel/>}
+                                                        disabled={reservation.status === 'CANCELLED' || reservation.status === 'EXPIRED' || cancellingId === reservation.id}
+                                                        onClick={() => cancelReservation(reservation.id)}
+                                                    >
+                                                        取消
+                                                    </Button>
+                                                }
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}

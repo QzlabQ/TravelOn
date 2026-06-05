@@ -8,11 +8,18 @@ import org.microarchitecturovisco.reservationservice.domain.dto.PaymentRequestDt
 import org.microarchitecturovisco.reservationservice.domain.dto.PaymentResponseDto;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateHotelOnlyReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateTicketReservationRequest;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.BookingPersonRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.ReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.UpdateReservationPaymentStatus;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.PaymentTransactionResponse;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.RefundRecordResponse;
 import org.microarchitecturovisco.reservationservice.domain.dto.responses.ReservationResponse;
+import org.microarchitecturovisco.reservationservice.domain.entity.PaymentTransaction;
+import org.microarchitecturovisco.reservationservice.domain.entity.RefundRecord;
+import org.microarchitecturovisco.reservationservice.domain.entity.RefundStatus;
 import org.microarchitecturovisco.reservationservice.domain.entity.Reservation;
 import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
+import org.microarchitecturovisco.reservationservice.domain.entity.BookingPersonSnapshot;
 import org.microarchitecturovisco.reservationservice.domain.exceptions.PaymentProcessException;
 import org.microarchitecturovisco.reservationservice.domain.exceptions.PurchaseFailedException;
 import org.microarchitecturovisco.reservationservice.domain.exceptions.ReservationFailException;
@@ -22,6 +29,8 @@ import org.microarchitecturovisco.reservationservice.domain.model.ReservationCon
 import org.microarchitecturovisco.reservationservice.domain.model.TransportReservationResponse;
 import org.microarchitecturovisco.reservationservice.queues.config.QueuesReservationConfig;
 import org.microarchitecturovisco.reservationservice.repositories.ReservationRepository;
+import org.microarchitecturovisco.reservationservice.repositories.PaymentTransactionRepository;
+import org.microarchitecturovisco.reservationservice.repositories.RefundRecordRepository;
 import org.microarchitecturovisco.reservationservice.services.saga.BookHotelsSaga;
 import org.microarchitecturovisco.reservationservice.services.saga.BookTransportsSaga;
 import org.microarchitecturovisco.reservationservice.services.saga.InvalidPaymentHandler;
@@ -39,6 +48,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,6 +64,8 @@ public class ReservationService {
     public static Logger logger = Logger.getLogger(ReservationService.class.getName());
 
     private final ReservationRepository reservationRepository;
+    private final PaymentTransactionRepository paymentTransactionRepository;
+    private final RefundRecordRepository refundRecordRepository;
     private final ReservationAggregate reservationAggregate;
 
     private final BookHotelsSaga bookHotelsSaga;
@@ -87,6 +99,7 @@ public class ReservationService {
                 .transportReservationsIds(emptyIfNull(transportReservationsIds))
                 .userId(userId)
                 .title("套餐预订")
+                .travelers(Collections.emptyList())
                 .build();
         reservationAggregate.handleCreateReservationCommand(command);
         return reservationRepository.findById(reservationId).orElseThrow(RuntimeException::new);
@@ -94,32 +107,50 @@ public class ReservationService {
 
     public List<ReservationResponse> getReservationsForUser(UUID userId) {
         return reservationRepository.findByUserIdOrderByHotelTimeFromDesc(userId).stream()
+                .map(this::refreshExpiredReservation)
                 .map(ReservationResponse::from)
                 .toList();
     }
 
     public ReservationResponse getReservation(UUID reservationId) {
         return reservationRepository.findById(reservationId)
+                .map(this::refreshExpiredReservation)
                 .map(ReservationResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
     }
 
-    public ReservationResponse cancelReservation(UUID reservationId) {
+    public ReservationResponse cancelReservation(UUID reservationId, String reason) {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
 
-        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+        if (reservation.getStatus() == ReservationStatus.CANCELLED ||
+                reservation.getStatus() == ReservationStatus.REFUND_PROCESSING ||
+                reservation.getStatus() == ReservationStatus.REFUNDED) {
             return ReservationResponse.from(reservation);
         }
 
-        if (reservation.isPaid() || reservation.getStatus() == ReservationStatus.PAID) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Paid reservations cannot be cancelled here");
+        boolean refundRequired = reservation.isPaid() || reservation.getStatus() == ReservationStatus.PAID;
+        LocalDateTime now = LocalDateTime.now();
+        String normalizedReason = hasText(reason) ? reason.trim() : "用户主动取消";
+
+        if (refundRequired) {
+            refundRecordRepository.save(RefundRecord.builder()
+                    .id(UUID.randomUUID())
+                    .reservationId(reservationId)
+                    .amount(reservation.getPrice())
+                    .reason(normalizedReason)
+                    .status(RefundStatus.PROCESSING)
+                    .requestedAt(now)
+                    .build());
         }
 
         reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
                 .reservationId(reservationId)
-                .paid(false)
-                .status(ReservationStatus.CANCELLED)
+                .paid(refundRequired ? reservation.isPaid() : false)
+                .status(refundRequired ? ReservationStatus.REFUND_PROCESSING : ReservationStatus.CANCELLED)
+                .cancellationReason(normalizedReason)
+                .cancelledAt(now)
+                .refundRequestedAt(refundRequired ? now : null)
                 .build());
 
         return reservationRepository.findById(reservationId)
@@ -135,6 +166,7 @@ public class ReservationService {
         }
 
         String bookingType = normalizeTicketType(request.transportType());
+        List<BookingPersonSnapshot> travelers = normalizeTravelers(request.travelers(), request.passengerCount());
         UUID reservationId = UUID.randomUUID();
         UUID transportReservationId = UUID.nameUUIDFromBytes(
                 (bookingType + request.bookingCode() + request.routeFrom() + request.routeTo() + departureAt)
@@ -148,7 +180,7 @@ public class ReservationService {
                 .infantsQuantity(0)
                 .kidsQuantity(0)
                 .teensQuantity(0)
-                .adultsQuantity(request.passengerCount())
+                .adultsQuantity(countTravelers(travelers, "ADULT", "STUDENT"))
                 .price(request.price())
                 .paid(false)
                 .status(ReservationStatus.PENDING_PAYMENT)
@@ -161,6 +193,7 @@ public class ReservationService {
                 .routeTo(request.routeTo())
                 .provider(request.provider())
                 .bookingCode(request.bookingCode())
+                .travelers(travelers)
                 .build();
 
         reservationAggregate.handleCreateReservationCommand(command);
@@ -173,6 +206,9 @@ public class ReservationService {
         }
 
         UUID reservationId = UUID.randomUUID();
+        int requestedGuestCount = request.adultsQuantity() + request.childrenUnder3Quantity() +
+                request.childrenUnder10Quantity() + request.childrenUnder18Quantity();
+        List<BookingPersonSnapshot> travelers = normalizeTravelers(request.travelers(), requestedGuestCount);
         String roomName = hasText(request.roomName()) ? request.roomName().trim() : "标准房";
         UUID roomReservationId = UUID.nameUUIDFromBytes(
                 (request.hotelId() + roomName + request.dateFrom() + request.dateTo() + request.userId())
@@ -198,6 +234,7 @@ public class ReservationService {
                 .title(request.hotelName())
                 .provider(roomName)
                 .bookingCode("HOTEL-" + reservationId.toString().substring(0, 8).toUpperCase())
+                .travelers(travelers)
                 .build();
 
         reservationAggregate.handleCreateReservationCommand(command);
@@ -249,8 +286,20 @@ public class ReservationService {
     public ReservationConfirmationResponse purchaseReservation(String reservationId, String cardNumber) {
         Reservation existingReservation = reservationRepository.findById(UUID.fromString(reservationId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
-        if (existingReservation.getStatus() == ReservationStatus.CANCELLED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancelled reservations cannot be paid");
+        if (existingReservation.getStatus() == ReservationStatus.PAID) {
+            return buildConfirmation(existingReservation);
+        }
+        if (existingReservation.getStatus() != ReservationStatus.PENDING_PAYMENT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending reservations can be paid");
+        }
+        if (existingReservation.getPaymentDeadline() != null &&
+                existingReservation.getPaymentDeadline().isBefore(LocalDateTime.now())) {
+            reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                    .reservationId(existingReservation.getId())
+                    .paid(false)
+                    .status(ReservationStatus.EXPIRED)
+                    .build());
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment deadline has expired");
         }
 
         boolean successfulPayment = false;
@@ -266,7 +315,7 @@ public class ReservationService {
         if(!successfulPayment) {
             Optional<Reservation> reservationOptional = reservationRepository.findById(UUID.fromString(reservationId));
 
-            if (reservationOptional.isPresent()) {
+            if (reservationOptional.isPresent() && "PACKAGE".equals(reservationOptional.get().getBookingType())) {
                 // If the reservation is present, get its value and build ReservationRequest
                 Reservation reservation = reservationOptional.get();
                 ReservationRequest reservationRequest = ReservationRequest.builder()
@@ -287,12 +336,18 @@ public class ReservationService {
             }
 
             logger.severe("Payment failed: " + failedPaymentMessage);
+            savePaymentTransaction(existingReservation, cardNumber, false, failedPaymentMessage);
             throw new PurchaseFailedException(failedPaymentMessage);
         }
 
+        savePaymentTransaction(existingReservation, cardNumber, true, null);
         updateReservationPaymentStatus(reservationId);
 
         Reservation reservation = reservationRepository.findById(UUID.fromString(reservationId)).orElseThrow(ReservationNotFoundAfterPaymentException::new);
+        return buildConfirmation(reservation);
+    }
+
+    private ReservationConfirmationResponse buildConfirmation(Reservation reservation) {
         HotelInfo hotelInfo = getHotelInformation(reservation.getHotelId());
         TransportReservationResponse transportInfo = getTransportInformation(reservation.getTransportReservationsIds().stream().map(UUID::toString).toList());
 
@@ -332,7 +387,58 @@ public class ReservationService {
                 .reservationId(UUID.fromString(reservationId))
                 .paid(true)
                 .status(ReservationStatus.PAID)
+                .paidAt(LocalDateTime.now())
                 .build());
+    }
+
+    public List<PaymentTransactionResponse> getPaymentTransactions(UUID reservationId) {
+        requireReservation(reservationId);
+        return paymentTransactionRepository.findByReservationIdOrderByCreatedAtDesc(reservationId).stream()
+                .map(PaymentTransactionResponse::from)
+                .toList();
+    }
+
+    public List<RefundRecordResponse> getRefundRecords(UUID reservationId) {
+        requireReservation(reservationId);
+        return refundRecordRepository.findByReservationIdOrderByRequestedAtDesc(reservationId).stream()
+                .map(RefundRecordResponse::from)
+                .toList();
+    }
+
+    public ReservationResponse completeRefund(UUID reservationId) {
+        Reservation reservation = requireReservation(reservationId);
+        if (reservation.getStatus() == ReservationStatus.REFUNDED) {
+            return ReservationResponse.from(reservation);
+        }
+        if (reservation.getStatus() != ReservationStatus.REFUND_PROCESSING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only processing refunds can be completed");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        RefundRecord refund = refundRecordRepository
+                .findFirstByReservationIdAndStatusOrderByRequestedAtDesc(reservationId, RefundStatus.PROCESSING)
+                .orElseGet(() -> refundRecordRepository.save(RefundRecord.builder()
+                        .id(UUID.randomUUID())
+                        .reservationId(reservationId)
+                        .amount(reservation.getPrice())
+                        .reason(hasText(reservation.getCancellationReason()) ? reservation.getCancellationReason() : "退款完成")
+                        .status(RefundStatus.PROCESSING)
+                        .requestedAt(reservation.getRefundRequestedAt() == null ? now : reservation.getRefundRequestedAt())
+                        .build()));
+        refund.setStatus(RefundStatus.COMPLETED);
+        refund.setCompletedAt(now);
+        refundRecordRepository.save(refund);
+
+        reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                .reservationId(reservationId)
+                .paid(false)
+                .status(ReservationStatus.REFUNDED)
+                .refundedAt(now)
+                .build());
+
+        return reservationRepository.findById(reservationId)
+                .map(ReservationResponse::from)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
     }
 
     private void sendBoughtOfferWebsocketMessages(String message, String idHotel) {
@@ -394,6 +500,26 @@ public class ReservationService {
         }
     }
 
+    private void savePaymentTransaction(Reservation reservation, String cardNumber, boolean approved, String failureReason) {
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .id(UUID.randomUUID())
+                .reservationId(reservation.getId())
+                .amount(reservation.getPrice())
+                .cardLast4(maskCardLast4(cardNumber))
+                .approved(approved)
+                .status(approved ? "SUCCESS" : "FAILED")
+                .failureReason(failureReason)
+                .createdAt(LocalDateTime.now())
+                .build());
+    }
+
+    private String maskCardLast4(String cardNumber) {
+        if (cardNumber == null || cardNumber.length() < 4) {
+            return null;
+        }
+        return cardNumber.substring(cardNumber.length() - 4);
+    }
+
     private LocalTime parseTime(String value) {
         try {
             return LocalTime.parse(value.trim());
@@ -419,6 +545,64 @@ public class ReservationService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private List<BookingPersonSnapshot> normalizeTravelers(List<BookingPersonRequest> travelers, int fallbackCount) {
+        if (travelers == null || travelers.isEmpty()) {
+            List<BookingPersonSnapshot> generated = new ArrayList<>();
+            for (int index = 0; index < Math.max(1, fallbackCount); index++) {
+                generated.add(BookingPersonSnapshot.builder()
+                        .name("旅客 " + (index + 1))
+                        .travelerType("ADULT")
+                        .build());
+            }
+            return generated;
+        }
+        return travelers.stream()
+                .map(person -> BookingPersonSnapshot.builder()
+                        .travelerId(normalizeOptional(person.travelerId()))
+                        .name(person.name().trim())
+                        .travelerType(normalizeTravelerType(person.travelerType()))
+                        .documentType(normalizeOptional(person.documentType()))
+                        .documentNumber(normalizeOptional(person.documentNumber()))
+                        .phone(normalizeOptional(person.phone()))
+                        .build())
+                .toList();
+    }
+
+    private int countTravelers(List<BookingPersonSnapshot> travelers, String... types) {
+        List<String> acceptedTypes = List.of(types);
+        return (int) travelers.stream()
+                .filter(person -> acceptedTypes.contains(person.getTravelerType()))
+                .count();
+    }
+
+    private String normalizeTravelerType(String value) {
+        String normalized = hasText(value) ? value.trim().toUpperCase() : "ADULT";
+        return List.of("ADULT", "CHILD", "STUDENT").contains(normalized) ? normalized : "ADULT";
+    }
+
+    private String normalizeOptional(String value) {
+        return hasText(value) ? value.trim() : null;
+    }
+
+    private Reservation refreshExpiredReservation(Reservation reservation) {
+        if (reservation.getStatus() == ReservationStatus.PENDING_PAYMENT &&
+                reservation.getPaymentDeadline() != null &&
+                reservation.getPaymentDeadline().isBefore(LocalDateTime.now())) {
+            reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                    .reservationId(reservation.getId())
+                    .paid(false)
+                    .status(ReservationStatus.EXPIRED)
+                    .build());
+            return reservationRepository.findById(reservation.getId()).orElse(reservation);
+        }
+        return reservation;
+    }
+
+    private Reservation requireReservation(UUID reservationId) {
+        return reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
     }
 
 }
