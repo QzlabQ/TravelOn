@@ -16,6 +16,7 @@ import org.microarchitecturovisco.hotelservice.model.mappers.HotelMapper;
 import org.microarchitecturovisco.hotelservice.model.mappers.LocationMapper;
 import org.microarchitecturovisco.hotelservice.model.mappers.RoomMapper;
 import org.microarchitecturovisco.hotelservice.repositories.HotelRepository;
+import org.microarchitecturovisco.hotelservice.repositories.LocationRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomRepository;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
@@ -33,7 +34,16 @@ public class HotelsService {
 
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
+    private final LocationRepository locationRepository;
     private final HotelEventProjector hotelEventProjector;
+
+    public List<org.microarchitecturovisco.hotelservice.model.dto.LocationDto> getDestinations() {
+        return locationRepository.findAll()
+                .stream()
+                .sorted(Comparator.comparing(Location::getRegion))
+                .map(LocationMapper::map)
+                .toList();
+    }
 
     public List<HotelResponseDto> searchHotels(
             UUID destinationId,

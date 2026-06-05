@@ -35,6 +35,10 @@ export class ApiRequests {
         });
     }
 
+    static getHotelDestinations = async () => {
+        return await axiosInstance.get('hotels/destinations');
+    }
+
     static getOffersBySearchQuery = async (params: GetOffersBySearchQueryParams) => {
         return await axiosInstance.get(`offers/?departureBus=${params.departureBus}&departurePlane=${params.departurePlane}&departureTrain=${params.departureTrain}&arrivals=${params.arrivals}&date_from=${params.dateFrom}&date_to=${params.dateTo}&adults=${params.adults}&teens=${params.teens}&kids=${params.kids}&infants=${params.infants}`);
     }

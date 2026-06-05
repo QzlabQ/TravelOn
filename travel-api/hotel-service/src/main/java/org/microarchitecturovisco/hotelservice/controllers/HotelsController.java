@@ -8,6 +8,7 @@ import org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateRoomRes
 import org.microarchitecturovisco.hotelservice.model.cqrs.commands.DeleteRoomReservationCommand;
 import org.microarchitecturovisco.hotelservice.model.domain.Hotel;
 import org.microarchitecturovisco.hotelservice.model.domain.Room;
+import org.microarchitecturovisco.hotelservice.model.dto.LocationDto;
 import org.microarchitecturovisco.hotelservice.model.dto.RoomReservationDto;
 import org.microarchitecturovisco.hotelservice.model.dto.HotelResponseDto;
 import org.microarchitecturovisco.hotelservice.model.dto.data_generator.DataUpdateType;
@@ -45,6 +46,11 @@ public class HotelsController {
 
     private final HotelsService hotelsService;
     private final HotelsCommandService hotelsCommandService;
+
+    @GetMapping("/destinations")
+    public List<LocationDto> getDestinations() {
+        return hotelsService.getDestinations();
+    }
 
     @GetMapping("/search")
     public List<HotelResponseDto> searchHotels(

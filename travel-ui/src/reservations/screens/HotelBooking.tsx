@@ -61,8 +61,8 @@ const HotelBooking = () => {
         setLoading(true);
         setError(false);
         try {
-            const response = await ApiRequests.getAvailableDestinations();
-            const arrivals = response.data.arrivals ?? [];
+            const response = await ApiRequests.getHotelDestinations();
+            const arrivals = response.data ?? [];
             setDestinations(arrivals);
             setDestination(arrivals[0]);
         } catch (e) {
