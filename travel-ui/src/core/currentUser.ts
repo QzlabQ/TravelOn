@@ -18,10 +18,113 @@ export type UserSession = {
     user: UserProfile;
 };
 
+export type BookingPreferences = {
+    defaultDepartureCity: string;
+    defaultArrivalCity: string;
+    preferredHotelMinRating: number;
+    preferredHotelMaxPrice: string;
+    preferredTrainTypes: string[];
+    onlyAvailableTickets: boolean;
+};
+
+export type AccountIdentity = {
+    realName: string;
+    documentType: string;
+    documentNumber: string;
+};
+
+export type WalletTransactionType = 'TOP_UP' | 'PAYMENT' | 'REFUND';
+
+export type WalletTransaction = {
+    id: string;
+    type: WalletTransactionType;
+    amount: number;
+    balanceAfter: number;
+    title: string;
+    reservationId?: string;
+    createdAt: string;
+};
+
+export type WalletState = {
+    balance: number;
+    transactions: WalletTransaction[];
+};
+
+export type PaymentMethodPreference = 'WALLET' | 'CARD';
+
+export type UserPaymentPreferences = {
+    defaultPaymentMethod: PaymentMethodPreference;
+};
+
+export type AppNotificationType = 'ORDER_CREATED' | 'PAYMENT_SUCCESS' | 'REFUND_COMPLETED';
+
+export type AppNotification = {
+    id: string;
+    type: AppNotificationType;
+    title: string;
+    message: string;
+    reservationId?: string;
+    createdAt: string;
+    read: boolean;
+};
+
 const LOGGED_IN_USER_ID_KEY = 'userId';
 const GUEST_USER_ID_KEY = 'guestUserId';
 const AUTH_SESSION_KEY = 'authSession';
+const BOOKING_PREFERENCES_KEY = 'bookingPreferences';
+const ACCOUNT_IDENTITIES_KEY = 'accountIdentities';
+const WALLETS_KEY = 'wallets';
+const PAYMENT_PREFERENCES_KEY = 'paymentPreferences';
+const NOTIFICATIONS_KEY = 'notifications';
 export const AUTH_SESSION_EVENT = 'travel-ui-auth-session-changed';
+export const BOOKING_PREFERENCES_EVENT = 'travel-ui-booking-preferences-changed';
+export const ACCOUNT_IDENTITY_EVENT = 'travel-ui-account-identity-changed';
+export const WALLET_EVENT = 'travel-ui-wallet-changed';
+export const PAYMENT_PREFERENCES_EVENT = 'travel-ui-payment-preferences-changed';
+export const NOTIFICATIONS_EVENT = 'travel-ui-notifications-changed';
+
+export const DEFAULT_BOOKING_PREFERENCES: BookingPreferences = {
+    defaultDepartureCity: '北京',
+    defaultArrivalCity: '上海',
+    preferredHotelMinRating: 0,
+    preferredHotelMaxPrice: '',
+    preferredTrainTypes: ['GC', 'D', 'T', 'K', 'Z', 'OTHER'],
+    onlyAvailableTickets: false,
+};
+
+const normalizeBookingPreferences = (value?: Partial<BookingPreferences> | null): BookingPreferences => {
+    const preferredHotelMinRating = Number(value?.preferredHotelMinRating ?? DEFAULT_BOOKING_PREFERENCES.preferredHotelMinRating);
+    const preferredTrainTypes = Array.isArray(value?.preferredTrainTypes) && value.preferredTrainTypes.length > 0
+        ? value.preferredTrainTypes
+        : DEFAULT_BOOKING_PREFERENCES.preferredTrainTypes;
+
+    return {
+        defaultDepartureCity: value?.defaultDepartureCity?.trim() || DEFAULT_BOOKING_PREFERENCES.defaultDepartureCity,
+        defaultArrivalCity: value?.defaultArrivalCity?.trim() || DEFAULT_BOOKING_PREFERENCES.defaultArrivalCity,
+        preferredHotelMinRating: Math.min(5, Math.max(0, Number.isNaN(preferredHotelMinRating) ? 0 : preferredHotelMinRating)),
+        preferredHotelMaxPrice: value?.preferredHotelMaxPrice?.trim() || '',
+        preferredTrainTypes,
+        onlyAvailableTickets: Boolean(value?.onlyAvailableTickets),
+    };
+};
+
+const normalizeMoney = (value: number) => Math.round(Math.max(0, value) * 100) / 100;
+
+const readLocalRecord = <T>(key: string): Record<string, T> => {
+    const rawValue = localStorage.getItem(key);
+    if (!rawValue) return {};
+
+    try {
+        return JSON.parse(rawValue) as Record<string, T>;
+    } catch {
+        localStorage.removeItem(key);
+        return {};
+    }
+};
+
+const writeLocalRecord = <T>(key: string, value: Record<string, T>) => {
+    localStorage.setItem(key, JSON.stringify(value));
+};
 
 export const getCurrentUserSession = (): UserSession | null => {
     const rawSession = localStorage.getItem(AUTH_SESSION_KEY);
@@ -76,4 +179,199 @@ export const getCurrentUserId = () => {
 
 export const getCurrentUserMode = () => {
     return getCurrentUserSession() ? 'ACCOUNT' : 'GUEST';
+};
+
+export const getBookingPreferences = (): BookingPreferences => {
+    const rawPreferences = localStorage.getItem(BOOKING_PREFERENCES_KEY);
+    if (!rawPreferences) {
+        return DEFAULT_BOOKING_PREFERENCES;
+    }
+
+    try {
+        return normalizeBookingPreferences(JSON.parse(rawPreferences) as Partial<BookingPreferences>);
+    } catch {
+        localStorage.removeItem(BOOKING_PREFERENCES_KEY);
+        return DEFAULT_BOOKING_PREFERENCES;
+    }
+};
+
+export const setBookingPreferences = (preferences: BookingPreferences) => {
+    const normalizedPreferences = normalizeBookingPreferences(preferences);
+    localStorage.setItem(BOOKING_PREFERENCES_KEY, JSON.stringify(normalizedPreferences));
+    window.dispatchEvent(new Event(BOOKING_PREFERENCES_EVENT));
+    return normalizedPreferences;
+};
+
+export const getAccountIdentity = (userId = getCurrentUserId()): AccountIdentity => {
+    const identities = readLocalRecord<AccountIdentity>(ACCOUNT_IDENTITIES_KEY);
+    return identities[userId] ?? {
+        realName: '',
+        documentType: '身份证',
+        documentNumber: '',
+    };
+};
+
+export const setAccountIdentity = (identity: AccountIdentity, userId = getCurrentUserId()) => {
+    const identities = readLocalRecord<AccountIdentity>(ACCOUNT_IDENTITIES_KEY);
+    const normalizedIdentity: AccountIdentity = {
+        realName: identity.realName.trim(),
+        documentType: identity.documentType.trim() || '身份证',
+        documentNumber: identity.documentNumber.trim(),
+    };
+    identities[userId] = normalizedIdentity;
+    writeLocalRecord(ACCOUNT_IDENTITIES_KEY, identities);
+    window.dispatchEvent(new Event(ACCOUNT_IDENTITY_EVENT));
+    return normalizedIdentity;
+};
+
+export const getWalletState = (userId = getCurrentUserId()): WalletState => {
+    const wallets = readLocalRecord<WalletState>(WALLETS_KEY);
+    const wallet = wallets[userId];
+    if (!wallet) {
+        return {balance: 0, transactions: []};
+    }
+
+    return {
+        balance: normalizeMoney(Number(wallet.balance) || 0),
+        transactions: Array.isArray(wallet.transactions) ? wallet.transactions : [],
+    };
+};
+
+const setWalletState = (wallet: WalletState, userId = getCurrentUserId()) => {
+    const wallets = readLocalRecord<WalletState>(WALLETS_KEY);
+    const normalizedWallet: WalletState = {
+        balance: normalizeMoney(wallet.balance),
+        transactions: wallet.transactions.slice(0, 30),
+    };
+    wallets[userId] = normalizedWallet;
+    writeLocalRecord(WALLETS_KEY, wallets);
+    window.dispatchEvent(new Event(WALLET_EVENT));
+    return normalizedWallet;
+};
+
+export const rechargeWallet = (amount: number, title = '账户充值', userId = getCurrentUserId()) => {
+    const rechargeAmount = normalizeMoney(amount);
+    if (rechargeAmount <= 0) {
+        throw new Error('充值金额必须大于 0');
+    }
+
+    const wallet = getWalletState(userId);
+    const nextBalance = normalizeMoney(wallet.balance + rechargeAmount);
+    return setWalletState({
+        balance: nextBalance,
+        transactions: [{
+            id: uuidv4(),
+            type: 'TOP_UP',
+            amount: rechargeAmount,
+            balanceAfter: nextBalance,
+            title,
+            createdAt: new Date().toISOString(),
+        }, ...wallet.transactions],
+    }, userId);
+};
+
+export const spendWallet = (amount: number, title: string, reservationId?: string, userId = getCurrentUserId()) => {
+    const paymentAmount = normalizeMoney(amount);
+    const wallet = getWalletState(userId);
+    if (paymentAmount <= 0) {
+        throw new Error('支付金额必须大于 0');
+    }
+    if (wallet.balance < paymentAmount) {
+        throw new Error('余额不足，请先充值');
+    }
+
+    const nextBalance = normalizeMoney(wallet.balance - paymentAmount);
+    return setWalletState({
+        balance: nextBalance,
+        transactions: [{
+            id: uuidv4(),
+            type: 'PAYMENT',
+            amount: paymentAmount,
+            balanceAfter: nextBalance,
+            title,
+            reservationId,
+            createdAt: new Date().toISOString(),
+        }, ...wallet.transactions],
+    }, userId);
+};
+
+export const refundWallet = (amount: number, title: string, reservationId?: string, userId = getCurrentUserId()) => {
+    const refundAmount = normalizeMoney(amount);
+    if (refundAmount <= 0) {
+        throw new Error('退款金额必须大于 0');
+    }
+
+    const wallet = getWalletState(userId);
+    const nextBalance = normalizeMoney(wallet.balance + refundAmount);
+    return setWalletState({
+        balance: nextBalance,
+        transactions: [{
+            id: uuidv4(),
+            type: 'REFUND',
+            amount: refundAmount,
+            balanceAfter: nextBalance,
+            title,
+            reservationId,
+            createdAt: new Date().toISOString(),
+        }, ...wallet.transactions],
+    }, userId);
+};
+
+export const getPaymentPreferences = (userId = getCurrentUserId()): UserPaymentPreferences => {
+    const preferences = readLocalRecord<UserPaymentPreferences>(PAYMENT_PREFERENCES_KEY);
+    const preference = preferences[userId];
+    return {
+        defaultPaymentMethod: preference?.defaultPaymentMethod === 'CARD' ? 'CARD' : 'WALLET',
+    };
+};
+
+export const setPaymentPreferences = (preference: UserPaymentPreferences, userId = getCurrentUserId()) => {
+    const preferences = readLocalRecord<UserPaymentPreferences>(PAYMENT_PREFERENCES_KEY);
+    const normalizedPreference: UserPaymentPreferences = {
+        defaultPaymentMethod: preference.defaultPaymentMethod === 'CARD' ? 'CARD' : 'WALLET',
+    };
+    preferences[userId] = normalizedPreference;
+    writeLocalRecord(PAYMENT_PREFERENCES_KEY, preferences);
+    window.dispatchEvent(new Event(PAYMENT_PREFERENCES_EVENT));
+    return normalizedPreference;
+};
+
+export const getNotifications = (userId = getCurrentUserId()): AppNotification[] => {
+    const notifications = readLocalRecord<AppNotification[]>(NOTIFICATIONS_KEY);
+    return Array.isArray(notifications[userId]) ? notifications[userId] : [];
+};
+
+export const addNotification = (
+    notification: Omit<AppNotification, 'id' | 'createdAt' | 'read'>,
+    userId = getCurrentUserId()
+) => {
+    const notifications = readLocalRecord<AppNotification[]>(NOTIFICATIONS_KEY);
+    const nextNotification: AppNotification = {
+        ...notification,
+        id: uuidv4(),
+        createdAt: new Date().toISOString(),
+        read: false,
+    };
+    notifications[userId] = [nextNotification, ...getNotifications(userId)].slice(0, 30);
+    writeLocalRecord(NOTIFICATIONS_KEY, notifications);
+    window.dispatchEvent(new Event(NOTIFICATIONS_EVENT));
+    return nextNotification;
+};
+
+export const markNotificationRead = (notificationId: string, userId = getCurrentUserId()) => {
+    const notifications = readLocalRecord<AppNotification[]>(NOTIFICATIONS_KEY);
+    notifications[userId] = getNotifications(userId).map(notification =>
+        notification.id === notificationId ? {...notification, read: true} : notification
+    );
+    writeLocalRecord(NOTIFICATIONS_KEY, notifications);
+    window.dispatchEvent(new Event(NOTIFICATIONS_EVENT));
+    return notifications[userId];
+};
+
+export const markAllNotificationsRead = (userId = getCurrentUserId()) => {
+    const notifications = readLocalRecord<AppNotification[]>(NOTIFICATIONS_KEY);
+    notifications[userId] = getNotifications(userId).map(notification => ({...notification, read: true}));
+    writeLocalRecord(NOTIFICATIONS_KEY, notifications);
+    window.dispatchEvent(new Event(NOTIFICATIONS_EVENT));
+    return notifications[userId];
 };

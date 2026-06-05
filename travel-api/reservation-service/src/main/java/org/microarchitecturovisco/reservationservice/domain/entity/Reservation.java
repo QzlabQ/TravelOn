@@ -103,7 +103,7 @@ public class Reservation {
             createdAt = LocalDateTime.now();
         }
         if (paymentDeadline == null) {
-            paymentDeadline = createdAt.plusMinutes(15);
+            paymentDeadline = createdAt.plusMinutes(30);
         }
     }
 }

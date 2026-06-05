@@ -35,6 +35,12 @@ export class ApiRequests {
         });
     }
 
+    static getHotelDetails = async (hotelId: string, params: HotelDetailsParams) => {
+        return await axiosInstance.get<HotelDetailsResponse>(`hotels/${hotelId}`, {
+            params
+        });
+    }
+
     static getHotelDestinations = async () => {
         return await axiosInstance.get('hotels/destinations');
     }
@@ -411,6 +417,50 @@ export interface HotelSearchOffer {
     },
     photos: string[],
     pricePerAdult: number,
+}
+
+export interface HotelDetailsParams {
+    dateFrom: string,
+    dateTo: string,
+    adults?: number,
+    childrenUnder3?: number,
+    childrenUnder10?: number,
+    childrenUnder18?: number,
+}
+
+export interface HotelRoomResponse {
+    roomId: string,
+    name: string,
+    description: string,
+    guestCapacity: number,
+}
+
+export interface HotelRoomConfiguration {
+    rooms: HotelRoomResponse[],
+    pricePerAdult: number,
+}
+
+export interface HotelCateringOption {
+    cateringId: string,
+    type: string,
+    rating: number,
+    price: number,
+    hotelId: string,
+}
+
+export interface HotelDetailsResponse {
+    hotelId: string,
+    hotelName: string,
+    rating: number,
+    description: string,
+    location: {
+        idLocation: string,
+        region: string,
+        country: string,
+    },
+    cateringOptions: HotelCateringOption[],
+    photos: string[],
+    roomsConfigurations: HotelRoomConfiguration[],
 }
 
 export interface LoginPayload {

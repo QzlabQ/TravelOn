@@ -23,7 +23,7 @@ public class InvalidPaymentHandler {
     private final BookHotelsSaga bookHotelsSaga;
     private final BookTransportsSaga bookTransportsSaga;
     private final ReservationRepository reservationRepository;
-    public static final int PAYMENT_TIMEOUT_SECONDS = 60;
+    public static final int PAYMENT_TIMEOUT_SECONDS = 30 * 60;
     public static Logger logger = Logger.getLogger(InvalidPaymentHandler.class.getName());
     private final RabbitTemplate rabbitTemplate;
 

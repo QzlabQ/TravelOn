@@ -11,13 +11,19 @@ import {
     LinearProgress,
     MenuItem,
     Paper,
+    Rating,
+    Switch,
     TextField,
+    ToggleButton,
+    ToggleButtonGroup,
     Typography
 } from "@mui/material";
 import {
     AccountCircle,
+    AccountBalanceWallet,
     Badge,
     Bookmarks,
+    CreditCard,
     Delete,
     Edit,
     Email,
@@ -30,11 +36,27 @@ import {
 import {Link, useNavigate} from "react-router-dom";
 import AuthDialog from "../components/AuthDialog";
 import {
+    ACCOUNT_IDENTITY_EVENT,
     clearCurrentUserSession,
+    getAccountIdentity,
+    getBookingPreferences,
     getCurrentUserSession,
+    getPaymentPreferences,
+    getWalletState,
+    PAYMENT_PREFERENCES_EVENT,
+    PaymentMethodPreference,
+    rechargeWallet,
+    setAccountIdentity,
+    setBookingPreferences,
+    setPaymentPreferences,
     updateCurrentUserProfile,
+    AccountIdentity,
+    BookingPreferences,
     UserProfile,
-    UserSession
+    UserSession,
+    WALLET_EVENT,
+    WalletTransactionType,
+    WalletState
 } from "../../core/currentUser";
 import {ApiRequests} from "../../core/apiConfig";
 import {TravelerPayload, TravelerResponse, TravelerType} from "../../core/apiConfig";
@@ -47,6 +69,12 @@ const emptyProfileForm = {
     avatarUrl: ""
 };
 
+const emptyIdentityForm: AccountIdentity = {
+    realName: "",
+    documentType: "身份证",
+    documentNumber: ""
+};
+
 const emptyTravelerForm: TravelerPayload = {
     name: "",
     travelerType: "ADULT",
@@ -55,6 +83,69 @@ const emptyTravelerForm: TravelerPayload = {
     phone: "",
     student: false,
     defaultTraveler: false
+};
+
+const trainTypeOptions = [
+    {label: "G/C 高铁城际", value: "GC"},
+    {label: "D 动车", value: "D"},
+    {label: "T 特快", value: "T"},
+    {label: "K 快速", value: "K"},
+    {label: "Z 直达", value: "Z"},
+    {label: "其他", value: "OTHER"},
+];
+
+const documentTypeOptions = ["身份证", "护照", "港澳通行证", "台胞证", "其他"];
+
+const maskValue = (value?: string, visibleStart = 3, visibleEnd = 4) => {
+    if (!value) return "";
+    if (value.length <= visibleStart + visibleEnd) return value.replace(/.(?=.{1})/g, "*");
+    return `${value.slice(0, visibleStart)}${"*".repeat(Math.max(3, value.length - visibleStart - visibleEnd))}${value.slice(-visibleEnd)}`;
+};
+
+const formatCurrency = (value: number) => `¥${value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+const parsePositiveAmount = (value: string | number) => {
+    const amount = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;
+};
+
+const walletTransactionMeta = {
+    TOP_UP: {label: "充值", color: "success" as const},
+    PAYMENT: {label: "支付", color: "warning" as const},
+    REFUND: {label: "退款", color: "info" as const},
+};
+
+type WalletTransactionFilter = "ALL" | WalletTransactionType;
+
+const walletTransactionFilters: Array<{label: string; value: WalletTransactionFilter}> = [
+    {label: "全部", value: "ALL"},
+    {label: "充值", value: "TOP_UP"},
+    {label: "支付", value: "PAYMENT"},
+    {label: "退款", value: "REFUND"},
+];
+
+const validateTraveler = (traveler: TravelerPayload) => {
+    if (!traveler.name.trim()) return "请填写出行人姓名。";
+    if (traveler.name.trim().length > 80) return "姓名不能超过 80 个字符。";
+    if ((traveler.documentType?.trim().length || 0) > 24) return "证件类型不能超过 24 个字符。";
+    if ((traveler.documentNumber?.trim().length || 0) > 48) return "证件号码不能超过 48 个字符。";
+    if ((traveler.phone?.trim().length || 0) > 32) return "手机号不能超过 32 个字符。";
+    return "";
+};
+
+const normalizeTravelerPayload = (traveler: TravelerPayload): TravelerPayload => ({
+    name: traveler.name.trim(),
+    travelerType: traveler.travelerType || "ADULT",
+    documentType: traveler.documentType?.trim() || undefined,
+    documentNumber: traveler.documentNumber?.trim() || undefined,
+    phone: traveler.phone?.trim() || undefined,
+    student: Boolean(traveler.student),
+    defaultTraveler: Boolean(traveler.defaultTraveler),
+});
+
+const extractApiErrorMessage = (error: any, fallback: string) => {
+    const responseMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message;
+    return responseMessage ? `${fallback}（${responseMessage}）` : fallback;
 };
 
 export default function Account() {
@@ -70,8 +161,20 @@ export default function Account() {
     const [travelerForm, setTravelerForm] = useState<TravelerPayload>(emptyTravelerForm);
     const [editingTravelerId, setEditingTravelerId] = useState("");
     const [travelerEditorOpen, setTravelerEditorOpen] = useState(false);
+    const [bookingPreferences, setBookingPreferencesForm] = useState<BookingPreferences>(getBookingPreferences());
+    const [identityForm, setIdentityForm] = useState<AccountIdentity>(() => getAccountIdentity());
+    const [wallet, setWallet] = useState<WalletState>(() => getWalletState());
+    const [topUpAmount, setTopUpAmount] = useState("500");
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethodPreference>(() => getPaymentPreferences().defaultPaymentMethod);
+    const [walletFilter, setWalletFilter] = useState<WalletTransactionFilter>("ALL");
 
     const profile = session?.user;
+    const identityVerified = Boolean(identityForm.realName.trim() && identityForm.documentNumber.trim().length >= 6);
+    const recentWalletTransactions = wallet.transactions
+        .filter(transaction => walletFilter === "ALL" || transaction.type === walletFilter)
+        .slice(0, 5);
+    const walletReserveTarget = 500;
+    const walletReserveGap = Math.max(0, Math.round((walletReserveTarget - wallet.balance) * 100) / 100);
 
     const initials = useMemo(() => {
         if (!profile) return "TC";
@@ -118,12 +221,30 @@ export default function Account() {
         }
     };
 
+    const refreshAccountAssets = () => {
+        setIdentityForm(getAccountIdentity());
+        setWallet(getWalletState());
+        setPaymentMethod(getPaymentPreferences().defaultPaymentMethod);
+    };
+
     useEffect(() => {
+        refreshAccountAssets();
+        const handleAccountAssetsChanged = () => refreshAccountAssets();
+        window.addEventListener(ACCOUNT_IDENTITY_EVENT, handleAccountAssetsChanged);
+        window.addEventListener(WALLET_EVENT, handleAccountAssetsChanged);
+        window.addEventListener(PAYMENT_PREFERENCES_EVENT, handleAccountAssetsChanged);
+
         if (profile) {
             syncProfileForm(profile);
             refreshProfile().then(r => r);
             loadTravelers().then(r => r);
         }
+
+        return () => {
+            window.removeEventListener(ACCOUNT_IDENTITY_EVENT, handleAccountAssetsChanged);
+            window.removeEventListener(WALLET_EVENT, handleAccountAssetsChanged);
+            window.removeEventListener(PAYMENT_PREFERENCES_EVENT, handleAccountAssetsChanged);
+        };
     }, []);
 
     const handleAuthenticated = (nextSession: UserSession) => {
@@ -131,6 +252,9 @@ export default function Account() {
         syncProfileForm(nextSession.user);
         setMessage("登录成功，欢迎回来。");
         setErrorMessage("");
+        setIdentityForm(getAccountIdentity(nextSession.user.id));
+        setWallet(getWalletState(nextSession.user.id));
+        setPaymentMethod(getPaymentPreferences(nextSession.user.id).defaultPaymentMethod);
         loadTravelers(nextSession).then(r => r);
     };
 
@@ -168,6 +292,9 @@ export default function Account() {
         clearCurrentUserSession();
         setSession(null);
         setProfileForm(emptyProfileForm);
+        setIdentityForm(emptyIdentityForm);
+        setWallet({balance: 0, transactions: []});
+        setPaymentMethod("WALLET");
         navigate("/");
     };
 
@@ -177,38 +304,129 @@ export default function Account() {
         setTravelerEditorOpen(true);
     };
 
-    const openEditTraveler = (traveler: TravelerResponse) => {
-        setEditingTravelerId(traveler.id);
+    const openCreateSelfTraveler = () => {
+        if (!profile) return;
+
+        setEditingTravelerId("");
         setTravelerForm({
-            name: traveler.name,
-            travelerType: traveler.travelerType,
-            documentType: traveler.documentType || "身份证",
-            documentNumber: traveler.documentNumber || "",
-            phone: traveler.phone || "",
-            student: traveler.student,
-            defaultTraveler: traveler.defaultTraveler
+            ...emptyTravelerForm,
+            name: identityForm.realName || `${profile.name || ""}${profile.surname ? ` ${profile.surname}` : ""}`.trim(),
+            documentType: identityForm.documentType || "身份证",
+            documentNumber: identityForm.documentNumber || "",
+            phone: profile.phone || "",
+            defaultTraveler: travelers.length === 0,
         });
         setTravelerEditorOpen(true);
     };
 
+    const openEditTraveler = (traveler: TravelerResponse) => {
+        setEditingTravelerId(traveler.id);
+        setTravelerForm({
+            name: traveler.name || "",
+            travelerType: traveler.travelerType || "ADULT",
+            documentType: traveler.documentType || "身份证",
+            documentNumber: traveler.documentNumber || "",
+            phone: traveler.phone || "",
+            student: Boolean(traveler.student),
+            defaultTraveler: Boolean(traveler.defaultTraveler)
+        });
+        setMessage("");
+        setErrorMessage("");
+        setTravelerEditorOpen(true);
+    };
+
     const saveTraveler = async () => {
-        if (!session || !travelerForm.name.trim()) return;
+        if (!session) return;
+        const payload = normalizeTravelerPayload(travelerForm);
+        const validationError = validateTraveler(payload);
+        if (validationError) {
+            setErrorMessage(validationError);
+            return;
+        }
+
         setSaving(true);
         setErrorMessage("");
         try {
             if (editingTravelerId) {
-                await ApiRequests.updateTraveler(session.token, editingTravelerId, travelerForm);
+                await ApiRequests.updateTraveler(session.token, editingTravelerId, payload);
             } else {
-                await ApiRequests.createTraveler(session.token, travelerForm);
+                await ApiRequests.createTraveler(session.token, payload);
             }
             setTravelerEditorOpen(false);
             setMessage(editingTravelerId ? "常用出行人已更新。" : "常用出行人已添加。");
             await loadTravelers();
-        } catch {
-            setErrorMessage("常用出行人保存失败，请检查填写内容。");
+        } catch (error: any) {
+            setErrorMessage(extractApiErrorMessage(error, "常用出行人保存失败，请检查填写内容。"));
         } finally {
             setSaving(false);
         }
+    };
+
+    const updateBookingPreference = <K extends keyof BookingPreferences>(key: K, value: BookingPreferences[K]) => {
+        setBookingPreferencesForm(previous => ({...previous, [key]: value}));
+    };
+
+    const togglePreferredTrainType = (value: string) => {
+        setBookingPreferencesForm(previous => {
+            const nextTypes = previous.preferredTrainTypes.includes(value)
+                ? previous.preferredTrainTypes.filter(item => item !== value)
+                : [...previous.preferredTrainTypes, value];
+            return {...previous, preferredTrainTypes: nextTypes};
+        });
+    };
+
+    const savePreferences = () => {
+        const normalizedPreferences = setBookingPreferences(bookingPreferences);
+        setBookingPreferencesForm(normalizedPreferences);
+        setMessage("预订偏好已保存，下次查询会自动应用。");
+        setErrorMessage("");
+    };
+
+    const saveIdentity = () => {
+        const normalizedIdentity = {
+            realName: identityForm.realName.trim(),
+            documentType: identityForm.documentType.trim() || "身份证",
+            documentNumber: identityForm.documentNumber.trim(),
+        };
+
+        if (!normalizedIdentity.realName) {
+            setErrorMessage("请填写真实姓名。");
+            return;
+        }
+        if (normalizedIdentity.documentNumber.length < 6) {
+            setErrorMessage("证件号码至少需要 6 位。");
+            return;
+        }
+
+        const savedIdentity = setAccountIdentity(normalizedIdentity);
+        setIdentityForm(savedIdentity);
+        setMessage("实名信息已保存，后续支付会自动带入。");
+        setErrorMessage("");
+    };
+
+    const handleRecharge = (amountValue?: number) => {
+        const amount = parsePositiveAmount(amountValue ?? topUpAmount);
+        if (amount <= 0) {
+            setErrorMessage("请输入大于 0 的充值金额。");
+            return;
+        }
+
+        try {
+            const nextWallet = rechargeWallet(amount, "账户充值");
+            setWallet(nextWallet);
+            setTopUpAmount(String(amount));
+            setMessage(`充值成功，当前余额 ${formatCurrency(nextWallet.balance)}。`);
+            setErrorMessage("");
+        } catch (error: any) {
+            setErrorMessage(error?.message || "充值失败，请稍后重试。");
+        }
+    };
+
+    const updateDefaultPaymentMethod = (method: PaymentMethodPreference) => {
+        const preference = setPaymentPreferences({defaultPaymentMethod: method});
+        setPaymentMethod(preference.defaultPaymentMethod);
+        setMessage(`默认支付方式已设为${preference.defaultPaymentMethod === "WALLET" ? "钱包" : "银行卡"}。`);
+        setErrorMessage("");
     };
 
     const deleteTraveler = async (travelerId: string) => {
@@ -298,6 +516,14 @@ export default function Account() {
                             <span className="text-sm text-gray-600">会员等级</span>
                             <Chip size="small" color="success" label={profile.loyaltyTier || "Explorer"}/>
                         </div>
+                        <div className="flex items-center justify-between rounded-lg bg-[#fff7ed] px-4 py-3">
+                            <span className="text-sm text-gray-600">钱包余额</span>
+                            <span className="text-sm font-semibold text-orange-600">{formatCurrency(wallet.balance)}</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
+                            <span className="text-sm text-gray-600">实名状态</span>
+                            <Chip size="small" color={identityVerified ? "primary" : "default"} label={identityVerified ? "已实名" : "未实名"}/>
+                        </div>
                         <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
                             <span className="text-sm text-gray-600">账户 ID</span>
                             <span className="max-w-[180px] truncate text-xs text-gray-500">{profile.id}</span>
@@ -380,12 +606,239 @@ export default function Account() {
                     </Paper>
 
                     <Paper elevation={0} className="border border-gray-200 p-6">
+                        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <Typography variant="h5" className="font-semibold">实名与钱包</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    本地模拟实名、余额充值和交易记录，让支付流程更接近真实产品。
+                                </Typography>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Chip color={identityVerified ? "success" : "warning"} label={identityVerified ? "已实名" : "待完善"}/>
+                                <AccountBalanceWallet style={{fontSize: 36, color: "#f97316"}}/>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
+                            <div className="rounded-lg border border-gray-200 p-4">
+                                <div className="mb-4 flex items-center justify-between">
+                                    <div>
+                                        <p className="font-semibold text-gray-900">实名信息</p>
+                                        <p className="text-xs text-gray-500">支付前会要求填写付款人实名信息，证件号仅保存在本地演示数据中。</p>
+                                    </div>
+                                    <CreditCard className="text-[#0f766e]"/>
+                                </div>
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <TextField
+                                        label="真实姓名"
+                                        value={identityForm.realName}
+                                        onChange={event => setIdentityForm({...identityForm, realName: event.target.value})}
+                                        fullWidth
+                                    />
+                                    <TextField
+                                        select
+                                        label="证件类型"
+                                        value={identityForm.documentType}
+                                        onChange={event => setIdentityForm({...identityForm, documentType: event.target.value})}
+                                        fullWidth
+                                    >
+                                        {documentTypeOptions.map(option => <MenuItem key={option} value={option}>{option}</MenuItem>)}
+                                    </TextField>
+                                    <TextField
+                                        className="md:col-span-2"
+                                        label="证件号码"
+                                        value={identityForm.documentNumber}
+                                        onChange={event => setIdentityForm({...identityForm, documentNumber: event.target.value.trim()})}
+                                        helperText={identityForm.documentNumber ? `展示时会脱敏：${maskValue(identityForm.documentNumber)}` : "用于模拟出票/入住身份核验"}
+                                        fullWidth
+                                    />
+                                </div>
+                                <div className="mt-4 flex justify-end">
+                                    <Button variant="contained" startIcon={<Save/>} onClick={saveIdentity}>保存实名信息</Button>
+                                </div>
+                            </div>
+
+                            <div className="rounded-lg border border-orange-100 bg-orange-50 p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm text-orange-700">当前余额</p>
+                                        <p className="mt-1 text-3xl font-bold text-orange-600">{formatCurrency(wallet.balance)}</p>
+                                    </div>
+                                    <Chip
+                                        size="small"
+                                        color={paymentMethod === "WALLET" ? "success" : "default"}
+                                        label={paymentMethod === "WALLET" ? "默认钱包" : "默认银行卡"}
+                                    />
+                                </div>
+                                <div className="mt-4 rounded-lg bg-white/80 p-3">
+                                    <p className="mb-2 text-sm font-semibold text-gray-700">默认支付方式</p>
+                                    <ToggleButtonGroup
+                                        fullWidth
+                                        exclusive
+                                        size="small"
+                                        value={paymentMethod}
+                                        onChange={(_, value) => value && updateDefaultPaymentMethod(value)}
+                                    >
+                                        <ToggleButton value="WALLET">钱包</ToggleButton>
+                                        <ToggleButton value="CARD">银行卡</ToggleButton>
+                                    </ToggleButtonGroup>
+                                </div>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    {[100, 500, 1000].map(amount => (
+                                        <Button key={amount} size="small" variant="outlined" onClick={() => handleRecharge(amount)}>
+                                            充 {formatCurrency(amount)}
+                                        </Button>
+                                    ))}
+                                    {walletReserveGap > 0 &&
+                                        <Button size="small" variant="contained" onClick={() => handleRecharge(walletReserveGap)}>
+                                            一键补足 {formatCurrency(walletReserveGap)}
+                                        </Button>
+                                    }
+                                </div>
+                                <div className="mt-4 flex gap-2">
+                                    <TextField
+                                        size="small"
+                                        label="自定义充值"
+                                        type="number"
+                                        value={topUpAmount}
+                                        onChange={event => setTopUpAmount(event.target.value)}
+                                        inputProps={{min: 1, step: 1}}
+                                        InputProps={{
+                                            startAdornment: <InputAdornment position="start">¥</InputAdornment>
+                                        }}
+                                    />
+                                    <Button variant="contained" onClick={() => handleRecharge()}>充值</Button>
+                                </div>
+                                <Divider className="my-4"/>
+                                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-sm font-semibold text-gray-700">最近交易</p>
+                                    <ToggleButtonGroup
+                                        exclusive
+                                        size="small"
+                                        value={walletFilter}
+                                        onChange={(_, value) => value && setWalletFilter(value)}
+                                    >
+                                        {walletTransactionFilters.map(filter => (
+                                            <ToggleButton key={filter.value} value={filter.value}>{filter.label}</ToggleButton>
+                                        ))}
+                                    </ToggleButtonGroup>
+                                </div>
+                                <div className="grid gap-2">
+                                    {recentWalletTransactions.map(transaction => {
+                                        const meta = walletTransactionMeta[transaction.type];
+                                        const signedAmount = transaction.type === "PAYMENT" ? "-" : "+";
+                                        return (
+                                            <div key={transaction.id} className="rounded-md bg-white px-3 py-2 text-sm">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <Chip size="small" color={meta.color} label={meta.label}/>
+                                                    <span className={transaction.type === "PAYMENT" ? "font-semibold text-red-500" : "font-semibold text-emerald-600"}>
+                                                        {signedAmount}{formatCurrency(transaction.amount)}
+                                                    </span>
+                                                </div>
+                                                <p className="mt-1 truncate text-xs text-gray-500">{transaction.title}</p>
+                                                <p className="mt-1 text-xs text-gray-400">
+                                                    余额 {formatCurrency(transaction.balanceAfter)} · {new Date(transaction.createdAt).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                    {recentWalletTransactions.length === 0 &&
+                                        <p className="rounded-md bg-white px-3 py-4 text-center text-sm text-gray-500">暂无交易记录，先试试充值。</p>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </Paper>
+
+                    <Paper elevation={0} className="border border-gray-200 p-6">
+                        <div className="mb-5 flex items-center justify-between">
+                            <div>
+                                <Typography variant="h5" className="font-semibold">预订偏好</Typography>
+                                <Typography variant="body2" color="text.secondary">保存常用线路和筛选条件，机票、火车票、酒店查询会优先套用。</Typography>
+                            </div>
+                            <TravelExplore style={{fontSize: 36, color: "#2563eb"}}/>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <TextField
+                                label="默认出发城市"
+                                value={bookingPreferences.defaultDepartureCity}
+                                onChange={event => updateBookingPreference("defaultDepartureCity", event.target.value)}
+                                fullWidth
+                            />
+                            <TextField
+                                label="默认到达城市"
+                                value={bookingPreferences.defaultArrivalCity}
+                                onChange={event => updateBookingPreference("defaultArrivalCity", event.target.value)}
+                                fullWidth
+                            />
+                            <TextField
+                                label="酒店最高预算"
+                                type="number"
+                                value={bookingPreferences.preferredHotelMaxPrice}
+                                onChange={event => updateBookingPreference("preferredHotelMaxPrice", event.target.value)}
+                                placeholder="不限"
+                                inputProps={{min: 0}}
+                                fullWidth
+                            />
+                            <div className="rounded-lg border border-gray-200 px-4 py-3">
+                                <p className="mb-2 text-sm font-semibold text-gray-700">酒店最低评分</p>
+                                <Rating
+                                    value={bookingPreferences.preferredHotelMinRating}
+                                    onChange={(_, value) => updateBookingPreference("preferredHotelMinRating", value ?? 0)}
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    {bookingPreferences.preferredHotelMinRating ? `${bookingPreferences.preferredHotelMinRating} 分以上` : "不限评分"}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-gray-200 px-4 py-3 md:col-span-2">
+                                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-700">火车车次偏好</p>
+                                        <p className="text-xs text-gray-500">进入火车票页时默认勾选这些车次类型。</p>
+                                    </div>
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={bookingPreferences.onlyAvailableTickets}
+                                                onChange={event => updateBookingPreference("onlyAvailableTickets", event.target.checked)}
+                                            />
+                                        }
+                                        label="只看有票"
+                                    />
+                                </div>
+                                <ToggleButtonGroup size="small" value={bookingPreferences.preferredTrainTypes}>
+                                    {trainTypeOptions.map(option => (
+                                        <ToggleButton
+                                            key={option.value}
+                                            value={option.value}
+                                            selected={bookingPreferences.preferredTrainTypes.includes(option.value)}
+                                            onClick={() => togglePreferredTrainType(option.value)}
+                                        >
+                                            {option.label}
+                                        </ToggleButton>
+                                    ))}
+                                </ToggleButtonGroup>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <Button variant="contained" startIcon={<Save/>} onClick={savePreferences}>
+                                保存偏好
+                            </Button>
+                        </div>
+                    </Paper>
+
+                    <Paper elevation={0} className="border border-gray-200 p-6">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
                                 <Typography variant="h5" className="font-semibold">常用出行人</Typography>
                                 <Typography variant="body2" color="text.secondary">预订机票、火车票和酒店时可以直接勾选。</Typography>
                             </div>
-                            <Button variant="contained" startIcon={<PersonAdd/>} onClick={openCreateTraveler}>新增</Button>
+                            <div className="flex gap-2">
+                                <Button variant="outlined" startIcon={<AccountCircle/>} onClick={openCreateSelfTraveler}>添加本人</Button>
+                                <Button variant="contained" startIcon={<PersonAdd/>} onClick={openCreateTraveler}>新增</Button>
+                            </div>
                         </div>
 
                         {travelerEditorOpen &&
@@ -397,7 +850,9 @@ export default function Account() {
                                         <MenuItem value="CHILD">儿童</MenuItem>
                                         <MenuItem value="STUDENT">学生</MenuItem>
                                     </TextField>
-                                    <TextField label="证件类型" value={travelerForm.documentType} onChange={event => setTravelerForm({...travelerForm, documentType: event.target.value})}/>
+                                    <TextField select label="证件类型" value={travelerForm.documentType} onChange={event => setTravelerForm({...travelerForm, documentType: event.target.value})}>
+                                        {documentTypeOptions.map(option => <MenuItem key={option} value={option}>{option}</MenuItem>)}
+                                    </TextField>
                                     <TextField label="证件号码" value={travelerForm.documentNumber} onChange={event => setTravelerForm({...travelerForm, documentNumber: event.target.value})}/>
                                     <TextField label="手机号" value={travelerForm.phone} onChange={event => setTravelerForm({...travelerForm, phone: event.target.value})}/>
                                     <div className="flex flex-wrap items-center gap-3">
@@ -405,6 +860,7 @@ export default function Account() {
                                         <FormControlLabel control={<Checkbox checked={travelerForm.defaultTraveler} onChange={event => setTravelerForm({...travelerForm, defaultTraveler: event.target.checked})}/>} label="默认出行人"/>
                                     </div>
                                 </div>
+                                {errorMessage && <Alert severity="error" className="mt-4">{errorMessage}</Alert>}
                                 <div className="mt-4 flex justify-end gap-2">
                                     <Button onClick={() => setTravelerEditorOpen(false)}>取消</Button>
                                     <Button variant="contained" startIcon={<Save/>} disabled={saving || !travelerForm.name.trim()} onClick={saveTraveler}>保存</Button>
@@ -421,7 +877,10 @@ export default function Account() {
                                             <Chip size="small" label={traveler.travelerType === "CHILD" ? "儿童" : traveler.travelerType === "STUDENT" ? "学生" : "成人"}/>
                                             {traveler.defaultTraveler && <Chip size="small" color="primary" label="默认"/>}
                                         </div>
-                                        <p className="mt-1 text-xs text-gray-500">{traveler.documentType || "证件未填写"} {traveler.documentNumber || ""} {traveler.phone ? ` · ${traveler.phone}` : ""}</p>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {traveler.documentType || "证件未填写"} {traveler.documentNumber ? maskValue(traveler.documentNumber) : ""}
+                                            {traveler.phone ? ` · ${maskValue(traveler.phone, 3, 4)}` : ""}
+                                        </p>
                                     </div>
                                     <div className="flex gap-1">
                                         <Button size="small" startIcon={<Edit/>} onClick={() => openEditTraveler(traveler)}>编辑</Button>

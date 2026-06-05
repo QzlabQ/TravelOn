@@ -1,15 +1,15 @@
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
+    Checkbox,
     Chip,
-    FormControl,
-    InputLabel,
     LinearProgress,
-    MenuItem,
-    Select,
+    Pagination,
     Slider,
+    Snackbar,
     Switch,
     TextField,
     ToggleButton,
@@ -26,9 +26,11 @@ import {
 } from "@mui/icons-material";
 import {ApiRequests, TicketSearchOffer} from "../../core/apiConfig";
 import {BookingPersonPayload} from "../../core/apiConfig";
-import {getCurrentUserId} from "../../core/currentUser";
+import {addNotification, getBookingPreferences, getCurrentUserId} from "../../core/currentUser";
 import TravelerSelector from "../../account/components/TravelerSelector";
-import {Link} from "react-router-dom";
+import {Link, useLocation, useNavigate} from "react-router-dom";
+import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
+import {useAuthSession} from "../../core/useAuthSession";
 
 type TicketMode = 'flight' | 'train';
 
@@ -64,6 +66,62 @@ const modeConfig = {
 };
 
 const today = new Date().toISOString().slice(0, 10);
+const TICKET_PAGE_SIZE = 8;
+const popularRoutes: Record<TicketMode, Array<{ from: string, to: string }>> = {
+    flight: [
+        {from: '北京', to: '上海'},
+        {from: '上海', to: '广州'},
+        {from: '深圳', to: '成都'},
+        {from: '杭州', to: '西安'},
+        {from: '重庆', to: '三亚'},
+        {from: '南京', to: '厦门'},
+    ],
+    train: [
+        {from: '北京', to: '沈阳'},
+        {from: '北京', to: '上海'},
+        {from: '上海', to: '南京'},
+        {from: '广州', to: '深圳'},
+        {from: '成都', to: '重庆'},
+        {from: '武汉', to: '长沙'},
+    ],
+};
+
+type TrainTypeFilter = 'GC' | 'D' | 'T' | 'K' | 'Z' | 'OTHER';
+
+const trainTypeFilters: Array<{label: string, value: TrainTypeFilter}> = [
+    {label: 'G/C', value: 'GC'},
+    {label: 'D', value: 'D'},
+    {label: 'T', value: 'T'},
+    {label: 'K', value: 'K'},
+    {label: 'Z', value: 'Z'},
+    {label: '其他', value: 'OTHER'},
+];
+const defaultTrainTypeFilters = trainTypeFilters.map(item => item.value);
+
+type TicketRebookState = {
+    routeFrom?: string | null;
+    routeTo?: string | null;
+    departureDate?: string | null;
+    bookingCode?: string | null;
+};
+
+const findPreferredCity = (cities: string[], keyword: string) => {
+    return cities.find(city => city.includes(keyword));
+};
+
+const isTrainTypeFilter = (value: string): value is TrainTypeFilter => {
+    return defaultTrainTypeFilters.includes(value as TrainTypeFilter);
+};
+
+const getTrainTypeGroup = (code: string): TrainTypeFilter => {
+    const firstLetter = code.trim().toUpperCase().charAt(0);
+    if (firstLetter === 'G' || firstLetter === 'C') return 'GC';
+    if (firstLetter === 'D') return 'D';
+    if (firstLetter === 'T') return 'T';
+    if (firstLetter === 'K') return 'K';
+    if (firstLetter === 'Z') return 'Z';
+    return 'OTHER';
+};
 
 const TicketCard = ({
     offer,
@@ -72,6 +130,7 @@ const TicketCard = ({
     onReserve,
     reserving = false,
     canReserve = true,
+    disabledLabel,
     selected = false
 }: {
     offer: TicketSearchOffer,
@@ -80,6 +139,7 @@ const TicketCard = ({
     onReserve?: (offer: TicketSearchOffer) => void,
     reserving?: boolean
     canReserve?: boolean
+    disabledLabel?: string
     selected?: boolean
 }) => {
     const config = modeConfig[mode];
@@ -126,7 +186,7 @@ const TicketCard = ({
                     disabled={reserving || !canReserve}
                     onClick={() => onReserve?.(offer)}
                 >
-                    {reserving ? '提交中' : selected ? '已选择' : '选择'}
+                    {!canReserve ? disabledLabel ?? '不可选择' : reserving ? '提交中' : selected ? '已选择' : '选择'}
                 </Button>
             </div>
         </div>
@@ -135,31 +195,83 @@ const TicketCard = ({
 
 const TicketBooking = ({mode}: TicketBookingProps) => {
     const config = modeConfig[mode];
+    const navigate = useNavigate();
+    const location = useLocation();
+    const session = useAuthSession();
+    const isAuthenticated = Boolean(session);
+    const rebookState = (location.state ?? {}) as TicketRebookState;
+    const bookingPreferences = useMemo(() => getBookingPreferences(), []);
+    const preferredTrainTypeFilters = bookingPreferences.preferredTrainTypes.filter(isTrainTypeFilter);
+    const navigateTimerRef = useRef<number | null>(null);
     const [departures, setDepartures] = useState<string[]>([]);
     const [arrivals, setArrivals] = useState<string[]>([]);
     const [from, setFrom] = useState('');
     const [to, setTo] = useState('');
-    const [date, setDate] = useState(today);
+    const [date, setDate] = useState(rebookState.departureDate ?? today);
     const [sortBy, setSortBy] = useState('departure');
     const [priceRange, setPriceRange] = useState<number[]>([config.lowPrice, config.highPrice]);
     const [studentOnly, setStudentOnly] = useState(false);
-    const [onlyAvailable, setOnlyAvailable] = useState(false);
+    const [onlyAvailable, setOnlyAvailable] = useState(bookingPreferences.onlyAvailableTickets);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
     const [bookingId, setBookingId] = useState('');
     const [bookingMessage, setBookingMessage] = useState('');
     const [bookingError, setBookingError] = useState(false);
+    const [toastOpen, setToastOpen] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
+    const [toastError, setToastError] = useState(false);
     const [reservationId, setReservationId] = useState('');
     const [selectedTravelers, setSelectedTravelers] = useState<BookingPersonPayload[]>([]);
+    const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
     const [ticketOffers, setTicketOffers] = useState<TicketSearchOffer[]>([]);
     const [selectedOffer, setSelectedOffer] = useState<TicketSearchOffer | null>(null);
     const [hasLoadedOptions, setHasLoadedOptions] = useState(false);
+    const [resultPage, setResultPage] = useState(1);
+    const [selectedTrainTypes, setSelectedTrainTypes] = useState<TrainTypeFilter[]>(preferredTrainTypeFilters.length > 0 ? preferredTrainTypeFilters : defaultTrainTypeFilters);
+    const [trainCodeQuery, setTrainCodeQuery] = useState(rebookState.bookingCode ?? '');
 
-    const offers = ticketOffers;
+    const offers = useMemo(() => {
+        if (mode !== 'train') return ticketOffers;
+        const normalizedTrainCodeQuery = trainCodeQuery.trim().toUpperCase();
+        return ticketOffers.filter(offer => {
+            const normalizedOfferCode = offer.code.toUpperCase();
+            return selectedTrainTypes.includes(getTrainTypeGroup(offer.code)) &&
+                (!normalizedTrainCodeQuery || normalizedOfferCode.includes(normalizedTrainCodeQuery));
+        });
+    }, [mode, selectedTrainTypes, ticketOffers, trainCodeQuery]);
     const recommendedOffer = offers[0];
     const moreOffers = recommendedOffer ? offers.filter(offer => offer.id !== recommendedOffer.id) : [];
+    const moreOfferPageCount = Math.max(1, Math.ceil(moreOffers.length / TICKET_PAGE_SIZE));
+    const currentMoreOfferPage = Math.min(resultPage, moreOfferPageCount);
+    const pagedMoreOffers = moreOffers.slice(
+        (currentMoreOfferPage - 1) * TICKET_PAGE_SIZE,
+        currentMoreOfferPage * TICKET_PAGE_SIZE
+    );
+    const pageStart = moreOffers.length === 0 ? 0 : (currentMoreOfferPage - 1) * TICKET_PAGE_SIZE + 1;
+    const pageEnd = Math.min(currentMoreOfferPage * TICKET_PAGE_SIZE, moreOffers.length);
+    const availablePopularRoutes = popularRoutes[mode]
+        .filter(route => departures.includes(route.from) && arrivals.includes(route.to));
+    const suggestedArrivals = arrivals
+        .filter(item => item !== to)
+        .slice(0, 6);
     const selectedPassengerCount = selectedTravelers.length;
     const selectedTotalPrice = selectedOffer ? selectedOffer.price * selectedPassengerCount : 0;
+    const allTrainTypesSelected = selectedTrainTypes.length === trainTypeFilters.length;
+
+    const clearAutoNavigate = () => {
+        if (navigateTimerRef.current) {
+            window.clearTimeout(navigateTimerRef.current);
+            navigateTimerRef.current = null;
+        }
+    };
+
+    const showToast = (message: string, errorToast = false) => {
+        setToastError(errorToast);
+        setToastMessage(message);
+        setToastOpen(true);
+    };
+
+    useEffect(() => clearAutoNavigate, []);
 
     const searchTickets = async (departureCity = from, arrivalCity = to, departureDate = date) => {
         if (!departureCity || !arrivalCity) return;
@@ -179,6 +291,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                 sortBy,
             });
             setTicketOffers(response.data);
+            setResultPage(1);
             setSelectedOffer(current => current ? response.data.find(offer => offer.id === current.id) ?? null : null);
         } catch (e) {
             console.log(e);
@@ -191,14 +304,26 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
 
     useEffect(() => {
         setHasLoadedOptions(false);
+        setSelectedTrainTypes(mode === 'train' && preferredTrainTypeFilters.length > 0 ? preferredTrainTypeFilters : defaultTrainTypeFilters);
+        setTrainCodeQuery(mode === 'train' ? rebookState.bookingCode ?? '' : '');
         setLoading(true);
         setError(false);
         ApiRequests.getTicketOptions(mode === 'flight' ? 'FLIGHT' : 'TRAIN')
             .then(response => {
                 const nextDepartures = response.data.departures ?? [];
                 const nextArrivals = response.data.arrivals ?? [];
-                const nextFrom = nextDepartures[0] ?? '';
-                const nextTo = nextArrivals.find(item => item !== nextFrom) ?? nextArrivals[0] ?? '';
+                const nextFrom = (rebookState.routeFrom && nextDepartures.includes(rebookState.routeFrom) ? rebookState.routeFrom : undefined)
+                    ?? findPreferredCity(nextDepartures, bookingPreferences.defaultDepartureCity)
+                    ?? findPreferredCity(nextDepartures, '北京')
+                    ?? nextDepartures[0]
+                    ?? '';
+                const nextArrivalCandidates = nextArrivals.filter(item => item !== nextFrom);
+                const nextTo = (rebookState.routeTo && nextArrivalCandidates.includes(rebookState.routeTo) ? rebookState.routeTo : undefined)
+                    ?? findPreferredCity(nextArrivalCandidates, bookingPreferences.defaultArrivalCity)
+                    ?? findPreferredCity(nextArrivalCandidates, '上海')
+                    ?? nextArrivalCandidates[0]
+                    ?? nextArrivals[0]
+                    ?? '';
                 setDepartures(nextDepartures);
                 setArrivals(nextArrivals);
                 setFrom(nextFrom);
@@ -231,6 +356,32 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
         setTo(oldFrom);
     };
 
+    const selectRoute = (departureCity: string, arrivalCity: string) => {
+        setFrom(departureCity);
+        setTo(arrivalCity);
+        searchTickets(departureCity, arrivalCity).then(r => r);
+    };
+
+    const toggleTrainType = (type: TrainTypeFilter) => {
+        setSelectedTrainTypes(current => {
+            const nextTypes = current.includes(type)
+                ? current.filter(item => item !== type)
+                : [...current, type];
+            setResultPage(1);
+            return nextTypes;
+        });
+    };
+
+    const toggleAllTrainTypes = () => {
+        setSelectedTrainTypes(allTrainTypesSelected ? [] : defaultTrainTypeFilters);
+        setResultPage(1);
+    };
+
+    const updateTrainCodeQuery = (value: string) => {
+        setTrainCodeQuery(value);
+        setResultPage(1);
+    };
+
     const updatePriceBound = (index: 0 | 1, value: string) => {
         const parsedValue = Number(value);
         if (Number.isNaN(parsedValue)) return;
@@ -249,30 +400,56 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
     };
 
     const selectTicket = (offer: TicketSearchOffer) => {
+        if (!isAuthenticated) {
+            setBookingError(true);
+            setBookingMessage('请先登录账户，再选择班次并提交订单。');
+            showToast('登录后才能选择和下单', true);
+            return;
+        }
+
         setSelectedOffer(offer);
         setBookingError(false);
         setBookingMessage('');
     };
 
-    const reserveTicket = async () => {
+    const openCheckoutConfirm = () => {
+        if (!isAuthenticated) {
+            setBookingError(true);
+            setBookingMessage('请先登录账户，再选择班次并提交订单。');
+            showToast('请先登录后再提交订单', true);
+            return;
+        }
         if (!selectedOffer) {
             setBookingError(true);
             setBookingMessage('请先选择一个可预订方案。');
+            showToast('请先选择一个可预订方案', true);
             return;
         }
         if (selectedTravelers.length === 0) {
             setBookingError(true);
             setBookingMessage('请先选择或填写至少一位出行人。');
+            showToast('请先选择或填写出行人', true);
             return;
         }
         if (selectedOffer.remainingSeats > 0 && selectedTravelers.length > selectedOffer.remainingSeats) {
             setBookingError(true);
             setBookingMessage('选择的出行人数超过当前余票数量。');
+            showToast('出行人数超过当前余票数量', true);
+            return;
+        }
+
+        setCheckoutConfirmOpen(true);
+    };
+
+    const reserveTicket = async () => {
+        if (!isAuthenticated || !selectedOffer || selectedTravelers.length === 0) {
+            setCheckoutConfirmOpen(false);
             return;
         }
         setBookingId(selectedOffer.id);
         setBookingError(false);
         setBookingMessage('');
+        setCheckoutConfirmOpen(false);
 
         try {
             const response = await ApiRequests.createTicketReservation({
@@ -290,10 +467,22 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                 travelers: selectedTravelers,
             });
             setReservationId(response.data.id);
+            addNotification({
+                type: "ORDER_CREATED",
+                title: "订单已创建",
+                message: `${mode === 'flight' ? '机票' : '火车票'}订单 ${selectedOffer.code} 已创建，请在 30 分钟内完成支付。`,
+                reservationId: response.data.id,
+            });
             setBookingMessage(`已创建预订 ${response.data.id}，请在订单详情中完成支付。`);
+            showToast('订单提交成功，即将进入订单详情');
+            clearAutoNavigate();
+            navigateTimerRef.current = window.setTimeout(() => {
+                navigate(`/reservations/${response.data.id}`);
+            }, 2000);
         } catch (e) {
             console.log(e);
             setBookingError(true);
+            showToast('提交失败，请稍后再试', true);
         } finally {
             setBookingId('');
         }
@@ -301,6 +490,34 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
 
     return (
         <div className='min-h-screen bg-slate-50 px-8 py-8'>
+            <Snackbar
+                open={toastOpen}
+                autoHideDuration={1800}
+                onClose={() => setToastOpen(false)}
+                anchorOrigin={{vertical: 'top', horizontal: 'center'}}
+                sx={{mt: 2, zIndex: theme => theme.zIndex.modal + 1}}
+            >
+                <Alert
+                    severity={toastError ? 'error' : 'success'}
+                    onClose={() => setToastOpen(false)}
+                    action={!toastError && reservationId ?
+                        <Button
+                            component={Link}
+                            to={`/reservations/${reservationId}`}
+                            color='inherit'
+                            size='small'
+                            onClick={clearAutoNavigate}
+                        >
+                            查看订单
+                        </Button>
+                        : undefined
+                    }
+                    sx={{minWidth: 320, borderRadius: 2, boxShadow: 6, fontSize: 16, alignItems: 'center'}}
+                >
+                    {toastMessage}
+                </Alert>
+            </Snackbar>
+
             <div className='mb-6 rounded-lg bg-white border border-slate-200 px-7 py-6 shadow-sm'>
                 <Chip icon={config.icon} label={config.eyebrow} sx={{backgroundColor: '#eff6ff', color: config.accent}}/>
                 <div className='mt-4 flex flex-wrap items-end justify-between gap-4'>
@@ -311,11 +528,15 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                     <div className='flex gap-2'>
                         <Chip icon={<ArrowForward/>} label={`${from || '-'} 到 ${to || '-'}`}/>
                         <Chip icon={<Tune/>} label={`${offers.length} 个方案`}/>
+                        {mode === 'train' &&
+                            <Chip label={trainCodeQuery.trim() ? `车次 ${trainCodeQuery.trim()}` : allTrainTypesSelected ? '全部车次' : `${selectedTrainTypes.length} 类车次`}/>
+                        }
                     </div>
                 </div>
             </div>
 
             {error && <Alert severity='warning' className='mb-4'>后端票务数据暂时不可用，请确认交通服务已启动。</Alert>}
+            {!isAuthenticated && <Alert severity='info' className='mb-4'>未登录时可以查询票价和查看方案；登录后才能选择班次、填写出行人并提交订单。</Alert>}
             {bookingError && <Alert severity='error' className='mb-4'>创建预订失败，请确认后端服务已启动。</Alert>}
             {bookingMessage && <Alert severity={bookingError ? 'warning' : 'success'} className='mb-4' action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}`} color='inherit' size='small'>订单详情</Button> : undefined}>{bookingMessage}</Alert>}
 
@@ -324,22 +545,42 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                     <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
                         <h2 className='text-lg font-bold text-slate-900 mb-4'>查询行程</h2>
                         <div className='grid grid-cols-[1fr_44px_1fr] items-center gap-2'>
-                            <FormControl fullWidth size='small'>
-                                <InputLabel>{config.fromLabel}</InputLabel>
-                                <Select value={from} label={config.fromLabel} onChange={event => setFrom(event.target.value)}>
-                                    {departures.map(item => <MenuItem key={item} value={item}>{item}</MenuItem>)}
-                                </Select>
-                            </FormControl>
+                            <Autocomplete
+                                size='small'
+                                options={departures}
+                                value={from || null}
+                                noOptionsText='没有匹配城市'
+                                onChange={(_, value) => setFrom(value ?? '')}
+                                renderInput={(params) => <TextField {...params} label={config.fromLabel}/>}
+                            />
                             <Button onClick={swapLocations} variant='outlined' sx={{minWidth: 44, height: 40, borderRadius: 2}}>
                                 <SwapHoriz/>
                             </Button>
-                            <FormControl fullWidth size='small'>
-                                <InputLabel>{config.toLabel}</InputLabel>
-                                <Select value={to} label={config.toLabel} onChange={event => setTo(event.target.value)}>
-                                    {arrivals.map(item => <MenuItem key={item} value={item}>{item}</MenuItem>)}
-                                </Select>
-                            </FormControl>
+                            <Autocomplete
+                                size='small'
+                                options={arrivals}
+                                value={to || null}
+                                noOptionsText='没有匹配城市'
+                                onChange={(_, value) => setTo(value ?? '')}
+                                renderInput={(params) => <TextField {...params} label={config.toLabel}/>}
+                            />
                         </div>
+                        {availablePopularRoutes.length > 0 &&
+                            <div className='mt-4'>
+                                <p className='mb-2 text-xs font-semibold text-slate-500'>热门线路</p>
+                                <div className='flex flex-wrap gap-2'>
+                                    {availablePopularRoutes.map(route => (
+                                        <Chip
+                                            key={`${route.from}-${route.to}`}
+                                            size='small'
+                                            label={`${route.from} → ${route.to}`}
+                                            onClick={() => selectRoute(route.from, route.to)}
+                                            sx={{cursor: 'pointer', backgroundColor: '#f8fafc'}}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        }
                         <label className='block mt-5 text-sm font-semibold text-slate-700'>
                             出行日期
                             <input className='mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900' type='date' value={date} onChange={event => setDate(event.target.value)}/>
@@ -377,11 +618,14 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                     variant='contained'
                                     size='large'
                                     sx={{borderRadius: 2}}
-                                    disabled={bookingId === selectedOffer.id || selectedPassengerCount === 0}
-                                    onClick={reserveTicket}
+                                    disabled={!isAuthenticated || bookingId === selectedOffer.id || selectedPassengerCount === 0}
+                                    onClick={openCheckoutConfirm}
                                 >
-                                    {bookingId === selectedOffer.id ? '提交中' : '提交订单'}
+                                    {!isAuthenticated ? '登录后提交' : bookingId === selectedOffer.id ? '提交中' : '提交订单'}
                                 </Button>
+                                {!isAuthenticated &&
+                                    <p className='text-xs text-orange-500'>请先登录账户，才能选择出行人并提交订单。</p>
+                                }
                                 {selectedPassengerCount === 0 &&
                                     <p className='text-xs text-orange-500'>请先在上方选择或填写出行人。</p>
                                 }
@@ -403,6 +647,43 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                             <span className='text-sm text-slate-700'>只看有票</span>
                             <Switch checked={onlyAvailable} onChange={event => setOnlyAvailable(event.target.checked)}/>
                         </div>
+                        {mode === 'train' &&
+                            <div className='mb-5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3'>
+                                <div className='flex items-center justify-between'>
+                                    <p className='text-sm font-semibold text-slate-800'>车次类型</p>
+                                    <label className='flex cursor-pointer items-center gap-1 text-sm text-slate-700'>
+                                        <Checkbox
+                                            size='small'
+                                            checked={allTrainTypesSelected}
+                                            indeterminate={selectedTrainTypes.length > 0 && !allTrainTypesSelected}
+                                            onChange={toggleAllTrainTypes}
+                                        />
+                                        全选
+                                    </label>
+                                </div>
+                                <div className='mt-2 grid grid-cols-3 gap-1'>
+                                    {trainTypeFilters.map(option => (
+                                        <label key={option.value} className='flex cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-sm text-slate-700 hover:bg-white'>
+                                            <Checkbox
+                                                size='small'
+                                                checked={selectedTrainTypes.includes(option.value)}
+                                                onChange={() => toggleTrainType(option.value)}
+                                            />
+                                            {option.label}
+                                        </label>
+                                    ))}
+                                </div>
+                                <TextField
+                                    fullWidth
+                                    size='small'
+                                    label='按车次筛选'
+                                    value={trainCodeQuery}
+                                    onChange={event => updateTrainCodeQuery(event.target.value.toUpperCase())}
+                                    placeholder='例如 G101 / D / K'
+                                    sx={{mt: 2, backgroundColor: '#fff'}}
+                                />
+                            </div>
+                        }
                         <p className='mb-2 text-sm font-semibold text-slate-700'>价格区间</p>
                         <div className='grid grid-cols-2 gap-3'>
                             <TextField
@@ -448,21 +729,33 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                 mode={mode}
                                 onReserve={selectTicket}
                                 reserving={bookingId === recommendedOffer.id}
-                                canReserve={recommendedOffer.remainingSeats > 0}
+                                canReserve={isAuthenticated && recommendedOffer.remainingSeats > 0}
+                                disabledLabel={!isAuthenticated ? '登录后选择' : '暂无余票'}
                                 selected={selectedOffer?.id === recommendedOffer.id}
                             />
-                            : <div className='rounded-lg border border-dashed border-slate-300 bg-slate-50 py-12 text-center text-slate-500'>暂无匹配班次，请调整出发地或目的地</div>
+                            : <div className='rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-slate-500'>
+                                <p>暂无匹配班次，请调整出发地或目的地</p>
+                                {suggestedArrivals.length > 0 &&
+                                    <div className='mt-4 flex flex-wrap justify-center gap-2'>
+                                        {suggestedArrivals.map(item => (
+                                            <Chip key={item} size='small' label={`试试 ${from || '当前城市'} → ${item}`} onClick={() => selectRoute(from, item)} sx={{cursor: 'pointer'}}/>
+                                        ))}
+                                    </div>
+                                }
+                            </div>
                         }
                     </section>
 
                     <section className='mt-5 rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
                         <div className='flex items-center justify-between gap-4'>
                             <h2 className='text-xl font-bold text-slate-950'>更多可选方案</h2>
-                            <p className='text-sm text-slate-500'>在列表内部上下滑动比较时间、价格和余票成功率</p>
+                            <p className='text-sm text-slate-500'>
+                                {moreOffers.length > 0 ? `显示 ${pageStart}-${pageEnd} / 共 ${moreOffers.length} 条` : '暂无更多方案'}
+                            </p>
                         </div>
-                        <div className='mt-4 max-h-[620px] overflow-y-auto rounded-lg bg-slate-50 p-3 pr-2'>
+                        <div className='mt-4 rounded-lg bg-slate-50 p-3 pr-2'>
                             <div className='flex flex-col gap-3'>
-                                {moreOffers.map(offer => (
+                                {pagedMoreOffers.map(offer => (
                                     <TicketCard
                                         key={offer.id}
                                         offer={offer}
@@ -470,7 +763,8 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                         compact
                                         onReserve={selectTicket}
                                         reserving={bookingId === offer.id}
-                                        canReserve={offer.remainingSeats > 0}
+                                        canReserve={isAuthenticated && offer.remainingSeats > 0}
+                                        disabledLabel={!isAuthenticated ? '登录后选择' : '暂无余票'}
                                         selected={selectedOffer?.id === offer.id}
                                     />
                                 ))}
@@ -479,6 +773,16 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                 }
                             </div>
                         </div>
+                        {moreOffers.length > TICKET_PAGE_SIZE &&
+                            <div className='mt-4 flex justify-center'>
+                                <Pagination
+                                    count={moreOfferPageCount}
+                                    page={currentMoreOfferPage}
+                                    color='primary'
+                                    onChange={(_, page) => setResultPage(page)}
+                                />
+                            </div>
+                        }
                     </section>
 
                     <section className='mt-5 rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
@@ -500,6 +804,34 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                     </section>
                 </main>
             </div>
+            {selectedOffer &&
+                <CheckoutConfirmDialog
+                    open={checkoutConfirmOpen}
+                    title={mode === 'flight' ? "确认机票订单" : "确认火车票订单"}
+                    subtitle="提交后将生成待支付订单，支付倒计时为 30 分钟。"
+                    travelers={selectedTravelers}
+                    summaryRows={[
+                        {label: "线路", value: `${from} → ${to}`},
+                        {label: "日期", value: date},
+                        {label: "班次", value: `${selectedOffer.carrier} ${selectedOffer.code}`},
+                        {label: "时间", value: `${selectedOffer.departureTime} - ${selectedOffer.arrivalTime}`},
+                        {label: "席别", value: selectedOffer.seatClass},
+                    ]}
+                    priceRows={[
+                        {label: "票价", value: `¥${selectedOffer.price} × ${selectedPassengerCount} 人`},
+                        {label: "服务费", value: "¥0.00"},
+                    ]}
+                    totalPrice={selectedTotalPrice}
+                    rules={[
+                        "未支付订单将在 30 分钟后自动超时。",
+                        "支付成功后如需取消，可在订单详情页申请退款。",
+                        "退改签规则以承运方实时政策为准，本项目为课程演示不调用真实出票接口。",
+                    ]}
+                    submitting={bookingId === selectedOffer.id}
+                    onClose={() => setCheckoutConfirmOpen(false)}
+                    onConfirm={reserveTicket}
+                />
+            }
         </div>
     );
 };

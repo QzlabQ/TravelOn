@@ -3,6 +3,8 @@ package org.microarchitecturovisco.reservationservice.domain.dto.responses;
 import org.microarchitecturovisco.reservationservice.domain.entity.RefundRecord;
 import org.microarchitecturovisco.reservationservice.domain.entity.RefundStatus;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 public record RefundRecordResponse(
@@ -14,6 +16,8 @@ public record RefundRecordResponse(
         String requestedAt,
         String completedAt
 ) {
+    private static final ZoneId RESPONSE_ZONE = ZoneId.systemDefault();
+
     public static RefundRecordResponse from(RefundRecord refund) {
         return new RefundRecordResponse(
                 refund.getId(),
@@ -21,8 +25,12 @@ public record RefundRecordResponse(
                 refund.getAmount(),
                 refund.getReason(),
                 refund.getStatus(),
-                refund.getRequestedAt() == null ? null : refund.getRequestedAt().toString(),
-                refund.getCompletedAt() == null ? null : refund.getCompletedAt().toString()
+                format(refund.getRequestedAt()),
+                format(refund.getCompletedAt())
         );
+    }
+
+    private static String format(LocalDateTime value) {
+        return value == null ? null : value.atZone(RESPONSE_ZONE).toOffsetDateTime().toString();
     }
 }

@@ -2,6 +2,8 @@ package org.microarchitecturovisco.reservationservice.domain.dto.responses;
 
 import org.microarchitecturovisco.reservationservice.domain.entity.PaymentTransaction;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 public record PaymentTransactionResponse(
@@ -14,6 +16,8 @@ public record PaymentTransactionResponse(
         String failureReason,
         String createdAt
 ) {
+    private static final ZoneId RESPONSE_ZONE = ZoneId.systemDefault();
+
     public static PaymentTransactionResponse from(PaymentTransaction transaction) {
         return new PaymentTransactionResponse(
                 transaction.getId(),
@@ -23,7 +27,11 @@ public record PaymentTransactionResponse(
                 transaction.isApproved(),
                 transaction.getStatus(),
                 transaction.getFailureReason(),
-                transaction.getCreatedAt() == null ? null : transaction.getCreatedAt().toString()
+                format(transaction.getCreatedAt())
         );
+    }
+
+    private static String format(LocalDateTime value) {
+        return value == null ? null : value.atZone(RESPONSE_ZONE).toOffsetDateTime().toString();
     }
 }

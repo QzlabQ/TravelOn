@@ -13,30 +13,71 @@ import {
     TableHead,
     TableRow
 } from "@mui/material";
-import {Cancel, Refresh, Visibility} from "@mui/icons-material";
+import {Cancel, Refresh, Replay, Visibility} from "@mui/icons-material";
 import {ApiRequests, ReservationResponse} from "../../core/apiConfig";
 import {getCurrentUserId, getCurrentUserMode} from "../../core/currentUser";
 import {Link} from "react-router-dom";
+import {
+    canCancelReservation,
+    formatTripDate,
+    getEffectiveReservationStatus,
+    getReservationStatusMeta,
+    toDateInputValue
+} from "../orderStatus";
 
-const statusLabel = (reservation: ReservationResponse) => {
-    if (reservation.status === 'REFUND_PROCESSING') return '退款处理中';
-    if (reservation.status === 'REFUNDED') return '已退款';
-    if (reservation.status === 'CANCELLED') return '已取消';
-    if (reservation.status === 'EXPIRED') return '已过期';
-    if (reservation.status === 'PAID' || reservation.paid) return '已支付';
-    return '待支付';
-};
+const getRebookTarget = (reservation: ReservationResponse) => {
+    if (reservation.bookingType === 'FLIGHT') {
+        return {
+            pathname: '/reservations/flights',
+            state: {
+                routeFrom: reservation.routeFrom,
+                routeTo: reservation.routeTo,
+                departureDate: toDateInputValue(reservation.hotelTimeFrom),
+                bookingCode: reservation.bookingCode,
+            },
+        };
+    }
 
-const statusColor = (reservation: ReservationResponse): "default" | "success" | "warning" | "error" => {
-    if (reservation.status === 'REFUND_PROCESSING') return 'warning';
-    if (reservation.status === 'CANCELLED' || reservation.status === 'EXPIRED' || reservation.status === 'REFUNDED') return 'default';
-    if (reservation.status === 'PAID' || reservation.paid) return 'success';
-    return 'warning';
-};
+    if (reservation.bookingType === 'TRAIN') {
+        return {
+            pathname: '/reservations/trains',
+            state: {
+                routeFrom: reservation.routeFrom,
+                routeTo: reservation.routeTo,
+                departureDate: toDateInputValue(reservation.hotelTimeFrom),
+                bookingCode: reservation.bookingCode,
+            },
+        };
+    }
 
-const formatReservationDate = (value: string) => {
-    if (!value) return '-';
-    return new Date(value).toLocaleString();
+    if (reservation.bookingType === 'HOTEL') {
+        if (reservation.hotelId) {
+            return {
+                pathname: `/reservations/hotels/${reservation.hotelId}`,
+                search: new URLSearchParams({
+                    dateFrom: toDateInputValue(reservation.hotelTimeFrom) ?? '',
+                    dateTo: toDateInputValue(reservation.hotelTimeTo) ?? '',
+                    adults: String(Math.max(1, reservation.adultsQuantity || 1)),
+                }).toString(),
+                state: {
+                    dateFrom: toDateInputValue(reservation.hotelTimeFrom),
+                    dateTo: toDateInputValue(reservation.hotelTimeTo),
+                    adults: Math.max(1, reservation.adultsQuantity || 1),
+                },
+            };
+        }
+
+        return {
+            pathname: '/reservations/hotels',
+            state: {
+                dateFrom: toDateInputValue(reservation.hotelTimeFrom),
+                dateTo: toDateInputValue(reservation.hotelTimeTo),
+                hotelName: reservation.title,
+            },
+        };
+    }
+
+    return {pathname: '/offers'};
 };
 
 const Reservations = () => {
@@ -134,27 +175,40 @@ const Reservations = () => {
                                                     : reservation.hotelId ? `酒店 ${reservation.hotelId}` : reservation.provider || '订单详情'}
                                             </p>
                                         </TableCell>
-                                        <TableCell>{formatReservationDate(reservation.hotelTimeFrom)}</TableCell>
-                                        <TableCell>{formatReservationDate(reservation.hotelTimeTo)}</TableCell>
+                                        <TableCell>{formatTripDate(reservation.hotelTimeFrom)}</TableCell>
+                                        <TableCell>{formatTripDate(reservation.hotelTimeTo)}</TableCell>
                                         <TableCell>
                                             {reservation.adultsQuantity + reservation.childrenUnder18Quantity + reservation.childrenUnder10Quantity + reservation.childrenUnder3Quantity}
                                         </TableCell>
                                         <TableCell>{Math.ceil(reservation.price).toLocaleString()} 元</TableCell>
                                         <TableCell>
-                                            <Chip size='small' color={statusColor(reservation)} label={statusLabel(reservation)}/>
+                                            <Chip
+                                                size='small'
+                                                color={getReservationStatusMeta(reservation).color}
+                                                label={getReservationStatusMeta(reservation).label}
+                                            />
                                         </TableCell>
                                         <TableCell align='right'>
                                             <div className='flex justify-end gap-2'>
                                                 <Button component={Link} to={`/reservations/${reservation.id}`} variant='outlined' size='small' startIcon={<Visibility/>}>
                                                     详情
                                                 </Button>
-                                                {!reservation.paid &&
+                                                <Button
+                                                    component={Link}
+                                                    to={getRebookTarget(reservation)}
+                                                    variant='outlined'
+                                                    size='small'
+                                                    startIcon={<Replay/>}
+                                                >
+                                                    再次预订
+                                                </Button>
+                                                {canCancelReservation(reservation) &&
                                                     <Button
                                                         color='error'
                                                         variant='outlined'
                                                         size='small'
                                                         startIcon={<Cancel/>}
-                                                        disabled={reservation.status === 'CANCELLED' || reservation.status === 'EXPIRED' || cancellingId === reservation.id}
+                                                        disabled={getEffectiveReservationStatus(reservation) === 'CANCELLED' || getEffectiveReservationStatus(reservation) === 'EXPIRED' || cancellingId === reservation.id}
                                                         onClick={() => cancelReservation(reservation.id)}
                                                     >
                                                         取消

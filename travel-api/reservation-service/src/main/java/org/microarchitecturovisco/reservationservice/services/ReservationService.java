@@ -123,8 +123,10 @@ public class ReservationService {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
 
+        if (reservation.getStatus() == ReservationStatus.REFUND_PROCESSING) {
+            return ReservationResponse.from(completeProcessingRefund(reservation));
+        }
         if (reservation.getStatus() == ReservationStatus.CANCELLED ||
-                reservation.getStatus() == ReservationStatus.REFUND_PROCESSING ||
                 reservation.getStatus() == ReservationStatus.REFUNDED) {
             return ReservationResponse.from(reservation);
         }
@@ -139,18 +141,20 @@ public class ReservationService {
                     .reservationId(reservationId)
                     .amount(reservation.getPrice())
                     .reason(normalizedReason)
-                    .status(RefundStatus.PROCESSING)
+                    .status(RefundStatus.COMPLETED)
                     .requestedAt(now)
+                    .completedAt(now)
                     .build());
         }
 
         reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
                 .reservationId(reservationId)
-                .paid(refundRequired ? reservation.isPaid() : false)
-                .status(refundRequired ? ReservationStatus.REFUND_PROCESSING : ReservationStatus.CANCELLED)
+                .paid(false)
+                .status(refundRequired ? ReservationStatus.REFUNDED : ReservationStatus.CANCELLED)
                 .cancellationReason(normalizedReason)
                 .cancelledAt(now)
                 .refundRequestedAt(refundRequired ? now : null)
+                .refundedAt(refundRequired ? now : null)
                 .build());
 
         return reservationRepository.findById(reservationId)
@@ -414,31 +418,7 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only processing refunds can be completed");
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        RefundRecord refund = refundRecordRepository
-                .findFirstByReservationIdAndStatusOrderByRequestedAtDesc(reservationId, RefundStatus.PROCESSING)
-                .orElseGet(() -> refundRecordRepository.save(RefundRecord.builder()
-                        .id(UUID.randomUUID())
-                        .reservationId(reservationId)
-                        .amount(reservation.getPrice())
-                        .reason(hasText(reservation.getCancellationReason()) ? reservation.getCancellationReason() : "退款完成")
-                        .status(RefundStatus.PROCESSING)
-                        .requestedAt(reservation.getRefundRequestedAt() == null ? now : reservation.getRefundRequestedAt())
-                        .build()));
-        refund.setStatus(RefundStatus.COMPLETED);
-        refund.setCompletedAt(now);
-        refundRecordRepository.save(refund);
-
-        reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
-                .reservationId(reservationId)
-                .paid(false)
-                .status(ReservationStatus.REFUNDED)
-                .refundedAt(now)
-                .build());
-
-        return reservationRepository.findById(reservationId)
-                .map(ReservationResponse::from)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+        return ReservationResponse.from(completeProcessingRefund(reservation));
     }
 
     private void sendBoughtOfferWebsocketMessages(String message, String idHotel) {
@@ -587,6 +567,9 @@ public class ReservationService {
     }
 
     private Reservation refreshExpiredReservation(Reservation reservation) {
+        if (reservation.getStatus() == ReservationStatus.REFUND_PROCESSING) {
+            return completeProcessingRefund(reservation);
+        }
         if (reservation.getStatus() == ReservationStatus.PENDING_PAYMENT &&
                 reservation.getPaymentDeadline() != null &&
                 reservation.getPaymentDeadline().isBefore(LocalDateTime.now())) {
@@ -598,6 +581,33 @@ public class ReservationService {
             return reservationRepository.findById(reservation.getId()).orElse(reservation);
         }
         return reservation;
+    }
+
+    private Reservation completeProcessingRefund(Reservation reservation) {
+        LocalDateTime now = LocalDateTime.now();
+        UUID reservationId = reservation.getId();
+        RefundRecord refund = refundRecordRepository
+                .findFirstByReservationIdAndStatusOrderByRequestedAtDesc(reservationId, RefundStatus.PROCESSING)
+                .orElseGet(() -> refundRecordRepository.save(RefundRecord.builder()
+                        .id(UUID.randomUUID())
+                        .reservationId(reservationId)
+                        .amount(reservation.getPrice())
+                        .reason(hasText(reservation.getCancellationReason()) ? reservation.getCancellationReason() : "退款完成")
+                        .status(RefundStatus.PROCESSING)
+                        .requestedAt(reservation.getRefundRequestedAt() == null ? now : reservation.getRefundRequestedAt())
+                        .build()));
+        refund.setStatus(RefundStatus.COMPLETED);
+        refund.setCompletedAt(now);
+        refundRecordRepository.save(refund);
+
+        reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                .reservationId(reservationId)
+                .paid(false)
+                .status(ReservationStatus.REFUNDED)
+                .refundedAt(now)
+                .build());
+
+        return reservationRepository.findById(reservationId).orElse(reservation);
     }
 
     private Reservation requireReservation(UUID reservationId) {

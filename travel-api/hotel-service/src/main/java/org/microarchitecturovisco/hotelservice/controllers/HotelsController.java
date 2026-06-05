@@ -28,6 +28,7 @@ import org.microarchitecturovisco.hotelservice.utils.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -50,6 +51,27 @@ public class HotelsController {
     @GetMapping("/destinations")
     public List<LocationDto> getDestinations() {
         return hotelsService.getDestinations();
+    }
+
+    @GetMapping("/{hotelId}")
+    public GetHotelDetailsResponseDto getHotelDetails(
+            @PathVariable UUID hotelId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(defaultValue = "2") int adults,
+            @RequestParam(defaultValue = "0") int childrenUnder3,
+            @RequestParam(defaultValue = "0") int childrenUnder10,
+            @RequestParam(defaultValue = "0") int childrenUnder18
+    ) {
+        return hotelsService.getHotelDetails(GetHotelDetailsRequestDto.builder()
+                .hotelId(hotelId)
+                .dateFrom(dateFrom.atStartOfDay())
+                .dateTo(dateTo.atTime(23, 59, 59))
+                .adults(adults)
+                .childrenUnderThree(childrenUnder3)
+                .childrenUnderTen(childrenUnder10)
+                .childrenUnderEighteen(childrenUnder18)
+                .build());
     }
 
     @GetMapping("/search")

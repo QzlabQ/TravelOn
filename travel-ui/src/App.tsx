@@ -15,6 +15,7 @@ import AiPlanner from "./ai-arrange/screens/AiPlanner";
 import Reservations from "./reservations/screens/Reservations";
 import TicketBooking from "./reservations/screens/TicketBooking";
 import HotelBooking from "./reservations/screens/HotelBooking";
+import HotelDetails from "./reservations/screens/HotelDetails";
 import Account from "./account/screens/Account";
 import ReservationDetails from "./reservations/screens/ReservationDetails";
 
@@ -37,6 +38,7 @@ function App() {
                     <Route path='/reservations/flights' element={<TicketBooking mode='flight'/>}/>
                     <Route path='/reservations/trains' element={<TicketBooking mode='train'/>}/>
                     <Route path='/reservations/hotels' element={<HotelBooking/>}/>
+                    <Route path='/reservations/hotels/:hotelId' element={<HotelDetails/>}/>
                     <Route path='/account' element={<Account/>}/>
                     <Route path='/clientPreferences' element={<Preferences/>}/>
                     <Route path='/TOUpdates' element={<TOUpdates/>}/>

@@ -3,6 +3,8 @@ package org.microarchitecturovisco.reservationservice.domain.dto.responses;
 import org.microarchitecturovisco.reservationservice.domain.entity.Reservation;
 import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,11 +38,13 @@ public record ReservationResponse(
         String refundedAt,
         String cancellationReason
 ) {
+    private static final ZoneId RESPONSE_ZONE = ZoneId.systemDefault();
+
     public static ReservationResponse from(Reservation reservation) {
         return new ReservationResponse(
                 reservation.getId(),
-                reservation.getHotelTimeFrom() == null ? null : reservation.getHotelTimeFrom().toString(),
-                reservation.getHotelTimeTo() == null ? null : reservation.getHotelTimeTo().toString(),
+                format(reservation.getHotelTimeFrom()),
+                format(reservation.getHotelTimeTo()),
                 reservation.getAdultsQuantity(),
                 reservation.getChildrenUnder3Quantity(),
                 reservation.getChildrenUnder10Quantity(),
@@ -69,7 +73,7 @@ public record ReservationResponse(
         );
     }
 
-    private static String format(java.time.LocalDateTime value) {
-        return value == null ? null : value.toString();
+    private static String format(LocalDateTime value) {
+        return value == null ? null : value.atZone(RESPONSE_ZONE).toOffsetDateTime().toString();
     }
 }
