@@ -15,6 +15,7 @@ import {
 import {Add, Person, PersonAdd} from "@mui/icons-material";
 import {ApiRequests, BookingPersonPayload, TravelerResponse, TravelerType} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
+import {getChineseResidentIdInfo, normalizeDocumentNumber, validateDocumentNumber} from "../../core/validation";
 
 type TravelerSelectorProps = {
     title?: string;
@@ -65,6 +66,8 @@ export default function TravelerSelector({title = "选择出行人", single = fa
     });
     const [temporaryTravelerError, setTemporaryTravelerError] = useState("");
     const [loadingError, setLoadingError] = useState(false);
+    const temporaryTravelerDocumentError = validateDocumentNumber("身份证", temporaryTravelerForm.documentNumber, false);
+    const temporaryTravelerIdInfo = getChineseResidentIdInfo(temporaryTravelerForm.documentNumber);
 
     useEffect(() => {
         if (!session) {
@@ -143,17 +146,14 @@ export default function TravelerSelector({title = "选择出行人", single = fa
 
     const addTemporaryTraveler = () => {
         const trimmedName = temporaryTravelerForm.name.trim();
-        const trimmedDocumentNumber = temporaryTravelerForm.documentNumber?.trim() || "";
+        const trimmedDocumentNumber = normalizeDocumentNumber("身份证", temporaryTravelerForm.documentNumber);
         if (!trimmedName) {
             setTemporaryTravelerError("请填写出行人姓名。");
             return;
         }
-        if (!trimmedDocumentNumber) {
-            setTemporaryTravelerError("请填写身份证号。");
-            return;
-        }
-        if (trimmedDocumentNumber.length > 48) {
-            setTemporaryTravelerError("身份证号不能超过 48 个字符。");
+        const documentError = validateDocumentNumber("身份证", trimmedDocumentNumber, true);
+        if (documentError) {
+            setTemporaryTravelerError(documentError);
             return;
         }
 
@@ -222,14 +222,19 @@ export default function TravelerSelector({title = "选择出行人", single = fa
                                 className="m-0"
                                 control={<Checkbox size="small" checked={selectedIds.includes(traveler.id)} disabled={!canSelectTraveler} onChange={() => toggleSavedTraveler(traveler.id)}/>}
                                 label={
-                                    <span>
-                                        <span className="text-sm font-semibold text-slate-800">{traveler.name}</span>
-                                        <span className="ml-2 text-xs text-slate-500">
-                                            {traveler.documentNumber ? maskValue(traveler.documentNumber) : traveler.phone ? maskValue(traveler.phone) : ""}
+                                        <span>
+                                            <span className="text-sm font-semibold text-slate-800">{traveler.name}</span>
+                                            <span className="ml-2 text-xs text-slate-500">
+                                                {traveler.documentNumber ? maskValue(traveler.documentNumber) : traveler.phone ? maskValue(traveler.phone) : ""}
+                                            </span>
+                                            {traveler.documentType === "身份证" && getChineseResidentIdInfo(traveler.documentNumber) &&
+                                                <span className="ml-2 text-xs text-slate-400">
+                                                    · {getChineseResidentIdInfo(traveler.documentNumber)?.birthDate} · {getChineseResidentIdInfo(traveler.documentNumber)?.age} 岁
+                                                </span>
+                                            }
                                         </span>
-                                    </span>
-                                }
-                            />
+                                    }
+                                />
                             <div className="flex gap-1">
                                 {traveler.defaultTraveler && <Chip size="small" label="默认"/>}
                                 <Chip size="small" variant="outlined" label={typeLabel(traveler.travelerType)}/>
@@ -246,7 +251,7 @@ export default function TravelerSelector({title = "选择出行人", single = fa
                             key={`${traveler.name}-${index}`}
                             color="primary"
                             variant="outlined"
-                            label={`${traveler.name} · ${typeLabel(traveler.travelerType)} · 身份证 ${maskValue(traveler.documentNumber)}`}
+                            label={`${traveler.name} · ${typeLabel(traveler.travelerType)} · ${getChineseResidentIdInfo(traveler.documentNumber)?.age ?? "--"}岁`}
                             onDelete={() => removeTemporaryTraveler(index)}
                         />
                     ))}
@@ -289,7 +294,10 @@ export default function TravelerSelector({title = "选择出行人", single = fa
                         label="身份证号"
                         value={temporaryTravelerForm.documentNumber}
                         onChange={event => setTemporaryTravelerForm({...temporaryTravelerForm, documentNumber: event.target.value})}
-                        helperText="提交订单时会保存脱敏证件信息。"
+                        error={Boolean(temporaryTravelerForm.documentNumber && temporaryTravelerDocumentError)}
+                        helperText={temporaryTravelerForm.documentNumber
+                            ? temporaryTravelerDocumentError || `已识别生日 ${temporaryTravelerIdInfo?.birthDate} · ${temporaryTravelerIdInfo?.age} 岁`
+                            : "需填写有效的 18 位居民身份证号。"}
                     />
                 </DialogContent>
                 <DialogActions>

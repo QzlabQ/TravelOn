@@ -35,19 +35,28 @@ import {
 } from "@mui/icons-material";
 import {Link, useNavigate} from "react-router-dom";
 import AuthDialog from "../components/AuthDialog";
+import BankCardEditorDialog from "../components/BankCardEditorDialog";
+import WalletTopUpDialog, {WalletTopUpDialogPayload} from "../components/WalletTopUpDialog";
 import {
     ACCOUNT_IDENTITY_EVENT,
+    addSavedBankCard,
+    BANK_CARDS_EVENT,
     clearCurrentUserSession,
+    deleteSavedBankCard,
     getAccountIdentity,
     getBookingPreferences,
     getCurrentUserSession,
     getPaymentPreferences,
+    getSavedBankCards,
     getWalletState,
     PAYMENT_PREFERENCES_EVENT,
     PaymentMethodPreference,
     rechargeWallet,
+    SavedBankCard,
+    SavedBankCardPayload,
     setAccountIdentity,
     setBookingPreferences,
+    setDefaultSavedBankCard,
     setPaymentPreferences,
     updateCurrentUserProfile,
     AccountIdentity,
@@ -60,6 +69,13 @@ import {
 } from "../../core/currentUser";
 import {ApiRequests} from "../../core/apiConfig";
 import {TravelerPayload, TravelerResponse, TravelerType} from "../../core/apiConfig";
+import {
+    getChineseResidentIdInfo,
+    normalizeChinaMainlandPhone,
+    normalizeDocumentNumber,
+    validateChinaMainlandPhone,
+    validateDocumentNumber
+} from "../../core/validation";
 
 const emptyProfileForm = {
     name: "",
@@ -128,8 +144,10 @@ const validateTraveler = (traveler: TravelerPayload) => {
     if (!traveler.name.trim()) return "请填写出行人姓名。";
     if (traveler.name.trim().length > 80) return "姓名不能超过 80 个字符。";
     if ((traveler.documentType?.trim().length || 0) > 24) return "证件类型不能超过 24 个字符。";
-    if ((traveler.documentNumber?.trim().length || 0) > 48) return "证件号码不能超过 48 个字符。";
-    if ((traveler.phone?.trim().length || 0) > 32) return "手机号不能超过 32 个字符。";
+    const documentError = validateDocumentNumber(traveler.documentType, traveler.documentNumber, true);
+    if (documentError) return documentError;
+    const phoneError = validateChinaMainlandPhone(traveler.phone, false);
+    if (phoneError) return phoneError;
     return "";
 };
 
@@ -137,9 +155,9 @@ const normalizeTravelerPayload = (traveler: TravelerPayload): TravelerPayload =>
     name: traveler.name.trim(),
     travelerType: traveler.travelerType || "ADULT",
     documentType: traveler.documentType?.trim() || undefined,
-    documentNumber: traveler.documentNumber?.trim() || undefined,
-    phone: traveler.phone?.trim() || undefined,
-    student: Boolean(traveler.student),
+    documentNumber: normalizeDocumentNumber(traveler.documentType, traveler.documentNumber) || undefined,
+    phone: normalizeChinaMainlandPhone(traveler.phone) || undefined,
+    student: traveler.travelerType === "STUDENT" ? true : Boolean(traveler.student),
     defaultTraveler: Boolean(traveler.defaultTraveler),
 });
 
@@ -164,12 +182,21 @@ export default function Account() {
     const [bookingPreferences, setBookingPreferencesForm] = useState<BookingPreferences>(getBookingPreferences());
     const [identityForm, setIdentityForm] = useState<AccountIdentity>(() => getAccountIdentity());
     const [wallet, setWallet] = useState<WalletState>(() => getWalletState());
+    const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>(() => getSavedBankCards());
     const [topUpAmount, setTopUpAmount] = useState("500");
+    const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
+    const [bankCardDialogOpen, setBankCardDialogOpen] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethodPreference>(() => getPaymentPreferences().defaultPaymentMethod);
     const [walletFilter, setWalletFilter] = useState<WalletTransactionFilter>("ALL");
+    const profilePhoneError = validateChinaMainlandPhone(profileForm.phone, false);
+    const identityDocumentError = validateDocumentNumber(identityForm.documentType, identityForm.documentNumber, false);
+    const travelerDocumentError = validateDocumentNumber(travelerForm.documentType, travelerForm.documentNumber, false);
+    const travelerPhoneError = validateChinaMainlandPhone(travelerForm.phone, false);
+    const identityResidentInfo = identityForm.documentType === "身份证" ? getChineseResidentIdInfo(identityForm.documentNumber) : null;
+    const travelerResidentInfo = travelerForm.documentType === "身份证" ? getChineseResidentIdInfo(travelerForm.documentNumber) : null;
 
     const profile = session?.user;
-    const identityVerified = Boolean(identityForm.realName.trim() && identityForm.documentNumber.trim().length >= 6);
+    const identityVerified = Boolean(identityForm.realName.trim() && !validateDocumentNumber(identityForm.documentType, identityForm.documentNumber, true));
     const recentWalletTransactions = wallet.transactions
         .filter(transaction => walletFilter === "ALL" || transaction.type === walletFilter)
         .slice(0, 5);
@@ -224,6 +251,7 @@ export default function Account() {
     const refreshAccountAssets = () => {
         setIdentityForm(getAccountIdentity());
         setWallet(getWalletState());
+        setSavedBankCards(getSavedBankCards());
         setPaymentMethod(getPaymentPreferences().defaultPaymentMethod);
     };
 
@@ -231,6 +259,7 @@ export default function Account() {
         refreshAccountAssets();
         const handleAccountAssetsChanged = () => refreshAccountAssets();
         window.addEventListener(ACCOUNT_IDENTITY_EVENT, handleAccountAssetsChanged);
+        window.addEventListener(BANK_CARDS_EVENT, handleAccountAssetsChanged);
         window.addEventListener(WALLET_EVENT, handleAccountAssetsChanged);
         window.addEventListener(PAYMENT_PREFERENCES_EVENT, handleAccountAssetsChanged);
 
@@ -242,6 +271,7 @@ export default function Account() {
 
         return () => {
             window.removeEventListener(ACCOUNT_IDENTITY_EVENT, handleAccountAssetsChanged);
+            window.removeEventListener(BANK_CARDS_EVENT, handleAccountAssetsChanged);
             window.removeEventListener(WALLET_EVENT, handleAccountAssetsChanged);
             window.removeEventListener(PAYMENT_PREFERENCES_EVENT, handleAccountAssetsChanged);
         };
@@ -254,18 +284,26 @@ export default function Account() {
         setErrorMessage("");
         setIdentityForm(getAccountIdentity(nextSession.user.id));
         setWallet(getWalletState(nextSession.user.id));
+        setSavedBankCards(getSavedBankCards(nextSession.user.id));
         setPaymentMethod(getPaymentPreferences(nextSession.user.id).defaultPaymentMethod);
         loadTravelers(nextSession).then(r => r);
     };
 
     const saveProfile = async () => {
         if (!session) return;
+        if (profilePhoneError) {
+            setErrorMessage(profilePhoneError);
+            return;
+        }
         setSaving(true);
         setMessage("");
         setErrorMessage("");
 
         try {
-            const response = await ApiRequests.updateCurrentUser(session.token, profileForm);
+            const response = await ApiRequests.updateCurrentUser(session.token, {
+                ...profileForm,
+                phone: normalizeChinaMainlandPhone(profileForm.phone) || ""
+            });
             const nextSession = {...session, user: response.data};
             updateCurrentUserProfile(response.data);
             setSession(nextSession);
@@ -294,6 +332,7 @@ export default function Account() {
         setProfileForm(emptyProfileForm);
         setIdentityForm(emptyIdentityForm);
         setWallet({balance: 0, transactions: []});
+        setSavedBankCards([]);
         setPaymentMethod("WALLET");
         navigate("/");
     };
@@ -386,15 +425,16 @@ export default function Account() {
         const normalizedIdentity = {
             realName: identityForm.realName.trim(),
             documentType: identityForm.documentType.trim() || "身份证",
-            documentNumber: identityForm.documentNumber.trim(),
+            documentNumber: normalizeDocumentNumber(identityForm.documentType, identityForm.documentNumber),
         };
 
         if (!normalizedIdentity.realName) {
             setErrorMessage("请填写真实姓名。");
             return;
         }
-        if (normalizedIdentity.documentNumber.length < 6) {
-            setErrorMessage("证件号码至少需要 6 位。");
+        const documentError = validateDocumentNumber(normalizedIdentity.documentType, normalizedIdentity.documentNumber, true);
+        if (documentError) {
+            setErrorMessage(documentError);
             return;
         }
 
@@ -404,28 +444,69 @@ export default function Account() {
         setErrorMessage("");
     };
 
-    const handleRecharge = (amountValue?: number) => {
+    const openTopUpDialog = (amountValue?: number) => {
         const amount = parsePositiveAmount(amountValue ?? topUpAmount);
-        if (amount <= 0) {
-            setErrorMessage("请输入大于 0 的充值金额。");
+        if (amount > 0) {
+            setTopUpAmount(String(amount));
+        }
+        if (savedBankCards.length === 0) {
+            setBankCardDialogOpen(true);
+            setErrorMessage("请先添加银联卡后再充值。");
             return;
         }
+        setTopUpDialogOpen(true);
+        setErrorMessage("");
+    };
 
-        try {
-            const nextWallet = rechargeWallet(amount, "账户充值");
-            setWallet(nextWallet);
-            setTopUpAmount(String(amount));
-            setMessage(`充值成功，当前余额 ${formatCurrency(nextWallet.balance)}。`);
-            setErrorMessage("");
-        } catch (error: any) {
-            setErrorMessage(error?.message || "充值失败，请稍后重试。");
-        }
+    const handleRecharge = async (payload: WalletTopUpDialogPayload) => {
+        const nextWallet = rechargeWallet(payload.amount, {
+            title: "银联卡快捷充值",
+            channel: "BANK_CARD",
+            accountLabel: payload.accountLabel,
+            referenceNo: payload.referenceNo,
+        });
+        setWallet(nextWallet);
+        setTopUpAmount(String(payload.amount));
+        setMessage(`已通过${payload.accountLabel}充值 ${formatCurrency(payload.amount)}，当前余额 ${formatCurrency(nextWallet.balance)}。`);
+        setErrorMessage("");
     };
 
     const updateDefaultPaymentMethod = (method: PaymentMethodPreference) => {
         const preference = setPaymentPreferences({defaultPaymentMethod: method});
         setPaymentMethod(preference.defaultPaymentMethod);
-        setMessage(`默认支付方式已设为${preference.defaultPaymentMethod === "WALLET" ? "钱包" : "银行卡"}。`);
+        setMessage(`默认支付方式已设为${preference.defaultPaymentMethod === "WALLET" ? "钱包" : "银联卡"}。`);
+        setErrorMessage("");
+    };
+
+    const openBankCardDialog = () => {
+        setBankCardDialogOpen(true);
+        setErrorMessage("");
+    };
+
+    const saveBankCard = async (payload: SavedBankCardPayload) => {
+        const nextCards = addSavedBankCard(payload);
+        setSavedBankCards(nextCards);
+        setMessage(`已添加 ${payload.bankName} 尾号 ${payload.cardNumber.slice(-4)}。`);
+        setErrorMessage("");
+    };
+
+    const removeBankCard = (cardId: string) => {
+        const targetCard = savedBankCards.find(card => card.id === cardId);
+        const nextCards = deleteSavedBankCard(cardId);
+        setSavedBankCards(nextCards);
+        setMessage(
+            targetCard
+                ? `已删除 ${targetCard.bankName} 尾号 ${targetCard.cardNumber.slice(-4)}。`
+                : "银联卡已删除。"
+        );
+        setErrorMessage("");
+    };
+
+    const markDefaultBankCard = (cardId: string) => {
+        const nextCards = setDefaultSavedBankCard(cardId);
+        const targetCard = nextCards.find(card => card.id === cardId);
+        setSavedBankCards(nextCards);
+        setMessage(targetCard ? `${targetCard.bankName} 已设为默认充值银联卡。` : "默认银联卡已更新。");
         setErrorMessage("");
     };
 
@@ -501,7 +582,7 @@ export default function Account() {
                         </Avatar>
                         <div>
                             <Typography variant="h5" className="font-semibold">
-                                {profile.name} {profile.surname}
+                                {[profile.name, profile.surname].filter(Boolean).join(" ")}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 {profile.email}
@@ -585,6 +666,8 @@ export default function Account() {
                                 value={profileForm.phone}
                                 onChange={event => setProfileForm({...profileForm, phone: event.target.value})}
                                 fullWidth
+                                error={Boolean(profileForm.phone && profilePhoneError)}
+                                helperText={profileForm.phone ? profilePhoneError || "用于接收订单提醒和联系通知" : "用于接收订单提醒和联系通知"}
                                 InputProps={{
                                     startAdornment: <InputAdornment position="start"><Phone fontSize="small"/></InputAdornment>
                                 }}
@@ -649,7 +732,10 @@ export default function Account() {
                                         label="证件号码"
                                         value={identityForm.documentNumber}
                                         onChange={event => setIdentityForm({...identityForm, documentNumber: event.target.value.trim()})}
-                                        helperText={identityForm.documentNumber ? `展示时会脱敏：${maskValue(identityForm.documentNumber)}` : "用于模拟出票/入住身份核验"}
+                                        error={Boolean(identityForm.documentNumber && identityDocumentError)}
+                                        helperText={identityForm.documentNumber
+                                            ? identityDocumentError || `已识别生日 ${identityResidentInfo?.birthDate} · ${identityResidentInfo?.age} 岁，展示时会脱敏：${maskValue(identityForm.documentNumber)}`
+                                            : "用于模拟出票/入住身份核验"}
                                         fullWidth
                                     />
                                 </div>
@@ -667,7 +753,7 @@ export default function Account() {
                                     <Chip
                                         size="small"
                                         color={paymentMethod === "WALLET" ? "success" : "default"}
-                                        label={paymentMethod === "WALLET" ? "默认钱包" : "默认银行卡"}
+                                        label={paymentMethod === "WALLET" ? "默认钱包" : "默认银联卡"}
                                     />
                                 </div>
                                 <div className="mt-4 rounded-lg bg-white/80 p-3">
@@ -680,17 +766,17 @@ export default function Account() {
                                         onChange={(_, value) => value && updateDefaultPaymentMethod(value)}
                                     >
                                         <ToggleButton value="WALLET">钱包</ToggleButton>
-                                        <ToggleButton value="CARD">银行卡</ToggleButton>
+                                        <ToggleButton value="CARD">银联卡</ToggleButton>
                                     </ToggleButtonGroup>
                                 </div>
                                 <div className="mt-4 flex flex-wrap gap-2">
                                     {[100, 500, 1000].map(amount => (
-                                        <Button key={amount} size="small" variant="outlined" onClick={() => handleRecharge(amount)}>
+                                        <Button key={amount} size="small" variant="outlined" onClick={() => openTopUpDialog(amount)}>
                                             充 {formatCurrency(amount)}
                                         </Button>
                                     ))}
                                     {walletReserveGap > 0 &&
-                                        <Button size="small" variant="contained" onClick={() => handleRecharge(walletReserveGap)}>
+                                        <Button size="small" variant="contained" onClick={() => openTopUpDialog(walletReserveGap)}>
                                             一键补足 {formatCurrency(walletReserveGap)}
                                         </Button>
                                     }
@@ -707,7 +793,39 @@ export default function Account() {
                                             startAdornment: <InputAdornment position="start">¥</InputAdornment>
                                         }}
                                     />
-                                    <Button variant="contained" onClick={() => handleRecharge()}>充值</Button>
+                                    <Button variant="contained" onClick={() => openTopUpDialog()}>去充值</Button>
+                                </div>
+                                <p className="mt-2 text-xs text-gray-500">充值前请先绑定银联卡，充值时可直接选择已保存的银联卡。</p>
+                                <div className="mt-4 rounded-lg bg-white/80 p-3">
+                                    <div className="mb-3 flex items-center justify-between gap-2">
+                                        <p className="text-sm font-semibold text-gray-700">已绑定银联卡</p>
+                                        <Button size="small" variant="outlined" onClick={openBankCardDialog}>添加银联卡</Button>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        {savedBankCards.map(card => (
+                                            <div key={card.id} className="rounded-lg border border-gray-200 bg-white px-3 py-3">
+                                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                                    <div>
+                                                        <p className="font-semibold text-gray-900">{card.bankName} · 尾号 {card.cardNumber.slice(-4)}</p>
+                                                        <p className="mt-1 text-xs text-gray-500">
+                                                            {card.cardBrand} / {card.cardType} · 持卡人 {card.holderName} · 预留 {maskValue(card.reservedPhone, 3, 4)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {card.defaultCard
+                                                            ? <Chip size="small" color="success" label="默认"/>
+                                                            : <Button size="small" onClick={() => markDefaultBankCard(card.id)}>设为默认</Button>}
+                                                        <Button size="small" color="error" onClick={() => removeBankCard(card.id)}>删除</Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {savedBankCards.length === 0 &&
+                                            <p className="rounded-lg border border-dashed border-gray-300 px-3 py-4 text-center text-sm text-gray-500">
+                                                暂无已绑定银联卡，充值前请先添加。
+                                            </p>
+                                        }
+                                    </div>
                                 </div>
                                 <Divider className="my-4"/>
                                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -736,6 +854,11 @@ export default function Account() {
                                                     </span>
                                                 </div>
                                                 <p className="mt-1 truncate text-xs text-gray-500">{transaction.title}</p>
+                                                {transaction.accountLabel &&
+                                                    <p className="mt-1 truncate text-xs text-gray-400">
+                                                        {transaction.accountLabel}{transaction.referenceNo ? ` · 流水号 ${transaction.referenceNo}` : ""}
+                                                    </p>
+                                                }
                                                 <p className="mt-1 text-xs text-gray-400">
                                                     余额 {formatCurrency(transaction.balanceAfter)} · {new Date(transaction.createdAt).toLocaleString()}
                                                 </p>
@@ -749,6 +872,24 @@ export default function Account() {
                             </div>
                         </div>
                     </Paper>
+
+                    <WalletTopUpDialog
+                        open={topUpDialogOpen}
+                        defaultAmount={topUpAmount}
+                        savedCards={savedBankCards}
+                        onClose={() => setTopUpDialogOpen(false)}
+                        onConfirm={handleRecharge}
+                        onAddCard={openBankCardDialog}
+                    />
+
+                    <BankCardEditorDialog
+                        open={bankCardDialogOpen}
+                        defaultHolderName={identityForm.realName.trim() || `${profile.name || ""}${profile.surname ? ` ${profile.surname}` : ""}`.trim()}
+                        defaultPhone={profile.phone || ""}
+                        suggestDefault={savedBankCards.length === 0}
+                        onClose={() => setBankCardDialogOpen(false)}
+                        onConfirm={saveBankCard}
+                    />
 
                     <Paper elevation={0} className="border border-gray-200 p-6">
                         <div className="mb-5 flex items-center justify-between">
@@ -853,8 +994,22 @@ export default function Account() {
                                     <TextField select label="证件类型" value={travelerForm.documentType} onChange={event => setTravelerForm({...travelerForm, documentType: event.target.value})}>
                                         {documentTypeOptions.map(option => <MenuItem key={option} value={option}>{option}</MenuItem>)}
                                     </TextField>
-                                    <TextField label="证件号码" value={travelerForm.documentNumber} onChange={event => setTravelerForm({...travelerForm, documentNumber: event.target.value})}/>
-                                    <TextField label="手机号" value={travelerForm.phone} onChange={event => setTravelerForm({...travelerForm, phone: event.target.value})}/>
+                                    <TextField
+                                        label="证件号码"
+                                        value={travelerForm.documentNumber}
+                                        onChange={event => setTravelerForm({...travelerForm, documentNumber: event.target.value})}
+                                        error={Boolean(travelerForm.documentNumber && travelerDocumentError)}
+                                        helperText={travelerForm.documentNumber
+                                            ? travelerDocumentError || `${travelerResidentInfo ? `已识别生日 ${travelerResidentInfo.birthDate} · ${travelerResidentInfo.age} 岁，` : ""}预订车票/酒店时会用于身份校验`
+                                            : "预订车票/酒店时会用于身份校验"}
+                                    />
+                                    <TextField
+                                        label="手机号"
+                                        value={travelerForm.phone}
+                                        onChange={event => setTravelerForm({...travelerForm, phone: event.target.value})}
+                                        error={Boolean(travelerForm.phone && travelerPhoneError)}
+                                        helperText={travelerForm.phone ? travelerPhoneError || "选填，用于接收订单提醒" : "选填，用于接收订单提醒"}
+                                    />
                                     <div className="flex flex-wrap items-center gap-3">
                                         <FormControlLabel control={<Checkbox checked={travelerForm.student} onChange={event => setTravelerForm({...travelerForm, student: event.target.checked})}/>} label="学生身份"/>
                                         <FormControlLabel control={<Checkbox checked={travelerForm.defaultTraveler} onChange={event => setTravelerForm({...travelerForm, defaultTraveler: event.target.checked})}/>} label="默认出行人"/>
@@ -863,7 +1018,14 @@ export default function Account() {
                                 {errorMessage && <Alert severity="error" className="mt-4">{errorMessage}</Alert>}
                                 <div className="mt-4 flex justify-end gap-2">
                                     <Button onClick={() => setTravelerEditorOpen(false)}>取消</Button>
-                                    <Button variant="contained" startIcon={<Save/>} disabled={saving || !travelerForm.name.trim()} onClick={saveTraveler}>保存</Button>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<Save/>}
+                                        disabled={saving || !travelerForm.name.trim() || Boolean(travelerDocumentError) || Boolean(travelerPhoneError)}
+                                        onClick={saveTraveler}
+                                    >
+                                        保存
+                                    </Button>
                                 </div>
                             </div>
                         }
@@ -880,6 +1042,7 @@ export default function Account() {
                                         <p className="mt-1 text-xs text-gray-500">
                                             {traveler.documentType || "证件未填写"} {traveler.documentNumber ? maskValue(traveler.documentNumber) : ""}
                                             {traveler.phone ? ` · ${maskValue(traveler.phone, 3, 4)}` : ""}
+                                            {traveler.documentType === "身份证" && getChineseResidentIdInfo(traveler.documentNumber) ? ` · ${getChineseResidentIdInfo(traveler.documentNumber)?.birthDate} · ${getChineseResidentIdInfo(traveler.documentNumber)?.age} 岁` : ""}
                                         </p>
                                     </div>
                                     <div className="flex gap-1">

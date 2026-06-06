@@ -10,6 +10,7 @@ import {
     Divider
 } from "@mui/material";
 import {BookingPersonPayload, TravelerType} from "../../core/apiConfig";
+import {getChineseResidentIdInfo} from "../../core/validation";
 
 export type CheckoutSummaryRow = {
     label: string;
@@ -78,10 +79,16 @@ export default function CheckoutConfirmDialog({
                                         <span className="font-semibold text-slate-900">{traveler.name || `人员 ${index + 1}`}</span>
                                         <Chip size="small" label={travelerTypeLabel(traveler.travelerType)}/>
                                     </div>
-                                    <p className="mt-1 text-xs text-slate-500">
-                                        {traveler.documentType || "证件"}：{maskValue(traveler.documentNumber)}
-                                        {traveler.phone ? ` · 手机 ${maskValue(traveler.phone, 3, 4)}` : ""}
-                                    </p>
+                                    {(() => {
+                                        const residentInfo = (traveler.documentType ?? "身份证") === "身份证" ? getChineseResidentIdInfo(traveler.documentNumber) : null;
+                                        return (
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                {traveler.documentType || "证件"}：{maskValue(traveler.documentNumber)}
+                                                {residentInfo ? ` · 生日 ${residentInfo.birthDate} · ${residentInfo.age} 岁` : ""}
+                                                {traveler.phone ? ` · 手机 ${maskValue(traveler.phone, 3, 4)}` : ""}
+                                            </p>
+                                        );
+                                    })()}
                                 </div>
                             ))}
                             {travelers.length === 0 && <p className="text-sm text-slate-500">还没有选择人员。</p>}

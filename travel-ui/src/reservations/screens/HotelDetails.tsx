@@ -25,6 +25,7 @@ import {addNotification, getCurrentUserId} from "../../core/currentUser";
 import {formatDate} from "../../core/utils";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
 import {useAuthSession} from "../../core/useAuthSession";
+import {validateStayDates} from "../../core/validation";
 
 const today = new Date();
 const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
@@ -79,8 +80,9 @@ const HotelDetails = () => {
         const start = new Date(dateFrom);
         const end = new Date(dateTo);
         const diff = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-        return Math.max(1, diff);
+        return Number.isFinite(diff) ? Math.max(1, diff) : 1;
     }, [dateFrom, dateTo]);
+    const stayDateError = validateStayDates(dateFrom, dateTo);
 
     const heroPhoto = details?.photos?.[0] || state.offer?.imageUrl || "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1400&q=80";
     const displayName = details?.hotelName || state.offer?.hotelName || "酒店详情";
@@ -104,7 +106,7 @@ const HotelDetails = () => {
     useEffect(() => clearAutoNavigate, []);
 
     useEffect(() => {
-        if (!hotelId) return;
+        if (!hotelId || stayDateError) return;
 
         setLoading(true);
         setError(false);
@@ -130,13 +132,19 @@ const HotelDetails = () => {
                 setError(true);
             })
             .finally(() => setLoading(false));
-    }, [hotelId, dateFrom, dateTo, adultCount, childCount]);
+    }, [hotelId, dateFrom, dateTo, adultCount, childCount, stayDateError]);
 
     const openCheckoutConfirm = () => {
         if (!isAuthenticated) {
             setBookingError(true);
             setBookingMessage("请先登录账户，再选择房型并提交订单。");
             showToast("请先登录后再提交订单", true);
+            return;
+        }
+        if (stayDateError) {
+            setBookingError(true);
+            setBookingMessage(stayDateError);
+            showToast(stayDateError, true);
             return;
         }
         if (!details || !selectedConfiguration) {
@@ -158,6 +166,12 @@ const HotelDetails = () => {
     const submitReservation = async () => {
         if (!isAuthenticated || !details || !selectedConfiguration || selectedTravelers.length === 0) {
             setCheckoutConfirmOpen(false);
+            return;
+        }
+        if (stayDateError) {
+            setBookingError(true);
+            setBookingMessage(stayDateError);
+            showToast(stayDateError, true);
             return;
         }
 
@@ -242,6 +256,7 @@ const HotelDetails = () => {
 
             {loading && <Box sx={{height: 5}} className="mb-4"><LinearProgress/></Box>}
             {error && <Alert severity="warning" className="mb-4">酒店详情暂时不可用，请确认酒店服务已启动。</Alert>}
+            {stayDateError && <Alert severity="warning" className="mb-4">{stayDateError}</Alert>}
             {!isAuthenticated && <Alert severity="info" className="mb-4">未登录时可以查看酒店价格、房型和评价；登录后才能选择房型、填写入住人并提交订单。</Alert>}
             {bookingMessage && <Alert severity={bookingError ? "error" : "success"} className="mb-4" action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}`} color="inherit" size="small">订单详情</Button> : undefined}>{bookingMessage}</Alert>}
 
@@ -285,6 +300,9 @@ const HotelDetails = () => {
                                 <input className="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900" type="date" value={dateTo} onChange={event => setDateTo(event.target.value)}/>
                             </label>
                         </div>
+                        <p className={`mt-3 text-xs ${stayDateError ? "text-red-500" : "text-slate-500"}`}>
+                            {stayDateError || "入住日期不能早于今天，离店日期需晚于入住日期。"}
+                        </p>
                     </section>
 
                     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -357,7 +375,7 @@ const HotelDetails = () => {
                             variant="contained"
                             size="large"
                             sx={{mt: 2, borderRadius: 2}}
-                            disabled={!isAuthenticated || submitting || !selectedConfiguration || selectedTravelers.length === 0}
+                            disabled={!isAuthenticated || submitting || !selectedConfiguration || selectedTravelers.length === 0 || Boolean(stayDateError)}
                             onClick={openCheckoutConfirm}
                         >
                             {!isAuthenticated ? "登录后提交" : submitting ? "提交中" : "提交订单"}

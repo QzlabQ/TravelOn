@@ -58,7 +58,7 @@ public class UserService {
                 .email(email)
                 .passwordHash(hashPassword(request.password()))
                 .name(request.name().trim())
-                .surname(request.surname().trim())
+                .surname(normalizeOptional(request.surname()) == null ? "" : request.surname().trim())
                 .phone(normalizeOptional(request.phone()))
                 .loyaltyTier("Explorer")
                 .sessionToken(generateSessionToken())

@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useState} from "react";
-import {Link, useParams} from "react-router-dom";
+import {Link, useNavigate, useParams} from "react-router-dom";
 import Countdown, {CountdownRenderProps} from "react-countdown";
 import {
     Alert,
@@ -39,17 +39,21 @@ import {
     RefundRecordResponse,
     ReservationResponse
 } from "../../core/apiConfig";
+import WalletTopUpDialog, {WalletTopUpDialogPayload} from "../../account/components/WalletTopUpDialog";
 import {
     ACCOUNT_IDENTITY_EVENT,
     AccountIdentity,
     addNotification,
+    BANK_CARDS_EVENT,
     getAccountIdentity,
     getPaymentPreferences,
+    getSavedBankCards,
     getWalletState,
     PAYMENT_PREFERENCES_EVENT,
     PaymentMethodPreference,
     rechargeWallet,
     refundWallet,
+    SavedBankCard,
     setAccountIdentity,
     setPaymentPreferences,
     spendWallet,
@@ -66,6 +70,14 @@ import {
     getReservationStatusMeta
 } from "../orderStatus";
 import {useAuthSession} from "../../core/useAuthSession";
+import {
+    getBankCardIssuerInfo,
+    getChineseResidentIdInfo,
+    normalizeDigits,
+    normalizeDocumentNumber,
+    validateBankCard,
+    validateDocumentNumber
+} from "../../core/validation";
 
 const bookingTypeMeta: Record<string, {label: string; icon: JSX.Element}> = {
     PACKAGE: {label: "旅游套餐", icon: <Route/>},
@@ -128,8 +140,16 @@ const walletTransactionMeta = {
     REFUND: {label: "退款", color: "info" as const},
 };
 
+const validatePayerIdentity = (identity: AccountIdentity) => {
+    if (!identity.realName.trim()) {
+        return "请填写付款人真实姓名。";
+    }
+    return validateDocumentNumber(identity.documentType, identity.documentNumber, true);
+};
+
 export default function ReservationDetails() {
     const {reservationId = ""} = useParams();
+    const navigate = useNavigate();
     const session = useAuthSession();
     const isAuthenticated = Boolean(session);
     const [reservation, setReservation] = useState<ReservationResponse>();
@@ -138,11 +158,13 @@ export default function ReservationDetails() {
     const [successMessage, setSuccessMessage] = useState("");
     const [payDialogOpen, setPayDialogOpen] = useState(false);
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-    const [cardNumber, setCardNumber] = useState("1234567812345674");
+    const [cardNumber, setCardNumber] = useState("6222020000000056");
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethodPreference>(() => getPaymentPreferences().defaultPaymentMethod);
     const [payerIdentity, setPayerIdentity] = useState<AccountIdentity>(() => getAccountIdentity());
     const [wallet, setWallet] = useState<WalletState>(() => getWalletState());
+    const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>(() => getSavedBankCards());
     const [topUpAmount, setTopUpAmount] = useState("500");
+    const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
     const [cancellationReason, setCancellationReason] = useState("");
     const [payments, setPayments] = useState<PaymentTransactionResponse[]>([]);
     const [refunds, setRefunds] = useState<RefundRecordResponse[]>([]);
@@ -216,15 +238,18 @@ export default function ReservationDetails() {
         const refreshPaymentAssets = () => {
             setPayerIdentity(getAccountIdentity());
             setWallet(getWalletState());
+            setSavedBankCards(getSavedBankCards());
             setPaymentMethod(getPaymentPreferences().defaultPaymentMethod);
         };
         refreshPaymentAssets();
         window.addEventListener(ACCOUNT_IDENTITY_EVENT, refreshPaymentAssets);
+        window.addEventListener(BANK_CARDS_EVENT, refreshPaymentAssets);
         window.addEventListener(WALLET_EVENT, refreshPaymentAssets);
         window.addEventListener(PAYMENT_PREFERENCES_EVENT, refreshPaymentAssets);
 
         return () => {
             window.removeEventListener(ACCOUNT_IDENTITY_EVENT, refreshPaymentAssets);
+            window.removeEventListener(BANK_CARDS_EVENT, refreshPaymentAssets);
             window.removeEventListener(WALLET_EVENT, refreshPaymentAssets);
             window.removeEventListener(PAYMENT_PREFERENCES_EVENT, refreshPaymentAssets);
         };
@@ -273,24 +298,29 @@ export default function ReservationDetails() {
         {active: Boolean(refundCompletedTime), title: "退款完成", time: refundCompletedTime, description: refundCompletedTime ? "退款已经完成。" : "等待退款结果。"},
     ];
     const reservationAmount = Math.round(Number(reservation.price || 0) * 100) / 100;
-    const hasValidPayerIdentity = Boolean(payerIdentity.realName.trim() && payerIdentity.documentNumber.trim().length >= 6);
+    const payerIdentityError = validatePayerIdentity(payerIdentity);
+    const normalizedCardNumber = normalizeDigits(cardNumber);
+    const bankCardError = paymentMethod === "CARD" ? validateBankCard(normalizedCardNumber) : "";
+    const payerIdentityInfo = payerIdentity.documentType === "身份证" ? getChineseResidentIdInfo(payerIdentity.documentNumber) : null;
+    const cardIssuerInfo = paymentMethod === "CARD" ? getBankCardIssuerInfo(normalizedCardNumber) : null;
+    const hasValidPayerIdentity = !payerIdentityError;
     const walletCanPay = wallet.balance >= reservationAmount;
     const walletPaymentTransaction = wallet.transactions.find(transaction => transaction.type === "PAYMENT" && transaction.reservationId === reservation.id);
     const walletAlreadyRefunded = wallet.transactions.some(transaction => transaction.type === "REFUND" && transaction.reservationId === reservation.id);
     const walletBalanceGap = Math.max(0, Math.round((reservationAmount - wallet.balance) * 100) / 100);
     const isWalletPayment = Boolean(walletPaymentTransaction || latestApprovedPayment?.cardLast4 === "8888");
     const paymentMethodLabel = latestApprovedPayment
-        ? isWalletPayment ? "钱包" : "银行卡"
+        ? isWalletPayment ? "钱包" : "银联卡"
         : "未支付";
     const refundDestination = effectiveStatus === "REFUNDED"
-        ? isWalletPayment ? "退回钱包余额" : "原银行卡"
+        ? isWalletPayment ? "退回钱包余额" : "原银联卡"
         : effectiveStatus === "PAID"
-            ? isWalletPayment ? "退款将退回钱包余额" : "退款将退回原银行卡"
+            ? isWalletPayment ? "退款将退回钱包余额" : "退款将退回原银联卡"
             : "无";
     const paymentDisabled = submitting
         || !isAuthenticated
         || !hasValidPayerIdentity
-        || (paymentMethod === "CARD" && cardNumber.length !== 16)
+        || (paymentMethod === "CARD" && Boolean(bankCardError))
         || (paymentMethod === "WALLET" && !walletCanPay);
 
     const openPaymentDialog = () => {
@@ -317,20 +347,28 @@ export default function ReservationDetails() {
         }
 
         const amount = parsePositiveAmount(amountValue ?? topUpAmount);
-        if (amount <= 0) {
-            setErrorMessage("请输入大于 0 的充值金额。");
-            return;
+        if (amount > 0) {
+            setTopUpAmount(String(amount));
+        }
+        setTopUpDialogOpen(true);
+        setErrorMessage("");
+    };
+
+    const confirmWalletTopUp = async (payload: WalletTopUpDialogPayload) => {
+        if (!isAuthenticated) {
+            throw new Error("请先登录账户后再充值。");
         }
 
-        try {
-            const nextWallet = rechargeWallet(amount, "支付前充值");
-            setWallet(nextWallet);
-            setTopUpAmount(String(amount));
-            setSuccessMessage(`充值成功，当前余额 ${formatCurrency(nextWallet.balance)}。`);
-            setErrorMessage("");
-        } catch (error: any) {
-            setErrorMessage(error?.message || "充值失败，请稍后重试。");
-        }
+        const nextWallet = rechargeWallet(payload.amount, {
+            title: "银联卡快捷充值",
+            channel: "BANK_CARD",
+            accountLabel: payload.accountLabel,
+            referenceNo: payload.referenceNo,
+        });
+        setWallet(nextWallet);
+        setTopUpAmount(String(payload.amount));
+        setSuccessMessage(`已通过${payload.accountLabel}充值 ${formatCurrency(payload.amount)}，当前余额 ${formatCurrency(nextWallet.balance)}。`);
+        setErrorMessage("");
     };
 
     const refundWalletPaymentIfNeeded = () => {
@@ -353,23 +391,22 @@ export default function ReservationDetails() {
         const normalizedIdentity = {
             realName: payerIdentity.realName.trim(),
             documentType: payerIdentity.documentType.trim() || "身份证",
-            documentNumber: payerIdentity.documentNumber.trim(),
+            documentNumber: normalizeDocumentNumber(payerIdentity.documentType, payerIdentity.documentNumber),
         };
 
-        if (!normalizedIdentity.realName) {
-            setErrorMessage("请填写付款人真实姓名。");
-            return;
-        }
-        if (normalizedIdentity.documentNumber.length < 6) {
-            setErrorMessage("证件号码至少需要 6 位。");
+        const payerError = validatePayerIdentity(normalizedIdentity);
+        if (payerError) {
+            setErrorMessage(payerError);
             return;
         }
         if (paymentMethod === "WALLET" && wallet.balance < reservationAmount) {
-            setErrorMessage("钱包余额不足，请先充值或改用银行卡支付。");
+            setErrorMessage("钱包余额不足，请先充值或改用银联卡支付。");
             return;
         }
-        if (paymentMethod === "CARD" && cardNumber.length !== 16) {
-            setErrorMessage("请输入 16 位银行卡号。");
+        const normalizedPaymentCardNumber = normalizeDigits(cardNumber);
+        const cardError = paymentMethod === "CARD" ? validateBankCard(normalizedPaymentCardNumber) : "";
+        if (cardError) {
+            setErrorMessage(cardError);
             return;
         }
 
@@ -379,7 +416,7 @@ export default function ReservationDetails() {
         try {
             const nextIdentity = setAccountIdentity(normalizedIdentity);
             setPayerIdentity(nextIdentity);
-            const paymentCardNumber = paymentMethod === "WALLET" ? "8888888888888888" : cardNumber;
+            const paymentCardNumber = paymentMethod === "WALLET" ? "8888888888888888" : normalizedPaymentCardNumber;
             await ApiRequests.payForReservation({reservationId: reservation.id, cardNumber: paymentCardNumber});
             if (paymentMethod === "WALLET") {
                 const nextWallet = spendWallet(reservationAmount, `支付订单 ${reservation.title || reservation.id}`, reservation.id);
@@ -389,14 +426,14 @@ export default function ReservationDetails() {
             addNotification({
                 type: "PAYMENT_SUCCESS",
                 title: "支付成功",
-                message: `${paymentMethod === "WALLET" ? "钱包" : "银行卡"}已支付 ${formatCurrency(reservationAmount)}。`,
+                message: `${paymentMethod === "WALLET" ? "钱包" : "银联卡"}已支付 ${formatCurrency(reservationAmount)}。`,
                 reservationId: reservation.id,
             });
             setPayDialogOpen(false);
-            setSuccessMessage(paymentMethod === "WALLET" ? "钱包支付成功，订单状态已经更新。" : "银行卡支付成功，订单状态已经更新。");
+            setSuccessMessage(paymentMethod === "WALLET" ? "钱包支付成功，订单状态已经更新。" : "银联卡支付成功，订单状态已经更新。");
             await loadReservation();
         } catch (error: any) {
-            setErrorMessage(error?.message || "支付未通过。演示环境中，可使用末位为偶数的 16 位银行卡号重试。");
+            setErrorMessage(error?.message || "支付未通过。请检查银联卡号后重试，演示卡可使用 6222020000000056。");
         } finally {
             setSubmitting(false);
         }
@@ -606,7 +643,7 @@ export default function ReservationDetails() {
                 <DialogTitle>模拟支付</DialogTitle>
                 <DialogContent>
                     <Alert severity="info" className="mb-4">
-                        演示环境不会调用真实支付接口；钱包会本地扣款，银行卡仍走后端模拟校验。
+                        演示环境不会调用真实支付接口；钱包会本地扣款，银联卡仍走后端模拟校验。
                     </Alert>
 
                     <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
@@ -643,7 +680,10 @@ export default function ReservationDetails() {
                                     label="证件号码"
                                     value={payerIdentity.documentNumber}
                                     onChange={event => setPayerIdentity({...payerIdentity, documentNumber: event.target.value.trim()})}
-                                    helperText="支付成功后会保存为账号实名信息，后续自动带入。"
+                                    error={Boolean(payerIdentity.documentNumber && payerIdentityError)}
+                                    helperText={payerIdentity.documentNumber
+                                        ? payerIdentityError || `${payerIdentityInfo ? `已识别生日 ${payerIdentityInfo.birthDate} · ${payerIdentityInfo.age} 岁，` : ""}支付成功后会保存为账号实名信息，后续自动带入。`
+                                        : "支付成功后会保存为账号实名信息，后续自动带入。"}
                                     fullWidth
                                 />
                             </div>
@@ -663,7 +703,7 @@ export default function ReservationDetails() {
                                 <FormControlLabel
                                     value="CARD"
                                     control={<Radio/>}
-                                    label="银行卡模拟支付"
+                                    label="银联卡支付"
                                 />
                             </RadioGroup>
 
@@ -698,18 +738,26 @@ export default function ReservationDetails() {
                                                 startAdornment: <InputAdornment position="start">¥</InputAdornment>
                                             }}
                                         />
-                                        <Button variant="contained" onClick={() => rechargeFromPaymentDialog()}>充值</Button>
+                                        <Button variant="contained" onClick={() => rechargeFromPaymentDialog()}>去充值</Button>
                                     </div>
+                                    <p className="mt-2 text-xs text-orange-700">充值前请先绑定银联卡，充值时可直接选择已保存的银联卡。</p>
                                     {wallet.transactions.length > 0 &&
                                         <div className="mt-3 grid gap-2">
                                             {wallet.transactions.slice(0, 3).map(transaction => {
                                                 const meta = walletTransactionMeta[transaction.type];
                                                 return (
-                                                    <div key={transaction.id} className="flex items-center justify-between rounded bg-white px-3 py-2 text-xs">
-                                                        <span className="truncate text-slate-500">{meta.label} · {transaction.title}</span>
-                                                        <span className={transaction.type === "PAYMENT" ? "font-semibold text-red-500" : "font-semibold text-emerald-600"}>
-                                                            {transaction.type === "PAYMENT" ? "-" : "+"}{formatCurrency(transaction.amount)}
-                                                        </span>
+                                                    <div key={transaction.id} className="rounded bg-white px-3 py-2 text-xs">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="truncate text-slate-500">{meta.label} · {transaction.title}</span>
+                                                            <span className={transaction.type === "PAYMENT" ? "font-semibold text-red-500" : "font-semibold text-emerald-600"}>
+                                                                {transaction.type === "PAYMENT" ? "-" : "+"}{formatCurrency(transaction.amount)}
+                                                            </span>
+                                                        </div>
+                                                        {transaction.accountLabel &&
+                                                            <p className="mt-1 truncate text-slate-400">
+                                                                {transaction.accountLabel}{transaction.referenceNo ? ` · 流水号 ${transaction.referenceNo}` : ""}
+                                                            </p>
+                                                        }
                                                     </div>
                                                 );
                                             })}
@@ -722,10 +770,13 @@ export default function ReservationDetails() {
                                 <div className="mt-3">
                                     <TextField
                                         fullWidth
-                                        label="银行卡号"
+                                        label="银联卡号"
                                         value={cardNumber}
-                                        onChange={event => setCardNumber(event.target.value.replace(/\D/g, "").slice(0, 16))}
-                                        helperText="演示规则：16 位卡号末位为偶数时支付成功。"
+                                        onChange={event => setCardNumber(normalizeDigits(event.target.value).slice(0, 19))}
+                                        error={Boolean(cardNumber && bankCardError)}
+                                        helperText={cardNumber
+                                            ? bankCardError || `${cardIssuerInfo ? `已识别 ${cardIssuerInfo.displayName}；` : ""}仅支持 16-19 位银联卡号；演示卡可用 6222020000000056。`
+                                            : "仅支持 16-19 位银联卡号；演示卡可用 6222020000000056。"}
                                     />
                                 </div>
                             }
@@ -759,6 +810,15 @@ export default function ReservationDetails() {
                     <Button color="error" variant="contained" disabled={submitting} onClick={submitCancellation}>确认提交</Button>
                 </DialogActions>
             </Dialog>
+
+            <WalletTopUpDialog
+                open={topUpDialogOpen}
+                defaultAmount={topUpAmount}
+                savedCards={savedBankCards}
+                onClose={() => setTopUpDialogOpen(false)}
+                onConfirm={confirmWalletTopUp}
+                onAddCard={() => navigate("/account")}
+            />
         </main>
     );
 }

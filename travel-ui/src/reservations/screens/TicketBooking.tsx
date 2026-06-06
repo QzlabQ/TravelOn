@@ -31,6 +31,7 @@ import TravelerSelector from "../../account/components/TravelerSelector";
 import {Link, useLocation, useNavigate} from "react-router-dom";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
 import {useAuthSession} from "../../core/useAuthSession";
+import {validateTicketTravelerRules} from "../../core/validation";
 
 type TicketMode = 'flight' | 'train';
 
@@ -256,6 +257,12 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
         .slice(0, 6);
     const selectedPassengerCount = selectedTravelers.length;
     const selectedTotalPrice = selectedOffer ? selectedOffer.price * selectedPassengerCount : 0;
+    const travelerRuleError = validateTicketTravelerRules(selectedTravelers, {
+        studentOnly,
+        studentEligible: selectedOffer?.studentEligible ?? null,
+        transportType: mode === "flight" ? "FLIGHT" : "TRAIN",
+        departureDate: date,
+    });
     const allTrainTypesSelected = selectedTrainTypes.length === trainTypeFilters.length;
 
     const clearAutoNavigate = () => {
@@ -431,6 +438,12 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
             showToast('请先选择或填写出行人', true);
             return;
         }
+        if (travelerRuleError) {
+            setBookingError(true);
+            setBookingMessage(travelerRuleError);
+            showToast(travelerRuleError, true);
+            return;
+        }
         if (selectedOffer.remainingSeats > 0 && selectedTravelers.length > selectedOffer.remainingSeats) {
             setBookingError(true);
             setBookingMessage('选择的出行人数超过当前余票数量。');
@@ -444,6 +457,12 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
     const reserveTicket = async () => {
         if (!isAuthenticated || !selectedOffer || selectedTravelers.length === 0) {
             setCheckoutConfirmOpen(false);
+            return;
+        }
+        if (travelerRuleError) {
+            setBookingError(true);
+            setBookingMessage(travelerRuleError);
+            showToast(travelerRuleError, true);
             return;
         }
         setBookingId(selectedOffer.id);
@@ -618,7 +637,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                     variant='contained'
                                     size='large'
                                     sx={{borderRadius: 2}}
-                                    disabled={!isAuthenticated || bookingId === selectedOffer.id || selectedPassengerCount === 0}
+                                    disabled={!isAuthenticated || bookingId === selectedOffer.id || selectedPassengerCount === 0 || Boolean(travelerRuleError)}
                                     onClick={openCheckoutConfirm}
                                 >
                                     {!isAuthenticated ? '登录后提交' : bookingId === selectedOffer.id ? '提交中' : '提交订单'}
@@ -628,6 +647,9 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                 }
                                 {selectedPassengerCount === 0 &&
                                     <p className='text-xs text-orange-500'>请先在上方选择或填写出行人。</p>
+                                }
+                                {travelerRuleError &&
+                                    <p className='text-xs text-red-500'>{travelerRuleError}</p>
                                 }
                             </div>
                         ) : (

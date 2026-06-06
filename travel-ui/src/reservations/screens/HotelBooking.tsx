@@ -23,6 +23,7 @@ import {addNotification, getBookingPreferences, getCurrentUserId} from "../../co
 import TravelerSelector from "../../account/components/TravelerSelector";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
 import {useAuthSession} from "../../core/useAuthSession";
+import {validateStayDates} from "../../core/validation";
 
 const today = new Date();
 const nextDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
@@ -95,6 +96,7 @@ const HotelBooking = () => {
         normalizedPriceFrom < 0 ||
         normalizedPriceTo < 0 ||
         normalizedPriceFrom > normalizedPriceTo;
+    const stayDateError = validateStayDates(dateFrom, dateTo);
 
     const loadDestinations = async () => {
         setLoading(true);
@@ -112,12 +114,18 @@ const HotelBooking = () => {
         }
     };
 
-    const searchHotels = async () => {
+    const searchHotels = async (showValidation = false) => {
+        if (!destination) return;
+        if (stayDateError) {
+            if (showValidation) {
+                showToast(stayDateError, true);
+            }
+            return;
+        }
+
         setLoading(true);
         setError(false);
         try {
-            if (!destination) return;
-
             const response = await ApiRequests.searchHotels({
                 destinationId: destination.idLocation,
                 dateFrom,
@@ -201,7 +209,7 @@ const HotelBooking = () => {
     useEffect(() => clearAutoNavigate, []);
 
     useEffect(() => {
-        if (!hasLoadedDestinations || !destination || hasInvalidPriceRange) return;
+        if (!hasLoadedDestinations || !destination || hasInvalidPriceRange || stayDateError) return;
 
         const timeoutId = window.setTimeout(() => {
             searchHotels().then(r => r);
@@ -230,6 +238,12 @@ const HotelBooking = () => {
             showToast('请先登录后再提交订单', true);
             return;
         }
+        if (stayDateError) {
+            setBookingError(true);
+            setBookingMessage(stayDateError);
+            showToast(stayDateError, true);
+            return;
+        }
         if (!selectedOffer) {
             setBookingError(true);
             setBookingMessage('请先选择一家可预订酒店。');
@@ -249,6 +263,12 @@ const HotelBooking = () => {
     const submitHotelReservation = async () => {
         if (!isAuthenticated || !selectedOffer || selectedTravelers.length === 0) {
             setCheckoutConfirmOpen(false);
+            return;
+        }
+        if (stayDateError) {
+            setBookingError(true);
+            setBookingMessage(stayDateError);
+            showToast(stayDateError, true);
             return;
         }
         setBookingHotelId(selectedOffer.idHotel);
@@ -338,6 +358,7 @@ const HotelBooking = () => {
             </div>
 
             {error && <Alert severity='warning' className='mb-4'>后端酒店数据暂时不可用，请启动服务后重试。</Alert>}
+            {stayDateError && <Alert severity='warning' className='mb-4'>{stayDateError}</Alert>}
             {!isAuthenticated && <Alert severity='info' className='mb-4'>未登录时可以查询酒店价格和查看详情；登录后才能选择入住人、选择酒店并提交订单。</Alert>}
             {bookingError && <Alert severity='error' className='mb-4'>创建酒店预订失败，请检查日期或后端服务。</Alert>}
             {bookingMessage && <Alert severity={bookingError ? 'warning' : 'success'} className='mb-4' action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}`} color='inherit' size='small'>订单详情</Button> : undefined}>{bookingMessage}</Alert>}
@@ -388,8 +409,11 @@ const HotelBooking = () => {
                                 <input className='rounded-lg border border-slate-300 px-3 py-2 text-slate-900' type='date' value={dateFrom} onChange={event => setDateFrom(event.target.value)}/>
                                 <input className='rounded-lg border border-slate-300 px-3 py-2 text-slate-900' type='date' value={dateTo} onChange={event => setDateTo(event.target.value)}/>
                             </div>
+                            <p className={`mt-2 text-xs ${stayDateError ? 'text-red-500' : 'text-slate-500'}`}>
+                                {stayDateError || '入住日期不能早于今天，离店日期需晚于入住日期。'}
+                            </p>
                         </label>
-                        <Button fullWidth variant='contained' size='large' startIcon={<Search/>} sx={{mt: 2, borderRadius: 2}} onClick={searchHotels} disabled={loading || !destination || hasInvalidPriceRange}>
+                        <Button fullWidth variant='contained' size='large' startIcon={<Search/>} sx={{mt: 2, borderRadius: 2}} onClick={() => searchHotels(true)} disabled={loading || !destination || hasInvalidPriceRange || Boolean(stayDateError)}>
                             查询
                         </Button>
                     </section>
@@ -422,7 +446,7 @@ const HotelBooking = () => {
                                     variant='contained'
                                     size='large'
                                     sx={{borderRadius: 2}}
-                                    disabled={!isAuthenticated || bookingHotelId === selectedOffer.idHotel || selectedGuestCount === 0}
+                                    disabled={!isAuthenticated || bookingHotelId === selectedOffer.idHotel || selectedGuestCount === 0 || Boolean(stayDateError)}
                                     onClick={openCheckoutConfirm}
                                 >
                                     {!isAuthenticated ? '登录后提交' : bookingHotelId === selectedOffer.idHotel ? '提交中' : '提交订单'}
@@ -493,7 +517,7 @@ const HotelBooking = () => {
                             <ToggleButton value='price_desc'>高价优先</ToggleButton>
                         </ToggleButtonGroup>
 
-                        <Button fullWidth variant='outlined' sx={{mt: 2, borderRadius: 2}} onClick={searchHotels} disabled={loading || !destination || hasInvalidPriceRange}>
+                        <Button fullWidth variant='outlined' sx={{mt: 2, borderRadius: 2}} onClick={() => searchHotels(true)} disabled={loading || !destination || hasInvalidPriceRange || Boolean(stayDateError)}>
                             应用筛选
                         </Button>
                     </section>

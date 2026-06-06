@@ -472,7 +472,7 @@ export interface RegisterPayload {
     email: string,
     password: string,
     name: string,
-    surname: string,
+    surname?: string,
     phone?: string,
 }
 
