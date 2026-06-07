@@ -68,6 +68,12 @@ spring:
             - Path=/users/**
           filters:
             - RemoveRequestHeader=Cookie
+        - id: community-service
+          uri: lb://community-service
+          predicates:
+            - Path=/community/**
+          filters:
+            - RemoveRequestHeader=Cookie
         - id: reservation-service
           uri: lb://reservation-service
           predicates:

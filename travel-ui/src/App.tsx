@@ -18,6 +18,8 @@ import HotelBooking from "./reservations/screens/HotelBooking";
 import HotelDetails from "./reservations/screens/HotelDetails";
 import Account from "./account/screens/Account";
 import ReservationDetails from "./reservations/screens/ReservationDetails";
+import Community from "./community/screens/Community";
+import CommunityPostDetails from "./community/screens/CommunityPostDetails";
 
 function App() {
     useEffect(() => {
@@ -40,6 +42,8 @@ function App() {
                     <Route path='/reservations/hotels' element={<HotelBooking/>}/>
                     <Route path='/reservations/hotels/:hotelId' element={<HotelDetails/>}/>
                     <Route path='/account' element={<Account/>}/>
+                    <Route path='/community' element={<Community/>}/>
+                    <Route path='/community/posts/:postId' element={<CommunityPostDetails/>}/>
                     <Route path='/clientPreferences' element={<Preferences/>}/>
                     <Route path='/TOUpdates' element={<TOUpdates/>}/>
                     <Route path='/ai-planner' element={<AiPlanner/>}/>

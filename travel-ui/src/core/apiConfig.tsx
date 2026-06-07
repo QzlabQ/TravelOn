@@ -154,6 +154,53 @@ export class ApiRequests {
     static listPlannerSnapshots = async (conversationId: string, userId: string) => {
         return await axiosInstance.get<PlannerSnapshot[]>(`ai-arrange/api/conversations/${conversationId}/snapshots?userId=${userId}`);
     }
+
+    static listCommunityPosts = async (params: CommunityPostsQuery, token?: string) => {
+        return await axiosInstance.get<PageResponse<CommunityPostResponse>>('community/posts', {
+            params,
+            headers: token ? {'X-User-Token': token} : undefined,
+        });
+    }
+
+    static createCommunityPost = async (token: string, payload: CreateCommunityPostPayload) => {
+        return await axiosInstance.post<CommunityPostResponse>('community/posts', payload, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static getCommunityPost = async (postId: string, token?: string) => {
+        return await axiosInstance.get<CommunityPostResponse>(`community/posts/${postId}`, {
+            headers: token ? {'X-User-Token': token} : undefined,
+        });
+    }
+
+    static toggleCommunityPostLike = async (token: string, postId: string) => {
+        return await axiosInstance.post<CommunityLikeResponse>(`community/posts/${postId}/likes`, {}, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static listCommunityReviews = async (params: CommunityReviewsQuery) => {
+        return await axiosInstance.get<PageResponse<CommunityReviewResponse>>('community/reviews', {params});
+    }
+
+    static createCommunityReview = async (token: string, payload: CreateCommunityReviewPayload) => {
+        return await axiosInstance.post<CommunityReviewResponse>('community/reviews', payload, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static getCommunitySummary = async (params: CommunitySummaryQuery) => {
+        return await axiosInstance.get<CommunitySummaryResponse>('community/summary', {params});
+    }
+}
+
+export interface PageResponse<T> {
+    content: T[],
+    totalElements: number,
+    totalPages: number,
+    number: number,
+    size: number,
 }
 
 export interface GetOffersBySearchQueryOffer {
@@ -660,4 +707,89 @@ export interface PlannerSnapshot {
 export function buildPlannerWebSocketUrl(conversationId: string, userId: string) {
     const params = new URLSearchParams({conversationId, userId});
     return `${baseWSURL}ai-arrange/ws/planner?${params.toString()}`;
+}
+
+export type CommunityCategory = 'TRAVEL_NOTE' | 'SCENIC_SPOT' | 'ROUTE' | 'MERCHANT' | 'HOTEL' | 'FOOD' | 'TRANSPORT' | 'OTHER';
+
+export type ReviewTargetType = 'SCENIC_SPOT' | 'ROUTE' | 'MERCHANT';
+
+export interface CommunityPostsQuery {
+    category?: CommunityCategory,
+    keyword?: string,
+    page?: number,
+    size?: number,
+    sort?: 'latest' | 'popular',
+}
+
+export interface CreateCommunityPostPayload {
+    title: string,
+    content: string,
+    category: CommunityCategory,
+    destination?: string,
+    imageUrls?: string[],
+}
+
+export interface CommunityPostResponse {
+    id: string,
+    title: string,
+    content: string,
+    category: CommunityCategory,
+    destination?: string | null,
+    imageUrls: string[],
+    authorUserId: string,
+    authorName: string,
+    likeCount: number,
+    likedByCurrentUser: boolean,
+    createdAt: string,
+    updatedAt: string,
+}
+
+export interface CommunityLikeResponse {
+    postId: string,
+    liked: boolean,
+    likeCount: number,
+}
+
+export interface CommunityReviewsQuery {
+    targetType?: ReviewTargetType,
+    targetId?: string,
+    category?: CommunityCategory,
+    page?: number,
+    size?: number,
+}
+
+export interface CreateCommunityReviewPayload {
+    targetType: ReviewTargetType,
+    targetId?: string,
+    targetName: string,
+    rating: number,
+    content: string,
+    category: CommunityCategory,
+}
+
+export interface CommunityReviewResponse {
+    id: string,
+    targetType: ReviewTargetType,
+    targetId?: string | null,
+    targetName: string,
+    rating: number,
+    content: string,
+    category: CommunityCategory,
+    authorUserId: string,
+    authorName: string,
+    createdAt: string,
+    updatedAt: string,
+}
+
+export interface CommunitySummaryQuery {
+    targetType?: ReviewTargetType,
+    targetId?: string,
+}
+
+export interface CommunitySummaryResponse {
+    targetType?: ReviewTargetType,
+    targetId?: string,
+    averageRating: number,
+    reviewCount: number,
+    latestReviews: CommunityReviewResponse[],
 }

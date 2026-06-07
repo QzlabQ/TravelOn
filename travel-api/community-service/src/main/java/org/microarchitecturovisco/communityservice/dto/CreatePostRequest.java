@@ -1,0 +1,17 @@
+package org.microarchitecturovisco.communityservice.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
+
+import java.util.List;
+
+public record CreatePostRequest(
+        @NotBlank @Size(max = 120) String title,
+        @NotBlank @Size(max = 4000) String content,
+        @NotNull CommunityCategory category,
+        @Size(max = 80) String destination,
+        List<@Size(max = 1000) String> imageUrls
+) {
+}

@@ -117,6 +117,18 @@ services:
     networks:
       - backend
 
+  community:
+    build: ./community-service
+    volumes:
+      - ./logs/community:/logs
+      - ./data/community-service:/data
+    depends_on:
+      - discovery
+      - gateway
+      - user
+    networks:
+      - backend
+
   data-generator:
     build: ./data-generator
     volumes:

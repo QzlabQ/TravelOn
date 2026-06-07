@@ -9,6 +9,7 @@ import {
     Bookmarks,
     Explore,
     Flight,
+    Forum,
     Hotel,
     Notifications,
     Person,
@@ -140,6 +141,17 @@ export default function Navbar() {
                                 style={{color: "#333"}}
                             >
                                 AI规划
+                            </Button>
+                        </Link>
+                    </li>
+                    <li className="flex flex-row items-center">
+                        <Link to="/community">
+                            <Button
+                                variant="text"
+                                startIcon={<Forum style={{color: "#333"}}/>}
+                                style={{color: "#333"}}
+                            >
+                                社区
                             </Button>
                         </Link>
                     </li>
