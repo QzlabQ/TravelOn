@@ -595,7 +595,7 @@ const HotelBooking = () => {
                     rules={[
                         "未支付订单将在 30 分钟后自动超时。",
                         "已支付订单取消后会直接完成退款，钱包支付退回余额。",
-                        "房型和价格来自后端酒店数据库，当前用于课程项目演示。",
+                        "房型和价格会随库存与日期变化，提交订单前请再次确认。",
                     ]}
                     submitting={bookingHotelId === selectedOffer.idHotel}
                     onClose={() => setCheckoutConfirmOpen(false)}

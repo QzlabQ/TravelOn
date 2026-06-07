@@ -202,10 +202,6 @@ export default function AuthDialog({open, initialMode = "login", onClose, onAuth
                                 >
                                     {submitting ? "登录中..." : "登录"}
                                 </Button>
-                                <Divider/>
-                                <Typography variant="body2" color="text.secondary">
-                                    可用演示账号：john0@gmail.com / password1
-                                </Typography>
                             </Box>
                         }
 

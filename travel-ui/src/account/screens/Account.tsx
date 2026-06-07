@@ -707,7 +707,7 @@ export default function Account() {
                                 <div className="mb-4 flex items-center justify-between">
                                     <div>
                                         <p className="font-semibold text-gray-900">实名信息</p>
-                                        <p className="text-xs text-gray-500">支付前会要求填写付款人实名信息，证件号仅保存在本地演示数据中。</p>
+                                        <p className="text-xs text-gray-500">支付前会要求填写付款人实名信息，证件号仅用于当前账户的出行与支付校验。</p>
                                     </div>
                                     <CreditCard className="text-[#0f766e]"/>
                                 </div>

@@ -433,7 +433,7 @@ export default function ReservationDetails() {
             setSuccessMessage(paymentMethod === "WALLET" ? "钱包支付成功，订单状态已经更新。" : "银联卡支付成功，订单状态已经更新。");
             await loadReservation();
         } catch (error: any) {
-            setErrorMessage(error?.message || "支付未通过。请检查银联卡号后重试，演示卡可使用 6222020000000056。");
+            setErrorMessage(error?.message || "支付未通过。请检查银联卡号后重试。");
         } finally {
             setSubmitting(false);
         }
@@ -640,10 +640,10 @@ export default function ReservationDetails() {
             </div>
 
             <Dialog open={payDialogOpen} onClose={() => setPayDialogOpen(false)} fullWidth maxWidth="sm">
-                <DialogTitle>模拟支付</DialogTitle>
+                <DialogTitle>支付订单</DialogTitle>
                 <DialogContent>
                     <Alert severity="info" className="mb-4">
-                        演示环境不会调用真实支付接口；钱包会本地扣款，银联卡仍走后端模拟校验。
+                        可使用钱包余额或银联卡完成支付，支付成功后订单状态会立即更新。
                     </Alert>
 
                     <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
@@ -775,8 +775,8 @@ export default function ReservationDetails() {
                                         onChange={event => setCardNumber(normalizeDigits(event.target.value).slice(0, 19))}
                                         error={Boolean(cardNumber && bankCardError)}
                                         helperText={cardNumber
-                                            ? bankCardError || `${cardIssuerInfo ? `已识别 ${cardIssuerInfo.displayName}；` : ""}仅支持 16-19 位银联卡号；演示卡可用 6222020000000056。`
-                                            : "仅支持 16-19 位银联卡号；演示卡可用 6222020000000056。"}
+                                            ? bankCardError || `${cardIssuerInfo ? `已识别 ${cardIssuerInfo.displayName}；` : ""}仅支持 16-19 位银联卡号。`
+                                            : "仅支持 16-19 位银联卡号。"}
                                     />
                                 </div>
                             }

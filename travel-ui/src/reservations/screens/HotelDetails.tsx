@@ -343,7 +343,7 @@ const HotelDetails = () => {
                                 {["房间整洁", "交通便利", "服务热情"].map(item => (
                                     <div key={item} className="rounded-lg bg-slate-50 p-4">
                                         <p className="font-semibold text-slate-900">{item}</p>
-                                        <p className="mt-2 text-slate-500">来自历史评论样本和酒店说明的综合展示。</p>
+                                        <p className="mt-2 text-slate-500">结合住客反馈与酒店信息整理展示。</p>
                                     </div>
                                 ))}
                             </div>
@@ -393,7 +393,7 @@ const HotelDetails = () => {
                         <div className="mt-3 space-y-2 text-sm text-slate-600">
                             <p>订单创建后可在订单详情页完成支付。</p>
                             <p>已支付订单取消后会进入退款流程，退款完成时间以订单状态为准。</p>
-                            <p>房型和价格来自后端酒店数据库，当前用于课程项目演示。</p>
+                            <p>房型与价格会随日期和库存变化，请以下单时展示为准。</p>
                         </div>
                     </section>
                 </aside>
@@ -420,7 +420,7 @@ const HotelDetails = () => {
                     rules={[
                         "未支付订单将在 30 分钟后自动超时。",
                         "已支付订单取消后会直接完成退款，钱包支付退回余额。",
-                        "房型和价格来自后端酒店数据库，当前用于课程项目演示。",
+                        "房型与价格会随日期和库存变化，请以下单时展示为准。",
                     ]}
                     submitting={submitting}
                     onClose={() => setCheckoutConfirmOpen(false)}
