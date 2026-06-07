@@ -538,7 +538,7 @@ export default function Account() {
                             <Button variant="contained" size="large" onClick={() => setAuthOpen(true)}>
                                 登录 / 注册
                             </Button>
-                            <Button variant="outlined" size="large" component={Link} to="/offers">
+                            <Button variant="outlined" size="large" component={Link} to="/reservations/flights">
                                 继续看产品
                             </Button>
                         </div>
@@ -615,7 +615,7 @@ export default function Account() {
                         <Button component={Link} to="/reservations" variant="contained" startIcon={<Bookmarks/>}>
                             查看我的预订
                         </Button>
-                        <Button component={Link} to="/ai-planner" variant="outlined" startIcon={<TravelExplore/>}>
+                        <Button component={Link} to="/reservations/flights" variant="outlined" startIcon={<TravelExplore/>}>
                             打开 AI 规划
                         </Button>
                         <Button color="error" variant="text" startIcon={<Logout/>} onClick={logout}>

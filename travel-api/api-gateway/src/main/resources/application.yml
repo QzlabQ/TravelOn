@@ -1,4 +1,4 @@
-server:
+﻿server:
   port: 8082
 
 eureka:
@@ -7,7 +7,6 @@ eureka:
       defaultZone: http://discovery:8010/eureka
   instance:
     prefer-ip-address: true
-
 
 logging:
   level:
@@ -56,12 +55,6 @@ spring:
             - Path=/transports/**
           filters:
             - RemoveRequestHeader=Cookie
-        - id: offer-provider-service
-          uri: lb://offer-provider-service
-          predicates:
-            - Path=/offers/**
-          filters:
-            - RemoveRequestHeader=Cookie
         - id: user-service
           uri: lb://user-service
           predicates:
@@ -83,26 +76,5 @@ spring:
             - Path=/payments/**
           filters:
             - RemoveRequestHeader=Cookie
-        - id: ai-arrange-websocket
-          uri: lb:ws://ai-arrange-service
-          predicates:
-            - Path=/ai-arrange/ws/**
-          filters:
-            - RemoveRequestHeader=Cookie
-        - id: ai-arrange-service
-          uri: lb://ai-arrange-service
-          predicates:
-            - Path=/ai-arrange/**
-          filters:
-            - RemoveRequestHeader=Cookie
-        - id: data-generator
-          uri: lb://data-generator
-          predicates:
-            - Path=/data-generator/**
-          metadata:
-            cors:
-              allowedOrigins: '*'
-              allowedMethods: '*'
-              allowedHeaders: '*'
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin

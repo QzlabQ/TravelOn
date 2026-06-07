@@ -77,7 +77,7 @@ const getRebookTarget = (reservation: ReservationResponse) => {
         };
     }
 
-    return {pathname: '/offers'};
+    return {pathname: '/reservations'};
 };
 
 const Reservations = () => {

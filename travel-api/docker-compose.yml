@@ -1,4 +1,4 @@
-# version: "3.9"
+﻿# version: "3.9"
 name: rsww_184249
 
 services:
@@ -9,18 +9,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     volumes:
-      - ./data/rabbitmq:/var/lib/rabbitmq #here hardcoded path to store rabbitmq data, change it to your local path
+      - ./data/rabbitmq:/var/lib/rabbitmq
       - ./logs/rabbitmq:/var/log/rabbitmq
-    networks:
-      - backend
-
-  mongo:
-    image: mongo:7
-    hostname: mongo
-    ports:
-      - "27017:27017"
-    volumes:
-      - ./data/mongo:/data/db
     networks:
       - backend
 
@@ -48,22 +38,10 @@ services:
     networks:
       - backend
 
-  # custom services
   hotel:
     build: ./hotel-service
     volumes:
       - ./logs/hotel:/logs
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-    networks:
-      - backend
-
-  offer-provider:
-    build: ./offer-provider-service
-    volumes:
-      - ./logs/offer-provider:/logs
     depends_on:
       - rabbitmq
       - discovery
@@ -117,46 +95,6 @@ services:
     networks:
       - backend
 
-  data-generator:
-    build: ./data-generator
-    volumes:
-      - ./logs/data-generator:/logs
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-      - hotel
-      - transport
-    networks:
-      - backend
-
-  ai-arrange-agent:
-    build: ./ai-arrange-agent-service
-    env_file:
-      - .env
-    ports:
-      - "8090:8090"
-    networks:
-      - backend
-
-  ai-arrange:
-    build: ./ai-arrange-service
-    env_file:
-      - .env
-    volumes:
-      - ./logs/ai-arrange:/logs
-    environment:
-      - MONGO_HOST=mongo
-      - RABBITMQ_HOST=rabbitmq
-      - AI_AGENT_ENABLED=true
-      - AI_AGENT_BASE_URL=http://ai-arrange-agent:8090
-    depends_on:
-      - rabbitmq
-      - mongo
-      - discovery
-      - gateway
-    networks:
-      - backend
-
 networks:
   backend:
+
