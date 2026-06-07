@@ -529,7 +529,7 @@ export default function AiPlanner() {
             }
         } catch (error) {
             console.error(error);
-            setErrorMessage("恢复 AI 规划会话失败，已保留本地缓存内容。请确认网关和 ai-arrange-service 可访问。");
+            setErrorMessage("恢复 AI 规划会话失败，已保留本地缓存内容。请确认 ai-arrange-service 可访问。");
         } finally {
             setHydrating(false);
         }
@@ -653,7 +653,7 @@ export default function AiPlanner() {
         socket.onerror = () => {
             if (closedByCleanup) return;
             setSocketStatus("error");
-            setErrorMessage("WebSocket 连接失败，请确认 api-gateway 和 ai-arrange-service 已启动。");
+            setErrorMessage("WebSocket 连接失败，请确认 ai-arrange-service 已启动。");
             setChatSending(false);
         };
 
@@ -713,7 +713,7 @@ export default function AiPlanner() {
             setChatInput("");
         } catch (error) {
             console.error(error);
-            setErrorMessage("创建 AI 规划会话失败，请确认网关 /ai-arrange/api/conversations 可访问。");
+            setErrorMessage("创建 AI 规划会话失败，请确认 ai-arrange-service 的 /ai-arrange/api/conversations 可访问。");
         } finally {
             setCreating(false);
         }

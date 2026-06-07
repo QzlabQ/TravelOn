@@ -26,7 +26,7 @@ class TransportSearchTool:
                 tool="search_flights",
                 status=ToolStatus.SKIPPED,
                 data=[],
-                errorMessage="Real transport-service connector is not implemented yet",
+                errorMessage="Real transport data connector is not implemented yet",
                 latencyMs=self._latency_ms(started),
                 userMessage="交通查询连接器尚未启用，已跳过机票/交通候选查询。",
                 warnings=[

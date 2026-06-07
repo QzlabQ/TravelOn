@@ -69,8 +69,8 @@ travel-api/logs/
 travel-api/**/target/
 travel-api/.env
 travel-api/.env.*
-travel-api/__pycache__/
-travel-api/*.pyc
+travel-api/**/__pycache__/
+travel-api/**/*.pyc
 travel-api/.pytest_cache/
 travel-api/.venv/
 travel-api/venv/

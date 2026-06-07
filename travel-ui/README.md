@@ -1,126 +1,64 @@
-# Travel agency frontend
+# Travel UI
 
-This is a frontend for travel agency application based on microservices architecture
-which can be found [here](https://github.com/Microarchitecturovisco/travel-api). 
-The app is written in TypeScript.
+`travel-ui` 是当前 AI 规划出行项目的前端。当前分支保留完整前端代码，但后端只保留 AI 规划链路，因此可直接联调的核心页面是 AI 规划页面。
 
+## 当前可用能力
 
-## Table of contents
-- [Description](#description)
-- [Setup](#setup)
-- [Available Scripts](#available-scripts)
-## Description
+- AI 规划入口：`/ai-planner`
+- 固定槽位填写：城市、日期、人数、预算、偏好等。
+- AI 对话：通过 WebSocket 连接 `ai-arrange-service`。
+- Markdown 行程展示和历史快照切换。
+- 地图点位展示、选点和路线展示。
+- Mock 数据加载，用于无后端或无外部 Key 时演示页面效果。
 
-### Home Page
-This is the home page, where you can search for trips depending on your choise (destinations, numer of people, dates and departure places). 
-<div align="center">
-  <img src="photos/main_view.png" width="800"/>
-</div>
+## 待合并页面
 
-### Clients Preferences
-You can easly switch to view with preferences of clients, where you can see which destinations, rooms, hotels, and transport types are most popular. You can also check information about last reservation to find an inspiration. This view is update in real time with usage of websockets.
-<div align="center">
-  <img src="photos/clients_preferences_view.png" width="800"/>
-</div>
+前端中仍保留旧项目的报价、详情和预订页面代码，例如：
 
-### Available Offers
-After you hit the search button, you will see Hotels which satisfie choosen parameters. From this view you also check hotel price and hotel rate.
-<div align="center">
-  <img src="photos/search_query_view.png" width="800"/>
-</div>
+- `/offers`
+- `/offerDetails`
+- `/buyOffer`
+- `/clientPreferences`
+- `/TOUpdates`
 
-### Offer details
+这些页面依赖旧旅游微服务接口。旧后端服务已经从当前分支移除，后续应在“已完成订票系统”合并时重新对接真实订票接口。
 
-From previous view you can choose a Hotel to see its details. Here you see all the details of the hotel such as: description, photos, available rooms configurations with descriptions and catering options. You can change room configuration, catering option, departure place and number of guests. Each change will result in automatic price change. Additionally, if someone buys an offer with hotel you are viewing, you will see a popup in top right corner with this information. It is made with websocket usage. You can see the popup on photo below. 
+发帖系统目前尚未开发，建议后续新增帖子列表、帖子详情、发布页、评论互动等页面。
 
-<div align="center">
-  <img src="photos/offer_details_view.png" width="800"/>
-</div>
-<div align="center">
-  <img src="photos/offer_photos_view.png" width="800"/>
-</div>
-<div align="center">
-  <img src="photos/offer_configuration_view.png" width="800"/>
-</div>
+## 环境变量
 
-### Reservation
-When you decide to purchase an offer you will see view with details of the trip. Here you can reserve an offer for 1 minute, during which you can decide to pay for an offer or decline it.
-
-<div align="center">
-  <img src="photos/reservation_view.png" width="800"/>
-</div>
-
-## Setup
-
-### Node
-
-Node.js version `> 19` is required
-
-### Download dependencies
-
-```shell
-corepack enable
-```
-
-```shell
-yarn
-```
-
-This project uses a modern version of `yarn` for package management
-
-### API host and port
-
-Configure the API connection in the `.env` file
+在 `travel-ui/.env` 中配置：
 
 ```env
 REACT_APP_API_HOSTNAME=localhost
 REACT_APP_API_PORT=8082
+REACT_APP_AMAP_JS_API_KEY=
+REACT_APP_AMAP_SECURITY_JS_CODE=
 ```
 
-### AMap key
+其中：
 
-The AI planner map component can run with mock map rendering first. To enable the AMap JavaScript map in the frontend, configure these values in `travel-ui/.env`:
+- `REACT_APP_API_HOSTNAME` / `REACT_APP_API_PORT` 指向 `ai-arrange-service`。
+- `REACT_APP_AMAP_JS_API_KEY` / `REACT_APP_AMAP_SECURITY_JS_CODE` 用于浏览器端高德地图渲染。
 
-```env
-REACT_APP_AMAP_JS_API_KEY=your_amap_javascript_key
-REACT_APP_AMAP_SECURITY_JS_CODE=your_amap_security_js_code
+后端 POI / 路线补全使用 `travel-api/.env` 中的 `AMAP_API_KEY`。
+
+## 本地启动
+
+```powershell
+corepack enable
+yarn
+yarn start
 ```
 
-The backend POI / route enrichment key is separate and remains `AMAP_API_KEY` in `travel-api/.env`.
+默认访问：
 
-## Available Scripts
+```text
+http://localhost:3000/ai-planner
+```
 
-In the project directory, you can run:
+## 构建
 
-### `yarn start`
-
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `yarn run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `yarn run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```powershell
+yarn build
+```

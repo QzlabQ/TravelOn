@@ -27,7 +27,7 @@ class HotelSearchTool:
                 tool="search_hotels",
                 status=ToolStatus.SKIPPED,
                 data=[],
-                errorMessage="Real offer-provider connector is not implemented yet",
+                errorMessage="Real booking-system hotel connector is not implemented yet",
                 latencyMs=self._latency_ms(started),
                 userMessage="酒店查询连接器尚未启用，已跳过酒店候选查询。",
                 warnings=[

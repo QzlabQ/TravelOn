@@ -79,7 +79,7 @@ The next development plan is tracked in `NEXT-DEVELOPMENT-PLAN.md`. The current 
 - keep the SSE streaming planner endpoint compatible while Java integration is added gradually;
 - continue Java integration in batches after the first `/run` + SSE + snapshot persistence batch;
 - use Chinese for user-facing text;
-- connect real adapters in this order: offer-provider hotels/products, Amap POI/routes, then weather and transport.
+- connect real adapters in this order: booking-system hotels/products, Amap POI/routes, then weather and transport.
 
 ## Harness Phase 1
 
@@ -110,7 +110,7 @@ Mock mode is enabled by default:
 AGENT_TOOL_MOCK_ENABLED=true
 ```
 
-Set `AGENT_TOOL_MOCK_ENABLED=false` only after real `offer-provider`, `transport`, and weather connectors are implemented. Python still does not read or write MongoDB; Java should pass business context through `userContext` and remain responsible for auth, persistence, and WebSocket delivery.
+Set `AGENT_TOOL_MOCK_ENABLED=false` only after real booking-system, transport-data, and weather connectors are implemented. Python still does not read or write MongoDB; Java should pass business context through `userContext` and remain responsible for auth, persistence, and WebSocket delivery.
 
 ## Prompt and ReAct Phase 3
 

@@ -382,7 +382,7 @@ class DeepSeekClient:
             return {
                 "assistantTextMaxChars": 180,
                 "summaryMaxChars": 220,
-                "markdownMaxChars": 5000,
+                "markdownMaxChars": 2800,
                 "maxPlaces": 12,
                 "maxRoutes": 12,
             }

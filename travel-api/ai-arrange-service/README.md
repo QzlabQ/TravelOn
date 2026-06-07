@@ -1,34 +1,49 @@
 # AI Arrange Service
 
-Independent pre-trip planning service for the intelligent travel flow.
+`ai-arrange-service` 是当前后端对前端开放的 AI 规划业务入口。它已经脱离旧项目的 Gateway / Eureka / RabbitMQ 架构，可以独立监听固定端口并直接被前端访问。
 
-## Scope
+## 职责
 
-- Collect fixed trip slots before chat starts.
-- Use free-form AI chat after required slots are present.
-- Forward planner status and final refresh events over WebSocket.
-- Consume the Python Agent SSE endpoint through `WebClient`.
-- Persist conversations, messages, and versioned snapshots in MongoDB.
-- Push structured Markdown, place suggestions, and simple route data for the map panel.
-- Enrich generic AI places through Amap POI search when `AMAP_API_KEY` is configured.
-- Keep an internal hotel matching extension point for the later offer-provider booking phase.
+- 创建、查询、更新 AI 规划会话。
+- 通过 WebSocket 接收用户消息和地图选点。
+- 调用 `ai-arrange-agent-service` 的 SSE / REST Agent 接口。
+- 将 Agent 结果保存为 MongoDB 会话消息和版本化快照。
+- 向前端推送规划进度、Markdown、地图点位、路线片段和错误信息。
+- 在配置 `AMAP_API_KEY` 后，对 AI 推荐点位做高德 POI 补全。
 
-## Gateway Paths
+## 接口
 
-- REST: `/ai-arrange/api/conversations`
-- WebSocket: `/ai-arrange/ws/planner?conversationId=<uuid>&userId=<uuid>`
+REST 基础路径：
 
-The gateway keeps a separate `lb:ws://ai-arrange-service` route for WebSocket upgrade traffic and a normal `lb://ai-arrange-service` route for REST traffic.
+```text
+/ai-arrange/api/conversations
+```
 
-## Required Slots
+WebSocket：
 
-The frontend should collect these before opening the AI chat:
+```text
+/ai-arrange/ws/planner?conversationId=<uuid>&userId=<uuid>
+```
+
+常用 REST：
+
+- `POST /ai-arrange/api/conversations`
+- `GET /ai-arrange/api/conversations?userId=<uuid>`
+- `GET /ai-arrange/api/conversations/{conversationId}?userId=<uuid>`
+- `PUT /ai-arrange/api/conversations/{conversationId}/core-slots`
+- `PUT /ai-arrange/api/conversations/{conversationId}/selection`
+- `GET /ai-arrange/api/conversations/{conversationId}/snapshots?userId=<uuid>`
+- `POST /ai-arrange/api/conversations/{conversationId}/planner/run`
+
+## 必填槽位
+
+前端在开始自由对话前需要收集：
 
 - `city`
 - `travelStartDate`
 - `peopleCount`
 
-Optional slots:
+可选槽位：
 
 - `travelEndDate`
 - `budget`
@@ -39,125 +54,42 @@ Optional slots:
 - `mustVisitKeywords`
 - `avoidKeywords`
 
-## REST Contract
+## 配置
 
-Create a planning conversation:
+- `AI_ARRANGE_SERVICE_PORT`：服务端口，默认 `8082`。
+- `MONGODB_URI` 或 `MONGO_HOST`：MongoDB 连接。
+- `AI_ARRANGE_AGENT_BASE_URL`：Python Agent 地址，本地默认 `http://localhost:8090`，Docker Compose 中为 `http://ai-arrange-agent:8090`。
+- `AI_ARRANGE_AGENT_TIMEOUT_SECONDS`：Agent 调用超时时间，默认 `150`。
+- `AI_ARRANGE_CORS_ALLOWED_ORIGINS`：允许访问 REST 接口的前端源，默认允许 `localhost:3000`。
+- `DEEPSEEK_API_KEY`：启用真实模型调用。
+- `DEEPSEEK_MODEL`：模型名称。
+- `AMAP_API_KEY`：启用后端高德 POI / 路线补全。
 
-```http
-POST /ai-arrange/api/conversations
-Content-Type: application/json
+未配置 `DEEPSEEK_API_KEY` 时，Python Agent 仍会返回结构化兜底方案，便于本地开发和测试。
+
+## 本地运行
+
+先启动 MongoDB 和 Python Agent，再运行：
+
+```powershell
+mvn spring-boot:run
 ```
 
-```json
-{
-  "userId": "00000000-0000-0000-0000-000000000001",
-  "coreSlots": {
-    "city": "Shanghai",
-    "travelStartDate": "2026-06-01",
-    "travelEndDate": "2026-06-03",
-    "peopleCount": 2,
-    "travelStyle": "relaxed",
-    "mustVisitKeywords": ["museum"],
-    "avoidKeywords": ["night market"]
-  }
-}
+也可以在 `travel-api` 目录用 Docker Compose 一次启动：
+
+```powershell
+docker compose up -d --build
 ```
-
-Other endpoints:
-
-- `GET /ai-arrange/api/conversations?userId=<uuid>`
-- `GET /ai-arrange/api/conversations/{conversationId}?userId=<uuid>`
-- `PUT /ai-arrange/api/conversations/{conversationId}/core-slots`
-- `PUT /ai-arrange/api/conversations/{conversationId}/selection`
-- `GET /ai-arrange/api/conversations/{conversationId}/snapshots?userId=<uuid>`
-- `POST /ai-arrange/api/conversations/{conversationId}/planner/run`
-
-## WebSocket Messages
-
-Client sends chat text:
-
-```json
-{
-  "type": "PLANNER_CHAT_SEND",
-  "conversationId": "00000000-0000-0000-0000-000000000010",
-  "userId": "00000000-0000-0000-0000-000000000001",
-  "payload": {
-    "message": "Please optimize the route around the Bund and museums.",
-    "selectedPlaceIds": []
-  }
-}
-```
-
-Client sends map selection changes:
-
-```json
-{
-  "type": "PLANNER_PLACE_SELECTION",
-  "conversationId": "00000000-0000-0000-0000-000000000010",
-  "userId": "00000000-0000-0000-0000-000000000001",
-  "payload": {
-    "selectedPlaceIds": ["00000000-0000-0000-0000-000000000101"]
-  }
-}
-```
-
-Server pushes planner status while consuming Python Agent SSE:
-
-```json
-{
-  "type": "PLANNER_TRACE_EVENT",
-  "conversationId": "00000000-0000-0000-0000-000000000010",
-  "payload": {
-    "traceId": "trace-1",
-    "type": "RUN_STARTED",
-    "status": "RUNNING",
-    "message": "开始生成旅行规划。"
-  }
-}
-```
-
-Server pushes refreshed structured data:
-
-```json
-{
-  "type": "PLANNER_DATA_REFRESH",
-  "conversationId": "00000000-0000-0000-0000-000000000010",
-  "payload": {
-    "status": "ACTIVE_CHAT",
-    "title": "Shanghai pre-trip plan",
-    "markdown": "# Shanghai pre-trip plan",
-    "snapshotVersion": 2,
-    "places": [],
-    "routes": [],
-    "selectedPlaceIds": []
-  }
-}
-```
-
-When the final Agent response is saved as a Java-owned snapshot, the server sends `PLANNER_SNAPSHOT_SAVED`. Recommendation groups are pushed through `PLANNER_OPTIONS_REFRESH`, and errors are sent as `PLANNER_ERROR`.
-
-## Configuration
-
-- `DEEPSEEK_API_KEY`: enables real AI calls.
-- `DEEPSEEK_BASE_URL`: default `https://api.deepseek.com`.
-- `DEEPSEEK_MODEL`: default `deepseek-v4-pro`.
-- `AI_ARRANGE_AGENT_BASE_URL`: Python Agent base URL, default `http://ai-arrange-agent:8090` in Docker Compose. For local non-Docker runs, set it to `http://localhost:8090`.
-- `AI_ARRANGE_AGENT_TIMEOUT_SECONDS`: Python Agent HTTP timeout, default `150`.
-- `AMAP_API_KEY`: enables Amap POI enrichment.
-- `MONGODB_URI` or `MONGO_HOST`: MongoDB persistence.
-- `RABBITMQ_HOST`: reserved for the later offer-provider integration phase.
-
-Without `DEEPSEEK_API_KEY`, the service still runs and returns a local placeholder answer so local development can proceed.
 
 ## Smoke Test
 
-Run from the repository root in PowerShell:
+在 `travel-api` 目录运行：
 
 ```powershell
 .\scripts\ai-arrange-smoke-test.ps1
 ```
 
-To auto-select the first returned map point and verify the selection refresh:
+自动选中第一个地图点并验证快照刷新：
 
 ```powershell
 .\scripts\ai-arrange-smoke-test.ps1 -AutoSelectFirstPlace

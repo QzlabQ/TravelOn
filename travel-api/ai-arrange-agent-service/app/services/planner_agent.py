@@ -604,7 +604,7 @@ class PlannerAgent:
         registry.register(
             ToolSpec(
                 name="search_hotels",
-                description="Search hotel candidates from offer-provider or mock data.",
+                description="Search hotel candidates from the booking system or mock data.",
                 input_schema=AgentRunRequest,
                 output_schema="list[PlannerPlaceSuggestion]",
                 timeout_seconds=policy.default_tool_timeout_seconds,

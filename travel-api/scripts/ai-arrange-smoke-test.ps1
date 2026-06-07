@@ -1,5 +1,5 @@
 param(
-    [string]$GatewayBaseUrl = "http://localhost:8082",
+    [string]$ServiceBaseUrl = "http://localhost:8082",
     [string]$UserId = "00000000-0000-0000-0000-000000000001",
     [string]$City = "Shanghai",
     [string]$TravelStartDate = "2026-06-01",
@@ -111,13 +111,13 @@ function Invoke-CreateConversationWithRetry {
                 $statusCode = [int]$_.Exception.Response.StatusCode
             }
 
-            $isGatewayStartupError = $statusCode -eq 502 -or $statusCode -eq 503 -or $statusCode -eq 504
-            if (-not $isGatewayStartupError -or [DateTimeOffset]::UtcNow -ge $deadline) {
+            $isStartupError = $statusCode -eq 502 -or $statusCode -eq 503 -or $statusCode -eq 504
+            if (-not $isStartupError -or [DateTimeOffset]::UtcNow -ge $deadline) {
                 throw
             }
 
             $remainingSeconds = [int][Math]::Ceiling(($deadline - [DateTimeOffset]::UtcNow).TotalSeconds)
-            Write-Host "Gateway returned $statusCode. Waiting for ai-arrange-service registration ($remainingSeconds seconds left)..."
+            Write-Host "AI service returned $statusCode. Waiting for ai-arrange-service startup ($remainingSeconds seconds left)..."
             Start-Sleep -Seconds ([Math]::Min(5, [Math]::Max(1, $remainingSeconds)))
         }
     }
@@ -149,9 +149,9 @@ function Get-SnapshotsWithSelectionRetry {
     }
 }
 
-$gateway = $GatewayBaseUrl.TrimEnd("/")
-$createUri = "$gateway/ai-arrange/api/conversations"
-$wsBaseUrl = $gateway -replace "^http", "ws"
+$service = $ServiceBaseUrl.TrimEnd("/")
+$createUri = "$service/ai-arrange/api/conversations"
+$wsBaseUrl = $service -replace "^http", "ws"
 $wsUri = "$wsBaseUrl/ai-arrange/ws/planner"
 
 $createBody = [ordered]@{
@@ -281,7 +281,7 @@ finally {
     $socket.Dispose()
 }
 
-$snapshotUri = "$gateway/ai-arrange/api/conversations/$conversationId/snapshots?userId=$UserId"
+$snapshotUri = "$service/ai-arrange/api/conversations/$conversationId/snapshots?userId=$UserId"
 Write-Host ""
 Write-Host "GET $snapshotUri"
 $snapshots = Get-SnapshotsWithSelectionRetry -Uri $snapshotUri -SelectedPlaceId $selectedPlaceId
