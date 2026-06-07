@@ -22,7 +22,7 @@ public class HotelCreatedEvent extends HotelEvent {
     private UUID idHotel;
     private String name;
     private float rating;
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String description;
     @ElementCollection
     private List<String> photos = new ArrayList<>();

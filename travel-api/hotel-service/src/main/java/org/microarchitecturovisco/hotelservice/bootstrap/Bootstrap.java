@@ -6,8 +6,10 @@ import org.microarchitecturovisco.hotelservice.bootstrap.util.*;
 import org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateHotelCommand;
 import org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateRoomReservationCommand;
 import org.microarchitecturovisco.hotelservice.model.dto.*;
+import org.microarchitecturovisco.hotelservice.repositories.HotelRepository;
 import org.microarchitecturovisco.hotelservice.services.HotelsCommandService;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
@@ -31,8 +33,11 @@ public class Bootstrap implements CommandLineRunner {
     private final RoomReservationParser roomReservationParser;
     private final HotelsCommandService hotelsCommandService;
     private final RoomParser roomParser;
-    private final JsonHotelParser jsonHotelParser;
     private final ResourceLoader resourceLoader;
+    private final HotelRepository hotelRepository;
+
+    @Value("${app.seed-data.base-path:file:../seed-data/hotel/}")
+    private String seedDataBasePath;
 
     public File loadCSVInitFiles(String filepathInResources)
             throws FileNotFoundException {
@@ -45,26 +50,22 @@ public class Bootstrap implements CommandLineRunner {
     public void run(String... args) throws IOException {
         Logger logger = Logger.getLogger("Bootstrap");
 
-        Resource hotelCsvFile = resourceLoader.getResource("classpath:initData/hotels.csv");
-        Resource hotelPhotosCsvFile = resourceLoader.getResource("classpath:initData/hotel_photos.csv");
-        Resource hotelRoomsCsvFile = resourceLoader.getResource("classpath:initData/hotel_rooms.csv");
-        Resource hotelCateringOptionsCsvFile = resourceLoader.getResource("classpath:initData/hotel_food_options.csv");
-        Resource hotelJsonFile = resourceLoader.getResource("classpath:initData/hotels.json");
-
-        List<HotelDto> hotels;
-        List<RoomReservationDto> roomReservations;
-
-        if (hotelJsonFile.exists()) {
-            hotels = jsonHotelParser.importHotels(hotelJsonFile);
-            roomReservations = List.of();
-            logger.info("Imported " + hotels.size() + " hotels from hotels.json");
-        } else {
-            List<LocationDto> hotelLocations = locationParser.importLocations(hotelCsvFile);
-            hotels = hotelParser.importHotels(hotelCsvFile, hotelPhotosCsvFile, hotelLocations);
-            List<CateringOptionDto> cateringOptions = cateringOptionParser.importCateringOptions(hotelCateringOptionsCsvFile, hotels);
-            roomParser.importRooms(hotelRoomsCsvFile, hotels);
-            roomReservations = roomReservationParser.importRoomReservations(hotels);
+        if (hotelRepository.count() > 0) {
+            logger.info("Skip hotel seed import because hotel data already exists");
+            return;
         }
+
+        Resource hotelCsvFile = seedResource("hotels.csv");
+        Resource hotelPhotosCsvFile = seedResource("hotel_photos.csv");
+        Resource hotelRoomsCsvFile = seedResource("hotel_rooms.csv");
+        Resource hotelCateringOptionsCsvFile = seedResource("hotel_food_options.csv");
+
+        List<LocationDto> hotelLocations = locationParser.importLocations(hotelCsvFile);
+        List<HotelDto> hotels = hotelParser.importHotels(hotelCsvFile, hotelPhotosCsvFile, hotelLocations);
+        cateringOptionParser.importCateringOptions(hotelCateringOptionsCsvFile, hotels);
+        roomParser.importRooms(hotelRoomsCsvFile, hotels);
+        List<RoomReservationDto> roomReservations = roomReservationParser.importRoomReservations(hotels);
+        logger.info("Imported " + hotels.size() + " hotels from hotels.csv");
 
         for (HotelDto hotelDto : hotels){
             hotelsCommandService.createHotel(CreateHotelCommand.builder()
@@ -82,5 +83,10 @@ public class Bootstrap implements CommandLineRunner {
                     .build()
             );
         }
+    }
+
+    private Resource seedResource(String filename) {
+        String basePath = seedDataBasePath.endsWith("/") ? seedDataBasePath : seedDataBasePath + "/";
+        return resourceLoader.getResource(basePath + filename);
     }
 }

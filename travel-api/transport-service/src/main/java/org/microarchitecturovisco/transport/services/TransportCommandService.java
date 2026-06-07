@@ -8,6 +8,8 @@ import org.microarchitecturovisco.transport.model.domain.TransportCourse;
 import org.microarchitecturovisco.transport.model.events.*;
 import org.microarchitecturovisco.transport.repositories.TransportCourseRepository;
 import org.microarchitecturovisco.transport.repositories.TransportEventStore;
+import org.microarchitecturovisco.transport.repositories.TransportRepository;
+import org.microarchitecturovisco.transport.repositories.TransportReservationRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -22,6 +24,8 @@ public class TransportCommandService {
 
     private final TransportEventSourcingHandler eventSourcingHandler;
     private final TransportCourseRepository transportCourseRepository;
+    private final TransportRepository transportRepository;
+    private final TransportReservationRepository transportReservationRepository;
 
     public void createTransport(CreateTransportCommand command) {
         TransportCreatedEvent transportCreatedEvent = new TransportCreatedEvent(
@@ -88,6 +92,15 @@ public class TransportCommandService {
                 .build();
         transportEventStore.save(transportCreatedEvent);
         eventSourcingHandler.project(List.of(transportCreatedEvent));
+    }
+
+    public void deleteTransport(UUID transportId) {
+        transportRepository.findById(transportId).ifPresent(transport -> {
+            if (transport.getTransportReservations() != null) {
+                transportReservationRepository.deleteAll(transport.getTransportReservations());
+            }
+            transportRepository.delete(transport);
+        });
     }
 
 }

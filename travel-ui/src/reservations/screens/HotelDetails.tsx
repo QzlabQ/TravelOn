@@ -16,6 +16,7 @@ import {Link, useLocation, useNavigate, useParams, useSearchParams} from "react-
 import {
     ApiRequests,
     BookingPersonPayload,
+    CommunitySummaryResponse,
     GetOffersBySearchQueryOffer,
     HotelDetailsResponse,
     HotelRoomConfiguration
@@ -26,6 +27,7 @@ import {formatDate} from "../../core/utils";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
 import {useAuthSession} from "../../core/useAuthSession";
 import {validateStayDates} from "../../core/validation";
+import {formatCommunityTime} from "../../community/components/communityLabels";
 
 const today = new Date();
 const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
@@ -60,6 +62,7 @@ const HotelDetails = () => {
     const [dateFrom, setDateFrom] = useState(searchParams.get("dateFrom") ?? state.dateFrom ?? formatDate(today));
     const [dateTo, setDateTo] = useState(searchParams.get("dateTo") ?? state.dateTo ?? formatDate(tomorrow));
     const [details, setDetails] = useState<HotelDetailsResponse | null>(null);
+    const [communitySummary, setCommunitySummary] = useState<CommunitySummaryResponse | null>(null);
     const [selectedConfiguration, setSelectedConfiguration] = useState<HotelRoomConfiguration | null>(null);
     const [selectedTravelers, setSelectedTravelers] = useState<BookingPersonPayload[]>([]);
     const [loading, setLoading] = useState(false);
@@ -86,7 +89,11 @@ const HotelDetails = () => {
 
     const heroPhoto = details?.photos?.[0] || state.offer?.imageUrl || "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1400&q=80";
     const displayName = details?.hotelName || state.offer?.hotelName || "酒店详情";
-    const displayRating = details?.rating ?? state.offer?.rating ?? 4.5;
+    const displayRating = communitySummary && communitySummary.reviewCount > 0
+        ? communitySummary.averageRating
+        : details?.rating ?? state.offer?.rating ?? 4.5;
+    const reviewCount = communitySummary?.reviewCount ?? 0;
+    const latestReviews = communitySummary?.latestReviews ?? [];
     const selectedRoomNames = selectedConfiguration?.rooms.map(room => room.name).join(" + ") || state.roomType || "标准房";
     const totalPrice = selectedConfiguration ? Math.ceil(selectedConfiguration.pricePerAdult * guestCount * nights) : 0;
 
@@ -133,6 +140,20 @@ const HotelDetails = () => {
             })
             .finally(() => setLoading(false));
     }, [hotelId, dateFrom, dateTo, adultCount, childCount, stayDateError]);
+
+    useEffect(() => {
+        if (!hotelId) {
+            setCommunitySummary(null);
+            return;
+        }
+
+        ApiRequests.getCommunitySummary({
+            targetType: "HOTEL",
+            targetId: hotelId,
+        })
+            .then(response => setCommunitySummary(response.data))
+            .catch(() => setCommunitySummary(null));
+    }, [hotelId]);
 
     const openCheckoutConfirm = () => {
         if (!isAuthenticated) {
@@ -332,20 +353,39 @@ const HotelDetails = () => {
                     </section>
 
                     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                        <h2 className="text-xl font-bold text-slate-950">住客评价</h2>
+                        <div className="flex items-center justify-between gap-4">
+                            <h2 className="text-xl font-bold text-slate-950">住客评价</h2>
+                            <Chip size="small" label={reviewCount > 0 ? `${reviewCount} 条社区评价` : "暂无社区评价"}/>
+                        </div>
                         <div className="mt-4 grid grid-cols-[180px_1fr] gap-5">
                             <div className="rounded-lg bg-blue-50 p-4 text-center">
                                 <p className="text-4xl font-bold text-blue-700">{displayRating.toFixed(1)}</p>
                                 <Rating value={displayRating} precision={0.1} readOnly size="small"/>
-                                <p className="mt-2 text-sm text-slate-500">综合评分</p>
+                                <p className="mt-2 text-sm text-slate-500">
+                                    {reviewCount > 0 ? "来自社区酒店评价" : "暂无社区评价，显示酒店基础评分"}
+                                </p>
                             </div>
-                            <div className="grid grid-cols-3 gap-3 text-sm">
-                                {["房间整洁", "交通便利", "服务热情"].map(item => (
-                                    <div key={item} className="rounded-lg bg-slate-50 p-4">
-                                        <p className="font-semibold text-slate-900">{item}</p>
-                                        <p className="mt-2 text-slate-500">来自历史评论样本和酒店说明的综合展示。</p>
+                            <div className="space-y-3">
+                                {latestReviews.map(review => (
+                                    <div key={review.id} className="rounded-lg bg-slate-50 p-4">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div>
+                                                <p className="font-semibold text-slate-900">{review.authorName}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{formatCommunityTime(review.createdAt)}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Rating value={review.rating} readOnly size="small"/>
+                                                <span className="text-sm font-semibold text-slate-700">{review.rating}.0</span>
+                                            </div>
+                                        </div>
+                                        <p className="mt-3 text-sm leading-6 text-slate-600">{review.content}</p>
                                     </div>
                                 ))}
+                                {latestReviews.length === 0 &&
+                                    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 py-10 text-center text-sm text-slate-500">
+                                        社区中还没有这家酒店的评论。
+                                    </div>
+                                }
                             </div>
                         </div>
                     </section>

@@ -7,7 +7,9 @@ import org.microarchitecturovisco.transport.model.cqrs.commands.CreateTransportR
 import org.microarchitecturovisco.transport.model.cqrs.commands.DeleteTransportReservationCommand;
 import org.microarchitecturovisco.transport.model.domain.Transport;
 import org.microarchitecturovisco.transport.model.domain.TransportReservation;
+import org.microarchitecturovisco.transport.model.domain.TicketOfferTemplate;
 import org.microarchitecturovisco.transport.model.domain.TicketType;
+import org.microarchitecturovisco.transport.model.cqrs.commands.CreateTransportCommand;
 import org.microarchitecturovisco.transport.model.dto.LocationDto;
 import org.microarchitecturovisco.transport.model.dto.TransportDto;
 import org.microarchitecturovisco.transport.model.dto.TransportReservationDto;
@@ -21,6 +23,7 @@ import org.microarchitecturovisco.transport.model.dto.response.TicketOfferDto;
 import org.microarchitecturovisco.transport.model.dto.response.TicketOptionsDto;
 import org.microarchitecturovisco.transport.model.mappers.LocationMapper;
 import org.microarchitecturovisco.transport.queues.config.QueuesConfig;
+import org.microarchitecturovisco.transport.repositories.TicketOfferTemplateRepository;
 import org.microarchitecturovisco.transport.services.TransportCommandService;
 import org.microarchitecturovisco.transport.services.TransportsQueryService;
 import org.microarchitecturovisco.transport.utils.json.JsonConverter;
@@ -28,10 +31,16 @@ import org.microarchitecturovisco.transport.utils.json.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.http.HttpStatus;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
@@ -52,10 +61,37 @@ public class TransportsQueryController {
     public static Logger logger = Logger.getLogger(TransportsQueryController.class.getName());
 
     private final TransportCommandService transportCommandService;
+    private final TicketOfferTemplateRepository ticketOfferTemplateRepository;
 
     @GetMapping("/")
     public List<TransportDto> getAllTransports() {
         return transportsQueryService.getAllTransports();
+    }
+
+    @PostMapping("/admin")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void createTransport(@RequestBody TransportDto transportDto) {
+        UUID transportId = transportDto.getIdTransport() == null ? UUID.randomUUID() : transportDto.getIdTransport();
+        transportDto.setIdTransport(transportId);
+        transportCommandService.createTransport(CreateTransportCommand.builder()
+                .uuid(transportId)
+                .commandTimeStamp(LocalDateTime.now())
+                .transportDto(transportDto)
+                .build());
+    }
+
+    @PutMapping("/admin/{transportId}")
+    public void updateTransport(
+            @PathVariable UUID transportId,
+            @RequestBody TransportUpdateRequest request
+    ) {
+        transportCommandService.updateTransport(transportId, request.getCapacity(), request.getPricePerAdult());
+    }
+
+    @DeleteMapping("/admin/{transportId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTransport(@PathVariable UUID transportId) {
+        transportCommandService.deleteTransport(transportId);
     }
 
     @GetMapping("/locations")
@@ -103,6 +139,30 @@ public class TransportsQueryController {
                 onlyAvailable,
                 sortBy
         );
+    }
+
+    @PostMapping("/tickets/templates")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TicketOfferTemplate createTicketOfferTemplate(@RequestBody TicketOfferTemplate template) {
+        if (template.getId() == null) {
+            template.setId(UUID.randomUUID());
+        }
+        return ticketOfferTemplateRepository.save(template);
+    }
+
+    @PutMapping("/tickets/templates/{templateId}")
+    public TicketOfferTemplate updateTicketOfferTemplate(
+            @PathVariable UUID templateId,
+            @RequestBody TicketOfferTemplate template
+    ) {
+        template.setId(templateId);
+        return ticketOfferTemplateRepository.save(template);
+    }
+
+    @DeleteMapping("/tickets/templates/{templateId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTicketOfferTemplate(@PathVariable UUID templateId) {
+        ticketOfferTemplateRepository.deleteById(templateId);
     }
 
     @GetMapping("/test")

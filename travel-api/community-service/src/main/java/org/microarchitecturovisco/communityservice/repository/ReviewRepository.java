@@ -29,6 +29,8 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     List<Review> findTop5ByTargetTypeAndTargetIdOrderByCreatedAtDesc(ReviewTargetType targetType, String targetId);
 
+    boolean existsByTargetType(ReviewTargetType targetType);
+
     long countByTargetTypeAndTargetId(ReviewTargetType targetType, String targetId);
 
     @Query("select coalesce(avg(review.rating), 0) from Review review where review.targetType = :targetType and review.targetId = :targetId")

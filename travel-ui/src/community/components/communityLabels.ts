@@ -1,7 +1,7 @@
 import {CommunityCategory, ReviewTargetType} from "../../core/apiConfig";
 
 export const categoryLabels: Record<CommunityCategory, string> = {
-    TRAVEL_NOTE: "旅游分享",
+    TRAVEL_NOTE: "旅行分享",
     SCENIC_SPOT: "景点评价",
     ROUTE: "路线评价",
     MERCHANT: "商家评价",
@@ -15,6 +15,7 @@ export const targetTypeLabels: Record<ReviewTargetType, string> = {
     SCENIC_SPOT: "景点",
     ROUTE: "路线",
     MERCHANT: "商家",
+    HOTEL: "酒店",
 };
 
 export const formatCommunityTime = (value?: string | null) => {

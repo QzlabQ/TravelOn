@@ -47,7 +47,11 @@ public class CommunityService {
                         : Sort.by(Sort.Direction.DESC, "createdAt")
         );
         UUID currentUserId = tryResolveUserId(token);
-        return postRepository.search(category, normalizeKeyword(keyword), pageable)
+        String normalizedKeyword = normalizeKeyword(keyword);
+        Page<CommunityPost> posts = normalizedKeyword == null
+                ? (category == null ? postRepository.findAll(pageable) : postRepository.findByCategory(category, pageable))
+                : postRepository.search(category, normalizedKeyword, pageable);
+        return posts
                 .map(post -> PostResponse.from(post, currentUserId != null && likeRepository.existsByPostIdAndUserId(post.getId(), currentUserId)));
     }
 

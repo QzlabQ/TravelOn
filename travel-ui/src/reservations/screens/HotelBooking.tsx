@@ -54,6 +54,24 @@ const toDateInputValue = (value?: string | null, fallback = formatDate(today)) =
     return value.slice(0, 10);
 };
 
+const withCommunityHotelRatings = async (offers: GetOffersBySearchQueryOffer[]) => {
+    const enriched = await Promise.all(offers.map(async offer => {
+        try {
+            const response = await ApiRequests.getCommunitySummary({
+                targetType: 'HOTEL',
+                targetId: offer.idHotel,
+            });
+            return response.data.reviewCount > 0
+                ? {...offer, rating: response.data.averageRating}
+                : offer;
+        } catch {
+            return offer;
+        }
+    }));
+
+    return enriched;
+};
+
 const HotelBooking = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -134,10 +152,10 @@ const HotelBooking = () => {
                 hotelName: hotelNameQuery.trim() || undefined,
                 minPrice: priceFrom.trim() === '' ? undefined : normalizedPriceFrom,
                 maxPrice: priceTo.trim() === '' ? undefined : normalizedPriceTo,
-                minRating: stars || undefined,
+                minRating: undefined,
                 hotelType,
                 roomType,
-                sortBy,
+                sortBy: sortBy === 'rating' ? 'price' : sortBy,
             });
             const mappedOffers = response.data.map(hotel => ({
                 idHotel: hotel.hotelId,
@@ -148,9 +166,21 @@ const HotelBooking = () => {
                 rating: hotel.rating,
                 imageUrl: hotel.photos[0] ?? '',
             }));
-            setOffers(mappedOffers);
+            const communityRatedOffers = await withCommunityHotelRatings(mappedOffers);
+            const filteredOffers = communityRatedOffers
+                .filter(offer => !stars || offer.rating >= stars)
+                .sort((left, right) => {
+                    if (sortBy === 'rating') {
+                        return right.rating - left.rating;
+                    }
+                    if (sortBy === 'price_desc') {
+                        return right.price - left.price;
+                    }
+                    return left.price - right.price;
+                });
+            setOffers(filteredOffers);
             setResultPage(1);
-            setSelectedOffer(current => current ? mappedOffers.find(offer => offer.idHotel === current.idHotel) ?? null : null);
+            setSelectedOffer(current => current ? filteredOffers.find(offer => offer.idHotel === current.idHotel) ?? null : null);
         } catch (e) {
             console.log(e);
             setError(true);

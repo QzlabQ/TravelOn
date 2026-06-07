@@ -9,6 +9,7 @@ import cloud.project.datagenerator.rabbitmq.requests.transports.TransportUpdateR
 import cloud.project.datagenerator.transports.domain.Transport;
 import cloud.project.datagenerator.transports.domain.TransportCourse;
 import cloud.project.datagenerator.transports.repositories.TransportRepository;
+import cloud.project.datagenerator.transports.repositories.TransportReservationRepository;
 import cloud.project.datagenerator.transports.utils.TransportUtils;
 import cloud.project.datagenerator.websockets.transports.DataGeneratorTransportsWebSocketHandler;
 import cloud.project.datagenerator.websockets.transports.TransportUpdate;
@@ -34,10 +35,11 @@ public class TransportsDataGenerator {
     private final Logger logger = Logger.getLogger("DataGenerator | Transports");
     private final TransportUtils transportUtils;
     private final TransportRepository transportRepository;
+    private final TransportReservationRepository transportReservationRepository;
 
     @Scheduled(fixedDelay = 10000, initialDelay = 600000)
     public void updateRandomTransportData() {
-        int action = random.nextInt(2);
+        int action = random.nextInt(3);
 
         switch (action) {
             case 0:
@@ -45,6 +47,9 @@ public class TransportsDataGenerator {
                 break;
             case 1:
                 updateRandomTransport();
+                break;
+            case 2:
+                deleteRandomTransport();
                 break;
         }
     }
@@ -93,6 +98,18 @@ public class TransportsDataGenerator {
         updateTransportDataInTransportModules(DataUpdateType.UPDATE, randomTransport);
 
         updateTransportUpdatesOnFrontend(DataUpdateType.UPDATE, randomTransport, capacityChange, priceChange);
+    }
+
+    private void deleteRandomTransport() {
+        Transport randomTransport = transportUtils.getRandomTransport();
+        if (randomTransport == null) return;
+
+        updateTransportDataInTransportModules(DataUpdateType.DELETE, randomTransport);
+        if (randomTransport.getTransportReservations() != null) {
+            transportReservationRepository.deleteAll(randomTransport.getTransportReservations());
+        }
+        transportRepository.delete(randomTransport);
+        updateTransportUpdatesOnFrontend(DataUpdateType.DELETE, randomTransport, 0, 0);
     }
 
     public void updateTransportDataInTransportModules(DataUpdateType updateType, Transport transport) {

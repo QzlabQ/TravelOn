@@ -28,9 +28,15 @@ import org.microarchitecturovisco.hotelservice.utils.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.http.HttpStatus;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
@@ -51,6 +57,57 @@ public class HotelsController {
     @GetMapping("/destinations")
     public List<LocationDto> getDestinations() {
         return hotelsService.getDestinations();
+    }
+
+    @PostMapping("/admin")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void createHotel(@RequestBody org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto) {
+        hotelsCommandService.createHotel(org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateHotelCommand.builder()
+                .uuid(hotelDto.getHotelId())
+                .commandTimeStamp(LocalDateTime.now())
+                .hotelDto(hotelDto)
+                .build());
+    }
+
+    @PutMapping("/admin/{hotelId}")
+    public Hotel updateHotel(
+            @PathVariable UUID hotelId,
+            @RequestBody org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto
+    ) {
+        return hotelsService.updateHotel(hotelId, hotelDto);
+    }
+
+    @DeleteMapping("/admin/{hotelId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteHotel(@PathVariable UUID hotelId) {
+        hotelsService.deleteHotel(hotelId);
+    }
+
+    @PostMapping("/admin/{hotelId}/rooms")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void createRoom(
+            @PathVariable UUID hotelId,
+            @RequestBody org.microarchitecturovisco.hotelservice.model.dto.RoomDto roomDto
+    ) {
+        UUID roomId = roomDto.getRoomId() == null ? UUID.randomUUID() : roomDto.getRoomId();
+        hotelsService.createRoomFromHotel(hotelId, roomId, roomDto.getName(),
+                roomDto.getGuestCapacity(), roomDto.getPricePerAdult(), roomDto.getDescription());
+    }
+
+    @PutMapping("/admin/{hotelId}/rooms/{roomId}")
+    public void updateRoom(
+            @PathVariable UUID hotelId,
+            @PathVariable UUID roomId,
+            @RequestBody org.microarchitecturovisco.hotelservice.model.dto.RoomDto roomDto
+    ) {
+        hotelsService.updateRoomFromHotel(hotelId, roomId, roomDto.getName(),
+                roomDto.getGuestCapacity(), roomDto.getPricePerAdult(), roomDto.getDescription());
+    }
+
+    @DeleteMapping("/admin/rooms/{roomId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRoom(@PathVariable UUID roomId) {
+        hotelsService.deleteRoom(roomId);
     }
 
     @GetMapping("/{hotelId}")
@@ -212,6 +269,12 @@ public class HotelsController {
 
         RoomUpdateRequest request = JsonReader.readDtoFromJson(requestJson, RoomUpdateRequest.class);
 
+        if (request.getUpdateType() == DataUpdateType.DELETE) {
+            System.out.println("Deleted room: " + request);
+            hotelsService.deleteRoom(request.getId());
+            return;
+        }
+
         // perform data update
         Hotel hotel;
         try {
@@ -247,6 +310,7 @@ public class HotelsController {
                     request.getGuestCapacity(), request.getPricePerAdult(), request.getDescription());
 
         }
+
     }
 
 }

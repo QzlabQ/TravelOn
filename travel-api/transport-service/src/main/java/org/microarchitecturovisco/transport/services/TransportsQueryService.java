@@ -198,7 +198,15 @@ public class TransportsQueryService {
 
     public GetTransportsBySearchQueryResponseDto getTransportsBySearchQuery(GetTransportsBySearchQueryRequestDto requestDto) {
 
-        List<Transport> transports = transportRepository.findAll();
+        List<Transport> transports;
+        if (requestDto.getDateFrom() != null && requestDto.getDateTo() != null) {
+            transports = transportRepository.findByDepartureDateGreaterThanEqualAndDepartureDateLessThanEqual(
+                    requestDto.getDateFrom(),
+                    requestDto.getDateTo()
+            );
+        } else {
+            transports = transportRepository.findAll();
+        }
 
         List<Transport> filteredTransports = new ArrayList<>();
 

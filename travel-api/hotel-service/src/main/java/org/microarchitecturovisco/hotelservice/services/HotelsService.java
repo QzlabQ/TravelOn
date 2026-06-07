@@ -17,6 +17,7 @@ import org.microarchitecturovisco.hotelservice.model.mappers.LocationMapper;
 import org.microarchitecturovisco.hotelservice.model.mappers.RoomMapper;
 import org.microarchitecturovisco.hotelservice.repositories.HotelRepository;
 import org.microarchitecturovisco.hotelservice.repositories.LocationRepository;
+import org.microarchitecturovisco.hotelservice.repositories.RoomReservationRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomRepository;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class HotelsService {
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
     private final LocationRepository locationRepository;
+    private final RoomReservationRepository roomReservationRepository;
     private final HotelEventProjector hotelEventProjector;
 
     public List<org.microarchitecturovisco.hotelservice.model.dto.LocationDto> getDestinations() {
@@ -319,6 +321,43 @@ public class HotelsService {
                                     String description) {
         RoomUpdateEvent roomUpdateEvent = new RoomUpdateEvent(hotelId, roomId, name, guestCapacity, pricePerAdult, description);
         hotelEventProjector.project(List.of(roomUpdateEvent));
+    }
+
+    public Hotel updateHotel(UUID hotelId, org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto) {
+        Hotel hotel = hotelRepository.findById(hotelId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hotel not found"));
+        hotel.setName(hotelDto.getName());
+        hotel.setRating(hotelDto.getRating());
+        hotel.setDescription(hotelDto.getDescription());
+        hotel.setPhotos(hotelDto.getPhotos());
+        return hotelRepository.save(hotel);
+    }
+
+    public void deleteRoom(UUID roomId) {
+        Room room = roomRepository.findById(roomId).orElseThrow(RuntimeException::new);
+        if (doesRoomHaveAnyReservationsInFuture(room)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Room has future reservations");
+        }
+        if (room.getRoomReservations() != null) {
+            roomReservationRepository.deleteAll(new ArrayList<>(room.getRoomReservations()));
+        }
+        Hotel hotel = room.getHotel();
+        if (hotel != null && hotel.getRooms() != null) {
+            hotel.getRooms().removeIf(existingRoom -> existingRoom.getId().equals(roomId));
+            hotelRepository.save(hotel);
+        }
+        roomRepository.delete(room);
+    }
+
+    public void deleteHotel(UUID hotelId) {
+        Hotel hotel = hotelRepository.findById(hotelId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hotel not found"));
+        boolean hasFutureReservations = hotel.getRooms() != null && hotel.getRooms().stream()
+                .anyMatch(this::doesRoomHaveAnyReservationsInFuture);
+        if (hasFutureReservations) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Hotel has future reservations");
+        }
+        hotelRepository.delete(hotel);
     }
 }
 

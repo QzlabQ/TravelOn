@@ -5,6 +5,7 @@ import org.microarchitecturovisco.userservice.domain.User;
 import org.microarchitecturovisco.userservice.repositories.UserRepository;
 import org.microarchitecturovisco.userservice.services.UserService;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -24,11 +25,19 @@ public class Bootstrap implements CommandLineRunner {
     private final ResourceLoader resourceLoader;
     private final UserService userService;
 
+    @Value("${app.seed-data.base-path:file:../seed-data/user/}")
+    private String seedDataBasePath;
+
     @Override
     public void run(String... args) {
         Logger logger = Logger.getLogger("Bootstrap | User");
 
-        List<User> users = importUsersFromCSV(resourceLoader.getResource("classpath:initData/users.csv"));
+        if (userRepository.count() > 0) {
+            logger.info("Skip user seed import because user data already exists");
+            return;
+        }
+
+        List<User> users = importUsersFromCSV(seedResource("users.csv"));
 
         users.forEach(user -> {
             if (!userRepository.existsByEmailIgnoreCase(user.getEmail())) {
@@ -37,6 +46,11 @@ public class Bootstrap implements CommandLineRunner {
         });
 
         logger.info("Saved " + users.size() + " users");
+    }
+
+    private Resource seedResource(String filename) {
+        String basePath = seedDataBasePath.endsWith("/") ? seedDataBasePath : seedDataBasePath + "/";
+        return resourceLoader.getResource(basePath + filename);
     }
 
     private File loadCSVInitFile(String filePath) {

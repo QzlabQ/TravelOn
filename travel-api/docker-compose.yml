@@ -2,6 +2,26 @@
 name: rsww_184249
 
 services:
+  postgres:
+    image: postgres:16
+    hostname: postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: travel_admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - backend
+
   rabbitmq:
     image: rabbitmq:3.13-management
     hostname: rabbitmq
@@ -53,10 +73,21 @@ services:
     build: ./hotel-service
     volumes:
       - ./logs/hotel:/logs
+      - ./seed-data/hotel:/seed-data/hotel:ro
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hotel_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      APP_SEED_DATA_BASE_PATH: file:/seed-data/hotel/
     depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      discovery:
+        condition: service_started
+      gateway:
+        condition: service_started
     networks:
       - backend
 
@@ -75,10 +106,19 @@ services:
     build: ./payment-service
     volumes:
       - ./logs/payment:/logs
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payment_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
     depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      discovery:
+        condition: service_started
+      gateway:
+        condition: service_started
     networks:
       - backend
 
@@ -86,11 +126,19 @@ services:
     build: ./reservation-service
     volumes:
       - ./logs/reservation:/logs
-      - ./data/reservation-service:/data
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/reservation_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
     depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      discovery:
+        condition: service_started
+      gateway:
+        condition: service_started
     networks:
       - backend
 
@@ -98,10 +146,21 @@ services:
     build: ./transport-service
     volumes:
       - ./logs/transport:/logs
+      - ./seed-data/transport:/seed-data/transport:ro
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/transport_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      APP_SEED_DATA_BASE_PATH: file:/seed-data/transport/
     depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      discovery:
+        condition: service_started
+      gateway:
+        condition: service_started
     networks:
       - backend
 
@@ -109,11 +168,21 @@ services:
     build: ./user-service
     volumes:
       - ./logs/user:/logs
-      - ./data/user-service:/data
+      - ./seed-data/user:/seed-data/user:ro
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      APP_SEED_DATA_BASE_PATH: file:/seed-data/user/
     depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      discovery:
+        condition: service_started
+      gateway:
+        condition: service_started
     networks:
       - backend
 
@@ -121,18 +190,33 @@ services:
     build: ./community-service
     volumes:
       - ./logs/community:/logs
-      - ./data/community-service:/data
+      - ./seed-data/hotel:/seed-data/hotel:ro
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/community_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      APP_SEED_DATA_HOTEL_REVIEWS_CSV: file:/seed-data/hotel/hotel_reviews.csv
     depends_on:
-      - discovery
-      - gateway
-      - user
+      postgres:
+        condition: service_healthy
+      discovery:
+        condition: service_started
+      gateway:
+        condition: service_started
+      user:
+        condition: service_started
     networks:
       - backend
 
   data-generator:
     build: ./data-generator
+    profiles:
+      - simulator
     volumes:
       - ./logs/data-generator:/logs
+      - ./seed-data/hotel:/seed-data/hotel:ro
+    environment:
+      APP_SEED_DATA_BASE_PATH: file:/seed-data/hotel/
     depends_on:
       - rabbitmq
       - discovery

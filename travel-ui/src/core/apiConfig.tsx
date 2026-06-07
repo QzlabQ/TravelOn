@@ -711,7 +711,7 @@ export function buildPlannerWebSocketUrl(conversationId: string, userId: string)
 
 export type CommunityCategory = 'TRAVEL_NOTE' | 'SCENIC_SPOT' | 'ROUTE' | 'MERCHANT' | 'HOTEL' | 'FOOD' | 'TRANSPORT' | 'OTHER';
 
-export type ReviewTargetType = 'SCENIC_SPOT' | 'ROUTE' | 'MERCHANT';
+export type ReviewTargetType = 'SCENIC_SPOT' | 'ROUTE' | 'MERCHANT' | 'HOTEL';
 
 export interface CommunityPostsQuery {
     category?: CommunityCategory,

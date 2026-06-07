@@ -61,8 +61,12 @@ public class Review {
     @PrePersist
     public void prePersist() {
         Instant now = Instant.now();
-        createdAt = now;
-        updatedAt = now;
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
     }
 
     @PreUpdate

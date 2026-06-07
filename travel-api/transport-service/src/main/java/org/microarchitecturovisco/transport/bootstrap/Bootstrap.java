@@ -12,10 +12,12 @@ import org.microarchitecturovisco.transport.model.dto.TransportDto;
 import org.microarchitecturovisco.transport.model.dto.TransportReservationDto;
 import org.microarchitecturovisco.transport.model.dto.request.GetTransportsBetweenMultipleLocationsRequestDto;
 import org.microarchitecturovisco.transport.repositories.LocationRepository;
+import org.microarchitecturovisco.transport.repositories.TransportRepository;
 import org.microarchitecturovisco.transport.services.TransportCommandService;
 import org.microarchitecturovisco.transport.utils.json.JsonConverter;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
@@ -37,13 +39,22 @@ public class Bootstrap implements CommandLineRunner {
     private final LocationRepository locationRepository;
     private final RabbitTemplate rabbitTemplate;
     private final ResourceLoader resourceLoader;
+    private final TransportRepository transportRepository;
+
+    @Value("${app.seed-data.base-path:file:../seed-data/transport/}")
+    private String seedDataBasePath;
 
     @Override
     public void run(String... args) {
         Logger logger = Logger.getLogger("Bootstrap | Transports");
 
-        Resource hotelCsvResource = resourceLoader.getResource("classpath:initData/hotels.csv");
-        Resource hotelDepartureOptionsResource = resourceLoader.getResource("classpath:initData/hotel_departure_options.csv");
+        if (transportRepository.count() > 0) {
+            logger.info("Skip transport seed import because transport data already exists");
+            return;
+        }
+
+        Resource hotelCsvResource = seedResource("hotels.csv");
+        Resource hotelDepartureOptionsResource = seedResource("hotel_departure_options.csv");
 
         List<LocationDto> planeArrivalLocations = locationParser.importLocationsAbroad(hotelCsvResource, "PLANE");
         List<LocationDto> busArrivalLocations = locationParser.importLocationsAbroad(hotelCsvResource, "BUS");
@@ -188,5 +199,10 @@ public class Bootstrap implements CommandLineRunner {
                 JsonConverter.convertToJsonWithLocalDateTime(requestDto));
 
         System.out.println(response + "\n");
+    }
+
+    private Resource seedResource(String filename) {
+        String basePath = seedDataBasePath.endsWith("/") ? seedDataBasePath : seedDataBasePath + "/";
+        return resourceLoader.getResource(basePath + filename);
     }
 }

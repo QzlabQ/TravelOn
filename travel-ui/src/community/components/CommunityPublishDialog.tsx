@@ -31,7 +31,7 @@ type Props = {
 
 const postCategories: CommunityCategory[] = ["TRAVEL_NOTE", "HOTEL", "FOOD", "TRANSPORT", "OTHER"];
 const reviewCategories: CommunityCategory[] = ["SCENIC_SPOT", "ROUTE", "MERCHANT", "HOTEL", "FOOD", "OTHER"];
-const targetTypes: ReviewTargetType[] = ["SCENIC_SPOT", "ROUTE", "MERCHANT"];
+const targetTypes: ReviewTargetType[] = ["SCENIC_SPOT", "ROUTE", "MERCHANT", "HOTEL"];
 
 const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
     const [mode, setMode] = useState<"post" | "review">("post");

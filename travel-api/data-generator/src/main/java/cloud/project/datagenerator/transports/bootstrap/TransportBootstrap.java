@@ -11,6 +11,7 @@ import cloud.project.datagenerator.transports.repositories.TransportCourseReposi
 import cloud.project.datagenerator.transports.repositories.TransportRepository;
 import cloud.project.datagenerator.transports.repositories.TransportReservationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -34,12 +35,20 @@ public class TransportBootstrap implements CommandLineRunner {
     private final LocationRepository locationRepository;
     private final TransportReservationRepository transportReservationRepository;
 
+    @Value("${app.seed-data.base-path:file:../seed-data/hotel/}")
+    private String seedDataBasePath;
+
     @Override
     public void run(String... args) {
         Logger logger = Logger.getLogger("TransportBootstrap | Transports");
 
-        Resource hotelCsvResource = resourceLoader.getResource("classpath:initData/hotels.csv");
-        Resource hotelDepartureOptionsResource = resourceLoader.getResource("classpath:initData/hotel_departure_options.csv");
+        if (transportRepository.count() > 0) {
+            logger.info("Skip data-generator transport seed import because transport data already exists");
+            return;
+        }
+
+        Resource hotelCsvResource = seedResource("hotels.csv");
+        Resource hotelDepartureOptionsResource = seedResource("hotel_departure_options.csv");
 
         List<Location> planeArrivalLocations = locationParser.importLocationsAbroad(hotelCsvResource, "PLANE");
         List<Location> busArrivalLocations = locationParser.importLocationsAbroad(hotelCsvResource, "BUS");
@@ -145,6 +154,11 @@ public class TransportBootstrap implements CommandLineRunner {
 
             transportReservationRepository.save(reservation);
         }
+    }
+
+    private Resource seedResource(String filename) {
+        String basePath = seedDataBasePath.endsWith("/") ? seedDataBasePath : seedDataBasePath + "/";
+        return resourceLoader.getResource(basePath + filename);
     }
 
 }

@@ -29,7 +29,7 @@ public class TransportUtils {
             return null;
         }
 
-        return transportCourses.get(random.nextInt(10));
+        return transportCourses.get(random.nextInt(transportCourses.size()));
     }
 
     public Transport getRandomTransport() {

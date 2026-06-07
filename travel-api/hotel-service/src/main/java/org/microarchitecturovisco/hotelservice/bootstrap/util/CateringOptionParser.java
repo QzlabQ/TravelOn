@@ -48,15 +48,20 @@ public class CateringOptionParser {
         int hotelId = Integer.parseInt(data[0]);
         String foodOption = data[1];
         float rating = Float.parseFloat(data[2]);
+        float csvPrice = data.length > 3 && !data[3].isBlank()
+                ? Float.parseFloat(data[3])
+                : cateringPriceCalculator.calculateCateringPrice(cateringTypeMapper.mapToCateringType(foodOption));
+        UUID cateringId = data.length > 4 && !data[4].isBlank()
+                ? UUID.fromString(data[4])
+                : UUID.nameUUIDFromBytes((hotelId + ":" + foodOption).getBytes());
 
         CateringType cateringType = cateringTypeMapper.mapToCateringType(foodOption);
         if (cateringType != null) {
-            float price = cateringPriceCalculator.calculateCateringPrice(cateringType);
             CateringOptionDto cateringOption = new CateringOptionDto();
-            cateringOption.setCateringId(UUID.randomUUID());
+            cateringOption.setCateringId(cateringId);
             cateringOption.setType(cateringType);
             cateringOption.setRating(rating);
-            cateringOption.setPrice(price);
+            cateringOption.setPrice(csvPrice);
 
             Optional<HotelDto> hotelOpt = searchForHotel(hotels, hotelId);
 

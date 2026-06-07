@@ -54,5 +54,10 @@ public class TransportsCommandController {
 
             transportCommandService.updateTransport(request.getId(), request.getCapacity(), request.getPricePerAdult());
         }
+
+        if (request.getUpdateType() == DataUpdateType.DELETE) {
+            logger.info("Deleted transport: " + request);
+            transportCommandService.deleteTransport(request.getId());
+        }
     }
 }

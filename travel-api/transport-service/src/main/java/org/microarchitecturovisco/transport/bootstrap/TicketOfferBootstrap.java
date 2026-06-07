@@ -1,11 +1,10 @@
 package org.microarchitecturovisco.transport.bootstrap;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.transport.model.domain.TicketOfferTemplate;
 import org.microarchitecturovisco.transport.model.domain.TicketType;
 import org.microarchitecturovisco.transport.repositories.TicketOfferTemplateRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.Resource;
@@ -22,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,35 +44,52 @@ public class TicketOfferBootstrap implements CommandLineRunner {
 
     private final TicketOfferTemplateRepository ticketOfferTemplateRepository;
     private final ResourceLoader resourceLoader;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${app.seed-data.base-path:file:../seed-data/transport/}")
+    private String seedDataBasePath;
 
     @Override
     public void run(String... args) throws Exception {
-        Resource tsvResource = resourceLoader.getResource("classpath:initData/ticket_offers.tsv");
-        Resource trainNumberResource = resourceLoader.getResource("classpath:initData/train_number.json");
-        Resource trainTypeResource = resourceLoader.getResource("classpath:initData/train_type.json");
-        Resource stationResource = resourceLoader.getResource("classpath:initData/station.json");
+        Logger logger = Logger.getLogger("TicketOfferBootstrap");
+        if (ticketOfferTemplateRepository.count() > 0) {
+            logger.info("Skip ticket offer seed import because ticket offer data already exists");
+            return;
+        }
+
+        Resource tsvResource = seedResource("ticket_offers.csv");
+        Resource trainNumberResource = seedResource("train_number.csv");
+        Resource trainRouteResource = seedResource("train_route.csv");
+        Resource trainTypeResource = seedResource("train_type.csv");
+        Resource trainTypeSeatsResource = seedResource("train_type_seats.csv");
+        Resource stationResource = seedResource("station.csv");
 
         List<TicketOfferTemplate> offers = new ArrayList<>(readTsvOffers(tsvResource));
         long tsvTrainOffers = offers.stream().filter(offer -> offer.getType() == TicketType.TRAIN).count();
 
-        if (trainNumberResource.exists() && trainTypeResource.exists() && stationResource.exists()) {
+        if (trainNumberResource.exists() && trainRouteResource.exists() && trainTypeResource.exists()
+                && trainTypeSeatsResource.exists() && stationResource.exists()) {
             offers = new ArrayList<>(offers.stream()
                     .filter(offer -> offer.getType() != TicketType.TRAIN)
                     .toList());
-            List<TicketOfferTemplate> trainOffers = readJsonTrainOffers(
+            List<TicketOfferTemplate> trainOffers = readCsvTrainOffers(
                     trainNumberResource,
+                    trainRouteResource,
                     trainTypeResource,
+                    trainTypeSeatsResource,
                     stationResource
             );
             offers.addAll(trainOffers);
-            Logger.getLogger("TicketOfferBootstrap").info("Imported " + trainOffers.size() +
-                    " train offer templates from JSON instead of " + tsvTrainOffers + " TSV train rows");
+            logger.info("Imported " + trainOffers.size() +
+                    " train offer templates from CSV instead of " + tsvTrainOffers + " TSV train rows");
         }
 
-        ticketOfferTemplateRepository.deleteAll();
         ticketOfferTemplateRepository.saveAll(offers);
-        Logger.getLogger("TicketOfferBootstrap").info("Imported " + offers.size() + " ticket offer templates");
+        logger.info("Imported " + offers.size() + " ticket offer templates");
+    }
+
+    private Resource seedResource(String filename) {
+        String basePath = seedDataBasePath.endsWith("/") ? seedDataBasePath : seedDataBasePath + "/";
+        return resourceLoader.getResource(basePath + filename);
     }
 
     private List<TicketOfferTemplate> readTsvOffers(Resource resource) throws IOException {
@@ -89,7 +104,7 @@ public class TicketOfferBootstrap implements CommandLineRunner {
                     continue;
                 }
 
-                String[] values = line.split("\\t", -1);
+                String[] values = line.split("\t", -1);
                 offers.add(TicketOfferTemplate.builder()
                         .id(UUID.nameUUIDFromBytes(line.getBytes(StandardCharsets.UTF_8)))
                         .type(TicketType.valueOf(values[0]))
@@ -115,38 +130,39 @@ public class TicketOfferBootstrap implements CommandLineRunner {
         return offers;
     }
 
-    private List<TicketOfferTemplate> readJsonTrainOffers(
+    private List<TicketOfferTemplate> readCsvTrainOffers(
             Resource trainNumberResource,
+            Resource trainRouteResource,
             Resource trainTypeResource,
+            Resource trainTypeSeatsResource,
             Resource stationResource
     ) throws IOException {
         Map<String, String> stationCities = readStationCities(stationResource);
-        Map<String, List<SeatInfo>> seatInfosByType = readSeatInfos(trainTypeResource);
+        Map<String, List<SeatInfo>> seatInfosByType = readSeatInfos(trainTypeSeatsResource);
         Map<String, String> trainTypeNames = readTrainTypeNames(trainTypeResource);
-        JsonNode trains = objectMapper.readTree(trainNumberResource.getInputStream());
+        Map<String, List<RouteStop>> routesByTrainNumber = readRoutes(trainRouteResource);
+        List<TrainInfo> trains = readTrains(trainNumberResource);
 
         List<TicketOfferTemplate> offers = new ArrayList<>();
-        for (JsonNode train : trains) {
+        for (TrainInfo train : trains) {
             if (offers.size() >= MAX_IMPORTED_TRAIN_OFFERS) {
                 break;
             }
 
-            String trainNumber = requiredText(train, "train_number");
-            String trainType = requiredText(train, "train_type");
-            List<RouteStop> stops = readRouteStops(train.path("route"));
-            if (trainNumber.isBlank() || trainType.isBlank() || stops.size() < 2) {
+            List<RouteStop> stops = routesByTrainNumber.getOrDefault(train.trainNumber(), List.of());
+            if (train.trainNumber().isBlank() || train.trainType().isBlank() || stops.size() < 2) {
                 continue;
             }
 
-            List<SeatInfo> seatInfos = seatInfosByType.getOrDefault(trainType, List.of(defaultSeatInfo(trainType)));
+            List<SeatInfo> seatInfos = seatInfosByType.getOrDefault(train.trainType(), List.of(defaultSeatInfo(train.trainType())));
             if (seatInfos.isEmpty()) {
-                seatInfos = List.of(defaultSeatInfo(trainType));
+                seatInfos = List.of(defaultSeatInfo(train.trainType()));
             }
 
-            int originDepartureSeconds = train.path("originDepatureTime").asInt(0);
+            int originDepartureSeconds = train.originDepartureTime();
             int fullTripSeconds = Math.max(1, arrivalSeconds(originDepartureSeconds, stops.get(stops.size() - 1)) -
                     departureSeconds(originDepartureSeconds, stops.get(0)));
-            String carrier = "中国铁路 " + trainTypeNames.getOrDefault(trainType, trainType);
+            String carrier = "中国铁路 " + trainTypeNames.getOrDefault(train.trainType(), train.trainType());
 
             for (int[] pair : buildSearchPairs(stops, stationCities)) {
                 if (offers.size() >= MAX_IMPORTED_TRAIN_OFFERS) {
@@ -167,8 +183,8 @@ public class TicketOfferBootstrap implements CommandLineRunner {
                     String departureCity = cityForStation(stationCities, from.station());
                     String arrivalCity = cityForStation(stationCities, to.station());
                     int price = calculateSegmentPrice(seatInfo.price(), travelSeconds, fullTripSeconds);
-                    int remainingSeats = deterministicRemainingSeats(trainNumber, from.station(), to.station(), seatInfo);
-                    String idSource = String.join("\t", "json-train", trainNumber, from.station(), to.station(), seatInfo.seatClass());
+                    int remainingSeats = deterministicRemainingSeats(train.trainNumber(), from.station(), to.station(), seatInfo);
+                    String idSource = String.join("\t", "csv-train", train.trainNumber(), from.station(), to.station(), seatInfo.seatClass());
 
                     offers.add(TicketOfferTemplate.builder()
                             .id(UUID.nameUUIDFromBytes(idSource.getBytes(StandardCharsets.UTF_8)))
@@ -180,15 +196,15 @@ public class TicketOfferBootstrap implements CommandLineRunner {
                             .departureTime(toLocalTime(departureSeconds))
                             .arrivalTime(toLocalTime(arrivalSeconds))
                             .carrier(carrier)
-                            .code(trainNumber)
+                            .code(train.trainNumber())
                             .seatClass(seatInfo.seatClass())
                             .price(price)
                             .remainingSeats(remainingSeats)
-                            .studentEligible(isStudentEligible(trainType, seatInfo.seatClass()))
+                            .studentEligible(isStudentEligible(train.trainType(), seatInfo.seatClass()))
                             .referenceDate(TRAIN_REFERENCE_DATE)
                             .sourceUrl("https://www.12306.cn/")
-                            .sourceNote("基于 train_number.json 的历史车次和 train_type.json 的座席模板生成；经停序号 " +
-                                    from.order() + "-" + to.order() + "，原始车次 " + trainNumber + "。")
+                            .sourceNote("基于 train_number.csv 和 train_type_seats.csv 的离线模板生成；经停序号 " +
+                                    from.order() + "-" + to.order() + "，原始车次 " + train.trainNumber() + "。")
                             .build());
                 }
             }
@@ -199,50 +215,46 @@ public class TicketOfferBootstrap implements CommandLineRunner {
 
     private Map<String, String> readStationCities(Resource stationResource) throws IOException {
         Map<String, String> stationCities = new HashMap<>();
-        JsonNode stations = objectMapper.readTree(stationResource.getInputStream());
-        for (JsonNode station : stations) {
-            String name = requiredText(station, "name");
-            String city = normalizeCityName(requiredText(station, "city"));
-            if (!name.isBlank() && !city.isBlank()) {
-                stationCities.put(name, city);
+        for (String[] values : readDelimitedRows(stationResource)) {
+            if (values.length >= 2) {
+                String name = values[0].trim();
+                String city = normalizeCityName(values[1]);
+                if (!name.isBlank() && !city.isBlank()) {
+                    stationCities.put(name, city);
+                }
             }
         }
         return stationCities;
     }
 
-    private Map<String, List<SeatInfo>> readSeatInfos(Resource trainTypeResource) throws IOException {
+    private Map<String, List<SeatInfo>> readSeatInfos(Resource trainTypeSeatsResource) throws IOException {
+        Map<String, Map<String, SeatAccumulator>> accumulators = new HashMap<>();
+        for (String[] values : readDelimitedRows(trainTypeSeatsResource)) {
+            if (values.length < 4) {
+                continue;
+            }
+            String typeId = values[0].trim();
+            String seatClass = values[1].trim();
+            int price = Integer.parseInt(values[3].trim());
+            accumulators
+                    .computeIfAbsent(typeId, ignored -> new HashMap<>())
+                    .computeIfAbsent(seatClass, ignored -> new SeatAccumulator())
+                    .add(price);
+        }
+
         Map<String, List<SeatInfo>> seatInfosByType = new HashMap<>();
-        JsonNode trainTypes = objectMapper.readTree(trainTypeResource.getInputStream());
-
-        for (JsonNode trainType : trainTypes) {
-            String typeId = requiredText(trainType, "id");
-            JsonNode seatRoot = trainType.path("seat");
+        for (Map.Entry<String, Map<String, SeatAccumulator>> typeEntry : accumulators.entrySet()) {
             List<SeatInfo> seatInfos = new ArrayList<>();
-            Iterator<Map.Entry<String, JsonNode>> seatClasses = seatRoot.fields();
-            while (seatClasses.hasNext()) {
-                Map.Entry<String, JsonNode> seatClassEntry = seatClasses.next();
-                String seatClass = seatClassEntry.getKey();
-                int totalSeats = 0;
-                int totalPrice = 0;
-
-                Iterator<Map.Entry<String, JsonNode>> seatLocations = seatClassEntry.getValue().fields();
-                while (seatLocations.hasNext()) {
-                    JsonNode seats = seatLocations.next().getValue();
-                    if (!seats.isArray()) {
-                        continue;
-                    }
-                    for (JsonNode seat : seats) {
-                        totalSeats++;
-                        totalPrice += seat.path("price").asInt(0);
-                    }
-                }
-
-                if (totalSeats > 0) {
-                    seatInfos.add(new SeatInfo(seatClass, Math.max(20, Math.round((float) totalPrice / totalSeats)), totalSeats));
-                }
+            for (Map.Entry<String, SeatAccumulator> seatEntry : typeEntry.getValue().entrySet()) {
+                SeatAccumulator accumulator = seatEntry.getValue();
+                seatInfos.add(new SeatInfo(
+                        seatEntry.getKey(),
+                        Math.max(20, Math.round((float) accumulator.totalPrice / accumulator.totalSeats)),
+                        accumulator.totalSeats
+                ));
             }
             seatInfos.sort(Comparator.comparingInt(info -> seatRank(info.seatClass())));
-            seatInfosByType.put(typeId, seatInfos);
+            seatInfosByType.put(typeEntry.getKey(), seatInfos);
         }
 
         return seatInfosByType;
@@ -250,34 +262,40 @@ public class TicketOfferBootstrap implements CommandLineRunner {
 
     private Map<String, String> readTrainTypeNames(Resource trainTypeResource) throws IOException {
         Map<String, String> trainTypeNames = new HashMap<>();
-        JsonNode trainTypes = objectMapper.readTree(trainTypeResource.getInputStream());
-        for (JsonNode trainType : trainTypes) {
-            trainTypeNames.put(requiredText(trainType, "id"), requiredText(trainType, "name"));
+        for (String[] values : readDelimitedRows(trainTypeResource)) {
+            if (values.length >= 2) {
+                trainTypeNames.put(values[0].trim(), values[1].trim());
+            }
         }
         return trainTypeNames;
     }
 
-    private List<RouteStop> readRouteStops(JsonNode routeNode) {
-        List<RouteStop> stops = new ArrayList<>();
-        if (!routeNode.isArray()) {
-            return stops;
+    private List<TrainInfo> readTrains(Resource trainNumberResource) throws IOException {
+        List<TrainInfo> trains = new ArrayList<>();
+        for (String[] values : readDelimitedRows(trainNumberResource)) {
+            if (values.length >= 3) {
+                trains.add(new TrainInfo(values[0].trim(), values[1].trim(), Integer.parseInt(values[2].trim())));
+            }
         }
+        return trains;
+    }
 
-        for (JsonNode stop : routeNode) {
-            String station = requiredText(stop, "station");
-            if (station.isBlank()) {
+    private Map<String, List<RouteStop>> readRoutes(Resource trainRouteResource) throws IOException {
+        Map<String, List<RouteStop>> routes = new HashMap<>();
+        for (String[] values : readDelimitedRows(trainRouteResource)) {
+            if (values.length < 5 || values[2].isBlank()) {
                 continue;
             }
-            stops.add(new RouteStop(
-                    stop.path("order").asInt(0),
-                    station,
-                    stop.path("arrivalTime").asInt(0),
-                    stop.path("depatureTime").asInt(0)
-            ));
+            routes.computeIfAbsent(values[0].trim(), ignored -> new ArrayList<>())
+                    .add(new RouteStop(
+                            Integer.parseInt(values[1].trim()),
+                            values[2].trim(),
+                            Integer.parseInt(values[3].trim()),
+                            Integer.parseInt(values[4].trim())
+                    ));
         }
-
-        stops.sort(Comparator.comparingInt(RouteStop::order));
-        return stops;
+        routes.values().forEach(stops -> stops.sort(Comparator.comparingInt(RouteStop::order)));
+        return routes;
     }
 
     private List<int[]> buildSearchPairs(List<RouteStop> stops, Map<String, String> stationCities) {
@@ -357,9 +375,19 @@ public class TicketOfferBootstrap implements CommandLineRunner {
         return normalized;
     }
 
-    private String requiredText(JsonNode node, String field) {
-        JsonNode value = node.path(field);
-        return value.isTextual() ? value.asText().trim() : "";
+    private List<String[]> readDelimitedRows(Resource resource) throws IOException {
+        List<String[]> rows = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
+            reader.readLine();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.isBlank()) {
+                    rows.add(line.split("\t", -1));
+                }
+            }
+        }
+        return rows;
     }
 
     private SeatInfo defaultSeatInfo(String trainType) {
@@ -388,6 +416,19 @@ public class TicketOfferBootstrap implements CommandLineRunner {
     }
 
     private record SeatInfo(String seatClass, int price, int remainingSeats) {
+    }
+
+    private static class SeatAccumulator {
+        private int totalPrice;
+        private int totalSeats;
+
+        private void add(int price) {
+            totalPrice += price;
+            totalSeats++;
+        }
+    }
+
+    private record TrainInfo(String trainNumber, String trainType, int originDepartureTime) {
     }
 
     private record RouteStop(int order, String station, int arrivalOffsetSeconds, int departureOffsetSeconds) {

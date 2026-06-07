@@ -1,0 +1,9 @@
+key	value
+flightNumber	"""CA1234"""
+operatingAirline	"""中国国际航空"""
+aircraftType	"""A320"""
+departureAirport	"""PEK"""
+arrivalAirport	"""SHA"""
+departureTime	"""2026-06-01T08:00:00+08:00"""
+arrivalTime	"""2026-06-01T10:30:00+08:00"""
+cabinClasses	"[{""cabinClass"": ""头等舱"", ""seatCount"": 0}, {""cabinClass"": ""公务舱"", ""seatCount"": 0}, {""cabinClass"": ""商务舱"", ""seatCount"": 8}, {""cabinClass"": ""高级经济舱"", ""seatCount"": 0}, {""cabinClass"": ""经济舱"", ""seatCount"": 150}]"

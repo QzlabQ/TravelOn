@@ -6,6 +6,7 @@ import cloud.project.datagenerator.hotels.domain.Hotel;
 import cloud.project.datagenerator.hotels.repositories.HotelRepository;
 import cloud.project.datagenerator.hotels.repositories.RoomRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -24,12 +25,20 @@ public class HotelBootstrap implements CommandLineRunner {
     private final HotelRepository hotelRepository;
     private final RoomRepository roomRepository;
 
+    @Value("${app.seed-data.base-path:file:../seed-data/hotel/}")
+    private String seedDataBasePath;
+
     @Override
     public void run(String... args) throws IOException {
         Logger logger = Logger.getLogger("TransportBootstrap");
 
-        Resource hotelCsvFile = resourceLoader.getResource("classpath:initData/hotels.csv");
-        Resource hotelRoomsCsvFile = resourceLoader.getResource("classpath:initData/hotel_rooms.csv");
+        if (hotelRepository.count() > 0) {
+            logger.info("Skip data-generator hotel seed import because hotel data already exists.");
+            return;
+        }
+
+        Resource hotelCsvFile = seedResource("hotels.csv");
+        Resource hotelRoomsCsvFile = seedResource("hotel_rooms.csv");
 
         List<Hotel> hotels = hotelParser.importHotels(hotelCsvFile);
         roomParser.importRooms(hotelRoomsCsvFile, hotels);
@@ -41,5 +50,10 @@ public class HotelBootstrap implements CommandLineRunner {
         });
 
         logger.info("Hotels and rooms have been imported and saved to the database.");
+    }
+
+    private Resource seedResource(String filename) {
+        String basePath = seedDataBasePath.endsWith("/") ? seedDataBasePath : seedDataBasePath + "/";
+        return resourceLoader.getResource(basePath + filename);
     }
 }

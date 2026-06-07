@@ -30,7 +30,7 @@ public class Room {
 
     @NotNull
     private float pricePerAdult;
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @OneToMany(mappedBy="room", fetch = FetchType.EAGER)

@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum DataUpdateType {
     CREATE("CREATE"),
-    UPDATE("UPDATE");
+    UPDATE("UPDATE"),
+    DELETE("DELETE");
 
     private final String value;
 }

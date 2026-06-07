@@ -1,6 +1,7 @@
 package cloud.project.datagenerator.hotels.bootstrap.util.hotel;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
@@ -18,10 +19,18 @@ public class HotelCsvReader {
 
     private final ResourceLoader resourceLoader;
 
+    @Value("${app.seed-data.base-path:file:../seed-data/hotel/}")
+    private String seedDataBasePath;
+
     // Method to read hotels.csv and retrieve hotel name based on hotelId
     public String getHotelNameById(int hotelId) throws FileNotFoundException {
-        Map<Integer, String> hotelIdToNameMap = readHotelCsvFile(resourceLoader.getResource("classpath:initData/hotels.csv"));
+        Map<Integer, String> hotelIdToNameMap = readHotelCsvFile(seedResource("hotels.csv"));
         return hotelIdToNameMap.getOrDefault(hotelId, "Hotel not found"); // Return hotel name or "Hotel not found" if not found
+    }
+
+    private Resource seedResource(String filename) {
+        String basePath = seedDataBasePath.endsWith("/") ? seedDataBasePath : seedDataBasePath + "/";
+        return resourceLoader.getResource(basePath + filename);
     }
 
     // Method to read hotels.csv and create a mapping of hotelId to hotelName

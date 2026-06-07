@@ -21,6 +21,7 @@ const tabs: Array<{value: CommunityTab, label: string, reviewTargetType?: Review
     {value: "SCENIC_SPOT", label: "景点评价", reviewTargetType: "SCENIC_SPOT"},
     {value: "ROUTE", label: "路线评价", reviewTargetType: "ROUTE"},
     {value: "MERCHANT", label: "商家评价", reviewTargetType: "MERCHANT"},
+    {value: "HOTEL", label: "酒店评价", reviewTargetType: "HOTEL"},
 ];
 
 const Community = () => {

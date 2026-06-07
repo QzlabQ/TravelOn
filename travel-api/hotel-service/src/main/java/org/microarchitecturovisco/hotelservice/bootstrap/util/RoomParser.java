@@ -33,7 +33,7 @@ public class RoomParser {
                 // Add room to the corresponding hotel
                 if (roomDto != null) {
                     Optional<HotelDto> hotelOpt = hotelDtos.stream()
-                            .filter(hotel -> hotel.getHotelId() == roomDto.getHotelId())
+                            .filter(hotel -> hotel.getHotelId().equals(roomDto.getHotelId()))
                             .findFirst();
                     hotelOpt.ifPresent(hotel -> hotel.getRooms().add(roomDto));
                 }

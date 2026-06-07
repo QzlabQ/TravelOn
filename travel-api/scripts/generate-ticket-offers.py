@@ -14,8 +14,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-HOTELS_FILE = ROOT / "transport-service/src/main/resources/initData/hotels.csv"
-TICKETS_FILE = ROOT / "transport-service/src/main/resources/initData/ticket_offers.tsv"
+HOTELS_FILE = ROOT / "seed-data/transport/hotels.csv"
+TICKETS_FILE = ROOT / "seed-data/transport/ticket_offers.csv"
 GENERATED_MARKER = "generated:nationwide-v1"
 EXTRA_TICKET_CITIES = ("满洲里", "温州")
 

@@ -1,7 +1,7 @@
 package org.microarchitecturovisco.hotelservice.model.events;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.Lob;
+import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,7 +22,7 @@ public class RoomUpdateEvent extends HotelEvent{
     private String name;
     private int guestCapacity;
     private float pricePerAdult;
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     public RoomUpdateEvent(UUID idHotel, UUID roomId, String name, int guestCapacity, float pricePerAdult,

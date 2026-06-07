@@ -33,7 +33,7 @@ public class HotelsDataGenerator {
 
     @Scheduled(fixedDelay = 10000, initialDelay = 600000)
     public void updateRandomHotelData() {
-        int action = random.nextInt(2);
+        int action = random.nextInt(3);
 
         switch (action) {
             case 0:
@@ -41,6 +41,9 @@ public class HotelsDataGenerator {
                 break;
             case 1:
                 updateRandomRoom();
+                break;
+            case 2:
+                deleteRandomRoom();
                 break;
         }
     }
@@ -89,6 +92,18 @@ public class HotelsDataGenerator {
         float priceChange = newPricePerAdult - currentPricePerAdult;
 
         updateHotelUpdatesOnFrontend(DataUpdateType.UPDATE, randomRoom.getName(), randomHotel.getName(), capacityChange, priceChange);
+    }
+
+    private void deleteRandomRoom() {
+        Hotel randomHotel = hotelUtils.getRandomHotel();
+        if (randomHotel == null) return;
+
+        Room randomRoom = hotelUtils.getRandomRoomFromHotel(randomHotel);
+        if (randomRoom == null) return;
+
+        updateHotelDataInHotelModules(DataUpdateType.DELETE, randomRoom);
+        roomRepository.delete(randomRoom);
+        updateHotelUpdatesOnFrontend(DataUpdateType.DELETE, randomRoom.getName(), randomHotel.getName(), 0, 0);
     }
 
     public void updateHotelDataInHotelModules(DataUpdateType updateType, Room room) {

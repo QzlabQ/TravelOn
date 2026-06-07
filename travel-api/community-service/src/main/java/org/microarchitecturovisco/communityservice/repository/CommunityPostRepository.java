@@ -11,11 +11,12 @@ import org.springframework.data.repository.query.Param;
 import java.util.UUID;
 
 public interface CommunityPostRepository extends JpaRepository<CommunityPost, UUID> {
+    Page<CommunityPost> findByCategory(CommunityCategory category, Pageable pageable);
 
     @Query("""
             select post from CommunityPost post
             where (:category is null or post.category = :category)
-              and (:keyword is null or lower(post.title) like lower(concat('%', :keyword, '%'))
+              and (lower(post.title) like lower(concat('%', :keyword, '%'))
                 or lower(post.content) like lower(concat('%', :keyword, '%'))
                 or lower(post.destination) like lower(concat('%', :keyword, '%')))
             """)
