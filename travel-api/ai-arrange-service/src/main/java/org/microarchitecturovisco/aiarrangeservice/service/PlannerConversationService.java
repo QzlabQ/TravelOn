@@ -355,6 +355,9 @@ public class PlannerConversationService {
         if (rootCause instanceof PlannerAgentStreamException) {
             return "PLANNER_AGENT_STREAM_FAILED";
         }
+        if (rootCause instanceof PlannerSnapshotVersionConflictException) {
+            return "PLANNER_VERSION_CONFLICT";
+        }
         if (rootCause instanceof DataAccessException) {
             return "PLANNER_SNAPSHOT_SAVE_FAILED";
         }
@@ -367,6 +370,9 @@ public class PlannerConversationService {
         }
         if (rootCause instanceof PlannerAgentStreamException) {
             return "规划引擎流式执行失败，请查看详情后重试。";
+        }
+        if (rootCause instanceof PlannerSnapshotVersionConflictException) {
+            return "规划版本已过期，请刷新到最新版本后再继续修改。";
         }
         if (rootCause instanceof DataAccessException) {
             return "规划已生成，但快照保存失败，请确认 MongoDB 已启动。";
@@ -414,6 +420,7 @@ public class PlannerConversationService {
                 .userId(userId)
                 .planningMode(resolvePlanningMode(payload, latestSnapshot))
                 .planningScope(resolvePlanningScope(payload, latestSnapshot))
+                .modelVariant(resolveModelVariant(payload))
                 .targetDayIndex(payload.getTargetDayIndex())
                 .targetDate(payload.getTargetDate())
                 .coreSlots(conversation.getCoreSlots())
@@ -466,6 +473,17 @@ public class PlannerConversationService {
         return latestSnapshot == null || latestSnapshot.getVersion() == null || latestSnapshot.getVersion() <= 0
                 ? "DAY_PLAN"
                 : "DAY_REFINE";
+    }
+
+    private String resolveModelVariant(PlannerChatSendPayload payload) {
+        if (!StringUtils.hasText(payload.getModelVariant())) {
+            return "FLASH";
+        }
+        String normalized = payload.getModelVariant().trim().toUpperCase();
+        if ("FLASH".equals(normalized) || "PRO".equals(normalized)) {
+            return normalized;
+        }
+        return "FLASH";
     }
 
     private PlannerAgentSnapshotRef toAgentSnapshotRef(PlannerSnapshot snapshot) {

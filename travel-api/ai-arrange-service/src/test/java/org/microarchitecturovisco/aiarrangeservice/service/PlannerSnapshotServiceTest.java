@@ -14,6 +14,8 @@ import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerPlaceSugg
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerSnapshotDraft;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunResponse;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentToolCall;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentWarning;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerMessageRepository;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerSnapshotRepository;
 import org.mockito.Mock;
@@ -26,7 +28,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -157,6 +162,17 @@ class PlannerSnapshotServiceTest {
                 .summary("summary")
                 .markdown("# Shanghai plan")
                 .nextQuestion("是否确认当天？")
+                .toolCalls(List.of(PlannerAgentToolCall.builder()
+                        .tool("deepseek_chat_completion")
+                        .status("SUCCESS")
+                        .latencyMs(1234)
+                        .outputSummary("requestMs=1200; model=flash")
+                        .build()))
+                .warnings(List.of(PlannerAgentWarning.builder()
+                        .code("MODEL_SLOW_RESPONSE")
+                        .message("模型响应偏慢。")
+                        .source("deepseek")
+                        .build()))
                 .snapshotDraft(PlannerSnapshotDraft.builder()
                         .baseVersion(4)
                         .proposedVersion(99)
@@ -189,5 +205,69 @@ class PlannerSnapshotServiceTest {
         assertThat(snapshot.getTargetDayIndex()).isEqualTo(2);
         assertThat(snapshot.getChecksum()).isEqualTo("snapshot-checksum");
         assertThat(snapshot.getTraceId()).isEqualTo("trace-1");
+        assertThat(snapshot.getAgentToolCalls()).hasSize(1);
+        assertThat(snapshot.getAgentToolCalls().getFirst().getLatencyMs()).isEqualTo(1234);
+        assertThat(snapshot.getAgentWarnings()).extracting(PlannerAgentWarning::getCode).containsExactly("MODEL_SLOW_RESPONSE");
+    }
+
+    @Test
+    void createSnapshotFromAgentResponseRejectsStaleBaseVersion() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = PlannerConversation.builder()
+                .id(conversationId)
+                .userId(userId)
+                .status(PlannerConversationStatus.ACTIVE_CHAT)
+                .coreSlots(TripCoreSlots.builder()
+                        .city("Shanghai")
+                        .travelStartDate(LocalDate.of(2026, 6, 1))
+                        .peopleCount(2)
+                        .build())
+                .title("Shanghai plan")
+                .selectedPlaceIds(List.of())
+                .build();
+        PlannerSnapshot latestSnapshot = PlannerSnapshot.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversationId)
+                .userId(userId)
+                .version(4)
+                .title("Current")
+                .markdown("# Current")
+                .createdAt(Instant.now())
+                .build();
+        AgentRunResponse response = AgentRunResponse.builder()
+                .traceId("trace-stale")
+                .status("SUCCESS")
+                .assistantText("已生成规划。")
+                .title("Shanghai plan")
+                .markdown("# Stale plan")
+                .snapshotDraft(PlannerSnapshotDraft.builder()
+                        .baseVersion(3)
+                        .proposedVersion(4)
+                        .scope("DAY_REFINE")
+                        .targetDayIndex(1)
+                        .markdown("# Stale plan")
+                        .checksum("stale-checksum")
+                        .build())
+                .build();
+
+        when(snapshotRepository.findFirstByConversationIdAndChecksumOrderByVersionDesc(conversationId, "stale-checksum"))
+                .thenReturn(Optional.empty());
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.of(latestSnapshot));
+
+        PlannerSnapshotService service = new PlannerSnapshotService(
+                plannerAiClient,
+                promptFactory,
+                new PlannerMarkdownBuilder(),
+                new PlaceEnrichmentService(amapPoiClient, internalOfferHotelMatcher),
+                messageRepository,
+                snapshotRepository
+        );
+
+        assertThatThrownBy(() -> service.createSnapshotFromAgentResponse(conversation, response))
+                .isInstanceOf(PlannerSnapshotVersionConflictException.class)
+                .hasMessageContaining("Agent 基于版本 3")
+                .hasMessageContaining("当前最新版本是 4");
+        verify(snapshotRepository, never()).save(any(PlannerSnapshot.class));
     }
 }

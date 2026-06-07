@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from app.config import AgentSettings
 from app.harness.sanitizer import summarize_tool_input
 from app.harness.tool_result import ToolResult, ToolStatus, ToolWarning
-from app.models import AgentRunRequest, PlanningScope, model_dump_jsonable
+from app.models import AgentRunRequest, PlannerModelVariant, PlanningScope, model_dump_jsonable
 from app.prompts.builder import build_system_prompt
 from app.prompts.repair_prompt import REPAIR_PROMPT
 from app.validation.planner_output import (
@@ -110,6 +110,7 @@ class DeepSeekClient:
                     content = await self._request_content(client, url, headers, payload)
                     timing_metadata["requestMs"] = self._elapsed_ms(request_started)
                     timing_metadata["responseChars"] = len(content)
+                    self._append_slow_response_warning(warnings, timing_metadata)
 
                     try:
                         parse_started = time.perf_counter()
@@ -246,9 +247,8 @@ class DeepSeekClient:
             react_observations=react_observations,
             planner_constraints=planner_constraints,
         )
-        return {
-            "model": self._settings.deepseek_model,
-            "thinking": {"type": "disabled"},
+        payload = {
+            "model": self._model_for_request(request),
             "temperature": self._settings.deepseek_temperature,
             "max_tokens": self._settings.deepseek_max_tokens,
             "response_format": {"type": "json_object"},
@@ -257,6 +257,10 @@ class DeepSeekClient:
                 {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
             ],
         }
+        thinking_payload = self._thinking_payload()
+        if thinking_payload is not None:
+            payload["thinking"] = thinking_payload
+        return payload
 
     def _build_repair_payload(
         self,
@@ -288,9 +292,8 @@ class DeepSeekClient:
                 "expectedOutputSchema": PlannerModelOutput.model_json_schema(),
             }
         )
-        return {
-            "model": self._settings.deepseek_model,
-            "thinking": {"type": "disabled"},
+        payload = {
+            "model": self._model_for_request(request),
             "temperature": 0,
             "max_tokens": self._settings.deepseek_max_tokens,
             "response_format": {"type": "json_object"},
@@ -300,6 +303,10 @@ class DeepSeekClient:
                 {"role": "user", "content": json.dumps(repair_payload, ensure_ascii=False)},
             ],
         }
+        thinking_payload = self._thinking_payload()
+        if thinking_payload is not None:
+            payload["thinking"] = thinking_payload
+        return payload
 
     def _build_user_payload(
         self,
@@ -315,9 +322,13 @@ class DeepSeekClient:
         day_scope = self._day_scope_payload(request)
         output_rules = {
             "language": "All user-facing fields must be Simplified Chinese: assistantText, title, summary, markdown, nextQuestion, place descriptions, route summaries, option labels, warning-like text.",
-            "markdown": "Use concise Chinese Markdown. Prefer bullet points over long paragraphs.",
-            "places": "Reuse candidatePlaces when possible. Return at most 8 places.",
-            "routes": "Return at most 8 route segments, or [] when route data is unavailable.",
+            "markdown": (
+                "Use detailed, actionable Chinese Markdown. Include time windows, route rhythm, transport notes, "
+                "meal suggestions, budget reminders, weather adjustments, and backup options. Prefer structured bullets, "
+                "but do not make the itinerary overly short."
+            ),
+            "places": "Reuse candidatePlaces when possible. Return enough useful places up to responseBudget.maxPlaces.",
+            "routes": "Return useful route segments up to responseBudget.maxRoutes, or [] when route data is unavailable.",
             "userSelections": "Keep selected places and style choices unless impossible; do not use rejected places as main recommendations.",
             "snapshot": "When latestSnapshot is provided, treat it as the previous saved plan and describe only useful changes in Chinese.",
             "jsonEscaping": "Do not write backslash commands or raw escape-like markers in user-facing text. Use plain Chinese punctuation and words.",
@@ -327,7 +338,8 @@ class DeepSeekClient:
                 {
                     "markdown": (
                         "Return ONLY the target day plan. Do not generate other days. "
-                        "Keep markdown under 2800 Chinese characters and include useful details for time windows, food, transport, budget notes, weather reminders, and alternatives."
+                        "Target 4200-5600 Chinese characters when evidence supports it, and do not go below 2200 Chinese characters unless critical input is missing. "
+                        "Include useful details for time windows, food, transport, budget notes, weather reminders, alternatives, and why each stop fits the user's constraints."
                     ),
                     "dayScope": (
                         "The markdown, places, and routes must correspond to targetDayIndex only. "
@@ -381,17 +393,19 @@ class DeepSeekClient:
         if day_scope["isDayScope"]:
             return {
                 "assistantTextMaxChars": 180,
-                "summaryMaxChars": 220,
-                "markdownMaxChars": 2800,
+                "summaryMaxChars": 320,
+                "markdownMaxChars": 5600,
+                "markdownTargetMinChars": 2200,
                 "maxPlaces": 12,
                 "maxRoutes": 12,
             }
         return {
             "assistantTextMaxChars": 220,
-            "summaryMaxChars": 260,
-            "markdownMaxChars": 8000,
-            "maxPlaces": 16,
-            "maxRoutes": 20,
+            "summaryMaxChars": 360,
+            "markdownMaxChars": 12000,
+            "markdownTargetMinChars": 5000,
+            "maxPlaces": 20,
+            "maxRoutes": 24,
         }
 
     def _payload_metrics(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -399,12 +413,18 @@ class DeepSeekClient:
         messages = payload.get("messages") or []
         system_prompt = str(messages[0].get("content") or "") if len(messages) > 0 and isinstance(messages[0], dict) else ""
         user_prompt = str(messages[-1].get("content") or "") if messages and isinstance(messages[-1], dict) else ""
+        thinking = payload.get("thinking")
+        thinking_type = thinking.get("type") if isinstance(thinking, dict) else "omitted"
         return {
+            "model": payload.get("model"),
+            "thinkingType": thinking_type,
+            "temperature": payload.get("temperature"),
             "payloadChars": len(body),
             "payloadBytes": len(body.encode("utf-8")),
             "systemPromptChars": len(system_prompt),
             "userPayloadChars": len(user_prompt),
             "maxTokens": payload.get("max_tokens"),
+            "slowResponseWarningMs": self._settings.deepseek_slow_response_warning_ms,
         }
 
     def _emit_payload_ready(self, context: Any | None, metadata: dict[str, Any]) -> None:
@@ -588,6 +608,39 @@ class DeepSeekClient:
     def _extract_content(self, data: dict[str, Any]) -> str:
         return data["choices"][0]["message"]["content"]
 
+    def _thinking_payload(self) -> dict[str, str] | None:
+        thinking_type = (self._settings.deepseek_thinking_type or "disabled").strip().lower()
+        if thinking_type in {"", "omit", "omitted", "none"}:
+            return None
+        return {"type": thinking_type}
+
+    def _model_for_request(self, request: AgentRunRequest) -> str:
+        if request.modelVariant == PlannerModelVariant.FLASH:
+            return self._settings.deepseek_flash_model
+        if request.modelVariant == PlannerModelVariant.PRO:
+            return self._settings.deepseek_pro_model
+        return self._settings.deepseek_model
+
+    def _append_slow_response_warning(
+        self,
+        warnings: list[ToolWarning],
+        metadata: dict[str, Any],
+    ) -> None:
+        threshold_ms = self._settings.deepseek_slow_response_warning_ms
+        request_ms = metadata.get("requestMs")
+        if not isinstance(request_ms, int) or threshold_ms <= 0 or request_ms <= threshold_ms:
+            return
+        warnings.append(
+            ToolWarning(
+                code="MODEL_SLOW_RESPONSE",
+                message=(
+                    f"DeepSeek 本次响应耗时 {request_ms}ms，超过慢响应阈值 {threshold_ms}ms；"
+                    "已记录模型、thinking 模式、payload 大小和 token 上限，便于排查。"
+                ),
+                source="deepseek",
+            )
+        )
+
     def _parse_json_content(self, content: str) -> dict[str, Any]:
         parsed, _ = self._parse_json_content_with_stats(content)
         return parsed
@@ -653,6 +706,8 @@ class DeepSeekClient:
     def _output_summary_with_metrics(self, summary: str, metadata: dict[str, Any]) -> str:
         metric_keys = [
             "payloadBytes",
+            "model",
+            "thinkingType",
             "maxTokens",
             "requestMs",
             "responseChars",

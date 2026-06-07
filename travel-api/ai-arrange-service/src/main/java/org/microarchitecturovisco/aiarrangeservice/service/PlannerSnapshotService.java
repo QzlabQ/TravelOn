@@ -146,6 +146,7 @@ public class PlannerSnapshotService {
         }
 
         PlannerSnapshot latestSnapshot = snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversation.getId()).orElse(null);
+        assertDraftBaseVersionIsCurrent(conversation, draft, latestSnapshot);
         Integer version = (latestSnapshot == null || latestSnapshot.getVersion() == null ? 0 : latestSnapshot.getVersion()) + 1;
         List<PlannerPlaceSuggestion> places = !safeList(response.getPlaces()).isEmpty()
                 ? safeList(response.getPlaces())
@@ -180,6 +181,8 @@ public class PlannerSnapshotService {
                 .patchOps(safeList(draft.getPatchOps()))
                 .checksum(draft.getChecksum())
                 .traceId(response.getTraceId())
+                .agentToolCalls(safeList(response.getToolCalls()))
+                .agentWarnings(safeList(response.getWarnings()))
                 .createdAt(Instant.now())
                 .build();
 
@@ -216,6 +219,28 @@ public class PlannerSnapshotService {
         }
 
         return routes;
+    }
+
+    private void assertDraftBaseVersionIsCurrent(
+            PlannerConversation conversation,
+            PlannerSnapshotDraft draft,
+            PlannerSnapshot latestSnapshot
+    ) {
+        if (draft.getBaseVersion() == null) {
+            return;
+        }
+
+        Integer latestVersion = latestSnapshot == null || latestSnapshot.getVersion() == null
+                ? 0
+                : latestSnapshot.getVersion();
+        if (!draft.getBaseVersion().equals(latestVersion)) {
+            throw new PlannerSnapshotVersionConflictException(
+                    conversation.getId(),
+                    draft.getBaseVersion(),
+                    latestVersion,
+                    draft.getChecksum()
+            );
+        }
     }
 
     private List<PlannerPlaceSuggestion> carryForwardPlaceIdentity(List<PlannerPlaceSuggestion> draftPlaces, List<PlannerPlaceSuggestion> previousPlaces) {

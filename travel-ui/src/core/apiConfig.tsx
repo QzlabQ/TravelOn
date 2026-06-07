@@ -167,7 +167,10 @@ export type PlannerMessageType =
 export interface PlannerChatSendPayload {
     message: string,
     selectedPlaceIds: string[],
+    modelVariant?: PlannerModelVariant,
 }
+
+export type PlannerModelVariant = 'FLASH' | 'PRO';
 
 export interface PlannerPlaceSelectionPayload {
     selectedPlaceIds: string[],

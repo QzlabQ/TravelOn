@@ -23,9 +23,11 @@ services:
       ALL_PROXY: ""
       all_proxy: ""
       DEEPSEEK_TIMEOUT_SECONDS: "180"
+      DEEPSEEK_THINKING_TYPE: "disabled"
       AGENT_MODEL_TIMEOUT_SECONDS: "180"
       AGENT_MAX_RUNTIME_SECONDS: "240"
-      DEEPSEEK_MAX_TOKENS: "10000"
+      DEEPSEEK_MAX_TOKENS: "12000"
+      DEEPSEEK_SLOW_RESPONSE_WARNING_MS: "60000"
       NO_PROXY: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,mongo"
       no_proxy: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,mongo"
     ports:
@@ -42,6 +44,7 @@ services:
     environment:
       MONGO_HOST: mongo
       AI_ARRANGE_AGENT_BASE_URL: http://ai-arrange-agent:8090
+      AI_ARRANGE_AGENT_TIMEOUT_SECONDS: "270"
       AI_ARRANGE_SERVICE_PORT: "8082"
       AI_ARRANGE_CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
       HTTP_PROXY: ""

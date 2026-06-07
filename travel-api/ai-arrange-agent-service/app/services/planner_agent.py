@@ -1858,6 +1858,9 @@ class PlannerAgent:
                 latencyMs=result.latencyMs,
                 detail=result.errorMessage,
                 retryCount=result.retryCount,
+                inputSummary=result.inputSummary,
+                outputSummary=result.outputSummary,
+                metadata=result.metadata,
             )
             for result in results
         ]

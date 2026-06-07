@@ -27,12 +27,20 @@ Runtime defaults for Java integration should follow the documented Stage 0 setti
 
 ```text
 DEEPSEEK_TIMEOUT_SECONDS=90
+DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
+DEEPSEEK_PRO_MODEL=deepseek-v4-pro
+DEEPSEEK_THINKING_TYPE=disabled
 AGENT_MODEL_TIMEOUT_SECONDS=90
 AGENT_MAX_RUNTIME_SECONDS=120
-DEEPSEEK_MAX_TOKENS=6000
+DEEPSEEK_MAX_TOKENS=12000
+DEEPSEEK_SLOW_RESPONSE_WARNING_MS=60000
 ```
 
 Java should configure its Python Agent HTTP timeout above `AGENT_MAX_RUNTIME_SECONDS`; the current recommendation is 150 seconds.
+
+When Docker Compose overrides `AGENT_MAX_RUNTIME_SECONDS` to 240 seconds for longer model generations, Java should use `AI_ARRANGE_AGENT_TIMEOUT_SECONDS=270` or another value above the Agent runtime limit.
+
+The frontend defaults to `modelVariant=FLASH` for faster planning. Users can switch to `PRO` from the planner page. `DEEPSEEK_FLASH_MODEL` and `DEEPSEEK_PRO_MODEL` control the actual provider model names.
 
 ## Java Integration
 
@@ -90,6 +98,12 @@ The service now wraps tool execution in a lightweight harness:
 - `ToolResult` standardizes tool output, warnings, latency, retry count, and failure details.
 - `TraceRecorder` emits JSON logs with a `traceId` for each agent turn and tool/model step.
 - `/agent/planner/run` responses include `traceId`, `toolCalls`, `warnings`, and `userFacingEvents`.
+- Java `PlannerSnapshot` now stores compact diagnostics from the Agent response:
+  - `traceId`
+  - `agentToolCalls`, including tool/model latency, retry count, input/output summaries, and sanitized metadata
+  - `agentWarnings`, including slow model response warnings
+
+Full raw `TraceEvent` sequences are still emitted as JSON logs by Python and streamed to Java/WebSocket while the run is active; they are not fully persisted to MongoDB.
 
 The first phase intentionally does not use MCP, LangGraph, direct MongoDB writes, or frontend WebSocket handling in Python.
 

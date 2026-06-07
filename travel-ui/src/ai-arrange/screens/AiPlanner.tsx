@@ -44,6 +44,7 @@ import {
     PlannerCoreSlots,
     PlannerDataRefreshPayload,
     PlannerErrorPayload,
+    PlannerModelVariant,
     PlannerPlaceSuggestion,
     PlannerRouteSegment,
     PlannerTraceEvent,
@@ -75,6 +76,7 @@ interface PlannerFormState {
     mustVisitKeywords: string,
     avoidKeywords: string,
     notes: string,
+    modelVariant: PlannerModelVariant,
 }
 
 interface PlannerViewData {
@@ -116,6 +118,7 @@ function defaultPlannerForm(): PlannerFormState {
         mustVisitKeywords: "",
         avoidKeywords: "",
         notes: "",
+        modelVariant: "FLASH",
     };
 }
 
@@ -142,9 +145,11 @@ function readStoredPlannerSession(): PlannerStoredSession | null {
 
 function normalizeFormState(value?: Partial<PlannerFormState> | null): PlannerFormState {
     const defaults = defaultPlannerForm();
+    const modelVariant: PlannerModelVariant = value?.modelVariant === "PRO" ? "PRO" : "FLASH";
     return {
         ...defaults,
         ...value,
+        modelVariant,
         peopleCount: Math.max(1, Number(value?.peopleCount ?? defaults.peopleCount) || defaults.peopleCount),
     };
 }
@@ -342,6 +347,7 @@ export default function AiPlanner() {
     const [mustVisitKeywords, setMustVisitKeywords] = useState(initialForm.mustVisitKeywords);
     const [avoidKeywords, setAvoidKeywords] = useState(initialForm.avoidKeywords);
     const [notes, setNotes] = useState(initialForm.notes);
+    const [modelVariant, setModelVariant] = useState<PlannerModelVariant>(initialForm.modelVariant);
 
     const [conversation, setConversation] = useState<PlannerConversationResponse | null>(initialSession?.conversation || null);
     const [socketStatus, setSocketStatus] = useState<SocketStatus>("idle");
@@ -369,6 +375,7 @@ export default function AiPlanner() {
         mustVisitKeywords,
         avoidKeywords,
         notes,
+        modelVariant,
     }), [
         city,
         travelStartDate,
@@ -381,6 +388,7 @@ export default function AiPlanner() {
         mustVisitKeywords,
         avoidKeywords,
         notes,
+        modelVariant,
     ]);
 
     const coreSlots = useMemo<PlannerCoreSlots>(() => ({
@@ -472,6 +480,7 @@ export default function AiPlanner() {
         setMustVisitKeywords(nextForm.mustVisitKeywords);
         setAvoidKeywords(nextForm.avoidKeywords);
         setNotes(nextForm.notes);
+        setModelVariant(nextForm.modelVariant);
     }, []);
 
     const setSnapshotView = useCallback((nextView: SnapshotView) => {
@@ -613,6 +622,7 @@ export default function AiPlanner() {
                 sendPlannerEnvelope(socket, conversationId, "PLANNER_CHAT_SEND", {
                     message: seed.prompt,
                     selectedPlaceIds: selectedPlaceIdsRef.current,
+                    modelVariant,
                 });
                 setChatSending(true);
             }
@@ -674,6 +684,7 @@ export default function AiPlanner() {
         appendAssistantDelta,
         applyLiveData,
         conversation?.id,
+        modelVariant,
         refreshSnapshotList,
         sendPlannerEnvelope,
         userId,
@@ -744,6 +755,7 @@ export default function AiPlanner() {
         sendPlannerEnvelope(socket, conversation.id, "PLANNER_CHAT_SEND", {
             message: trimmedInput,
             selectedPlaceIds: liveData.selectedPlaceIds,
+            modelVariant,
         });
         setChatSending(true);
     };
@@ -833,6 +845,7 @@ export default function AiPlanner() {
         setMustVisitKeywords(nextForm.mustVisitKeywords);
         setAvoidKeywords(nextForm.avoidKeywords);
         setNotes(nextForm.notes);
+        setModelVariant(nextForm.modelVariant);
     };
 
     const loadMockPlannerData = () => {
@@ -865,6 +878,25 @@ export default function AiPlanner() {
         setPlannerTraceEvents([]);
         setSnapshotView("latest");
     };
+
+    const handleModelVariantChange = (value: string) => {
+        setModelVariant(value === "FLASH" ? "FLASH" : "PRO");
+    };
+
+    const renderModelVariantSelect = (fullWidth = false) => (
+        <TextField
+            select
+            label="模型模式"
+            value={modelVariant}
+            fullWidth={fullWidth}
+            size={fullWidth ? "medium" : "small"}
+            onChange={event => handleModelVariantChange(event.target.value)}
+            sx={fullWidth ? undefined : {minWidth: 150}}
+        >
+            <MenuItem value="FLASH">Flash 快速</MenuItem>
+            <MenuItem value="PRO">Pro 高质量</MenuItem>
+        </TextField>
+    );
 
     const navigateToInternalOffer = (place: PlannerPlaceSuggestion) => {
         if (!place.internalOfferId) return;
@@ -927,15 +959,18 @@ export default function AiPlanner() {
                         />
                     </div>
 
-                    <TextField
-                        label="人数"
-                        value={peopleCount}
-                        required
-                        fullWidth
-                        type="number"
-                        inputProps={{min: 1}}
-                        onChange={event => setPeopleCount(Math.max(1, Number(event.target.value) || 1))}
-                    />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <TextField
+                            label="人数"
+                            value={peopleCount}
+                            required
+                            fullWidth
+                            type="number"
+                            inputProps={{min: 1}}
+                            onChange={event => setPeopleCount(Math.max(1, Number(event.target.value) || 1))}
+                        />
+                        {renderModelVariantSelect(true)}
+                    </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <TextField
@@ -1292,6 +1327,7 @@ export default function AiPlanner() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {conversation && renderModelVariantSelect(false)}
                         {displayData.snapshotVersion &&
                             <Chip size="small" color="secondary" variant="outlined" label={`v${displayData.snapshotVersion}`}/>
                         }

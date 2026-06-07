@@ -17,7 +17,14 @@
 DEEPSEEK_API_KEY=
 AMAP_API_KEY=
 DEEPSEEK_MODEL=
+DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
+DEEPSEEK_PRO_MODEL=deepseek-v4-pro
+DEEPSEEK_THINKING_TYPE=disabled
+DEEPSEEK_MAX_TOKENS=12000
+DEEPSEEK_SLOW_RESPONSE_WARNING_MS=60000
 ```
+
+AI 规划页默认使用 Flash 模型模式，前端可切换为 Pro。
 
 启动后端：
 
@@ -65,3 +72,22 @@ mvn spring-boot:run
 ```
 
 未配置 `DEEPSEEK_API_KEY` 时，Agent 会返回结构化兜底规划，便于本地联调。
+
+检查MongoSnap shot:
+
+```powershell
+cd travel-api
+docker compose exec mongo mongosh ai-arrange-db
+
+db.planner_snapshots
+  .find({}, {
+    version: 1,
+    traceId: 1,
+    agentToolCalls: 1,
+    agentWarnings: 1,
+    createdAt: 1
+  })
+  .sort({ createdAt: -1 })
+  .limit(5)
+  .pretty()
+```

@@ -20,10 +20,14 @@
 - 优先更新文档和接口契约。
 - 运行配置使用当前文档中的设置：
   - `DEEPSEEK_TIMEOUT_SECONDS=90`
+  - `DEEPSEEK_FLASH_MODEL=deepseek-v4-flash`
+  - `DEEPSEEK_PRO_MODEL=deepseek-v4-pro`
+  - `DEEPSEEK_THINKING_TYPE=disabled`
   - `AGENT_MODEL_TIMEOUT_SECONDS=90`
   - `AGENT_MAX_RUNTIME_SECONDS=120`
-  - `DEEPSEEK_MAX_TOKENS=6000`
-  - Java 调 Python Agent 的 HTTP timeout 建议大于 120 秒，先按 150 秒配置。
+  - `DEEPSEEK_MAX_TOKENS=12000`
+  - `DEEPSEEK_SLOW_RESPONSE_WARNING_MS=60000`
+  - Java 调 Python Agent 的 HTTP timeout 建议大于 Agent runtime；默认 runtime 120 秒时至少 150 秒，Docker runtime 240 秒时使用 270 秒。
 - Java 接入逐步完成，不一次性完成全部版本、回滚、diff 和 WebSocket 能力。
 - 用户可见文案统一为中文。
 - 外部能力接入顺序：
@@ -64,9 +68,12 @@ Java 调用 Python stream endpoint
 - 将代码默认配置与文档设置对齐：
   - `DEEPSEEK_TIMEOUT_SECONDS` 默认改回 90。
   - `AGENT_MAX_RUNTIME_SECONDS` 默认改回 120。
-  - `DEEPSEEK_MAX_TOKENS` 默认改回 6000。
+  - `DEEPSEEK_MAX_TOKENS` 默认提高到 12000，避免单日规划被输出上限压得过短。
+  - `DEEPSEEK_FLASH_MODEL` / `DEEPSEEK_PRO_MODEL` 用于前端 Flash/Pro 模型模式选择，前端默认使用 Flash。
+  - `DEEPSEEK_THINKING_TYPE` 默认 `disabled`，确保 DeepSeek thinking mode 默认关闭。
+  - `DEEPSEEK_SLOW_RESPONSE_WARNING_MS` 默认 60000，用于标记模型慢响应。
   - `AGENT_MODEL_TIMEOUT_SECONDS` 默认继续跟随 `DEEPSEEK_TIMEOUT_SECONDS`。
-- 文档中明确：Java HTTP timeout 先按 150 秒。
+- 文档中明确：Java HTTP timeout 必须大于 `AGENT_MAX_RUNTIME_SECONDS`。
 
 验收标准：
 
@@ -163,7 +170,7 @@ POST /agent/planner/run
 
 - 新增 `PlannerAgentClient`。
 - 支持调用 `/agent/planner/run` 和 `/agent/planner/stream`。
-- HTTP timeout 先配置 150 秒。
+- HTTP timeout 必须大于 Agent runtime；当前默认 150 秒，Docker 长运行配置使用 270 秒。
 - 定义 Java DTO，与 Python 当前字段保持兼容：
   - `planningMode`
   - `planningScope`
@@ -185,7 +192,7 @@ POST /agent/planner/run
 - 新增 `POST /ai-arrange/api/conversations/{conversationId}/planner/run`，用于 Java 侧同步触发 Agent 规划。
 - WebSocket `PLANNER_CHAT_SEND` 改为消费 Python SSE，并转发 `PLANNER_TRACE_EVENT`、`PLANNER_OPTIONS_REFRESH`、`PLANNER_DATA_REFRESH`、`PLANNER_SNAPSHOT_SAVED`。
 - 新增 Java 侧 Agent DTO，覆盖 `planningMode`、`planningScope`、`interaction`、`latestSnapshot`、`recommendationGroups`、`snapshotDraft`、`dayPlans`、`patchOps`、`checksum` 等字段。
-- `PlannerSnapshot` 已扩展保存 `baseVersion`、`scope`、`targetDayIndex`、`currentDayIndex`、`completedDayIndexes`、`dayPlans`、`changeSummary`、`patchOps`、`checksum`、`traceId`。
+- `PlannerSnapshot` 已扩展保存 `baseVersion`、`scope`、`targetDayIndex`、`currentDayIndex`、`completedDayIndexes`、`dayPlans`、`changeSummary`、`patchOps`、`checksum`、`traceId`、`agentToolCalls` 和 `agentWarnings`。
 - `PlannerSnapshotService.createSnapshotFromAgentResponse` 由 Java 分配正式版本号，`snapshotDraft.proposedVersion` 只作为 Agent 建议值，不作为最终版本。
 - 已基于 `conversationId + checksum` 做重复响应幂等保存；并发冲突、回滚后重规划、日计划确认和 diff 仍属于后续批次。
 

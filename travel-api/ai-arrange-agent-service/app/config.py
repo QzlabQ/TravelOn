@@ -36,11 +36,15 @@ class AgentSettings:
     deepseek_base_url: str
     deepseek_chat_completions_path: str
     deepseek_model: str
+    deepseek_flash_model: str
+    deepseek_pro_model: str
+    deepseek_thinking_type: str
     deepseek_temperature: float
     deepseek_timeout_seconds: float
     deepseek_retry_count: int
     deepseek_retry_backoff_seconds: float
     deepseek_max_tokens: int
+    deepseek_slow_response_warning_ms: int
     amap_api_key: str
     amap_base_url: str
     amap_enabled: bool
@@ -62,18 +66,23 @@ class AgentSettings:
 
 def load_settings() -> AgentSettings:
     deepseek_timeout_seconds = _as_float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS"), 90.0)
+    deepseek_model = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
     return AgentSettings(
         app_name=os.getenv("AGENT_APP_NAME", "ai-arrange-agent-service"),
         app_version=os.getenv("AGENT_APP_VERSION", "0.1.0"),
         deepseek_api_key=os.getenv("DEEPSEEK_API_KEY", ""),
         deepseek_base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
         deepseek_chat_completions_path=os.getenv("DEEPSEEK_CHAT_COMPLETIONS_PATH", "/chat/completions"),
-        deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro"),
+        deepseek_model=deepseek_model,
+        deepseek_flash_model=os.getenv("DEEPSEEK_FLASH_MODEL") or "deepseek-v4-flash",
+        deepseek_pro_model=os.getenv("DEEPSEEK_PRO_MODEL") or deepseek_model,
+        deepseek_thinking_type=os.getenv("DEEPSEEK_THINKING_TYPE") or "disabled",
         deepseek_temperature=_as_float(os.getenv("DEEPSEEK_TEMPERATURE"), 0.6),
         deepseek_timeout_seconds=deepseek_timeout_seconds,
         deepseek_retry_count=_as_int(os.getenv("DEEPSEEK_RETRY_COUNT"), 1),
         deepseek_retry_backoff_seconds=_as_float(os.getenv("DEEPSEEK_RETRY_BACKOFF_SECONDS"), 1.0),
-        deepseek_max_tokens=_as_int(os.getenv("DEEPSEEK_MAX_TOKENS"), 6000),
+        deepseek_max_tokens=_as_int(os.getenv("DEEPSEEK_MAX_TOKENS"), 12000),
+        deepseek_slow_response_warning_ms=_as_int(os.getenv("DEEPSEEK_SLOW_RESPONSE_WARNING_MS"), 60000),
         amap_api_key=os.getenv("AMAP_API_KEY", ""),
         amap_base_url=os.getenv("AMAP_BASE_URL", "https://restapi.amap.com/v3"),
         amap_enabled=_as_bool(os.getenv("AMAP_ENABLED"), True),
