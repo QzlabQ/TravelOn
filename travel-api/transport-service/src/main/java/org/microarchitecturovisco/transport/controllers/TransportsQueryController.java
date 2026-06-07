@@ -7,6 +7,7 @@ import org.microarchitecturovisco.transport.model.cqrs.commands.CreateTransportR
 import org.microarchitecturovisco.transport.model.cqrs.commands.DeleteTransportReservationCommand;
 import org.microarchitecturovisco.transport.model.domain.Transport;
 import org.microarchitecturovisco.transport.model.domain.TransportReservation;
+import org.microarchitecturovisco.transport.model.domain.TicketType;
 import org.microarchitecturovisco.transport.model.dto.LocationDto;
 import org.microarchitecturovisco.transport.model.dto.TransportDto;
 import org.microarchitecturovisco.transport.model.dto.TransportReservationDto;
@@ -16,6 +17,8 @@ import org.microarchitecturovisco.transport.model.dto.response.AvailableTranspor
 import org.microarchitecturovisco.transport.model.dto.response.CheckTransportAvailabilityResponseDto;
 import org.microarchitecturovisco.transport.model.dto.response.GetTransportsBetweenLocationsResponseDto;
 import org.microarchitecturovisco.transport.model.dto.response.GetTransportsBySearchQueryResponseDto;
+import org.microarchitecturovisco.transport.model.dto.response.TicketOfferDto;
+import org.microarchitecturovisco.transport.model.dto.response.TicketOptionsDto;
 import org.microarchitecturovisco.transport.model.mappers.LocationMapper;
 import org.microarchitecturovisco.transport.queues.config.QueuesConfig;
 import org.microarchitecturovisco.transport.services.TransportCommandService;
@@ -27,8 +30,11 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -67,6 +73,36 @@ public class TransportsQueryController {
     @GetMapping("/available")
     public AvailableTransportsDto getAvailableTransports() {
         return transportsQueryService.getAvailableTransports();
+    }
+
+    @GetMapping("/tickets/options")
+    public TicketOptionsDto getTicketOptions(@RequestParam TicketType type) {
+        return transportsQueryService.getTicketOptions(type);
+    }
+
+    @GetMapping("/tickets")
+    public List<TicketOfferDto> searchTicketOffers(
+            @RequestParam TicketType type,
+            @RequestParam String departureCity,
+            @RequestParam String arrivalCity,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate departureDate,
+            @RequestParam(required = false) Integer minPrice,
+            @RequestParam(required = false) Integer maxPrice,
+            @RequestParam(defaultValue = "false") boolean studentOnly,
+            @RequestParam(defaultValue = "false") boolean onlyAvailable,
+            @RequestParam(defaultValue = "departure") String sortBy
+    ) {
+        return transportsQueryService.searchTicketOffers(
+                type,
+                departureCity,
+                arrivalCity,
+                departureDate,
+                minPrice,
+                maxPrice,
+                studentOnly,
+                onlyAvailable,
+                sortBy
+        );
     }
 
     @GetMapping("/test")

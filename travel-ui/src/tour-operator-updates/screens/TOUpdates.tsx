@@ -21,6 +21,19 @@ type TransportUpdate = {
     capacityChange: number;
 };
 
+const localizeUpdateType = (updateType: string) => {
+    if (updateType === 'CREATE') return '新增';
+    if (updateType === 'UPDATE') return '更新';
+    if (updateType === 'DELETE') return '删除';
+    return updateType;
+};
+
+const localizeTransportType = (transportType: string) => {
+    if (transportType === 'Samolot' || transportType === 'PLANE') return '飞机';
+    if (transportType === 'Bus' || transportType === 'BUS') return '巴士';
+    return transportType;
+};
+
 const TOUpdates = () => {
 
     const [hotelUpdates, setHotelUpdates] = useState<HotelUpdate[]>([]);
@@ -79,19 +92,19 @@ const TOUpdates = () => {
                 <Paper elevation={2} style={{height: 'fit-content'}}>
                     <div className='mt-4 mb-6 flex flex-row gap-2 items-center justify-center'>
                         <ConnectingAirports style={{fontSize: 18}}/>
-                        <h3 className='text-xl'>Aktualizacje transportów</h3>
+                        <h3 className='text-xl'>交通更新</h3>
                     </div>
 
                     <TableContainer>
                         <Table>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell className='border border-gray-300 p-2'>Data zmiany</TableCell>
-                                    <TableCell className='border border-gray-300 p-2'>Skąd</TableCell>
-                                    <TableCell className='border border-gray-300 p-2'>Dokąd</TableCell>
-                                    <TableCell className='border border-gray-300 p-2'>Typ transportu</TableCell>
-                                    <TableCell className='border border-gray-300 p-2'>Typ zmiany</TableCell>
-                                    <TableCell className='border border-gray-300 p-2'>Zmiany</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>变更时间</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>出发地</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>目的地</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>交通类型</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>变更类型</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>变更内容</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -100,8 +113,8 @@ const TOUpdates = () => {
                                         <TableCell className='border border-gray-300 p-2'>{new Date(transport.updateDateTime).toLocaleString()}</TableCell>
                                         <TableCell className='border border-gray-300 p-2'>{transport.departureRegionAndCountry}</TableCell>
                                         <TableCell className='border border-gray-300 p-2'>{transport.arrivalRegionAndCountry}</TableCell>
-                                        <TableCell className='border border-gray-300 p-2'>{transport.transportTypeName}</TableCell>
-                                        <TableCell className='border border-gray-300 p-2'>{transport.updateType}</TableCell>
+                                        <TableCell className='border border-gray-300 p-2'>{localizeTransportType(transport.transportTypeName)}</TableCell>
+                                        <TableCell className='border border-gray-300 p-2'>{localizeUpdateType(transport.updateType)}</TableCell>
                                         <TableCell className='border border-gray-300 p-2'>
                                             {transport.updateType === 'CREATE' ? (
                                                 <div className='flex flex-col gap-1'>
@@ -109,8 +122,8 @@ const TOUpdates = () => {
                                                 </div>
                                             ) : (
                                                 <div className='flex flex-col gap-1'>
-                                                    <p>Cena: {transport.priceChange > 0 ? '+' : ''}{transport.priceChange}</p>
-                                                    <p>Miejsca: {transport.capacityChange > 0 ? '+' : ''}{transport.capacityChange}</p>
+                                                    <p>价格：{transport.priceChange > 0 ? '+' : ''}{transport.priceChange}</p>
+                                                    <p>座位：{transport.capacityChange > 0 ? '+' : ''}{transport.capacityChange}</p>
                                                 </div>
                                             )}
                                         </TableCell>
@@ -124,18 +137,18 @@ const TOUpdates = () => {
                 <Paper elevation={2} style={{ height: 'fit-content' }}>
                     <div className='mt-4 mb-6 flex flex-row gap-2 items-center justify-center'>
                         <Hotel style={{ fontSize: 18 }} />
-                        <h3 className='text-xl'>Aktualizacje hoteli</h3>
+                        <h3 className='text-xl'>酒店更新</h3>
                     </div>
 
                     <TableContainer>
                         <Table>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell className='border border-gray-300 p-2'>Data zmiany</TableCell>
-                                    <TableCell className='border border-gray-300 p-2'>Hotel</TableCell>
-                                    <TableCell className='border border-gray-300 p-2'>Pokój</TableCell>
-                                    <TableCell className='border border-gray-300 p-2'>Typ zmiany</TableCell>
-                                    <TableCell className='border border-gray-300 p-2'>Zmiany</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>变更时间</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>酒店</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>房间</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>变更类型</TableCell>
+                                    <TableCell className='border border-gray-300 p-2'>变更内容</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -144,7 +157,7 @@ const TOUpdates = () => {
                                         <TableCell className='border border-gray-300 p-2'>{new Date(hotel.updateDateTime).toLocaleString()}</TableCell>
                                         <TableCell className='border border-gray-300 p-2'>{hotel.hotelName}</TableCell>
                                         <TableCell className='border border-gray-300 p-2'>{hotel.roomName}</TableCell>
-                                        <TableCell className='border border-gray-300 p-2'>{hotel.updateType}</TableCell>
+                                        <TableCell className='border border-gray-300 p-2'>{localizeUpdateType(hotel.updateType)}</TableCell>
                                         <TableCell className='border border-gray-300 p-2'>
                                             {hotel.updateType === 'CREATE' ? (
                                                 <div className='flex flex-col gap-1'>
@@ -152,8 +165,8 @@ const TOUpdates = () => {
                                                 </div>
                                             ) : (
                                                 <div className='flex flex-col gap-1'>
-                                                    <p>Cena: {hotel.priceChange > 0 ? '+' : ''}{hotel.priceChange}</p>
-                                                    <p>Miejsca: {hotel.capacityChange > 0 ? '+' : ''}{hotel.capacityChange}</p>
+                                                    <p>价格：{hotel.priceChange > 0 ? '+' : ''}{hotel.priceChange}</p>
+                                                    <p>名额：{hotel.capacityChange > 0 ? '+' : ''}{hotel.capacityChange}</p>
                                                 </div>
                                             )}
                                         </TableCell>

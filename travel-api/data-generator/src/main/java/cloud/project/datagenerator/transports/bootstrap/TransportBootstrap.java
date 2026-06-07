@@ -17,7 +17,6 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.time.Month;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -51,7 +50,12 @@ public class TransportBootstrap implements CommandLineRunner {
         List<TransportCourse> planeCourses = transportCoursesMap.get("PLANE");
         List<TransportCourse> busCourses = transportCoursesMap.get("BUS");
 
-        LocalDateTime bootstrapBeginDay = LocalDateTime.of(2024, Month.MAY, 1, 12, 0, 0);
+        LocalDateTime bootstrapBeginDay = LocalDateTime.now()
+                .plusDays(1)
+                .withHour(12)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0);
 
         int randomSeed = 12345678;
         Random random = new Random(randomSeed);

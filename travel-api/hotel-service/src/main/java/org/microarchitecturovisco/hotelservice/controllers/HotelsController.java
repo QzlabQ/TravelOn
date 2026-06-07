@@ -8,7 +8,9 @@ import org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateRoomRes
 import org.microarchitecturovisco.hotelservice.model.cqrs.commands.DeleteRoomReservationCommand;
 import org.microarchitecturovisco.hotelservice.model.domain.Hotel;
 import org.microarchitecturovisco.hotelservice.model.domain.Room;
+import org.microarchitecturovisco.hotelservice.model.dto.LocationDto;
 import org.microarchitecturovisco.hotelservice.model.dto.RoomReservationDto;
+import org.microarchitecturovisco.hotelservice.model.dto.HotelResponseDto;
 import org.microarchitecturovisco.hotelservice.model.dto.data_generator.DataUpdateType;
 import org.microarchitecturovisco.hotelservice.model.dto.data_generator.RoomUpdateRequest;
 import org.microarchitecturovisco.hotelservice.model.dto.request.CheckHotelAvailabilityQueryRequestDto;
@@ -25,8 +27,13 @@ import org.microarchitecturovisco.hotelservice.utils.JsonConverter;
 import org.microarchitecturovisco.hotelservice.utils.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +47,61 @@ public class HotelsController {
 
     private final HotelsService hotelsService;
     private final HotelsCommandService hotelsCommandService;
+
+    @GetMapping("/destinations")
+    public List<LocationDto> getDestinations() {
+        return hotelsService.getDestinations();
+    }
+
+    @GetMapping("/{hotelId}")
+    public GetHotelDetailsResponseDto getHotelDetails(
+            @PathVariable UUID hotelId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(defaultValue = "2") int adults,
+            @RequestParam(defaultValue = "0") int childrenUnder3,
+            @RequestParam(defaultValue = "0") int childrenUnder10,
+            @RequestParam(defaultValue = "0") int childrenUnder18
+    ) {
+        return hotelsService.getHotelDetails(GetHotelDetailsRequestDto.builder()
+                .hotelId(hotelId)
+                .dateFrom(dateFrom.atStartOfDay())
+                .dateTo(dateTo.atTime(23, 59, 59))
+                .adults(adults)
+                .childrenUnderThree(childrenUnder3)
+                .childrenUnderTen(childrenUnder10)
+                .childrenUnderEighteen(childrenUnder18)
+                .build());
+    }
+
+    @GetMapping("/search")
+    public List<HotelResponseDto> searchHotels(
+            @RequestParam UUID destinationId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(defaultValue = "2") int adults,
+            @RequestParam(required = false) String hotelName,
+            @RequestParam(required = false) Float minPrice,
+            @RequestParam(required = false) Float maxPrice,
+            @RequestParam(required = false) Float minRating,
+            @RequestParam(defaultValue = "ALL") String hotelType,
+            @RequestParam(defaultValue = "ALL") String roomType,
+            @RequestParam(defaultValue = "price") String sortBy
+    ) {
+        return hotelsService.searchHotels(
+                destinationId,
+                dateFrom,
+                dateTo,
+                adults,
+                hotelName,
+                minPrice,
+                maxPrice,
+                minRating,
+                hotelType,
+                roomType,
+                sortBy
+        );
+    }
 
     @RabbitListener(queues = "hotels.requests.hotelsBySearchQuery")
     public String consumeGetHotelsRequest(String requestDtoJson) {
@@ -155,7 +217,8 @@ public class HotelsController {
         try {
             hotel = hotelsService.getHotel(request.getHotelId());
         } catch (HotelNoFoundException e) {
-            e.printStackTrace();
+            logger.warning("Skip room update because hotel was not found: " + request.getHotelId());
+            return;
         }
 
         // create room
@@ -171,7 +234,13 @@ public class HotelsController {
         if (request.getUpdateType() == DataUpdateType.UPDATE) {
             System.out.println("Updated room: " + request);
 
-            Room roomToUpdate = hotelsService.getRoomById(request.getId());
+            Room roomToUpdate;
+            try {
+                roomToUpdate = hotelsService.getRoomById(request.getId());
+            } catch (RuntimeException e) {
+                logger.warning("Skip room update because room was not found: " + request.getId());
+                return;
+            }
             if(hotelsService.doesRoomHaveAnyReservationsInFuture(roomToUpdate)) return;
 
             hotelsService.updateRoomFromHotel(request.getHotelId(), request.getId(), request.getName(),

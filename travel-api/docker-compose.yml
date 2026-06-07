@@ -86,6 +86,7 @@ services:
     build: ./reservation-service
     volumes:
       - ./logs/reservation:/logs
+      - ./data/reservation-service:/data
     depends_on:
       - rabbitmq
       - discovery
@@ -108,6 +109,7 @@ services:
     build: ./user-service
     volumes:
       - ./logs/user:/logs
+      - ./data/user-service:/data
     depends_on:
       - rabbitmq
       - discovery

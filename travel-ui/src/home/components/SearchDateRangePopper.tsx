@@ -11,13 +11,13 @@ const SearchDateRangePopper = ({selectedDateFrom, selectedDateTo, onSelection}) 
             <div className='flex flex-col gap-4'>
 
                 <DatePicker
-                    label="Wyjazd"
+                    label="出发"
                     value={dayjs(selectedDateFrom)}
                     onChange={(value) => onSelection(value?.toDate(), 'FROM')}
                 />
 
                 <DatePicker
-                    label="Powrót"
+                    label="返回"
                     value={dayjs(selectedDateTo)}
                     onChange={(value) => onSelection(value?.toDate(), 'TO')}
                 />

@@ -1,10 +1,10 @@
 import {Checkbox, FormControlLabel, FormGroup, Paper} from "@mui/material";
-import {DirectionsBus, Flight} from "@mui/icons-material";
+import {DirectionsBus, Flight, Train} from "@mui/icons-material";
 import {Location} from "../../core/domain/DomainInterfaces";
 
 
 // @ts-ignore
-const SearchDeparturesPopper = ({departures, selectedPlaneDepartures, selectedBusDepartures, onSelection}) => {
+const SearchDeparturesPopper = ({departures, selectedPlaneDepartures, selectedBusDepartures, selectedTrainDepartures, onSelection}) => {
 
     return (
         <Paper className='px-10 py-5 mt-2'>
@@ -12,7 +12,7 @@ const SearchDeparturesPopper = ({departures, selectedPlaneDepartures, selectedBu
                 <div>
                     <div className='flex flex-row gap-2 items-center mb-2 ml-0.5'>
                         <Flight style={{fontSize: 16}}/>
-                        <h3 className='text-xs'>WYLOT SAMOLOTEM</h3>
+                        <h3 className='text-xs'>飞机出发</h3>
                     </div>
 
                     <FormGroup>
@@ -26,7 +26,7 @@ const SearchDeparturesPopper = ({departures, selectedPlaneDepartures, selectedBu
                 <div>
                     <div className='flex flex-row gap-2 items-center mb-2 ml-0.5'>
                         <DirectionsBus style={{fontSize: 16}}/>
-                        <h3 className='text-xs'>WYJAZD BUSEM</h3>
+                        <h3 className='text-xs'>巴士出发</h3>
                     </div>
                     <FormGroup>
                         <FormGroup>
@@ -36,6 +36,19 @@ const SearchDeparturesPopper = ({departures, selectedPlaneDepartures, selectedBu
                                 } label={depr.region} />
                             ))}
                         </FormGroup>
+                    </FormGroup>
+                </div>
+                <div>
+                    <div className='flex flex-row gap-2 items-center mb-2 ml-0.5'>
+                        <Train style={{fontSize: 16}}/>
+                        <h3 className='text-xs'>火车出发</h3>
+                    </div>
+                    <FormGroup>
+                        {(departures.train ?? []).map((depr: Location, index: number) => (
+                            <FormControlLabel key={index} className='select-none' control={
+                                <Checkbox checked={selectedTrainDepartures.some((loc: Location) => loc.idLocation === depr.idLocation)} onChange={() => onSelection(depr, 'TRAIN')} />
+                            } label={depr.region} />
+                        ))}
                     </FormGroup>
                 </div>
             </div>

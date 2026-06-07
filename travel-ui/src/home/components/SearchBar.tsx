@@ -9,20 +9,48 @@ import React, {memo, useEffect, useState} from "react";
 import {Location} from "../../core/domain/DomainInterfaces";
 import {ApiRequests} from "../../core/apiConfig";
 
+const getDefaultDateFrom = () => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + 7);
+    return date;
+}
+
+const getDefaultDateTo = () => {
+    const date = getDefaultDateFrom();
+    date.setDate(date.getDate() + 2);
+    return date;
+}
+
+const formatDateOnly = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+const isPastDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date < today;
+}
+
 // @ts-ignore
 const SearchBar = ({onSearch, hideClearSearch = false}) => {
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const [anchorType, setAnchorType] = useState('');
 
     const [arrivals, setArrivals] = useState([]);
-    const [departures, setDepartures] = useState<{plane: Location[], bus: Location[]}>({
+    const [departures, setDepartures] = useState<{plane: Location[], bus: Location[], train: Location[]}>({
         plane: [],
-        bus: []
+        bus: [],
+        train: []
     });
 
     const [selectedDestinations, setSelectedDestinations] = useState<Location[]>([]);
     const [selectedPlaneDepartures, setSelectedPlaneDepartures] = useState<Location[]>([]);
     const [selectedBusDepartures, setSelectedBusDepartures] = useState<Location[]>([]);
+    const [selectedTrainDepartures, setSelectedTrainDepartures] = useState<Location[]>([]);
 
     const [selectedGuests, setSelectedGuests] = useState({
         adults: 2,
@@ -31,8 +59,8 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
         infants: 0,
     });
 
-    const [selectedDateFrom, setSelectedDateFrom] = useState(new Date(2024, 4, 1,));
-    const [selectedDateTo, setSelectedDateTo] = useState(() => new Date(2024, 4, 3));
+    const [selectedDateFrom, setSelectedDateFrom] = useState(getDefaultDateFrom);
+    const [selectedDateTo, setSelectedDateTo] = useState(getDefaultDateTo);
 
     const handleClick = (event: React.MouseEvent<HTMLElement>, type: string) => {
         setAnchorEl(event.currentTarget);
@@ -44,7 +72,8 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
             .then(response => {
                 setDepartures({
                     plane: response.data.departures.plane,
-                    bus: response.data.departures.bus
+                    bus: response.data.departures.bus,
+                    train: response.data.departures.train ?? []
                 })
                 setArrivals(response.data.arrivals);
             })
@@ -64,10 +93,10 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
         setSelectedDestinations(newSelectedList);
     }
 
-    const onDepartureSelection = (depr: Location, type: 'PLANE' | 'BUS') => {
+    const onDepartureSelection = (depr: Location, type: 'PLANE' | 'BUS' | 'TRAIN') => {
         let newSelectedList;
 
-        const searchList = type === 'PLANE' ? selectedPlaneDepartures : selectedBusDepartures;
+        const searchList = type === 'PLANE' ? selectedPlaneDepartures : type === 'BUS' ? selectedBusDepartures : selectedTrainDepartures;
 
         const itemIndex = searchList.findIndex(loc => loc.idLocation === depr.idLocation);
         if (itemIndex >= 0) {
@@ -79,8 +108,11 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
         if (type == 'PLANE') {
             setSelectedPlaneDepartures(newSelectedList);
         }
-        else {
+        else if (type == 'BUS') {
             setSelectedBusDepartures(newSelectedList);
+        }
+        else {
+            setSelectedTrainDepartures(newSelectedList);
         }
     }
 
@@ -119,14 +151,22 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
         setSelectedDestinations(searchParams.arrivals);
         setSelectedPlaneDepartures(searchParams.departurePlane);
         setSelectedBusDepartures(searchParams.departureBus);
+        setSelectedTrainDepartures(searchParams.departureTrain ?? []);
         setSelectedGuests({
             adults: searchParams.adults,
             teens: searchParams.teens,
             kids: searchParams.kids,
             infants: searchParams.infants,
         });
-        setSelectedDateFrom(new Date(searchParams.dateFrom));
-        setSelectedDateTo(new Date(searchParams.dateTo));
+        const storedDateFrom = new Date(searchParams.dateFrom);
+        const storedDateTo = new Date(searchParams.dateTo);
+        if (isPastDate(storedDateFrom) || isPastDate(storedDateTo)) {
+            clearSearchParameters();
+            return;
+        }
+
+        setSelectedDateFrom(storedDateFrom);
+        setSelectedDateTo(storedDateTo);
     }
 
     useEffect(() => {
@@ -135,13 +175,16 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
     }, []);
 
     const clearSearchParameters = () => {
+        const defaultDateFrom = getDefaultDateFrom();
+        const defaultDateTo = getDefaultDateTo();
         localStorage.setItem('searchParams',
             JSON.stringify({
                 departurePlane: [],
                 departureBus: [],
+                departureTrain: [],
                 arrivals: [],
-                dateFrom: '2024-05-01',
-                dateTo: '2024-05-03',
+                dateFrom: formatDateOnly(defaultDateFrom),
+                dateTo: formatDateOnly(defaultDateTo),
                 adults: 2,
                 teens: 0,
                 kids: 0,
@@ -149,9 +192,10 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
             }));
         setSelectedPlaneDepartures([]);
         setSelectedBusDepartures([]);
+        setSelectedTrainDepartures([]);
         setSelectedDestinations([]);
-        setSelectedDateTo(new Date(2024, 4, 3));
-        setSelectedDateFrom(new Date(2024, 4, 1));
+        setSelectedDateTo(defaultDateTo);
+        setSelectedDateFrom(defaultDateFrom);
         setSelectedGuests({
             adults: 2,
             teens: 0,
@@ -166,6 +210,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
             JSON.stringify({
                 departurePlane: selectedPlaneDepartures,
                 departureBus: selectedBusDepartures,
+                departureTrain: selectedTrainDepartures,
                 arrivals: selectedDestinations,
                 dateFrom: selectedDateFrom,
                 dateTo: selectedDateTo,
@@ -195,7 +240,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
                         onClick={event => handleClick(event, 'destination')}
                         endIcon={<ArrowDropDown/>}
                     >
-                        Cele podróży
+                        目的地
                     </Button>
                     <Popper open={Boolean(anchorEl) && anchorType == 'destination'} anchorEl={anchorEl}>
                         <SearchDestinationsPopper
@@ -216,7 +261,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
                         onClick={event => handleClick(event, 'guests')}
                         endIcon={<ArrowDropDown/>}
                     >
-                        Ile osób
+                        旅客人数
                     </Button>
                     <Popper open={Boolean(anchorEl) && anchorType == 'guests'} anchorEl={anchorEl}>
                         <SearchGuestQuantityPopper
@@ -236,7 +281,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
                         onClick={event => handleClick(event, 'when')}
                         endIcon={<ArrowDropDown/>}
                     >
-                        Kiedy
+                        出行时间
                     </Button>
                     <Popper open={Boolean(anchorEl) && anchorType == 'when'} anchorEl={anchorEl}>
                         <SearchDateRangePopper
@@ -257,13 +302,14 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
                         onClick={event => handleClick(event, 'from')}
                         endIcon={<ArrowDropDown/>}
                     >
-                        Skąd
+                        出发地
                     </Button>
                     <Popper open={Boolean(anchorEl) && anchorType == 'from'} anchorEl={anchorEl}>
                         <SearchDeparturesPopper
                             departures={departures}
                             selectedPlaneDepartures={selectedPlaneDepartures}
                             selectedBusDepartures={selectedBusDepartures}
+                            selectedTrainDepartures={selectedTrainDepartures}
                             onSelection={onDepartureSelection}
                         />
                     </Popper>
@@ -278,7 +324,7 @@ const SearchBar = ({onSearch, hideClearSearch = false}) => {
                         <Button color='error' className='flex flex-row items-center gap-1'
                                 onClick={clearSearchParameters}>
                             <Close style={{fontSize: 18}}/>
-                            <p className='text-sm'>Wyczyść parametry wyszukiwania</p>
+                            <p className='text-sm'>清空搜索条件</p>
                         </Button>
                     </div>
                 }

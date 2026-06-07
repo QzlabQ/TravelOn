@@ -31,6 +31,7 @@ public class Bootstrap implements CommandLineRunner {
     private final RoomReservationParser roomReservationParser;
     private final HotelsCommandService hotelsCommandService;
     private final RoomParser roomParser;
+    private final JsonHotelParser jsonHotelParser;
     private final ResourceLoader resourceLoader;
 
     public File loadCSVInitFiles(String filepathInResources)
@@ -48,12 +49,22 @@ public class Bootstrap implements CommandLineRunner {
         Resource hotelPhotosCsvFile = resourceLoader.getResource("classpath:initData/hotel_photos.csv");
         Resource hotelRoomsCsvFile = resourceLoader.getResource("classpath:initData/hotel_rooms.csv");
         Resource hotelCateringOptionsCsvFile = resourceLoader.getResource("classpath:initData/hotel_food_options.csv");
+        Resource hotelJsonFile = resourceLoader.getResource("classpath:initData/hotels.json");
 
-        List<LocationDto> hotelLocations = locationParser.importLocations(hotelCsvFile);
-        List<HotelDto> hotels = hotelParser.importHotels(hotelCsvFile, hotelPhotosCsvFile, hotelLocations);
-        List<CateringOptionDto> cateringOptions = cateringOptionParser.importCateringOptions(hotelCateringOptionsCsvFile, hotels);
-        roomParser.importRooms(hotelRoomsCsvFile, hotels);
-        List<RoomReservationDto> roomReservations = roomReservationParser.importRoomReservations(hotels);
+        List<HotelDto> hotels;
+        List<RoomReservationDto> roomReservations;
+
+        if (hotelJsonFile.exists()) {
+            hotels = jsonHotelParser.importHotels(hotelJsonFile);
+            roomReservations = List.of();
+            logger.info("Imported " + hotels.size() + " hotels from hotels.json");
+        } else {
+            List<LocationDto> hotelLocations = locationParser.importLocations(hotelCsvFile);
+            hotels = hotelParser.importHotels(hotelCsvFile, hotelPhotosCsvFile, hotelLocations);
+            List<CateringOptionDto> cateringOptions = cateringOptionParser.importCateringOptions(hotelCateringOptionsCsvFile, hotels);
+            roomParser.importRooms(hotelRoomsCsvFile, hotels);
+            roomReservations = roomReservationParser.importRoomReservations(hotels);
+        }
 
         for (HotelDto hotelDto : hotels){
             hotelsCommandService.createHotel(CreateHotelCommand.builder()

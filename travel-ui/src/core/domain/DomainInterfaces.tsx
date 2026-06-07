@@ -52,7 +52,7 @@ export interface Transport {
 
 export interface TransportCourse {
     idTransportCourse: string,
-    type: 'PLANE' | 'BUS',
+    type: 'PLANE' | 'BUS' | 'TRAIN',
     departureFromLocation: Location,
     arrivalAtLocation: Location,
 }

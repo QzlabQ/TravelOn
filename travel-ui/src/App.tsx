@@ -12,6 +12,12 @@ import BuyOffer from "./offers/screens/BuyOffer";
 import Preferences from "./preferences/screens/Preferences";
 import TOUpdates from "./tour-operator-updates/screens/TOUpdates";
 import AiPlanner from "./ai-arrange/screens/AiPlanner";
+import Reservations from "./reservations/screens/Reservations";
+import TicketBooking from "./reservations/screens/TicketBooking";
+import HotelBooking from "./reservations/screens/HotelBooking";
+import HotelDetails from "./reservations/screens/HotelDetails";
+import Account from "./account/screens/Account";
+import ReservationDetails from "./reservations/screens/ReservationDetails";
 
 function App() {
     useEffect(() => {
@@ -27,6 +33,13 @@ function App() {
                     <Route path='/offers' element={<Offers/>}/>
                     <Route path='/offerDetails' element={<OfferDetails/>}/>
                     <Route path='/buyOffer' element={<BuyOffer/>}/>
+                    <Route path='/reservations' element={<Reservations/>}/>
+                    <Route path='/reservations/:reservationId' element={<ReservationDetails/>}/>
+                    <Route path='/reservations/flights' element={<TicketBooking mode='flight'/>}/>
+                    <Route path='/reservations/trains' element={<TicketBooking mode='train'/>}/>
+                    <Route path='/reservations/hotels' element={<HotelBooking/>}/>
+                    <Route path='/reservations/hotels/:hotelId' element={<HotelDetails/>}/>
+                    <Route path='/account' element={<Account/>}/>
                     <Route path='/clientPreferences' element={<Preferences/>}/>
                     <Route path='/TOUpdates' element={<TOUpdates/>}/>
                     <Route path='/ai-planner' element={<AiPlanner/>}/>

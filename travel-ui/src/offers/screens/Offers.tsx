@@ -24,6 +24,7 @@ const Offers = () => {
         searchParams = {...searchParams,
             departurePlane: searchParams.departurePlane ? searchParams.departurePlane.map((dpt: Location) => dpt.idLocation) : [],
             departureBus: searchParams.departureBus ? searchParams.departureBus.map((dpt: Location) => dpt.idLocation) : [],
+            departureTrain: searchParams.departureTrain ? searchParams.departureTrain.map((dpt: Location) => dpt.idLocation) : [],
             arrivals: searchParams.arrivals ? searchParams.arrivals.map((dst: Location) => dst.idLocation) : [],
             dateFrom: formatDate(searchParams.dateFrom ? new Date(searchParams.dateFrom) : new Date()),
             dateTo: formatDate(searchParams.dateFrom ? new Date(searchParams.dateTo) : new Date()),
@@ -77,9 +78,9 @@ const Offers = () => {
                 <div className='flex flex-col gap-4 mt-4'>
                     <div className='flex flex-row items-center gap-2'>
                         <SentimentVeryDissatisfied style={{fontSize: 36}}/>
-                        <p className='text-2xl'>Nie znaleziono żadnych ofert</p>
+                        <p className='text-2xl'>未找到任何旅游产品</p>
                     </div>
-                    <p>Zmień parametry wyszukiwania i spróbuj ponownie...</p>
+                    <p>请调整搜索条件后重试...</p>
                 </div>
             }
 
@@ -87,9 +88,9 @@ const Offers = () => {
                 <div className='flex flex-col gap-4 mt-4'>
                     <div className='flex flex-row items-center gap-2'>
                         <SentimentVeryDissatisfied style={{fontSize: 36}}/>
-                        <p className='text-2xl'>Wystąpił nieoczekiwany błąd</p>
+                        <p className='text-2xl'>发生了意外错误</p>
                     </div>
-                    <p>Spróbuj ponownie za chwilę...</p>
+                    <p>请稍后再试...</p>
                 </div>
             }
         </div>

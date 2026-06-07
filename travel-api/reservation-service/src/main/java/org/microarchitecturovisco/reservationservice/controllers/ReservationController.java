@@ -1,12 +1,20 @@
 package org.microarchitecturovisco.reservationservice.controllers;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.reservationservice.domain.commands.DeleteReservationCommand;
 import org.microarchitecturovisco.reservationservice.domain.commands.UpdateReservationCommand;
 import org.microarchitecturovisco.reservationservice.domain.dto.ReservationPreference;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateHotelOnlyReservationRequest;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateTicketReservationRequest;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.CancelReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.ReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.UpdateReservationPaymentStatus;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.PaymentTransactionResponse;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.RefundRecordResponse;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.ReservationResponse;
 import org.microarchitecturovisco.reservationservice.domain.entity.Reservation;
+import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
 import org.microarchitecturovisco.reservationservice.domain.exceptions.ReservationFailException;
 import org.microarchitecturovisco.reservationservice.domain.model.PurchaseRequestBody;
 import org.microarchitecturovisco.reservationservice.domain.model.ReservationConfirmationResponse;
@@ -15,6 +23,8 @@ import org.microarchitecturovisco.reservationservice.services.ReservationService
 import org.microarchitecturovisco.reservationservice.utils.json.JsonReader;
 import org.microarchitecturovisco.reservationservice.websockets.ReservationWebSocketHandlerPreferences;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,8 +46,51 @@ public class ReservationController {
     private final ReservationAggregate reservationAggregate;
     public static Logger logger = Logger.getLogger(ReservationController.class.getName());
 
+    @GetMapping("/user/{userId}")
+    public List<ReservationResponse> getReservationsForUser(@PathVariable UUID userId) {
+        return reservationService.getReservationsForUser(userId);
+    }
+
+    @GetMapping("/{reservationId}")
+    public ReservationResponse getReservation(@PathVariable UUID reservationId) {
+        return reservationService.getReservation(reservationId);
+    }
+
+    @PostMapping("/{reservationId}/cancel")
+    public ReservationResponse cancelReservation(
+            @PathVariable UUID reservationId,
+            @Valid @RequestBody(required = false) CancelReservationRequest request
+    ) {
+        return reservationService.cancelReservation(reservationId, request == null ? null : request.reason());
+    }
+
+    @GetMapping("/{reservationId}/payments")
+    public List<PaymentTransactionResponse> getPaymentTransactions(@PathVariable UUID reservationId) {
+        return reservationService.getPaymentTransactions(reservationId);
+    }
+
+    @GetMapping("/{reservationId}/refunds")
+    public List<RefundRecordResponse> getRefundRecords(@PathVariable UUID reservationId) {
+        return reservationService.getRefundRecords(reservationId);
+    }
+
+    @PostMapping("/{reservationId}/refunds/complete")
+    public ReservationResponse completeRefund(@PathVariable UUID reservationId) {
+        return reservationService.completeRefund(reservationId);
+    }
+
+    @PostMapping("/tickets")
+    public ReservationResponse createTicketReservation(@Valid @RequestBody CreateTicketReservationRequest request) {
+        return reservationService.createTicketReservation(request);
+    }
+
+    @PostMapping("/hotels")
+    public ReservationResponse createHotelOnlyReservation(@Valid @RequestBody CreateHotelOnlyReservationRequest request) {
+        return reservationService.createHotelOnlyReservation(request);
+    }
+
     @PostMapping("/reservation")
-    public String addReservation(@RequestBody ReservationRequest reservationRequest) {
+    public String addReservation(@Valid @RequestBody ReservationRequest reservationRequest) {
         try {
             logger.info("RESERVATION REQUEST:" + reservationRequest.toString());
             UUID reservationId = reservationService.bookOrchestration(reservationRequest);
@@ -148,7 +201,11 @@ public class ReservationController {
         UpdateReservationPaymentStatus reservationPaymentStatus = JsonReader.readDtoFromJson(reservationPaymentStatusJson, UpdateReservationPaymentStatus.class);
         UUID reservationId = reservationPaymentStatus.getReservationId();
 
-        reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder().reservationId(reservationId).paid(true).build());
+        reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                .reservationId(reservationId)
+                .paid(true)
+                .status(ReservationStatus.PAID)
+                .build());
 
         logger.info("Reservation in Reservation module updated successfully");
     }

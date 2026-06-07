@@ -2,12 +2,24 @@ package org.microarchitecturovisco.reservationservice.services;
 
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.reservationservice.domain.commands.CreateReservationCommand;
+import org.microarchitecturovisco.reservationservice.domain.commands.UpdateReservationCommand;
 import org.microarchitecturovisco.reservationservice.domain.dto.HotelInfo;
 import org.microarchitecturovisco.reservationservice.domain.dto.PaymentRequestDto;
 import org.microarchitecturovisco.reservationservice.domain.dto.PaymentResponseDto;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateHotelOnlyReservationRequest;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateTicketReservationRequest;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.BookingPersonRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.ReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.UpdateReservationPaymentStatus;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.PaymentTransactionResponse;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.RefundRecordResponse;
+import org.microarchitecturovisco.reservationservice.domain.dto.responses.ReservationResponse;
+import org.microarchitecturovisco.reservationservice.domain.entity.PaymentTransaction;
+import org.microarchitecturovisco.reservationservice.domain.entity.RefundRecord;
+import org.microarchitecturovisco.reservationservice.domain.entity.RefundStatus;
 import org.microarchitecturovisco.reservationservice.domain.entity.Reservation;
+import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
+import org.microarchitecturovisco.reservationservice.domain.entity.BookingPersonSnapshot;
 import org.microarchitecturovisco.reservationservice.domain.exceptions.PaymentProcessException;
 import org.microarchitecturovisco.reservationservice.domain.exceptions.PurchaseFailedException;
 import org.microarchitecturovisco.reservationservice.domain.exceptions.ReservationFailException;
@@ -17,6 +29,8 @@ import org.microarchitecturovisco.reservationservice.domain.model.ReservationCon
 import org.microarchitecturovisco.reservationservice.domain.model.TransportReservationResponse;
 import org.microarchitecturovisco.reservationservice.queues.config.QueuesReservationConfig;
 import org.microarchitecturovisco.reservationservice.repositories.ReservationRepository;
+import org.microarchitecturovisco.reservationservice.repositories.PaymentTransactionRepository;
+import org.microarchitecturovisco.reservationservice.repositories.RefundRecordRepository;
 import org.microarchitecturovisco.reservationservice.services.saga.BookHotelsSaga;
 import org.microarchitecturovisco.reservationservice.services.saga.BookTransportsSaga;
 import org.microarchitecturovisco.reservationservice.services.saga.InvalidPaymentHandler;
@@ -26,9 +40,15 @@ import org.microarchitecturovisco.reservationservice.websockets.ReservationWebSo
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,6 +64,8 @@ public class ReservationService {
     public static Logger logger = Logger.getLogger(ReservationService.class.getName());
 
     private final ReservationRepository reservationRepository;
+    private final PaymentTransactionRepository paymentTransactionRepository;
+    private final RefundRecordRepository refundRecordRepository;
     private final ReservationAggregate reservationAggregate;
 
     private final BookHotelsSaga bookHotelsSaga;
@@ -70,13 +92,157 @@ public class ReservationService {
                 .adultsQuantity(adultsQuantity)
                 .price(price)
                 .paid(false)
+                .status(ReservationStatus.PENDING_PAYMENT)
+                .bookingType("PACKAGE")
                 .hotelId(hotelId)
-                .roomReservationsIds(roomReservationsIds)
-                .transportReservationsIds(transportReservationsIds)
+                .roomReservationsIds(emptyIfNull(roomReservationsIds))
+                .transportReservationsIds(emptyIfNull(transportReservationsIds))
                 .userId(userId)
+                .title("套餐预订")
+                .travelers(Collections.emptyList())
                 .build();
         reservationAggregate.handleCreateReservationCommand(command);
         return reservationRepository.findById(reservationId).orElseThrow(RuntimeException::new);
+    }
+
+    public List<ReservationResponse> getReservationsForUser(UUID userId) {
+        return reservationRepository.findByUserIdOrderByHotelTimeFromDesc(userId).stream()
+                .map(this::refreshExpiredReservation)
+                .map(ReservationResponse::from)
+                .toList();
+    }
+
+    public ReservationResponse getReservation(UUID reservationId) {
+        return reservationRepository.findById(reservationId)
+                .map(this::refreshExpiredReservation)
+                .map(ReservationResponse::from)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+    }
+
+    public ReservationResponse cancelReservation(UUID reservationId, String reason) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+
+        if (reservation.getStatus() == ReservationStatus.REFUND_PROCESSING) {
+            return ReservationResponse.from(completeProcessingRefund(reservation));
+        }
+        if (reservation.getStatus() == ReservationStatus.CANCELLED ||
+                reservation.getStatus() == ReservationStatus.REFUNDED) {
+            return ReservationResponse.from(reservation);
+        }
+
+        boolean refundRequired = reservation.isPaid() || reservation.getStatus() == ReservationStatus.PAID;
+        LocalDateTime now = LocalDateTime.now();
+        String normalizedReason = hasText(reason) ? reason.trim() : "用户主动取消";
+
+        if (refundRequired) {
+            refundRecordRepository.save(RefundRecord.builder()
+                    .id(UUID.randomUUID())
+                    .reservationId(reservationId)
+                    .amount(reservation.getPrice())
+                    .reason(normalizedReason)
+                    .status(RefundStatus.COMPLETED)
+                    .requestedAt(now)
+                    .completedAt(now)
+                    .build());
+        }
+
+        reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                .reservationId(reservationId)
+                .paid(false)
+                .status(refundRequired ? ReservationStatus.REFUNDED : ReservationStatus.CANCELLED)
+                .cancellationReason(normalizedReason)
+                .cancelledAt(now)
+                .refundRequestedAt(refundRequired ? now : null)
+                .refundedAt(refundRequired ? now : null)
+                .build());
+
+        return reservationRepository.findById(reservationId)
+                .map(ReservationResponse::from)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+    }
+
+    public ReservationResponse createTicketReservation(CreateTicketReservationRequest request) {
+        LocalDateTime departureAt = request.departureDate().atTime(parseTime(request.departureTime()));
+        LocalDateTime arrivalAt = request.departureDate().atTime(parseTime(request.arrivalTime()));
+        if (arrivalAt.isBefore(departureAt)) {
+            arrivalAt = arrivalAt.plusDays(1);
+        }
+
+        String bookingType = normalizeTicketType(request.transportType());
+        List<BookingPersonSnapshot> travelers = normalizeTravelers(request.travelers(), request.passengerCount());
+        UUID reservationId = UUID.randomUUID();
+        UUID transportReservationId = UUID.nameUUIDFromBytes(
+                (bookingType + request.bookingCode() + request.routeFrom() + request.routeTo() + departureAt)
+                        .getBytes(StandardCharsets.UTF_8)
+        );
+
+        CreateReservationCommand command = CreateReservationCommand.builder()
+                .id(reservationId)
+                .hotelTimeFrom(departureAt)
+                .hotelTimeTo(arrivalAt)
+                .infantsQuantity(0)
+                .kidsQuantity(0)
+                .teensQuantity(0)
+                .adultsQuantity(countTravelers(travelers, "ADULT", "STUDENT"))
+                .price(request.price())
+                .paid(false)
+                .status(ReservationStatus.PENDING_PAYMENT)
+                .bookingType(bookingType)
+                .roomReservationsIds(Collections.emptyList())
+                .transportReservationsIds(List.of(transportReservationId))
+                .userId(request.userId())
+                .title((bookingType.equals("FLIGHT") ? "机票预订 " : "火车票预订 ") + request.bookingCode())
+                .routeFrom(request.routeFrom())
+                .routeTo(request.routeTo())
+                .provider(request.provider())
+                .bookingCode(request.bookingCode())
+                .travelers(travelers)
+                .build();
+
+        reservationAggregate.handleCreateReservationCommand(command);
+        return getReservation(reservationId);
+    }
+
+    public ReservationResponse createHotelOnlyReservation(CreateHotelOnlyReservationRequest request) {
+        if (!request.dateTo().isAfter(request.dateFrom())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateTo must be after dateFrom");
+        }
+
+        UUID reservationId = UUID.randomUUID();
+        int requestedGuestCount = request.adultsQuantity() + request.childrenUnder3Quantity() +
+                request.childrenUnder10Quantity() + request.childrenUnder18Quantity();
+        List<BookingPersonSnapshot> travelers = normalizeTravelers(request.travelers(), requestedGuestCount);
+        String roomName = hasText(request.roomName()) ? request.roomName().trim() : "标准房";
+        UUID roomReservationId = UUID.nameUUIDFromBytes(
+                (request.hotelId() + roomName + request.dateFrom() + request.dateTo() + request.userId())
+                        .getBytes(StandardCharsets.UTF_8)
+        );
+
+        CreateReservationCommand command = CreateReservationCommand.builder()
+                .id(reservationId)
+                .hotelTimeFrom(request.dateFrom().atTime(14, 0))
+                .hotelTimeTo(request.dateTo().atTime(12, 0))
+                .infantsQuantity(request.childrenUnder3Quantity())
+                .kidsQuantity(request.childrenUnder10Quantity())
+                .teensQuantity(request.childrenUnder18Quantity())
+                .adultsQuantity(request.adultsQuantity())
+                .price(request.price())
+                .paid(false)
+                .status(ReservationStatus.PENDING_PAYMENT)
+                .bookingType("HOTEL")
+                .hotelId(request.hotelId())
+                .roomReservationsIds(List.of(roomReservationId))
+                .transportReservationsIds(Collections.emptyList())
+                .userId(request.userId())
+                .title(request.hotelName())
+                .provider(roomName)
+                .bookingCode("HOTEL-" + reservationId.toString().substring(0, 8).toUpperCase())
+                .travelers(travelers)
+                .build();
+
+        reservationAggregate.handleCreateReservationCommand(command);
+        return getReservation(reservationId);
     }
 
     public UUID bookOrchestration(ReservationRequest reservationRequest) throws ReservationFailException {
@@ -122,6 +288,24 @@ public class ReservationService {
     }
 
     public ReservationConfirmationResponse purchaseReservation(String reservationId, String cardNumber) {
+        Reservation existingReservation = reservationRepository.findById(UUID.fromString(reservationId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+        if (existingReservation.getStatus() == ReservationStatus.PAID) {
+            return buildConfirmation(existingReservation);
+        }
+        if (existingReservation.getStatus() != ReservationStatus.PENDING_PAYMENT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending reservations can be paid");
+        }
+        if (existingReservation.getPaymentDeadline() != null &&
+                existingReservation.getPaymentDeadline().isBefore(LocalDateTime.now())) {
+            reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                    .reservationId(existingReservation.getId())
+                    .paid(false)
+                    .status(ReservationStatus.EXPIRED)
+                    .build());
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment deadline has expired");
+        }
+
         boolean successfulPayment = false;
         String failedPaymentMessage = "";
         try {
@@ -135,7 +319,7 @@ public class ReservationService {
         if(!successfulPayment) {
             Optional<Reservation> reservationOptional = reservationRepository.findById(UUID.fromString(reservationId));
 
-            if (reservationOptional.isPresent()) {
+            if (reservationOptional.isPresent() && "PACKAGE".equals(reservationOptional.get().getBookingType())) {
                 // If the reservation is present, get its value and build ReservationRequest
                 Reservation reservation = reservationOptional.get();
                 ReservationRequest reservationRequest = ReservationRequest.builder()
@@ -156,12 +340,18 @@ public class ReservationService {
             }
 
             logger.severe("Payment failed: " + failedPaymentMessage);
+            savePaymentTransaction(existingReservation, cardNumber, false, failedPaymentMessage);
             throw new PurchaseFailedException(failedPaymentMessage);
         }
 
+        savePaymentTransaction(existingReservation, cardNumber, true, null);
         updateReservationPaymentStatus(reservationId);
 
         Reservation reservation = reservationRepository.findById(UUID.fromString(reservationId)).orElseThrow(ReservationNotFoundAfterPaymentException::new);
+        return buildConfirmation(reservation);
+    }
+
+    private ReservationConfirmationResponse buildConfirmation(Reservation reservation) {
         HotelInfo hotelInfo = getHotelInformation(reservation.getHotelId());
         TransportReservationResponse transportInfo = getTransportInformation(reservation.getTransportReservationsIds().stream().map(UUID::toString).toList());
 
@@ -196,6 +386,39 @@ public class ReservationService {
                 "", // Routing key is ignored for FanoutExchange
                 requestJson
         );
+
+        reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                .reservationId(UUID.fromString(reservationId))
+                .paid(true)
+                .status(ReservationStatus.PAID)
+                .paidAt(LocalDateTime.now())
+                .build());
+    }
+
+    public List<PaymentTransactionResponse> getPaymentTransactions(UUID reservationId) {
+        requireReservation(reservationId);
+        return paymentTransactionRepository.findByReservationIdOrderByCreatedAtDesc(reservationId).stream()
+                .map(PaymentTransactionResponse::from)
+                .toList();
+    }
+
+    public List<RefundRecordResponse> getRefundRecords(UUID reservationId) {
+        requireReservation(reservationId);
+        return refundRecordRepository.findByReservationIdOrderByRequestedAtDesc(reservationId).stream()
+                .map(RefundRecordResponse::from)
+                .toList();
+    }
+
+    public ReservationResponse completeRefund(UUID reservationId) {
+        Reservation reservation = requireReservation(reservationId);
+        if (reservation.getStatus() == ReservationStatus.REFUNDED) {
+            return ReservationResponse.from(reservation);
+        }
+        if (reservation.getStatus() != ReservationStatus.REFUND_PROCESSING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only processing refunds can be completed");
+        }
+
+        return ReservationResponse.from(completeProcessingRefund(reservation));
     }
 
     private void sendBoughtOfferWebsocketMessages(String message, String idHotel) {
@@ -203,10 +426,24 @@ public class ReservationService {
     }
 
     private HotelInfo getHotelInformation(UUID hotelId) {
+        if (hotelId == null) {
+            return HotelInfo.builder()
+                    .hotelPrice(0.0f)
+                    .name("票务订单")
+                    .roomTypes(Collections.emptyMap())
+                    .build();
+        }
         return HotelInfo.builder().hotelPrice(1500.0f).name("Hotel testowy").roomTypes(Map.of("Pokój dwuosobowy", 1)).build();
     }
 
     private TransportReservationResponse getTransportInformation(List<String> transportIds) {
+        if (transportIds == null || transportIds.isEmpty()) {
+            return TransportReservationResponse.builder()
+                    .type("None")
+                    .departureFrom(LocationReservationResponse.builder().country("").region("").build())
+                    .departureTo(LocationReservationResponse.builder().region("").country("").build())
+                    .build();
+        }
         return TransportReservationResponse.builder().type("Plane").departureFrom(LocationReservationResponse.builder().country("Polska").region("Gdańsk").build()).departureTo(LocationReservationResponse.builder().region("Marsa Alam").country("Egipt").build()).build();
     }
 
@@ -241,6 +478,141 @@ public class ReservationService {
         catch (AmqpException e) {
             throw new PaymentProcessException("Amqp exception was thrown");
         }
+    }
+
+    private void savePaymentTransaction(Reservation reservation, String cardNumber, boolean approved, String failureReason) {
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .id(UUID.randomUUID())
+                .reservationId(reservation.getId())
+                .amount(reservation.getPrice())
+                .cardLast4(maskCardLast4(cardNumber))
+                .approved(approved)
+                .status(approved ? "SUCCESS" : "FAILED")
+                .failureReason(failureReason)
+                .createdAt(LocalDateTime.now())
+                .build());
+    }
+
+    private String maskCardLast4(String cardNumber) {
+        if (cardNumber == null || cardNumber.length() < 4) {
+            return null;
+        }
+        return cardNumber.substring(cardNumber.length() - 4);
+    }
+
+    private LocalTime parseTime(String value) {
+        try {
+            return LocalTime.parse(value.trim());
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Time must use HH:mm format");
+        }
+    }
+
+    private String normalizeTicketType(String transportType) {
+        String value = transportType.trim().toUpperCase();
+        if (value.equals("FLIGHT") || value.equals("PLANE") || value.equals("SAMOLOT")) {
+            return "FLIGHT";
+        }
+        if (value.equals("TRAIN") || value.equals("POCIAG") || value.equals("RAIL")) {
+            return "TRAIN";
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported transport type");
+    }
+
+    private List<UUID> emptyIfNull(List<UUID> values) {
+        return values == null ? Collections.emptyList() : values;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private List<BookingPersonSnapshot> normalizeTravelers(List<BookingPersonRequest> travelers, int fallbackCount) {
+        if (travelers == null || travelers.isEmpty()) {
+            List<BookingPersonSnapshot> generated = new ArrayList<>();
+            for (int index = 0; index < Math.max(1, fallbackCount); index++) {
+                generated.add(BookingPersonSnapshot.builder()
+                        .name("旅客 " + (index + 1))
+                        .travelerType("ADULT")
+                        .build());
+            }
+            return generated;
+        }
+        return travelers.stream()
+                .map(person -> BookingPersonSnapshot.builder()
+                        .travelerId(normalizeOptional(person.travelerId()))
+                        .name(person.name().trim())
+                        .travelerType(normalizeTravelerType(person.travelerType()))
+                        .documentType(normalizeOptional(person.documentType()))
+                        .documentNumber(normalizeOptional(person.documentNumber()))
+                        .phone(normalizeOptional(person.phone()))
+                        .build())
+                .toList();
+    }
+
+    private int countTravelers(List<BookingPersonSnapshot> travelers, String... types) {
+        List<String> acceptedTypes = List.of(types);
+        return (int) travelers.stream()
+                .filter(person -> acceptedTypes.contains(person.getTravelerType()))
+                .count();
+    }
+
+    private String normalizeTravelerType(String value) {
+        String normalized = hasText(value) ? value.trim().toUpperCase() : "ADULT";
+        return List.of("ADULT", "CHILD", "STUDENT").contains(normalized) ? normalized : "ADULT";
+    }
+
+    private String normalizeOptional(String value) {
+        return hasText(value) ? value.trim() : null;
+    }
+
+    private Reservation refreshExpiredReservation(Reservation reservation) {
+        if (reservation.getStatus() == ReservationStatus.REFUND_PROCESSING) {
+            return completeProcessingRefund(reservation);
+        }
+        if (reservation.getStatus() == ReservationStatus.PENDING_PAYMENT &&
+                reservation.getPaymentDeadline() != null &&
+                reservation.getPaymentDeadline().isBefore(LocalDateTime.now())) {
+            reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                    .reservationId(reservation.getId())
+                    .paid(false)
+                    .status(ReservationStatus.EXPIRED)
+                    .build());
+            return reservationRepository.findById(reservation.getId()).orElse(reservation);
+        }
+        return reservation;
+    }
+
+    private Reservation completeProcessingRefund(Reservation reservation) {
+        LocalDateTime now = LocalDateTime.now();
+        UUID reservationId = reservation.getId();
+        RefundRecord refund = refundRecordRepository
+                .findFirstByReservationIdAndStatusOrderByRequestedAtDesc(reservationId, RefundStatus.PROCESSING)
+                .orElseGet(() -> refundRecordRepository.save(RefundRecord.builder()
+                        .id(UUID.randomUUID())
+                        .reservationId(reservationId)
+                        .amount(reservation.getPrice())
+                        .reason(hasText(reservation.getCancellationReason()) ? reservation.getCancellationReason() : "退款完成")
+                        .status(RefundStatus.PROCESSING)
+                        .requestedAt(reservation.getRefundRequestedAt() == null ? now : reservation.getRefundRequestedAt())
+                        .build()));
+        refund.setStatus(RefundStatus.COMPLETED);
+        refund.setCompletedAt(now);
+        refundRecordRepository.save(refund);
+
+        reservationAggregate.handleReservationUpdateCommand(UpdateReservationCommand.builder()
+                .reservationId(reservationId)
+                .paid(false)
+                .status(ReservationStatus.REFUNDED)
+                .refundedAt(now)
+                .build());
+
+        return reservationRepository.findById(reservationId).orElse(reservation);
+    }
+
+    private Reservation requireReservation(UUID reservationId) {
+        return reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
     }
 
 }
