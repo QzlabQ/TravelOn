@@ -97,6 +97,26 @@ def test_validate_planner_output_normalizes_model_place_type_aliases() -> None:
     assert output.places[2].type.value == "RESTAURANT"
 
 
+def test_validate_planner_output_drops_invalid_uuid_placeholders() -> None:
+    output = validate_planner_output_payload(
+        {
+            "assistantText": "已生成行程。",
+            "title": "上海第一天行程",
+            "markdown": "# 上海第一天",
+            "places": [
+                {"placeId": "x-bund", "name": "外滩", "type": "SCENIC", "source": "AI"},
+            ],
+            "routes": [
+                {"fromPlaceId": "x-bund", "toPlaceId": "x-museum", "summary": "步行串联。"},
+            ],
+        }
+    )
+
+    assert output.places[0].placeId is None
+    assert output.routes[0].fromPlaceId is None
+    assert output.routes[0].toPlaceId is None
+
+
 def test_deepseek_payload_includes_day_scope_rules() -> None:
     client = DeepSeekClient(agent_settings())
     request = AgentRunRequest.model_validate(
@@ -144,11 +164,56 @@ def test_deepseek_payload_includes_day_scope_rules() -> None:
     assert user_payload["dayScope"]["targetDayIndex"] == 2
     assert user_payload["dayScope"]["targetDate"] == "2026-06-02"
     assert user_payload["dayScope"]["confirmedDaySummaries"][0]["dayIndex"] == 1
+    assert user_payload["responseBudget"]["markdownMaxChars"] == 2800
+    assert "repairRules" not in user_payload
     assert "Return ONLY the target day plan" in user_payload["outputRules"]["markdown"]
+    assert "backslash" in user_payload["outputRules"]["jsonEscaping"]
+    assert payload["thinking"] == {"type": "disabled"}
+
+
+def test_deepseek_parser_repairs_invalid_backslash_escapes() -> None:
+    client = DeepSeekClient(agent_settings())
+
+    parsed = client._parse_json_content(  # noqa: SLF001 - regression covers provider JSON tolerance.
+        r'{"assistantText":"已生成。","title":"上海行程","markdown":"路线提示：\emoji 和 \walk 标记","places":[],"routes":[],}'
+    )
+
+    assert parsed["markdown"] == r"路线提示：\emoji 和 \walk 标记"
 
 
 @pytest.mark.asyncio
-async def test_deepseek_repairs_invalid_model_output(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_deepseek_success_includes_timing_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = DeepSeekClient(agent_settings())
+
+    async def fake_request_content(*_: Any, **__: Any) -> str:
+        return json.dumps(
+            {
+                "assistantText": "已生成规划。",
+                "title": "上海行程",
+                "summary": "简短行程。",
+                "markdown": "# 上海行程\n\n- 第 1 天：外滩。",
+                "nextQuestion": None,
+                "places": [],
+                "routes": [],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(client, "_request_content", fake_request_content)
+
+    result = await client.generate_plan(sample_request(), places=[])
+
+    assert result.status == ToolStatus.SUCCESS
+    assert result.metadata["payloadBytes"] > 0
+    assert result.metadata["responseChars"] > 0
+    assert result.metadata["requestMs"] >= 0
+    assert result.metadata["parseMs"] >= 0
+    assert result.metadata["validationMs"] >= 0
+    assert "payloadBytes=" in (result.outputSummary or "")
+
+
+@pytest.mark.asyncio
+async def test_deepseek_repairs_schema_invalid_model_output(monkeypatch: pytest.MonkeyPatch) -> None:
     client = DeepSeekClient(agent_settings())
     calls: list[dict[str, Any]] = []
 
@@ -156,7 +221,15 @@ async def test_deepseek_repairs_invalid_model_output(monkeypatch: pytest.MonkeyP
         payload = args[-1]
         calls.append(payload)
         if len(calls) == 1:
-            return "not json at all"
+            return json.dumps(
+                {
+                    "assistantText": "我先给出草稿。",
+                    "title": "上海行程",
+                    "places": [],
+                    "routes": [],
+                },
+                ensure_ascii=False,
+            )
         return json.dumps(
             {
                 "assistantText": "我已修复规划。",
@@ -180,20 +253,50 @@ async def test_deepseek_repairs_invalid_model_output(monkeypatch: pytest.MonkeyP
     assert result.data and result.data["markdown"].startswith("# 上海行程")
     assert {"MODEL_OUTPUT_INVALID", "MODEL_OUTPUT_REPAIRED"}.issubset(warning_codes)
     assert calls[0]["max_tokens"] == 1200
+    assert calls[0]["thinking"] == {"type": "disabled"}
     assert calls[0]["response_format"] == {"type": "json_object"}
     assert calls[1]["max_tokens"] == 1200
+    assert calls[1]["thinking"] == {"type": "disabled"}
     assert calls[1]["response_format"] == {"type": "json_object"}
     assert "expectedOutputSchema" in repair_payload
+    assert "repairRules" in repair_payload
+    assert result.metadata["repairPayloadBytes"] > result.metadata["payloadBytes"]
+    assert result.metadata["repairRequestMs"] >= 0
     assert result.inputSummary
     assert result.outputSummary
     assert len(calls) == 2
 
 
 @pytest.mark.asyncio
+async def test_deepseek_fails_fast_when_json_is_unrecoverable(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = DeepSeekClient(agent_settings())
+    calls: list[object] = []
+
+    async def fake_request_content(*args: Any, **__: Any) -> str:
+        calls.append(args[-1])
+        return "still not json"
+
+    monkeypatch.setattr(client, "_request_content", fake_request_content)
+
+    result = await client.generate_plan(sample_request(), places=[])
+
+    assert result.status == ToolStatus.FAILED
+    assert result.errorCode == "MODEL_OUTPUT_PARSE_FAILED"
+    invalid_warning = next(warning for warning in result.warnings if warning.code == "MODEL_OUTPUT_INVALID")
+    assert "原始输出预览：still not json" in invalid_warning.message
+    assert len(calls) == 1
+    assert "repairRequestMs" not in result.metadata
+
+
+@pytest.mark.asyncio
 async def test_deepseek_fails_cleanly_when_repair_is_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
     client = DeepSeekClient(agent_settings())
+    calls: list[object] = []
 
-    async def fake_request_content(*_: Any, **__: Any) -> str:
+    async def fake_request_content(*args: Any, **__: Any) -> str:
+        calls.append(args[-1])
+        if len(calls) == 1:
+            return json.dumps({"assistantText": "缺少关键字段。", "title": "上海行程"}, ensure_ascii=False)
         return "still not json"
 
     monkeypatch.setattr(client, "_request_content", fake_request_content)
@@ -202,5 +305,4 @@ async def test_deepseek_fails_cleanly_when_repair_is_invalid(monkeypatch: pytest
 
     assert result.status == ToolStatus.FAILED
     assert result.errorCode == "MODEL_OUTPUT_REPAIR_FAILED"
-    invalid_warning = next(warning for warning in result.warnings if warning.code == "MODEL_OUTPUT_INVALID")
-    assert "原始输出预览：still not json" in invalid_warning.message
+    assert len(calls) == 2

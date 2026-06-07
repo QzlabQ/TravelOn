@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
+import reactor.core.publisher.Mono;
+
 @Component
 public class PythonPlannerAgentClient implements PlannerAgentClient {
 
@@ -65,6 +67,7 @@ public class PythonPlannerAgentClient implements PlannerAgentClient {
                 .doOnNext(onEvent)
                 .filter(this::isTerminalEvent)
                 .next()
+                .switchIfEmpty(Mono.error(new PlannerAgentStreamException("Planner Agent 流式响应缺少终止事件")))
                 .map(this::responseFromTerminalEvent)
                 .toFuture();
     }
@@ -79,11 +82,27 @@ public class PythonPlannerAgentClient implements PlannerAgentClient {
     }
 
     private AgentRunResponse responseFromTerminalEvent(PlannerStreamEvent event) {
+        if ("RUN_FAILED".equals(event.getType())) {
+            throw new PlannerAgentStreamException(failedEventMessage(event));
+        }
         Map<String, Object> data = event.getData();
         Object response = data == null ? null : data.get("response");
         if (response == null) {
-            throw new IllegalStateException("Planner Agent 流式响应缺少最终结果");
+            throw new PlannerAgentStreamException("Planner Agent 流式响应缺少最终结果");
         }
         return objectMapper.convertValue(response, AgentRunResponse.class);
+    }
+
+    private String failedEventMessage(PlannerStreamEvent event) {
+        StringBuilder message = new StringBuilder("Planner Agent 流式执行失败");
+        if (event.getMessage() != null && !event.getMessage().isBlank()) {
+            message.append(": ").append(event.getMessage());
+        }
+        Map<String, Object> data = event.getData();
+        Object error = data == null ? null : data.get("error");
+        if (error != null && !String.valueOf(error).isBlank()) {
+            message.append(" (").append(error).append(")");
+        }
+        return message.toString();
     }
 }

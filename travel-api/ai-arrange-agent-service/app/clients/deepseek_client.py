@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from datetime import timedelta
 from typing import Any
@@ -27,6 +28,10 @@ class DeepSeekRateLimitError(RuntimeError):
     pass
 
 
+_INVALID_JSON_ESCAPE_PATTERN = re.compile(r'\\(?!["\\/bfnrtu])')
+_TRAILING_JSON_COMMA_PATTERN = re.compile(r",(\s*[}\]])")
+
+
 class DeepSeekClient:
     def __init__(self, settings: AgentSettings) -> None:
         self._settings = settings
@@ -40,6 +45,7 @@ class DeepSeekClient:
         budget: dict[str, Any] | None = None,
         react_observations: list[dict[str, Any]] | None = None,
         planner_constraints: dict[str, Any] | None = None,
+        context: Any | None = None,
         **_: Any,
     ) -> ToolResult:
         started = time.perf_counter()
@@ -87,6 +93,8 @@ class DeepSeekClient:
             react_observations=react_observations,
             planner_constraints=planner_constraints,
         )
+        payload_metrics = self._payload_metrics(payload)
+        self._emit_payload_ready(context, payload_metrics)
         headers = {
             "Authorization": f"Bearer {self._settings.deepseek_api_key}",
             "Content-Type": "application/json",
@@ -94,13 +102,28 @@ class DeepSeekClient:
 
         last_error = "unknown error"
         warnings: list[ToolWarning] = []
+        timing_metadata: dict[str, Any] = dict(payload_metrics)
         async with httpx.AsyncClient(timeout=self._settings.deepseek_timeout_seconds) as client:
             for attempt in range(self._settings.deepseek_retry_count + 1):
+                request_started = time.perf_counter()
                 try:
                     content = await self._request_content(client, url, headers, payload)
+                    timing_metadata["requestMs"] = self._elapsed_ms(request_started)
+                    timing_metadata["responseChars"] = len(content)
+
                     try:
-                        parsed = self._parse_json_content(content)
-                        validated_output = validate_planner_output_payload(parsed)
+                        parse_started = time.perf_counter()
+                        try:
+                            parsed, parse_metadata = self._parse_json_content_with_stats(content)
+                        finally:
+                            timing_metadata["parseMs"] = self._elapsed_ms(parse_started)
+                        timing_metadata.update(parse_metadata)
+
+                        validation_started = time.perf_counter()
+                        try:
+                            validated_output = validate_planner_output_payload(parsed)
+                        finally:
+                            timing_metadata["validationMs"] = self._elapsed_ms(validation_started)
                     except (ValidationError, TypeError, ValueError) as validation_error:
                         return await self._repair_or_fallback(
                             started=started,
@@ -117,6 +140,7 @@ class DeepSeekClient:
                             react_observations=react_observations,
                             planner_constraints=planner_constraints,
                             input_summary=input_summary,
+                            metadata=timing_metadata,
                         )
 
                     return self._tool_result(
@@ -127,10 +151,15 @@ class DeepSeekClient:
                         retry_count=attempt,
                         user_message="已生成结构化旅行方案。",
                         input_summary=input_summary,
-                        output_summary=summarize_planner_output(validated_output),
+                        output_summary=self._output_summary_with_metrics(
+                            summarize_planner_output(validated_output),
+                            timing_metadata,
+                        ),
                         warnings=warnings,
+                        metadata=timing_metadata,
                     )
                 except DeepSeekRateLimitError as error:
+                    timing_metadata["requestMs"] = self._elapsed_ms(request_started)
                     last_error = str(error)
                     if attempt < self._settings.deepseek_retry_count:
                         await self._sleep_before_retry(attempt)
@@ -152,10 +181,15 @@ class DeepSeekClient:
                         retry_count=attempt,
                         user_message="模型请求被限流，已切换为本地规划模板。",
                         input_summary=input_summary,
-                        output_summary="rate limited; local fallback required",
+                        output_summary=self._output_summary_with_metrics(
+                            "rate limited; local fallback required",
+                            timing_metadata,
+                        ),
                         warnings=warnings,
+                        metadata=timing_metadata,
                     )
                 except (httpx.TimeoutException, httpx.HTTPError, ValueError, KeyError) as error:
+                    timing_metadata["requestMs"] = self._elapsed_ms(request_started)
                     last_error = str(error)
                     if attempt < self._settings.deepseek_retry_count:
                         await self._sleep_before_retry(attempt)
@@ -178,8 +212,12 @@ class DeepSeekClient:
             retry_count=self._settings.deepseek_retry_count,
             user_message="模型生成失败，已使用本地规划模板。",
             input_summary=input_summary,
-            output_summary=f"generation failed: {last_error}",
+            output_summary=self._output_summary_with_metrics(
+                f"generation failed: {last_error}",
+                timing_metadata,
+            ),
             warnings=warnings,
+            metadata=timing_metadata,
         )
 
     def _chat_completions_url(self) -> str:
@@ -210,6 +248,7 @@ class DeepSeekClient:
         )
         return {
             "model": self._settings.deepseek_model,
+            "thinking": {"type": "disabled"},
             "temperature": self._settings.deepseek_temperature,
             "max_tokens": self._settings.deepseek_max_tokens,
             "response_format": {"type": "json_object"},
@@ -245,11 +284,13 @@ class DeepSeekClient:
             {
                 "validationError": validation_error,
                 "invalidModelOutput": raw_content[:8000],
+                "repairRules": REPAIR_PROMPT,
                 "expectedOutputSchema": PlannerModelOutput.model_json_schema(),
             }
         )
         return {
             "model": self._settings.deepseek_model,
+            "thinking": {"type": "disabled"},
             "temperature": 0,
             "max_tokens": self._settings.deepseek_max_tokens,
             "response_format": {"type": "json_object"},
@@ -274,18 +315,19 @@ class DeepSeekClient:
         day_scope = self._day_scope_payload(request)
         output_rules = {
             "language": "All user-facing fields must be Simplified Chinese: assistantText, title, summary, markdown, nextQuestion, place descriptions, route summaries, option labels, warning-like text.",
-            "markdown": "Use a concise Chinese day-by-day itinerary with weather, budget, and transport notes when available.",
-            "places": "Reuse candidatePlaces when possible.",
-            "routes": "Return [] when route data is unavailable.",
+            "markdown": "Use concise Chinese Markdown. Prefer bullet points over long paragraphs.",
+            "places": "Reuse candidatePlaces when possible. Return at most 8 places.",
+            "routes": "Return at most 8 route segments, or [] when route data is unavailable.",
             "userSelections": "Keep selected places and style choices unless impossible; do not use rejected places as main recommendations.",
             "snapshot": "When latestSnapshot is provided, treat it as the previous saved plan and describe only useful changes in Chinese.",
+            "jsonEscaping": "Do not write backslash commands or raw escape-like markers in user-facing text. Use plain Chinese punctuation and words.",
         }
         if day_scope["isDayScope"]:
             output_rules.update(
                 {
                     "markdown": (
                         "Return ONLY the target day plan. Do not generate other days. "
-                        "Use Chinese sections for morning, lunch, afternoon, dinner, evening, route notes, and alternatives when useful."
+                        "Keep markdown under 2800 Chinese characters and include useful details for time windows, food, transport, budget notes, weather reminders, and alternatives."
                     ),
                     "dayScope": (
                         "The markdown, places, and routes must correspond to targetDayIndex only. "
@@ -303,8 +345,8 @@ class DeepSeekClient:
             "budget": budget,
             "reactObservations": react_observations,
             "plannerConstraints": planner_constraints,
+            "responseBudget": self._response_budget(day_scope),
             "outputRules": output_rules,
-            "repairRules": REPAIR_PROMPT,
         }
 
     def _day_scope_payload(self, request: AgentRunRequest) -> dict[str, Any]:
@@ -334,6 +376,49 @@ class DeepSeekClient:
             "totalDays": request.coreSlots.day_count(),
             "confirmedDaySummaries": confirmed_day_summaries,
         }
+
+    def _response_budget(self, day_scope: dict[str, Any]) -> dict[str, Any]:
+        if day_scope["isDayScope"]:
+            return {
+                "assistantTextMaxChars": 180,
+                "summaryMaxChars": 220,
+                "markdownMaxChars": 5000,
+                "maxPlaces": 12,
+                "maxRoutes": 12,
+            }
+        return {
+            "assistantTextMaxChars": 220,
+            "summaryMaxChars": 260,
+            "markdownMaxChars": 8000,
+            "maxPlaces": 16,
+            "maxRoutes": 20,
+        }
+
+    def _payload_metrics(self, payload: dict[str, Any]) -> dict[str, Any]:
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        messages = payload.get("messages") or []
+        system_prompt = str(messages[0].get("content") or "") if len(messages) > 0 and isinstance(messages[0], dict) else ""
+        user_prompt = str(messages[-1].get("content") or "") if messages and isinstance(messages[-1], dict) else ""
+        return {
+            "payloadChars": len(body),
+            "payloadBytes": len(body.encode("utf-8")),
+            "systemPromptChars": len(system_prompt),
+            "userPayloadChars": len(user_prompt),
+            "maxTokens": payload.get("max_tokens"),
+        }
+
+    def _emit_payload_ready(self, context: Any | None, metadata: dict[str, Any]) -> None:
+        recorder = getattr(context, "recorder", None)
+        if recorder is None:
+            return
+        recorder.emit(
+            event_type="MODEL_PAYLOAD_READY",
+            name="deepseek_chat_completion",
+            status="READY",
+            message="DeepSeek 请求载荷已准备。",
+            metadata=metadata,
+            phase="model",
+        )
 
     def _target_day_index(self, request: AgentRunRequest) -> int:
         if request.targetDayIndex is not None:
@@ -385,8 +470,11 @@ class DeepSeekClient:
         react_observations: list[dict[str, Any]],
         planner_constraints: dict[str, Any],
         input_summary: str,
+        metadata: dict[str, Any],
     ) -> ToolResult:
+        metadata = dict(metadata)
         validation_summary = format_validation_error(validation_error)
+        metadata["validationError"] = validation_summary
         warnings = [
             ToolWarning(
                 code="MODEL_OUTPUT_INVALID",
@@ -397,6 +485,25 @@ class DeepSeekClient:
                 source="deepseek",
             )
         ]
+
+        if isinstance(validation_error, json.JSONDecodeError):
+            return self._tool_result(
+                started=started,
+                status=ToolStatus.FAILED,
+                data=None,
+                detail=validation_summary,
+                error_code="MODEL_OUTPUT_PARSE_FAILED",
+                error_message=validation_summary,
+                user_message="模型输出不是有效 JSON，已切换到本地规划模板。",
+                input_summary=input_summary,
+                output_summary=self._output_summary_with_metrics(
+                    f"parse failed: {validation_summary}",
+                    metadata,
+                ),
+                warnings=warnings,
+                metadata=metadata,
+            )
+
         repair_payload = self._build_repair_payload(
             request=request,
             places=places,
@@ -408,13 +515,30 @@ class DeepSeekClient:
             raw_content=raw_content,
             validation_error=validation_summary,
         )
+        repair_payload_metrics = self._payload_metrics(repair_payload)
+        metadata.update({f"repair{k[0].upper()}{k[1:]}": v for k, v in repair_payload_metrics.items()})
 
         try:
+            repair_started = time.perf_counter()
             repair_content = await self._request_content(client, url, headers, repair_payload)
-            repair_parsed = self._parse_json_content(repair_content)
-            repaired_output = validate_planner_output_payload(repair_parsed)
+            metadata["repairRequestMs"] = self._elapsed_ms(repair_started)
+            metadata["repairResponseChars"] = len(repair_content)
+
+            repair_parse_started = time.perf_counter()
+            try:
+                repair_parsed, repair_parse_metadata = self._parse_json_content_with_stats(repair_content)
+            finally:
+                metadata["repairParseMs"] = self._elapsed_ms(repair_parse_started)
+            metadata.update({f"repair{k[0].upper()}{k[1:]}": v for k, v in repair_parse_metadata.items()})
+
+            repair_validation_started = time.perf_counter()
+            try:
+                repaired_output = validate_planner_output_payload(repair_parsed)
+            finally:
+                metadata["repairValidationMs"] = self._elapsed_ms(repair_validation_started)
         except (DeepSeekRateLimitError, httpx.TimeoutException, httpx.HTTPError, ValueError, KeyError, ValidationError, TypeError) as repair_error:
             repair_summary = format_validation_error(repair_error)
+            metadata["repairError"] = repair_summary
             warnings.append(
                 ToolWarning(
                     code="MODEL_OUTPUT_REPAIR_FAILED",
@@ -431,8 +555,12 @@ class DeepSeekClient:
                 error_message=validation_summary,
                 user_message="模型输出不符合结构要求，已切换到本地规划模板。",
                 input_summary=input_summary,
-                output_summary=f"repair failed: {validation_summary}",
+                output_summary=self._output_summary_with_metrics(
+                    f"repair failed: {validation_summary}",
+                    metadata,
+                ),
                 warnings=warnings,
+                metadata=metadata,
             )
 
         warnings.append(
@@ -449,14 +577,22 @@ class DeepSeekClient:
             detail=None,
             user_message="模型输出已自动修复并生成结构化旅行方案。",
             input_summary=input_summary,
-            output_summary=summarize_planner_output(repaired_output),
+            output_summary=self._output_summary_with_metrics(
+                summarize_planner_output(repaired_output),
+                metadata,
+            ),
             warnings=warnings,
+            metadata=metadata,
         )
 
     def _extract_content(self, data: dict[str, Any]) -> str:
         return data["choices"][0]["message"]["content"]
 
     def _parse_json_content(self, content: str) -> dict[str, Any]:
+        parsed, _ = self._parse_json_content_with_stats(content)
+        return parsed
+
+    def _parse_json_content_with_stats(self, content: str) -> tuple[dict[str, Any], dict[str, Any]]:
         text = content.strip()
         if text.startswith("```"):
             lines = text.splitlines()
@@ -472,10 +608,32 @@ class DeepSeekClient:
             if start >= 0 and end > start:
                 text = text[start : end + 1]
 
-        parsed = json.loads(text)
+        metadata: dict[str, Any] = {
+            "jsonFenceStripped": content.strip() != text,
+            "jsonCandidateChars": len(text),
+        }
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as error:
+            repaired_text = text
+            repaired_text = _INVALID_JSON_ESCAPE_PATTERN.sub(r"\\\\", repaired_text)
+            if repaired_text != text:
+                metadata["localEscapeRepairApplied"] = True
+                metadata["localEscapeRepairError"] = error.msg
+
+            comma_repaired_text = _TRAILING_JSON_COMMA_PATTERN.sub(r"\1", repaired_text)
+            if comma_repaired_text != repaired_text:
+                metadata["localTrailingCommaRepairApplied"] = True
+                repaired_text = comma_repaired_text
+
+            if repaired_text == text:
+                raise
+            parsed = json.loads(repaired_text)
         if not isinstance(parsed, dict):
             raise ValueError("Model response JSON must be an object")
-        return parsed
+        metadata.setdefault("localEscapeRepairApplied", False)
+        metadata.setdefault("localTrailingCommaRepairApplied", False)
+        return parsed, metadata
 
     def _raw_output_preview(self, content: str, limit: int = 240) -> str:
         text = " ".join(content.strip().split())
@@ -488,6 +646,25 @@ class DeepSeekClient:
     async def _sleep_before_retry(self, attempt: int) -> None:
         delay = self._settings.deepseek_retry_backoff_seconds * (2**attempt)
         await asyncio.sleep(delay)
+
+    def _elapsed_ms(self, started: float) -> int:
+        return int((time.perf_counter() - started) * 1000)
+
+    def _output_summary_with_metrics(self, summary: str, metadata: dict[str, Any]) -> str:
+        metric_keys = [
+            "payloadBytes",
+            "maxTokens",
+            "requestMs",
+            "responseChars",
+            "parseMs",
+            "validationMs",
+            "repairPayloadBytes",
+            "repairRequestMs",
+            "repairResponseChars",
+            "repairParseMs",
+        ]
+        parts = [f"{key}={metadata[key]}" for key in metric_keys if metadata.get(key) is not None]
+        return f"{summary}; {'; '.join(parts)}" if parts else summary
 
     def _tool_result(
         self,
@@ -503,14 +680,16 @@ class DeepSeekClient:
         input_summary: str | None = None,
         output_summary: str | None = None,
         warnings: list[ToolWarning] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ToolResult:
         return ToolResult(
             tool="deepseek_chat_completion",
             status=status,
             data=data,
+            metadata=metadata or {},
             errorCode=error_code,
             errorMessage=error_message or detail,
-            latencyMs=int((time.perf_counter() - started) * 1000),
+            latencyMs=self._elapsed_ms(started),
             retryCount=retry_count,
             userMessage=user_message,
             inputSummary=input_summary,

@@ -24,13 +24,14 @@ import {
     CheckCircle,
     Close,
     EditNote,
+    ErrorOutline,
     Group,
     History,
+    HourglassTop,
     Hotel,
     LocationOn,
     Map as MapIcon,
     RestartAlt,
-    Route as RouteIcon,
     Send,
     TravelExplore
 } from "@mui/icons-material";
@@ -42,11 +43,15 @@ import {
     PlannerConversationResponse,
     PlannerCoreSlots,
     PlannerDataRefreshPayload,
+    PlannerErrorPayload,
     PlannerPlaceSuggestion,
     PlannerRouteSegment,
+    PlannerTraceEvent,
     PlannerSnapshot,
     PlannerSocketEnvelope
 } from "../../core/apiConfig";
+import {PlannerMapPanel} from "../components/PlannerMapPanel";
+import {buildMockPlannerViewData} from "../mockPlannerData";
 
 type SocketStatus = "idle" | "connecting" | "connected" | "closed" | "error";
 type SnapshotView = "latest" | number;
@@ -91,12 +96,8 @@ interface PlannerStoredSession {
     liveData: PlannerViewData,
     displayData: PlannerViewData,
     snapshots: PlannerSnapshot[],
+    plannerTraceEvents: PlannerTraceEvent[],
     viewingSnapshotVersion: SnapshotView,
-}
-
-interface PositionedPlace extends PlannerPlaceSuggestion {
-    x: number,
-    y: number,
 }
 
 const DEFAULT_DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -220,12 +221,17 @@ function viewDataFromRefresh(payload: PlannerDataRefreshPayload): PlannerViewDat
     };
 }
 
-function sortSnapshots(snapshots: PlannerSnapshot[]) {
-    return [...snapshots].sort((left, right) => (right.version || 0) - (left.version || 0));
+function formatPlannerError(payload: PlannerErrorPayload) {
+    const lines = [
+        payload.message || payload.code || "规划服务返回错误",
+        payload.code ? `错误码：${payload.code}` : "",
+        payload.detail ? `详情：${payload.detail}` : "",
+    ].filter(Boolean);
+    return lines.join("\n");
 }
 
-function isFiniteNumber(value: unknown): value is number {
-    return typeof value === "number" && Number.isFinite(value);
+function sortSnapshots(snapshots: PlannerSnapshot[]) {
+    return [...snapshots].sort((left, right) => (right.version || 0) - (left.version || 0));
 }
 
 function placeTypeToLabel(type?: string) {
@@ -243,28 +249,43 @@ function sourceToLabel(source?: string) {
     return "AI";
 }
 
-function normalizePositions(places: PlannerPlaceSuggestion[]): PositionedPlace[] {
-    const validPlaces = places.filter(place => isFiniteNumber(place.latitude) && isFiniteNumber(place.longitude));
-    if (validPlaces.length === 0) return [];
+function traceToolLabel(tool?: string) {
+    if (tool === "agent") return "整理偏好";
+    if (tool === "search_hotels") return "酒店";
+    if (tool === "get_weather") return "天气";
+    if (tool === "search_flights") return "交通";
+    if (tool === "estimate_budget") return "预算";
+    if (tool === "amap_route_plan") return "路线";
+    if (tool === "deepseek_chat_completion") return "模型";
+    if (tool === "fallback_plan_builder") return "兜底";
+    return tool || "规划";
+}
 
-    const latitudes = validPlaces.map(place => place.latitude as number);
-    const longitudes = validPlaces.map(place => place.longitude as number);
-    const minLat = Math.min(...latitudes);
-    const maxLat = Math.max(...latitudes);
-    const minLng = Math.min(...longitudes);
-    const maxLng = Math.max(...longitudes);
-    const latSpan = Math.max(maxLat - minLat, 0.001);
-    const lngSpan = Math.max(maxLng - minLng, 0.001);
+function traceStatusLabel(status?: string) {
+    if (status === "RUNNING") return "进行中";
+    if (status === "READY") return "已准备";
+    if (status === "SUCCESS") return "完成";
+    if (status === "PARTIAL_SUCCESS") return "部分完成";
+    if (status === "FAILED") return "失败";
+    if (status === "SKIPPED") return "跳过";
+    return status || "等待";
+}
 
-    return validPlaces.map(place => {
-        const longitude = place.longitude as number;
-        const latitude = place.latitude as number;
-        return {
-            ...place,
-            x: 10 + ((longitude - minLng) / lngSpan) * 80,
-            y: 90 - ((latitude - minLat) / latSpan) * 80,
-        };
-    });
+function traceStatusColor(status?: string): "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning" {
+    if (status === "RUNNING" || status === "READY") return "primary";
+    if (status === "SUCCESS") return "success";
+    if (status === "PARTIAL_SUCCESS" || status === "SKIPPED") return "warning";
+    if (status === "FAILED") return "error";
+    return "default";
+}
+
+function traceMessage(event?: PlannerTraceEvent | null) {
+    if (!event) return "等待规划任务开始";
+    return event.message || `${traceToolLabel(event.tool)}${traceStatusLabel(event.status)}`;
+}
+
+function traceEventKey(event: PlannerTraceEvent, index: number) {
+    return event.eventId || `${event.type}-${event.tool || "planner"}-${event.createdAt || index}`;
 }
 
 function buildInitialPrompt(slots: PlannerCoreSlots) {
@@ -282,110 +303,6 @@ function buildInitialPrompt(slots: PlannerCoreSlots) {
         slots.notes ? `补充：${slots.notes}` : "",
         "请用 Markdown 输出，并同步给出可选择的地图点位。"
     ].filter(Boolean).join("\n");
-}
-
-function PlannerMapPanel({
-    places,
-    routes,
-    selectedPlaceIds,
-    readOnly,
-    onTogglePlace,
-}: {
-    places: PlannerPlaceSuggestion[],
-    routes: PlannerRouteSegment[],
-    selectedPlaceIds: string[],
-    readOnly: boolean,
-    onTogglePlace: (placeId: string) => void,
-}) {
-    const positionedPlaces = useMemo(() => normalizePositions(places), [places]);
-    const positionedById = useMemo(() => {
-        const map = new Map<string, PositionedPlace>();
-        positionedPlaces.forEach(place => map.set(place.placeId, place));
-        return map;
-    }, [positionedPlaces]);
-
-    return (
-        <section className="flex min-h-0 flex-[1.35] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
-            <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
-                <div className="flex items-center gap-2">
-                    <MapIcon style={{color: "#556cd6"}}/>
-                    <Typography variant="h6">地图点位</Typography>
-                </div>
-                <Chip label={`${places.length} 个推荐`} size="small" color="primary" variant="outlined"/>
-            </div>
-
-            <div className="relative min-h-[260px] flex-1 bg-[#eef5f2]">
-                <div
-                    className="absolute inset-0 opacity-70"
-                    style={{
-                        backgroundImage: "linear-gradient(#d6e5df 1px, transparent 1px), linear-gradient(90deg, #d6e5df 1px, transparent 1px)",
-                        backgroundSize: "42px 42px",
-                    }}
-                />
-                <svg className="pointer-events-none absolute inset-0 h-full w-full">
-                    {routes.map((route, index) => {
-                        if (!route.fromPlaceId || !route.toPlaceId) return null;
-                        const from = positionedById.get(route.fromPlaceId);
-                        const to = positionedById.get(route.toPlaceId);
-                        if (!from || !to) return null;
-                        return (
-                            <line
-                                key={`${route.fromPlaceId}-${route.toPlaceId}-${index}`}
-                                x1={`${from.x}%`}
-                                y1={`${from.y}%`}
-                                x2={`${to.x}%`}
-                                y2={`${to.y}%`}
-                                stroke="#556cd6"
-                                strokeWidth="3"
-                                strokeDasharray="7 7"
-                                strokeLinecap="round"
-                            />
-                        );
-                    })}
-                </svg>
-
-                {positionedPlaces.length === 0 &&
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-10 text-center text-gray-500">
-                        <LocationOn style={{fontSize: 44}}/>
-                        <Typography>AI 生成点位后会在这里显示位置</Typography>
-                    </div>
-                }
-
-                {positionedPlaces.map((place, index) => {
-                    const selected = selectedPlaceIds.includes(place.placeId);
-                    return (
-                        <Tooltip key={place.placeId} title={place.name} arrow>
-                            <button
-                                type="button"
-                                disabled={readOnly}
-                                className={`absolute flex h-10 w-10 -translate-x-1/2 -translate-y-full items-center justify-center rounded-full border-2 bg-white shadow-md transition ${
-                                    selected ? "border-[#19857b] text-[#19857b]" : "border-[#556cd6] text-[#556cd6]"
-                                } ${readOnly ? "cursor-not-allowed opacity-70" : "hover:scale-105"}`}
-                                style={{left: `${place.x}%`, top: `${place.y}%`}}
-                                onClick={() => onTogglePlace(place.placeId)}
-                                aria-label={`选择 ${place.name}`}
-                            >
-                                <span className="text-sm font-semibold">{index + 1}</span>
-                            </button>
-                        </Tooltip>
-                    );
-                })}
-            </div>
-
-            <div className="max-h-32 shrink-0 overflow-y-auto border-t border-gray-200 bg-white px-4 py-3">
-                {routes.length === 0 &&
-                    <Typography variant="body2" color="text.secondary">路线会在 AI 形成完整行程后同步。</Typography>
-                }
-                {routes.map((route, index) => (
-                    <div key={`${route.fromPlaceId}-${route.toPlaceId}-${index}`} className="mb-2 flex items-center gap-2 text-sm text-gray-700">
-                        <RouteIcon style={{fontSize: 18, color: "#556cd6"}}/>
-                        <span>{route.summary || `${route.transportMode || "路线"} ${route.distanceKm ? `${route.distanceKm}km` : ""}`}</span>
-                        {route.estimatedMinutes && <span className="text-gray-500">约 {route.estimatedMinutes} 分钟</span>}
-                    </div>
-                ))}
-            </div>
-        </section>
-    );
 }
 
 export default function AiPlanner() {
@@ -437,6 +354,7 @@ export default function AiPlanner() {
     const [liveData, setLiveData] = useState<PlannerViewData>(initialLiveData);
     const [displayData, setDisplayData] = useState<PlannerViewData>(initialDisplayData);
     const [snapshots, setSnapshots] = useState<PlannerSnapshot[]>(sortSnapshots(initialSession?.snapshots || []));
+    const [plannerTraceEvents, setPlannerTraceEvents] = useState<PlannerTraceEvent[]>(initialSession?.plannerTraceEvents || []);
     const [viewingSnapshotVersion, setViewingSnapshotVersion] = useState<SnapshotView>(initialSession?.viewingSnapshotVersion || "latest");
 
     const formState = useMemo<PlannerFormState>(() => ({
@@ -495,6 +413,16 @@ export default function AiPlanner() {
     const isSnapshotPreview = viewingSnapshotVersion !== "latest";
     const snapshotSelectorValue = viewingSnapshotVersion === "latest" ? "latest" : String(viewingSnapshotVersion);
     const snapshotCountLabel = snapshots.length > 0 ? `${snapshots.length} 个版本` : "暂无快照";
+    const progressEvents = useMemo(
+        () => plannerTraceEvents.filter(event => event.type !== "RUN_FINISHED" || event.message),
+        [plannerTraceEvents]
+    );
+    const currentTraceEvent = useMemo(() => {
+        const activeEvent = [...progressEvents].reverse().find(event => event.status === "RUNNING" || event.status === "READY");
+        return activeEvent || progressEvents[progressEvents.length - 1] || null;
+    }, [progressEvents]);
+    const recentTraceEvents = useMemo(() => progressEvents.slice(-5), [progressEvents]);
+    const showPlannerProgress = chatSending || progressEvents.length > 0;
 
     useEffect(() => {
         viewingSnapshotVersionRef.current = viewingSnapshotVersion;
@@ -510,12 +438,13 @@ export default function AiPlanner() {
             form: formState,
             conversation,
             chatMessages,
-            chatInput,
-            liveData,
-            displayData,
-            snapshots,
-            viewingSnapshotVersion,
-        };
+        chatInput,
+        liveData,
+        displayData,
+        snapshots,
+        plannerTraceEvents,
+        viewingSnapshotVersion,
+    };
         localStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(session));
     }, [
         userId,
@@ -526,6 +455,7 @@ export default function AiPlanner() {
         liveData,
         displayData,
         snapshots,
+        plannerTraceEvents,
         viewingSnapshotVersion,
     ]);
 
@@ -696,6 +626,15 @@ export default function AiPlanner() {
                 return;
             }
 
+            if (envelope.type === "PLANNER_TRACE_EVENT") {
+                const payload = envelope.payload as PlannerTraceEvent;
+                setPlannerTraceEvents(prevEvents => [...prevEvents.slice(-11), payload]);
+                if (payload.type === "RUN_FAILED") {
+                    setChatSending(false);
+                }
+                return;
+            }
+
             if (envelope.type === "PLANNER_DATA_REFRESH") {
                 const payload = envelope.payload as PlannerDataRefreshPayload;
                 applyLiveData(viewDataFromRefresh(payload));
@@ -705,8 +644,8 @@ export default function AiPlanner() {
             }
 
             if (envelope.type === "PLANNER_ERROR") {
-                const payload = envelope.payload as {message?: string, code?: string};
-                setErrorMessage(payload.message || payload.code || "规划服务返回错误");
+                const payload = envelope.payload as PlannerErrorPayload;
+                setErrorMessage(formatPlannerError(payload));
                 setChatSending(false);
             }
         };
@@ -768,6 +707,7 @@ export default function AiPlanner() {
             setLiveData(nextData);
             setDisplayData(nextData);
             setSnapshots([]);
+            setPlannerTraceEvents([]);
             setSnapshotView("latest");
             setChatMessages([]);
             setChatInput("");
@@ -800,6 +740,7 @@ export default function AiPlanner() {
         ]);
         setChatInput("");
         setErrorMessage("");
+        setPlannerTraceEvents([]);
         sendPlannerEnvelope(socket, conversation.id, "PLANNER_CHAT_SEND", {
             message: trimmedInput,
             selectedPlaceIds: liveData.selectedPlaceIds,
@@ -808,8 +749,6 @@ export default function AiPlanner() {
     };
 
     const togglePlaceSelection = (placeId: string) => {
-        if (!conversation) return;
-
         if (isSnapshotPreview) {
             setErrorMessage("历史快照为只读回看。请切回最新版本后再调整点位。");
             return;
@@ -829,6 +768,8 @@ export default function AiPlanner() {
         };
 
         applyLiveData(nextData);
+
+        if (!conversation) return;
 
         const socket = plannerWSRef.current;
         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -878,6 +819,7 @@ export default function AiPlanner() {
         setLiveData(nextData);
         setDisplayData(nextData);
         setSnapshots([]);
+        setPlannerTraceEvents([]);
         setSnapshotView("latest");
 
         setCity(nextForm.city);
@@ -891,6 +833,37 @@ export default function AiPlanner() {
         setMustVisitKeywords(nextForm.mustVisitKeywords);
         setAvoidKeywords(nextForm.avoidKeywords);
         setNotes(nextForm.notes);
+    };
+
+    const loadMockPlannerData = () => {
+        plannerWSRef.current?.close();
+        pendingInitialPromptRef.current = null;
+
+        const nextData = {
+            ...emptyPlannerView(),
+            ...buildMockPlannerViewData(coreSlots.city || city || "上海"),
+            snapshotVersion: null,
+        };
+
+        setConversation(null);
+        setSocketStatus("idle");
+        setCreating(false);
+        setHydrating(false);
+        setChatSending(false);
+        setErrorMessage("");
+        setChatInput("");
+        setChatMessages([
+            {
+                id: uuidv4(),
+                role: "system",
+                text: "已载入模拟地图数据，可以先做前端联调。",
+            }
+        ]);
+        setLiveData(nextData);
+        setDisplayData(nextData);
+        setSnapshots([]);
+        setPlannerTraceEvents([]);
+        setSnapshotView("latest");
     };
 
     const navigateToInternalOffer = (place: PlannerPlaceSuggestion) => {
@@ -1025,7 +998,7 @@ export default function AiPlanner() {
                 </div>
             </div>
 
-            <div className="shrink-0 border-t border-gray-200 px-5 py-4">
+            <div className="grid shrink-0 gap-3 border-t border-gray-200 px-5 py-4 md:grid-cols-[minmax(0,1fr)_auto]">
                 <Button
                     type="submit"
                     variant="contained"
@@ -1035,6 +1008,15 @@ export default function AiPlanner() {
                     fullWidth
                 >
                     开始规划
+                </Button>
+                <Button
+                    type="button"
+                    variant="outlined"
+                    size="large"
+                    startIcon={<MapIcon/>}
+                    onClick={loadMockPlannerData}
+                >
+                    载入模拟数据
                 </Button>
             </div>
         </form>
@@ -1117,12 +1099,65 @@ export default function AiPlanner() {
         </section>
     );
 
+    const renderPlannerProgress = () => {
+        if (!showPlannerProgress) return null;
+
+        const activeStatus = currentTraceEvent?.status || (chatSending ? "RUNNING" : "SUCCESS");
+        const activeLabel = traceMessage(currentTraceEvent) || (chatSending ? "正在等待规划引擎响应..." : "规划任务已结束。");
+
+        return (
+            <div className="shrink-0 border-b border-gray-200 bg-[#fbfcff] px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2 text-gray-800">
+                        {activeStatus === "FAILED"
+                            ? <ErrorOutline style={{fontSize: 20, color: "#d32f2f"}}/>
+                            : activeStatus === "SUCCESS"
+                                ? <CheckCircle style={{fontSize: 20, color: "#2e7d32"}}/>
+                                : <HourglassTop style={{fontSize: 20, color: "#556cd6"}}/>
+                        }
+                        <Typography variant="body2" className="truncate">
+                            {activeLabel}
+                        </Typography>
+                    </div>
+                    <Chip
+                        size="small"
+                        color={traceStatusColor(activeStatus)}
+                        variant="outlined"
+                        label={traceStatusLabel(activeStatus)}
+                    />
+                </div>
+
+                {chatSending &&
+                    <Box sx={{mt: 1.25}}>
+                        <LinearProgress/>
+                    </Box>
+                }
+
+                {recentTraceEvents.length > 0 &&
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                        {recentTraceEvents.map((event, index) => (
+                            <Chip
+                                key={traceEventKey(event, index)}
+                                size="small"
+                                variant="outlined"
+                                color={traceStatusColor(event.status)}
+                                label={`${traceToolLabel(event.tool)} · ${traceStatusLabel(event.status)}`}
+                            />
+                        ))}
+                    </div>
+                }
+            </div>
+        );
+    };
+
     const renderChatPanel = () => (
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
                 <Typography variant="h6">对话协作</Typography>
                 {chatSending && <Chip size="small" label="AI 生成中" color="primary" variant="outlined"/>}
             </div>
+
+            {renderPlannerProgress()}
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
                 {chatMessages.length === 0 &&
@@ -1275,7 +1310,18 @@ export default function AiPlanner() {
                 }
 
                 {errorMessage &&
-                    <Alert severity="error" className="shrink-0" onClose={() => setErrorMessage("")}>{errorMessage}</Alert>
+                    <Alert
+                        severity="error"
+                        className="shrink-0"
+                        onClose={() => setErrorMessage("")}
+                        action={
+                            <Button color="inherit" size="small" onClick={resetPlanner}>
+                                新建对话
+                            </Button>
+                        }
+                    >
+                        <span className="whitespace-pre-wrap">{errorMessage}</span>
+                    </Alert>
                 }
 
                 <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">

@@ -12,6 +12,8 @@ import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerSnapshotD
 import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunResponse;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentToolCall;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentWarning;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerStreamEvent;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerDataRefreshPayload;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.PlannerChatSendPayload;
@@ -216,6 +218,69 @@ class PlannerConversationServiceTest {
 
         verify(webSocketSessionRegistry, timeout(1000)).send(eq(conversationId), eq(PlannerMessageType.PLANNER_TRACE_EVENT), any());
         verify(webSocketSessionRegistry, timeout(1000)).send(eq(conversationId), eq(PlannerMessageType.PLANNER_SNAPSHOT_SAVED), any());
+        executorService.shutdownNow();
+    }
+
+    @Test
+    void handleChatMessageReportsAgentFallbackWarning() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = conversation(conversationId, userId);
+        AgentRunResponse response = agentResponse(null, 1, "fallback-checksum");
+        response.setStatus("PARTIAL_SUCCESS");
+        response.setToolCalls(List.of(
+                PlannerAgentToolCall.builder()
+                        .tool("deepseek_chat_completion")
+                        .status("FAILED")
+                        .detail("All connection attempts failed")
+                        .retryCount(1)
+                        .build(),
+                PlannerAgentToolCall.builder()
+                        .tool("fallback_plan_builder")
+                        .status("SUCCESS")
+                        .build()
+        ));
+        response.setWarnings(List.of(
+                PlannerAgentWarning.builder()
+                        .code("MODEL_FAILED")
+                        .message("模型生成失败，已使用本地规划模板。")
+                        .source("deepseek")
+                        .build()
+        ));
+        PlannerSnapshot savedSnapshot = agentSnapshot(conversationId, userId, 1, null, "fallback-checksum");
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.of(conversation));
+        when(conversationRepository.save(any(PlannerConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).thenReturn(List.of());
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.empty());
+        when(snapshotService.createSnapshotFromAgentResponse(any(PlannerConversation.class), eq(response))).thenReturn(savedSnapshot);
+        when(plannerAgentClient.streamPlanner(any(AgentRunRequest.class), any())).thenReturn(CompletableFuture.completedFuture(response));
+
+        PlannerConversationService service = new PlannerConversationService(
+                conversationRepository,
+                messageRepository,
+                snapshotRepository,
+                promptFactory,
+                plannerAiClient,
+                plannerAgentClient,
+                snapshotService,
+                webSocketSessionRegistry,
+                executorService
+        );
+
+        service.handleChatMessage(conversationId, userId, PlannerChatSendPayload.builder().message("生成第一天").build());
+
+        ArgumentCaptor<String> detailCaptor = ArgumentCaptor.forClass(String.class);
+        verify(webSocketSessionRegistry, timeout(1000)).sendError(
+                eq(conversationId),
+                eq("PLANNER_AGENT_FALLBACK_USED"),
+                eq("模型生成失败，已返回本地兜底规划。请检查 DeepSeek 网络/API 配置。"),
+                detailCaptor.capture()
+        );
+        assertThat(detailCaptor.getValue()).contains("deepseek_chat_completion 失败");
+        assertThat(detailCaptor.getValue()).contains("All connection attempts failed");
+        assertThat(detailCaptor.getValue()).contains("fallback_plan_builder");
         executorService.shutdownNow();
     }
 

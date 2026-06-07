@@ -2,6 +2,7 @@ package org.microarchitecturovisco.aiarrangeservice.service;
 
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.aiarrangeservice.client.AiChatMessage;
+import org.microarchitecturovisco.aiarrangeservice.client.PlannerAgentStreamException;
 import org.microarchitecturovisco.aiarrangeservice.client.PlannerAgentClient;
 import org.microarchitecturovisco.aiarrangeservice.client.PlannerAiClient;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerConversation;
@@ -12,6 +13,8 @@ import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerMessageRo
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerMessageType;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunResponse;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentToolCall;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentWarning;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentHistoryMessage;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentSnapshotRef;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerInteractionInput;
@@ -29,13 +32,21 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.dao.DataAccessException;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.net.ConnectException;
+import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @Service
@@ -159,20 +170,30 @@ public class PlannerConversationService {
                 PlannerChatStreamPayload.builder().delta("").done(false).build());
 
         plannerAgentClient.streamPlanner(agentRequest, event -> forwardAgentStreamEvent(conversationId, event))
-                .thenApplyAsync(response -> finalizeAgentTurnFromAgent(activeConversation, userId, response, "planner-agent-stream"), plannerExecutorService)
-                .thenAccept(snapshot -> {
+                .thenApplyAsync(response -> {
+                    PlannerSnapshot snapshot = finalizeAgentTurnFromAgent(activeConversation, userId, response, "planner-agent-stream");
+                    return new AgentTurnResult(response, snapshot);
+                }, plannerExecutorService)
+                .thenAccept(result -> {
                     webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_CHAT_STREAM,
                             PlannerChatStreamPayload.builder().delta("").done(true).build());
-                    if (snapshot != null) {
+                    if (result.snapshot() != null) {
                         webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_DATA_REFRESH,
-                                PlannerDataRefreshPayload.from(activeConversation.getStatus(), snapshot));
+                                PlannerDataRefreshPayload.from(activeConversation.getStatus(), result.snapshot(), result.response().getRecommendationGroups()));
                         webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
-                                Map.of("version", snapshot.getVersion()));
+                                Map.of("version", result.snapshot().getVersion(), "traceId", result.response().getTraceId()));
                     }
+                    sendAgentFallbackWarning(conversationId, result.response());
                 })
                 .exceptionally(error -> {
-                    logger.warning("Planner chat failed: " + error.getMessage());
-                    webSocketSessionRegistry.sendError(conversationId, "PLANNER_CHAT_FAILED", "规划生成失败，请稍后重试或补充更明确的偏好。");
+                    Throwable rootCause = unwrapFailure(error);
+                    logger.log(Level.WARNING, "Planner chat failed", rootCause);
+                    webSocketSessionRegistry.sendError(
+                            conversationId,
+                            plannerErrorCode(rootCause),
+                            plannerErrorMessage(rootCause),
+                            plannerErrorDetail(rootCause)
+                    );
                     return null;
                 });
     }
@@ -250,6 +271,135 @@ public class PlannerConversationService {
 
     private String defaultNextQuestion() {
         return "你想先从酒店区域、核心景点，还是餐厅偏好开始？";
+    }
+
+    private void sendAgentFallbackWarning(UUID conversationId, AgentRunResponse response) {
+        if (response == null || !isFallbackUsed(response)) {
+            return;
+        }
+        webSocketSessionRegistry.sendError(
+                conversationId,
+                "PLANNER_AGENT_FALLBACK_USED",
+                "模型生成失败，已返回本地兜底规划。请检查 DeepSeek 网络/API 配置。",
+                agentFallbackDetail(response)
+        );
+    }
+
+    private boolean isFallbackUsed(AgentRunResponse response) {
+        if (response.getToolCalls() == null) {
+            return false;
+        }
+        return response.getToolCalls().stream()
+                .anyMatch(toolCall -> "fallback_plan_builder".equals(toolCall.getTool()));
+    }
+
+    private String agentFallbackDetail(AgentRunResponse response) {
+        List<String> details = new ArrayList<>();
+        if (StringUtils.hasText(response.getTraceId())) {
+            details.add("traceId=" + response.getTraceId());
+        }
+        firstFailedToolCall(response).ifPresent(toolCall -> {
+            String detail = toolCall.getTool() + " 失败";
+            if (StringUtils.hasText(toolCall.getDetail())) {
+                detail = detail + ": " + toolCall.getDetail();
+            }
+            details.add(detail);
+        });
+        if (response.getWarnings() != null) {
+            response.getWarnings().stream()
+                    .filter(warning -> !"MOCK_DATA_USED".equals(warning.getCode()))
+                    .limit(3)
+                    .map(this::warningDetail)
+                    .filter(StringUtils::hasText)
+                    .forEach(details::add);
+        }
+        details.add("已启用 fallback_plan_builder 本地兜底模板。");
+        return sanitizeErrorDetail(String.join("；", details));
+    }
+
+    private java.util.Optional<PlannerAgentToolCall> firstFailedToolCall(AgentRunResponse response) {
+        if (response.getToolCalls() == null) {
+            return java.util.Optional.empty();
+        }
+        return response.getToolCalls().stream()
+                .filter(toolCall -> "FAILED".equals(toolCall.getStatus()) || "PARTIAL_SUCCESS".equals(toolCall.getStatus()))
+                .findFirst();
+    }
+
+    private String warningDetail(PlannerAgentWarning warning) {
+        if (warning == null || !StringUtils.hasText(warning.getCode())) {
+            return "";
+        }
+        if (StringUtils.hasText(warning.getMessage())) {
+            return warning.getCode() + ": " + warning.getMessage();
+        }
+        return warning.getCode();
+    }
+
+    private Throwable unwrapFailure(Throwable error) {
+        Throwable current = error;
+        while (current instanceof CompletionException || current instanceof ExecutionException) {
+            Throwable cause = current.getCause();
+            if (cause == null) {
+                break;
+            }
+            current = cause;
+        }
+        return current == null ? new IllegalStateException("未知规划失败") : current;
+    }
+
+    private String plannerErrorCode(Throwable rootCause) {
+        if (isAgentConnectivityFailure(rootCause)) {
+            return "PLANNER_AGENT_UNAVAILABLE";
+        }
+        if (rootCause instanceof PlannerAgentStreamException) {
+            return "PLANNER_AGENT_STREAM_FAILED";
+        }
+        if (rootCause instanceof DataAccessException) {
+            return "PLANNER_SNAPSHOT_SAVE_FAILED";
+        }
+        return "PLANNER_CHAT_FAILED";
+    }
+
+    private String plannerErrorMessage(Throwable rootCause) {
+        if (isAgentConnectivityFailure(rootCause)) {
+            return "规划引擎暂时不可用，请确认 Python Agent 已启动，并检查 AI_ARRANGE_AGENT_BASE_URL 配置。";
+        }
+        if (rootCause instanceof PlannerAgentStreamException) {
+            return "规划引擎流式执行失败，请查看详情后重试。";
+        }
+        if (rootCause instanceof DataAccessException) {
+            return "规划已生成，但快照保存失败，请确认 MongoDB 已启动。";
+        }
+        return "规划生成失败，请稍后重试或补充更明确的偏好。";
+    }
+
+    private String plannerErrorDetail(Throwable rootCause) {
+        String detail = rootCause.getClass().getSimpleName();
+        if (StringUtils.hasText(rootCause.getMessage())) {
+            detail = detail + ": " + rootCause.getMessage();
+        }
+        return sanitizeErrorDetail(detail);
+    }
+
+    private String sanitizeErrorDetail(String detail) {
+        String sanitized = detail
+                .replaceAll("(?i)(Bearer\\s+)[^\\s,;]+", "$1***")
+                .replaceAll("(?i)(api[-_]?key=)[^\\s&]+", "$1***")
+                .replaceAll("(?i)(token=)[^\\s&]+", "$1***");
+        int maxLength = 320;
+        if (sanitized.length() <= maxLength) {
+            return sanitized;
+        }
+        return sanitized.substring(0, maxLength) + "...";
+    }
+
+    private boolean isAgentConnectivityFailure(Throwable rootCause) {
+        return rootCause instanceof WebClientRequestException
+                || rootCause instanceof WebClientResponseException
+                || rootCause instanceof ConnectException
+                || rootCause instanceof UnknownHostException
+                || rootCause instanceof java.net.SocketTimeoutException;
     }
 
     private AgentRunRequest buildAgentRunRequest(
@@ -356,5 +506,8 @@ public class PlannerConversationService {
 
     private String nonBlank(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private record AgentTurnResult(AgentRunResponse response, PlannerSnapshot snapshot) {
     }
 }

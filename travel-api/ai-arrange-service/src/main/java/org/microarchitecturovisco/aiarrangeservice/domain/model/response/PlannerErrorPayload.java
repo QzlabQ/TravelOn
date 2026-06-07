@@ -13,4 +13,5 @@ public class PlannerErrorPayload {
 
     private String code;
     private String message;
+    private String detail;
 }

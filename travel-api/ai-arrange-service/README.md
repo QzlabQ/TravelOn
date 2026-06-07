@@ -141,7 +141,7 @@ When the final Agent response is saved as a Java-owned snapshot, the server send
 - `DEEPSEEK_API_KEY`: enables real AI calls.
 - `DEEPSEEK_BASE_URL`: default `https://api.deepseek.com`.
 - `DEEPSEEK_MODEL`: default `deepseek-v4-pro`.
-- `AI_ARRANGE_AGENT_BASE_URL`: Python Agent base URL, default `http://ai-arrange-agent-service:8090`.
+- `AI_ARRANGE_AGENT_BASE_URL`: Python Agent base URL, default `http://ai-arrange-agent:8090` in Docker Compose. For local non-Docker runs, set it to `http://localhost:8090`.
 - `AI_ARRANGE_AGENT_TIMEOUT_SECONDS`: Python Agent HTTP timeout, default `150`.
 - `AMAP_API_KEY`: enables Amap POI enrichment.
 - `MONGODB_URI` or `MONGO_HOST`: MongoDB persistence.

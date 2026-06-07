@@ -158,6 +158,9 @@ export type PlannerMessageType =
     'PLANNER_CHAT_SEND'
     | 'PLANNER_CHAT_STREAM'
     | 'PLANNER_DATA_REFRESH'
+    | 'PLANNER_TRACE_EVENT'
+    | 'PLANNER_OPTIONS_REFRESH'
+    | 'PLANNER_SNAPSHOT_SAVED'
     | 'PLANNER_PLACE_SELECTION'
     | 'PLANNER_ERROR';
 
@@ -173,6 +176,40 @@ export interface PlannerPlaceSelectionPayload {
 export interface PlannerChatStreamPayload {
     delta: string,
     done: boolean,
+}
+
+export type PlannerTraceEventType =
+    'RUN_STARTED'
+    | 'TOOL_STARTED'
+    | 'TOOL_FINISHED'
+    | 'MODEL_STARTED'
+    | 'MODEL_FINISHED'
+    | 'FALLBACK_USED'
+    | 'OPTIONS_READY'
+    | 'SNAPSHOT_DRAFT_READY'
+    | 'RUN_FINISHED'
+    | 'RUN_FAILED';
+
+export interface PlannerTraceEvent {
+    eventId?: string,
+    traceId?: string,
+    conversationId?: string,
+    userId?: string,
+    type: PlannerTraceEventType | string,
+    status: string,
+    message?: string,
+    phase?: string,
+    tool?: string,
+    snapshotVersion?: number,
+    targetDayIndex?: number,
+    data?: Record<string, unknown>,
+    createdAt?: string,
+}
+
+export interface PlannerErrorPayload {
+    code?: string,
+    message?: string,
+    detail?: string,
 }
 
 export interface PlannerDataRefreshPayload {

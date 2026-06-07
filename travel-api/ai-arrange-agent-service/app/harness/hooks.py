@@ -96,6 +96,7 @@ def after_tool_call(
             "errorCode": result.errorCode,
             "inputSummary": result.inputSummary,
             "outputSummary": result.outputSummary,
+            "resultMetadata": result.metadata,
         },
     )
     return recorder.append_user_event(
@@ -109,6 +110,7 @@ def after_tool_call(
                 "errorCode": result.errorCode,
                 "inputSummary": result.inputSummary,
                 "outputSummary": result.outputSummary,
+                "resultMetadata": result.metadata,
             },
         )
     )
@@ -169,6 +171,7 @@ def after_model_call(
             "errorCode": result.errorCode,
             "inputSummary": result.inputSummary,
             "outputSummary": result.outputSummary,
+            "resultMetadata": result.metadata,
         },
     )
     return recorder.append_user_event(
@@ -182,6 +185,7 @@ def after_model_call(
                 "errorCode": result.errorCode,
                 "inputSummary": result.inputSummary,
                 "outputSummary": result.outputSummary,
+                "resultMetadata": result.metadata,
             },
         )
     )

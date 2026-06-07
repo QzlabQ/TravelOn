@@ -1,5 +1,16 @@
 # AI Arrange Agent 下一阶段开发计划
 
+## 最新调整：阶段 5 先行
+
+当前开发顺序临时调整为先完成阶段 5 的地图组件和前端联调。阶段 4 `offer-provider` adapter 与阶段 6 天气 / 交通 adapter 先忽略，不进入本轮实现。
+
+本轮阶段 5 的最小交付：
+
+- 前端 AI 规划页接入地图组件。
+- 没有高德前端 key 时，使用模拟地图和模拟点位数据完成联调。
+- 配置高德前端 key 后，地图组件加载高德 JavaScript API 展示真实地图底图。
+- 后端仍可继续输出 mock-first 的 `places` / `routes` 结构，前端先按结构消费。
+
 ## 1. 本轮结论
 
 下一阶段先更新和冻结文档，再逐步进入 Java / MongoDB / WebSocket / 前端联调。Python `ai-arrange-agent-service` 仍保持内部 Agent 规划节点定位，不直接面向前端，不直连 MongoDB，不处理登录鉴权和正式版本号。

@@ -72,6 +72,22 @@ This project uses a modern version of `yarn` for package management
 
 Configure the API connection in the `.env` file
 
+```env
+REACT_APP_API_HOSTNAME=localhost
+REACT_APP_API_PORT=8082
+```
+
+### AMap key
+
+The AI planner map component can run with mock map rendering first. To enable the AMap JavaScript map in the frontend, configure these values in `travel-ui/.env`:
+
+```env
+REACT_APP_AMAP_JS_API_KEY=your_amap_javascript_key
+REACT_APP_AMAP_SECURITY_JS_CODE=your_amap_security_js_code
+```
+
+The backend POI / route enrichment key is separate and remains `AMAP_API_KEY` in `travel-api/.env`.
+
 ## Available Scripts
 
 In the project directory, you can run:

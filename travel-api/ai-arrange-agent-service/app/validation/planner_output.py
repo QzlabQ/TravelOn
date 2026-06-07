@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -47,7 +48,49 @@ class PlannerModelOutput(BaseModel):
 
 
 def validate_planner_output_payload(payload: Any) -> PlannerModelOutput:
-    return PlannerModelOutput.model_validate(payload)
+    return PlannerModelOutput.model_validate(normalize_planner_output_payload(payload))
+
+
+def normalize_planner_output_payload(payload: Any) -> Any:
+    if not isinstance(payload, dict):
+        return payload
+
+    normalized = dict(payload)
+    normalized["places"] = _normalize_uuid_fields(normalized.get("places"), {"placeId", "internalOfferId"})
+    normalized["routes"] = _normalize_uuid_fields(normalized.get("routes"), {"fromPlaceId", "toPlaceId"})
+    return normalized
+
+
+def _normalize_uuid_fields(value: Any, fields: set[str]) -> Any:
+    if not isinstance(value, list):
+        return value
+
+    normalized_items: list[Any] = []
+    for item in value:
+        if not isinstance(item, dict):
+            normalized_items.append(item)
+            continue
+
+        normalized_item = dict(item)
+        for field in fields:
+            if field in normalized_item and not _is_valid_uuid_or_blank(normalized_item[field]):
+                normalized_item[field] = None
+        normalized_items.append(normalized_item)
+    return normalized_items
+
+
+def _is_valid_uuid_or_blank(value: Any) -> bool:
+    if value is None or value == "":
+        return True
+    if isinstance(value, UUID):
+        return True
+    if not isinstance(value, str):
+        return False
+    try:
+        UUID(value)
+    except ValueError:
+        return False
+    return True
 
 
 def format_validation_error(error: Exception) -> str:

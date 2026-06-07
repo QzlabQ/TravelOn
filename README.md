@@ -8,3 +8,12 @@ DEEPSEEK_API_KEY=
 AMAP_API_KEY=
 DEEPSEEK_MODEL=
 ```
+
+Frontend AMap JavaScript map rendering is configured separately in `travel-ui/.env`:
+
+```.env
+REACT_APP_AMAP_JS_API_KEY=
+REACT_APP_AMAP_SECURITY_JS_CODE=
+```
+
+`AMAP_API_KEY` is used by backend services for POI / route enrichment. `REACT_APP_AMAP_JS_API_KEY` is used by the browser map component.

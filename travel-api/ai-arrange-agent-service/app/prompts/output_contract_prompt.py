@@ -15,5 +15,8 @@ Required fields:
   distanceKm, estimatedMinutes, polyline, summary. User-facing summary must be Simplified Chinese.
 
 Do not include traceId, toolCalls, warnings, or userFacingEvents. The backend adds them.
-If tool evidence is weak, still return partial markdown and reuse candidatePlaces where possible.
+If tool evidence is weak, still return useful markdown and reuse candidatePlaces where possible.
+Keep the response detailed enough to be actionable, but do not exceed the responseBudget in the user
+payload, do not invent more than the requested places/routes, and avoid raw backslash escape-like text
+in user-facing fields.
 """.strip()

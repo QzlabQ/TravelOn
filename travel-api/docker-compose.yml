@@ -132,6 +132,19 @@ services:
     build: ./ai-arrange-agent-service
     env_file:
       - .env
+    environment:
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      ALL_PROXY: ""
+      all_proxy: ""
+      DEEPSEEK_TIMEOUT_SECONDS: "180"
+      AGENT_MODEL_TIMEOUT_SECONDS: "180"
+      AGENT_MAX_RUNTIME_SECONDS: "240"
+      DEEPSEEK_MAX_TOKENS: "10000"
+      NO_PROXY: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
+      no_proxy: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
     ports:
       - "8090:8090"
     networks:
@@ -147,7 +160,15 @@ services:
       - MONGO_HOST=mongo
       - RABBITMQ_HOST=rabbitmq
       - AI_AGENT_ENABLED=true
-      - AI_AGENT_BASE_URL=http://ai-arrange-agent:8090
+      - AI_ARRANGE_AGENT_BASE_URL=http://ai-arrange-agent:8090
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - http_proxy=
+      - https_proxy=
+      - ALL_PROXY=
+      - all_proxy=
+      - NO_PROXY=localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq
+      - no_proxy=localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq
     depends_on:
       - rabbitmq
       - mongo

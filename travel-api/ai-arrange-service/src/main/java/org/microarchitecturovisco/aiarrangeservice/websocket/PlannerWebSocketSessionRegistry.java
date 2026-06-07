@@ -40,6 +40,10 @@ public class PlannerWebSocketSessionRegistry {
     }
 
     public void sendError(UUID conversationId, String code, String message) {
+        sendError(conversationId, code, message, null);
+    }
+
+    public void sendError(UUID conversationId, String code, String message, String detail) {
         if (conversationId == null) {
             logger.warning(code + ": " + message);
             return;
@@ -47,6 +51,9 @@ public class PlannerWebSocketSessionRegistry {
         Map<String, Object> errorPayload = new java.util.LinkedHashMap<>();
         errorPayload.put("code", String.valueOf(code));
         errorPayload.put("message", String.valueOf(message));
+        if (detail != null && !detail.isBlank()) {
+            errorPayload.put("detail", detail);
+        }
         send(conversationId, PlannerMessageType.PLANNER_ERROR, errorPayload);
     }
 

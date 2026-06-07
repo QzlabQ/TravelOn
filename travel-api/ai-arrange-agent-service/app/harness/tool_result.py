@@ -27,6 +27,7 @@ class ToolResult(BaseModel):
     tool: str
     status: ToolStatus
     data: Any | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
     warnings: list[ToolWarning] = Field(default_factory=list)
     errorCode: str | None = None
     errorMessage: str | None = None
