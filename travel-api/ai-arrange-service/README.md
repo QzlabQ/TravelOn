@@ -70,7 +70,13 @@ Other endpoints:
 - `PUT /ai-arrange/api/conversations/{conversationId}/core-slots`
 - `PUT /ai-arrange/api/conversations/{conversationId}/selection`
 - `GET /ai-arrange/api/conversations/{conversationId}/snapshots?userId=<uuid>`
+- `GET /ai-arrange/api/conversations/{conversationId}/snapshots/{version}?userId=<uuid>`
+- `POST /ai-arrange/api/conversations/{conversationId}/snapshots/{version}/rollback?userId=<uuid>`
+- `GET /ai-arrange/api/conversations/{conversationId}/snapshots/{fromVersion}/diff/{toVersion}?userId=<uuid>`
 - `POST /ai-arrange/api/conversations/{conversationId}/planner/run`
+
+Rollback creates a new formal snapshot version from the selected historical version. Existing snapshots are never mutated.
+The diff endpoint returns summary-oriented change items for fields such as Markdown, selected places, day plans, and planning metadata.
 
 ## WebSocket Messages
 
@@ -83,7 +89,10 @@ Client sends chat text:
   "userId": "00000000-0000-0000-0000-000000000001",
   "payload": {
     "message": "Please optimize the route around the Bund and museums.",
-    "selectedPlaceIds": []
+    "selectedPlaceIds": [],
+    "modelVariant": "FLASH",
+    "planningScope": "DAY_REFINE",
+    "targetDayIndex": 1
   }
 }
 ```

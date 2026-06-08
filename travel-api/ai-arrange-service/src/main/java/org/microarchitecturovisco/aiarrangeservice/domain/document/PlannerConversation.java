@@ -11,7 +11,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -34,6 +36,9 @@ public class PlannerConversation {
 
     @Builder.Default
     private List<UUID> selectedPlaceIds = new ArrayList<>();
+
+    @Builder.Default
+    private Map<String, UUID> currentDayRevisionIds = new LinkedHashMap<>();
 
     private Instant createdAt;
     private Instant updatedAt;

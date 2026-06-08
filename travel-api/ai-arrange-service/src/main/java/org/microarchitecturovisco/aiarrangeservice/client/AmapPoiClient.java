@@ -16,6 +16,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.logging.Logger;
 
@@ -92,11 +94,48 @@ public class AmapPoiClient {
             candidate.setAddress(poi.path("address").asText());
         }
 
-        JsonNode firstPhoto = poi.path("photos").path(0);
-        if (!firstPhoto.isMissingNode() && StringUtils.hasText(firstPhoto.path("url").asText())) {
-            candidate.setImageUrl(firstPhoto.path("url").asText());
+        List<String> photoUrls = extractPhotoUrls(poi.path("photos"));
+        if (!photoUrls.isEmpty()) {
+            if (!StringUtils.hasText(candidate.getImageUrl())) {
+                candidate.setImageUrl(photoUrls.getFirst());
+            }
+            candidate.setImageUrls(mergeImageUrls(candidate.getImageUrls(), photoUrls));
         }
         candidate.setSource(PlannerPlaceSource.AMAP);
+    }
+
+    private List<String> extractPhotoUrls(JsonNode photos) {
+        List<String> urls = new ArrayList<>();
+        if (photos == null || !photos.isArray()) {
+            return urls;
+        }
+
+        for (JsonNode photo : photos) {
+            if (urls.size() >= 3) {
+                break;
+            }
+            addImageUrl(urls, photo.path("url").asText());
+        }
+        return urls;
+    }
+
+    private List<String> mergeImageUrls(List<String> existing, List<String> incoming) {
+        List<String> urls = new ArrayList<>();
+        if (existing != null) {
+            existing.forEach(url -> addImageUrl(urls, url));
+        }
+        incoming.forEach(url -> addImageUrl(urls, url));
+        return urls;
+    }
+
+    private void addImageUrl(List<String> urls, String url) {
+        if (urls.size() >= 3 || !StringUtils.hasText(url)) {
+            return;
+        }
+        String normalized = url.trim();
+        if (!urls.contains(normalized)) {
+            urls.add(normalized);
+        }
     }
 
     private Double parseDouble(String value) {

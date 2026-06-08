@@ -23,7 +23,9 @@ import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.PlannerChatSendPayload;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerChatStreamPayload;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerConversationResponse;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerDayVersionResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerDataRefreshPayload;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerSnapshotDiffResponse;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerConversationRepository;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerMessageRepository;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerSnapshotRepository;
@@ -122,6 +124,75 @@ public class PlannerConversationService {
     public List<PlannerSnapshot> listSnapshots(UUID conversationId, UUID userId) {
         getOwnedConversation(conversationId, userId);
         return snapshotRepository.findByConversationIdOrderByVersionDesc(conversationId);
+    }
+
+    public PlannerSnapshot getSnapshot(UUID conversationId, UUID userId, Integer version) {
+        getOwnedConversation(conversationId, userId);
+        return snapshotService.getSnapshot(conversationId, version);
+    }
+
+    public List<PlannerDayVersionResponse> listDayVersions(UUID conversationId, UUID userId, Integer dayIndex) {
+        PlannerConversation conversation = getOwnedConversation(conversationId, userId);
+        List<PlannerDayVersionResponse> versions = snapshotService.listDayVersions(conversation, dayIndex);
+        conversationRepository.save(conversation);
+        return versions;
+    }
+
+    public PlannerSnapshot activateDayVersion(UUID conversationId, UUID userId, Integer dayIndex, Integer dayVersion) {
+        PlannerConversation conversation = getOwnedConversation(conversationId, userId);
+        PlannerSnapshot snapshot = snapshotService.activateDayVersion(conversation, dayIndex, dayVersion);
+        conversation.setSelectedPlaceIds(snapshot.getSelectedPlaceIds() == null ? new ArrayList<>() : new ArrayList<>(snapshot.getSelectedPlaceIds()));
+        refreshConversationFromSnapshot(conversation, snapshot);
+        conversationRepository.save(conversation);
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_DATA_REFRESH,
+                PlannerDataRefreshPayload.from(conversation.getStatus(), snapshot));
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
+                Map.of("version", snapshot.getVersion(), "activatedDayIndex", dayIndex, "activatedDayVersion", dayVersion));
+        return snapshot;
+    }
+
+    public PlannerSnapshot rollbackSnapshot(UUID conversationId, UUID userId, Integer version) {
+        PlannerConversation conversation = getOwnedConversation(conversationId, userId);
+        PlannerSnapshot snapshot = snapshotService.rollbackSnapshot(conversation, version);
+        conversation.setSelectedPlaceIds(snapshot.getSelectedPlaceIds() == null ? new ArrayList<>() : new ArrayList<>(snapshot.getSelectedPlaceIds()));
+        refreshConversationFromSnapshot(conversation, snapshot);
+        conversationRepository.save(conversation);
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_DATA_REFRESH,
+                PlannerDataRefreshPayload.from(conversation.getStatus(), snapshot));
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
+                Map.of("version", snapshot.getVersion(), "restoredFromVersion", version));
+        return snapshot;
+    }
+
+    public PlannerSnapshot restoreDaySnapshot(UUID conversationId, UUID userId, Integer dayIndex, Integer version) {
+        PlannerConversation conversation = getOwnedConversation(conversationId, userId);
+        PlannerSnapshot snapshot = snapshotService.restoreDaySnapshot(conversation, dayIndex, version);
+        conversation.setSelectedPlaceIds(snapshot.getSelectedPlaceIds() == null ? new ArrayList<>() : new ArrayList<>(snapshot.getSelectedPlaceIds()));
+        refreshConversationFromSnapshot(conversation, snapshot);
+        conversationRepository.save(conversation);
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_DATA_REFRESH,
+                PlannerDataRefreshPayload.from(conversation.getStatus(), snapshot));
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
+                Map.of("version", snapshot.getVersion(), "restoredDayIndex", dayIndex, "restoredFromVersion", version));
+        return snapshot;
+    }
+
+    public PlannerSnapshot assembleTripSnapshot(UUID conversationId, UUID userId) {
+        PlannerConversation conversation = getOwnedConversation(conversationId, userId);
+        PlannerSnapshot snapshot = snapshotService.assembleTripSnapshot(conversation);
+        conversation.setSelectedPlaceIds(snapshot.getSelectedPlaceIds() == null ? new ArrayList<>() : new ArrayList<>(snapshot.getSelectedPlaceIds()));
+        refreshConversationFromSnapshot(conversation, snapshot);
+        conversationRepository.save(conversation);
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_DATA_REFRESH,
+                PlannerDataRefreshPayload.from(conversation.getStatus(), snapshot));
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
+                Map.of("version", snapshot.getVersion(), "scope", "TRIP_ASSEMBLE"));
+        return snapshot;
+    }
+
+    public PlannerSnapshotDiffResponse diffSnapshots(UUID conversationId, UUID userId, Integer fromVersion, Integer toVersion) {
+        getOwnedConversation(conversationId, userId);
+        return snapshotService.diffSnapshots(conversationId, fromVersion, toVersion);
     }
 
     public PlannerSnapshot runPlannerAgent(UUID conversationId, UUID userId, PlannerChatSendPayload payload) {
@@ -349,6 +420,9 @@ public class PlannerConversationService {
     }
 
     private String plannerErrorCode(Throwable rootCause) {
+        if (isAgentRequestValidationFailure(rootCause)) {
+            return "PLANNER_AGENT_REQUEST_INVALID";
+        }
         if (isAgentConnectivityFailure(rootCause)) {
             return "PLANNER_AGENT_UNAVAILABLE";
         }
@@ -362,6 +436,9 @@ public class PlannerConversationService {
     }
 
     private String plannerErrorMessage(Throwable rootCause) {
+        if (isAgentRequestValidationFailure(rootCause)) {
+            return "规划请求参数与 Python Agent 协议不匹配，请检查 planningMode、planningScope、targetDayIndex 等字段。";
+        }
         if (isAgentConnectivityFailure(rootCause)) {
             return "规划引擎暂时不可用，请确认 Python Agent 已启动，并检查 AI_ARRANGE_AGENT_BASE_URL 配置。";
         }
@@ -394,9 +471,14 @@ public class PlannerConversationService {
         return sanitized.substring(0, maxLength) + "...";
     }
 
+    private boolean isAgentRequestValidationFailure(Throwable rootCause) {
+        return rootCause instanceof WebClientResponseException responseException
+                && responseException.getStatusCode().is4xxClientError();
+    }
+
     private boolean isAgentConnectivityFailure(Throwable rootCause) {
         return rootCause instanceof WebClientRequestException
-                || rootCause instanceof WebClientResponseException
+                || rootCause instanceof WebClientResponseException responseException && responseException.getStatusCode().is5xxServerError()
                 || rootCause instanceof ConnectException
                 || rootCause instanceof UnknownHostException
                 || rootCause instanceof java.net.SocketTimeoutException;
@@ -414,6 +496,7 @@ public class PlannerConversationService {
                 .userId(userId)
                 .planningMode(resolvePlanningMode(payload, latestSnapshot))
                 .planningScope(resolvePlanningScope(payload, latestSnapshot))
+                .modelVariant(resolveModelVariant(payload))
                 .targetDayIndex(payload.getTargetDayIndex())
                 .targetDate(payload.getTargetDate())
                 .coreSlots(conversation.getCoreSlots())
@@ -466,6 +549,10 @@ public class PlannerConversationService {
         return latestSnapshot == null || latestSnapshot.getVersion() == null || latestSnapshot.getVersion() <= 0
                 ? "DAY_PLAN"
                 : "DAY_REFINE";
+    }
+
+    private String resolveModelVariant(PlannerChatSendPayload payload) {
+        return "PRO".equalsIgnoreCase(payload.getModelVariant()) ? "PRO" : "FLASH";
     }
 
     private PlannerAgentSnapshotRef toAgentSnapshotRef(PlannerSnapshot snapshot) {

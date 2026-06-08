@@ -24,6 +24,7 @@ public class RunPlannerAgentRequest {
     private String message;
     private String planningMode;
     private String planningScope;
+    private String modelVariant;
     private Integer targetDayIndex;
     private LocalDate targetDate;
     private PlannerInteractionInput interaction;
@@ -36,6 +37,7 @@ public class RunPlannerAgentRequest {
                 .message(message)
                 .planningMode(planningMode)
                 .planningScope(planningScope)
+                .modelVariant(modelVariant)
                 .targetDayIndex(targetDayIndex)
                 .targetDate(targetDate)
                 .interaction(interaction)

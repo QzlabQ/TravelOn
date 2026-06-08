@@ -120,12 +120,7 @@ class AmapPoiTool:
             longitude = self._safe_float(raw_lng)
             latitude = self._safe_float(raw_lat)
 
-        photos = poi.get("photos") if isinstance(poi.get("photos"), list) else []
-        image_url = None
-        if photos:
-            first_photo = photos[0]
-            if isinstance(first_photo, dict):
-                image_url = first_photo.get("url")
+        image_urls = self._photo_urls(poi.get("photos"))
 
         return PlannerPlaceSuggestion(
             placeId=uuid5(NAMESPACE_URL, f"amap:{poi.get('id') or poi.get('name') or 'unnamed'}"),
@@ -136,11 +131,30 @@ class AmapPoiTool:
             latitude=latitude,
             longitude=longitude,
             address=poi.get("address") if isinstance(poi.get("address"), str) else None,
-            imageUrl=image_url,
+            imageUrl=image_urls[0] if image_urls else None,
+            imageUrls=image_urls,
             description=poi.get("type") if isinstance(poi.get("type"), str) else None,
             selected=False,
             tags=[tag for tag in [poi.get("type")] if isinstance(tag, str) and tag],
         )
+
+    def _photo_urls(self, photos) -> list[str]:
+        if not isinstance(photos, list):
+            return []
+
+        urls: list[str] = []
+        for photo in photos:
+            if len(urls) >= 3:
+                break
+            if not isinstance(photo, dict):
+                continue
+            url = photo.get("url")
+            if not isinstance(url, str):
+                continue
+            url = url.strip()
+            if url and url not in urls:
+                urls.append(url)
+        return urls
 
     def _map_type(self, typecode: str) -> PlaceType:
         if typecode.startswith("110"):

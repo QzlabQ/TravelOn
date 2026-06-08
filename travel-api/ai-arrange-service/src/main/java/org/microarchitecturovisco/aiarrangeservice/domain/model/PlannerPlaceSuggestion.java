@@ -34,6 +34,10 @@ public class PlannerPlaceSuggestion {
     private Double longitude;
     private String address;
     private String imageUrl;
+
+    @Builder.Default
+    private List<String> imageUrls = new ArrayList<>();
+
     private String description;
 
     @Builder.Default
