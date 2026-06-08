@@ -237,6 +237,218 @@ class PlannerSnapshotServiceTest {
     }
 
     @Test
+    void createSnapshotFromAgentResponseEnrichesDayPlanImagesBeforeSavingMarkdown() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = PlannerConversation.builder()
+                .id(conversationId)
+                .userId(userId)
+                .status(PlannerConversationStatus.ACTIVE_CHAT)
+                .coreSlots(TripCoreSlots.builder()
+                        .city("Shanghai")
+                        .travelStartDate(LocalDate.of(2026, 6, 1))
+                        .peopleCount(2)
+                        .build())
+                .title("Shanghai plan")
+                .selectedPlaceIds(List.of())
+                .build();
+        PlannerPlaceSuggestion bund = PlannerPlaceSuggestion.builder()
+                .name("The Bund")
+                .type(PlannerPlaceType.SCENIC)
+                .build();
+        PlannerDayPlanRef dayPlan = PlannerDayPlanRef.builder()
+                .dayIndex(1)
+                .date(LocalDate.of(2026, 6, 1))
+                .title("Day 1")
+                .markdown("# Day 1\n\n- Walk the Bund.")
+                .places(List.of(bund))
+                .build();
+        AgentRunResponse response = AgentRunResponse.builder()
+                .traceId("trace-images")
+                .status("SUCCESS")
+                .assistantText("已生成规划。")
+                .title("Shanghai plan")
+                .summary("summary")
+                .markdown("# Day 1\n\n- Walk the Bund.")
+                .snapshotDraft(PlannerSnapshotDraft.builder()
+                        .scope("DAY_PLAN")
+                        .targetDayIndex(1)
+                        .markdown("# Day 1\n\n- Walk the Bund.")
+                        .currentDayPlan(dayPlan)
+                        .dayPlans(List.of(dayPlan))
+                        .build())
+                .build();
+
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.empty());
+        when(snapshotRepository.save(any(PlannerSnapshot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dayRevisionRepository.findFirstByConversationIdAndDayIndexAndContentHashOrderByDayVersionDesc(any(), any(), any()))
+                .thenReturn(Optional.empty());
+        when(dayRevisionRepository.findFirstByConversationIdAndDayIndexOrderByDayVersionDesc(any(), any()))
+                .thenReturn(Optional.empty());
+        when(amapPoiClient.searchFirst(any(), any(PlannerPlaceSuggestion.class))).thenAnswer(invocation -> {
+            PlannerPlaceSuggestion candidate = invocation.getArgument(1);
+            candidate.setImageUrl("https://img.test/bund-1.jpg");
+            candidate.setImageUrls(List.of("https://img.test/bund-1.jpg", "https://img.test/bund-2.jpg"));
+            return Optional.of(candidate);
+        });
+
+        PlannerSnapshotService service = new PlannerSnapshotService(
+                plannerAiClient,
+                promptFactory,
+                new PlannerMarkdownBuilder(),
+                new PlaceEnrichmentService(amapPoiClient, internalOfferHotelMatcher),
+                messageRepository,
+                snapshotRepository,
+                dayRevisionRepository
+        );
+
+        PlannerSnapshot snapshot = service.createSnapshotFromAgentResponse(conversation, response);
+
+        assertThat(snapshot.getMarkdown()).contains("### 景点图片参考", "![The Bund 1](https://img.test/bund-1.jpg)");
+        assertThat(snapshot.getCurrentDayPlan().getMarkdown()).contains("### 景点图片参考", "![The Bund 2](https://img.test/bund-2.jpg)");
+        assertThat(snapshot.getDayPlans().getFirst().getMarkdown()).contains("### 景点图片参考");
+    }
+
+    @Test
+    void createSnapshotFromAgentResponseKeepsImageReferencePlaceholderWhenImagesAreMissing() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = PlannerConversation.builder()
+                .id(conversationId)
+                .userId(userId)
+                .status(PlannerConversationStatus.ACTIVE_CHAT)
+                .coreSlots(TripCoreSlots.builder()
+                        .city("Shanghai")
+                        .travelStartDate(LocalDate.of(2026, 6, 1))
+                        .peopleCount(2)
+                        .build())
+                .title("Shanghai plan")
+                .selectedPlaceIds(List.of())
+                .build();
+        PlannerPlaceSuggestion bund = PlannerPlaceSuggestion.builder()
+                .name("The Bund")
+                .type(PlannerPlaceType.SCENIC)
+                .build();
+        PlannerDayPlanRef dayPlan = PlannerDayPlanRef.builder()
+                .dayIndex(1)
+                .date(LocalDate.of(2026, 6, 1))
+                .title("Day 1")
+                .markdown("# Day 1\n\n- Walk the Bund.")
+                .places(List.of(bund))
+                .build();
+        AgentRunResponse response = AgentRunResponse.builder()
+                .traceId("trace-image-placeholder")
+                .status("SUCCESS")
+                .assistantText("已生成规划。")
+                .title("Shanghai plan")
+                .summary("summary")
+                .markdown("# Day 1\n\n- Walk the Bund.")
+                .snapshotDraft(PlannerSnapshotDraft.builder()
+                        .scope("DAY_PLAN")
+                        .targetDayIndex(1)
+                        .markdown("# Day 1\n\n- Walk the Bund.")
+                        .currentDayPlan(dayPlan)
+                        .dayPlans(List.of(dayPlan))
+                        .build())
+                .build();
+
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.empty());
+        when(snapshotRepository.save(any(PlannerSnapshot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dayRevisionRepository.findFirstByConversationIdAndDayIndexAndContentHashOrderByDayVersionDesc(any(), any(), any()))
+                .thenReturn(Optional.empty());
+        when(dayRevisionRepository.findFirstByConversationIdAndDayIndexOrderByDayVersionDesc(any(), any()))
+                .thenReturn(Optional.empty());
+        when(amapPoiClient.searchFirst(any(), any(PlannerPlaceSuggestion.class))).thenReturn(Optional.empty());
+
+        PlannerSnapshotService service = new PlannerSnapshotService(
+                plannerAiClient,
+                promptFactory,
+                new PlannerMarkdownBuilder(),
+                new PlaceEnrichmentService(amapPoiClient, internalOfferHotelMatcher),
+                messageRepository,
+                snapshotRepository,
+                dayRevisionRepository
+        );
+
+        PlannerSnapshot snapshot = service.createSnapshotFromAgentResponse(conversation, response);
+
+        assertThat(snapshot.getMarkdown()).contains("### 景点图片参考", "暂无可展示图片");
+        assertThat(snapshot.getCurrentDayPlan().getMarkdown()).contains("### 景点图片参考", "暂无可展示图片");
+        assertThat(snapshot.getDayPlans().getFirst().getMarkdown()).contains("### 景点图片参考", "暂无可展示图片");
+    }
+
+    @Test
+    void createSnapshotFromAgentResponseBackfillsDayPlanImagesFromTopLevelPlaces() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = PlannerConversation.builder()
+                .id(conversationId)
+                .userId(userId)
+                .status(PlannerConversationStatus.ACTIVE_CHAT)
+                .coreSlots(TripCoreSlots.builder()
+                        .city("Shanghai")
+                        .travelStartDate(LocalDate.of(2026, 6, 1))
+                        .peopleCount(2)
+                        .build())
+                .title("Shanghai plan")
+                .selectedPlaceIds(List.of())
+                .build();
+        PlannerPlaceSuggestion bund = PlannerPlaceSuggestion.builder()
+                .name("The Bund")
+                .type(PlannerPlaceType.SCENIC)
+                .imageUrl("https://img.test/bund-1.jpg")
+                .imageUrls(List.of("https://img.test/bund-1.jpg", "https://img.test/bund-2.jpg"))
+                .build();
+        PlannerDayPlanRef dayPlan = PlannerDayPlanRef.builder()
+                .dayIndex(1)
+                .date(LocalDate.of(2026, 6, 1))
+                .title("Day 1")
+                .markdown("# Day 1\n\n- Walk the Bund.")
+                .build();
+        AgentRunResponse response = AgentRunResponse.builder()
+                .traceId("trace-top-level-images")
+                .status("SUCCESS")
+                .assistantText("已生成规划。")
+                .title("Shanghai plan")
+                .summary("summary")
+                .markdown("# Day 1\n\n- Walk the Bund.")
+                .places(List.of(bund))
+                .snapshotDraft(PlannerSnapshotDraft.builder()
+                        .scope("DAY_PLAN")
+                        .targetDayIndex(1)
+                        .markdown("# Day 1\n\n- Walk the Bund.")
+                        .currentDayPlan(dayPlan)
+                        .dayPlans(List.of(dayPlan))
+                        .build())
+                .build();
+
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.empty());
+        when(snapshotRepository.save(any(PlannerSnapshot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dayRevisionRepository.findFirstByConversationIdAndDayIndexAndContentHashOrderByDayVersionDesc(any(), any(), any()))
+                .thenReturn(Optional.empty());
+        when(dayRevisionRepository.findFirstByConversationIdAndDayIndexOrderByDayVersionDesc(any(), any()))
+                .thenReturn(Optional.empty());
+
+        PlannerSnapshotService service = new PlannerSnapshotService(
+                plannerAiClient,
+                promptFactory,
+                new PlannerMarkdownBuilder(),
+                new PlaceEnrichmentService(amapPoiClient, internalOfferHotelMatcher),
+                messageRepository,
+                snapshotRepository,
+                dayRevisionRepository
+        );
+
+        PlannerSnapshot snapshot = service.createSnapshotFromAgentResponse(conversation, response);
+
+        assertThat(snapshot.getCurrentDayPlan().getPlaces()).extracting(PlannerPlaceSuggestion::getName).containsExactly("The Bund");
+        assertThat(snapshot.getCurrentDayPlan().getMarkdown())
+                .contains("### 景点图片参考", "![The Bund 1](https://img.test/bund-1.jpg)", "![The Bund 2](https://img.test/bund-2.jpg)");
+        assertThat(snapshot.getDayPlans().getFirst().getMarkdown())
+                .contains("### 景点图片参考", "![The Bund 1](https://img.test/bund-1.jpg)");
+    }
+
+    @Test
     void createSnapshotFromAgentResponseRejectsStaleBaseVersion() {
         UUID conversationId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();

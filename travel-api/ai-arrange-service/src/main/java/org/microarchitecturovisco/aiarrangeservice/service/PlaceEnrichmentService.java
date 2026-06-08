@@ -24,8 +24,12 @@ public class PlaceEnrichmentService {
     private final InternalOfferHotelMatcher internalOfferHotelMatcher;
 
     public List<PlannerPlaceSuggestion> enrichPlaces(PlannerConversation conversation, List<PlannerPlaceSuggestion> rawPlaces) {
+        return enrichPlaces(conversation, rawPlaces, conversation.getSelectedPlaceIds());
+    }
+
+    public List<PlannerPlaceSuggestion> enrichPlaces(PlannerConversation conversation, List<PlannerPlaceSuggestion> rawPlaces, List<UUID> selectedPlaceIds) {
         List<PlannerPlaceSuggestion> enriched = new ArrayList<>();
-        Set<UUID> selectedIds = new HashSet<>(conversation.getSelectedPlaceIds() == null ? List.of() : conversation.getSelectedPlaceIds());
+        Set<UUID> selectedIds = new HashSet<>(selectedPlaceIds == null ? List.of() : selectedPlaceIds);
 
         if (rawPlaces == null || rawPlaces.isEmpty()) {
             return enriched;
@@ -35,7 +39,8 @@ public class PlaceEnrichmentService {
             if (place.getPlaceId() == null) {
                 place.setPlaceId(UUID.randomUUID());
             }
-            place.setSelected(selectedIds.contains(place.getPlaceId()));
+            normalizeImageFields(place);
+            place.setSelected(place.isSelected() || selectedIds.contains(place.getPlaceId()));
 
             if (place.getType() == PlannerPlaceType.HOTEL && StringUtils.hasText(place.getName())) {
                 internalOfferHotelMatcher.tryMatch(conversation.getCoreSlots().getCity(), place).ifPresent(match -> {
@@ -44,8 +49,9 @@ public class PlaceEnrichmentService {
                 });
             }
 
-            if ((place.getLatitude() == null || place.getLongitude() == null) && StringUtils.hasText(conversation.getCoreSlots().getCity())) {
+            if ((place.getLatitude() == null || place.getLongitude() == null || !hasImage(place)) && StringUtils.hasText(conversation.getCoreSlots().getCity())) {
                 amapPoiClient.searchFirst(conversation.getCoreSlots().getCity(), place);
+                normalizeImageFields(place);
             }
 
             enriched.add(place);
@@ -62,5 +68,32 @@ public class PlaceEnrichmentService {
         return places.stream()
                 .peek(place -> place.setSelected(selected.contains(place.getPlaceId())))
                 .collect(Collectors.toList());
+    }
+
+    private void normalizeImageFields(PlannerPlaceSuggestion place) {
+        List<String> imageUrls = new ArrayList<>();
+        addImageUrl(imageUrls, place.getImageUrl());
+        if (place.getImageUrls() != null) {
+            place.getImageUrls().forEach(url -> addImageUrl(imageUrls, url));
+        }
+        place.setImageUrls(imageUrls);
+        if (!StringUtils.hasText(place.getImageUrl()) && !imageUrls.isEmpty()) {
+            place.setImageUrl(imageUrls.getFirst());
+        }
+    }
+
+    private boolean hasImage(PlannerPlaceSuggestion place) {
+        return StringUtils.hasText(place.getImageUrl())
+                || (place.getImageUrls() != null && place.getImageUrls().stream().anyMatch(StringUtils::hasText));
+    }
+
+    private void addImageUrl(List<String> imageUrls, String imageUrl) {
+        if (imageUrls.size() >= 3 || !StringUtils.hasText(imageUrl)) {
+            return;
+        }
+        String normalized = imageUrl.trim();
+        if (!imageUrls.contains(normalized)) {
+            imageUrls.add(normalized);
+        }
     }
 }

@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class AgentStatus(str, Enum):
@@ -133,9 +133,53 @@ class PlannerPlaceSuggestion(BaseModel):
     longitude: float | None = None
     address: str | None = None
     imageUrl: str | None = None
+    imageUrls: list[str] = Field(default_factory=list)
     description: str | None = None
     selected: bool = False
     tags: list[str] = Field(default_factory=list)
+
+    @field_validator("imageUrl", mode="before")
+    @classmethod
+    def _normalize_image_url(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            value = str(value)
+        text = value.strip()
+        return text or None
+
+    @field_validator("imageUrls", mode="before")
+    @classmethod
+    def _normalize_image_urls(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            text = value.strip()
+            return [text] if text else []
+        if not isinstance(value, list):
+            return []
+
+        urls: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            text = str(item).strip()
+            if text and text not in urls:
+                urls.append(text)
+        return urls
+
+    @model_validator(mode="after")
+    def _sync_image_url_fields(self):
+        urls: list[str] = []
+        if self.imageUrl:
+            urls.append(self.imageUrl)
+        for url in self.imageUrls:
+            if url not in urls:
+                urls.append(url)
+        self.imageUrls = urls
+        if self.imageUrl is None and urls:
+            self.imageUrl = urls[0]
+        return self
 
     @field_validator("type", mode="before")
     @classmethod

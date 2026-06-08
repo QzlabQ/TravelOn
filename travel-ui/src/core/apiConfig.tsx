@@ -743,6 +743,7 @@ export interface PlannerPlaceSuggestion {
     longitude?: number,
     address?: string,
     imageUrl?: string,
+    imageUrls?: string[],
     description?: string,
     selected?: boolean,
     tags?: string[],

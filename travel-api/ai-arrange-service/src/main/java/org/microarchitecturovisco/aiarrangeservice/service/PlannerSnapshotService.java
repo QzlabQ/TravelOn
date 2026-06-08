@@ -162,18 +162,32 @@ public class PlannerSnapshotService {
         PlannerSnapshot latestSnapshot = snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversation.getId()).orElse(null);
         assertDraftBaseVersionIsCurrent(conversation, draft, latestSnapshot);
         Integer version = (latestSnapshot == null || latestSnapshot.getVersion() == null ? 0 : latestSnapshot.getVersion()) + 1;
-        List<PlannerDayPlanRef> dayPlans = mergeDayPlans(latestSnapshot, safeList(draft.getDayPlans()), draft.getCurrentDayPlan());
+        List<PlannerDayPlanRef> dayPlans = enrichDayPlans(
+                conversation,
+                mergeDayPlans(latestSnapshot, safeList(draft.getDayPlans()), draft.getCurrentDayPlan())
+        );
         PlannerDayPlanRef currentDayPlan = resolveCurrentDayPlan(draft, dayPlans);
         List<PlannerPlaceSuggestion> places = !safeList(response.getPlaces()).isEmpty()
                 ? safeList(response.getPlaces())
                 : !safeList(draft.getPlaces()).isEmpty()
                 ? safeList(draft.getPlaces())
                 : currentDayPlan == null ? new ArrayList<>() : safeList(currentDayPlan.getPlaces());
+        places = placeEnrichmentService.enrichPlaces(conversation, places);
+        dayPlans = backfillCurrentDayPlanPlaces(dayPlans, currentDayPlan, places);
         List<PlannerRouteSegment> routes = !safeList(response.getRoutes()).isEmpty()
                 ? safeList(response.getRoutes())
                 : !safeList(draft.getRoutes()).isEmpty()
                 ? safeList(draft.getRoutes())
                 : currentDayPlan == null ? new ArrayList<>() : safeList(currentDayPlan.getRoutes());
+        dayPlans = appendImageReferencesToDayPlans(dayPlans);
+        if (currentDayPlan != null && currentDayPlan.getDayIndex() != null) {
+            Integer currentDayIndex = currentDayPlan.getDayIndex();
+            currentDayPlan = dayPlans.stream()
+                    .filter(dayPlan -> currentDayIndex.equals(dayPlan.getDayIndex()))
+                    .findFirst()
+                    .orElse(dayPlanWithImageReference(currentDayPlan));
+        }
+        String markdown = markdownBuilder.appendImageReferenceIfMissing(firstNonBlank(response.getMarkdown(), draft.getMarkdown(), ""), places);
 
         PlannerSnapshot snapshot = PlannerSnapshot.builder()
                 .id(UUID.randomUUID())
@@ -187,7 +201,7 @@ public class PlannerSnapshotService {
                 .completedDayIndexes(resolveCompletedDayIndexes(dayPlans, latestSnapshot))
                 .title(firstNonBlank(response.getTitle(), draft.getTitle(), defaultTitle(conversation)))
                 .summary(firstNonBlank(response.getSummary(), draft.getSummary(), response.getAssistantText()))
-                .markdown(firstNonBlank(response.getMarkdown(), draft.getMarkdown(), ""))
+                .markdown(markdown)
                 .nextQuestion(firstNonBlank(response.getNextQuestion(), draft.getNextQuestion(), defaultNextQuestion(conversation)))
                 .assistantText(response.getAssistantText())
                 .places(places)
@@ -389,12 +403,15 @@ public class PlannerSnapshotService {
         if (dayPlans.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot assemble a trip before day plans exist");
         }
+        dayPlans = appendImageReferencesToDayPlans(enrichDayPlans(conversation, dayPlans));
 
         Integer nextVersion = (latestSnapshot.getVersion() == null ? 0 : latestSnapshot.getVersion()) + 1;
         List<PlannerPlaceSuggestion> places = flattenDayPlaces(dayPlans);
         List<PlannerRouteSegment> routes = flattenDayRoutes(dayPlans);
         List<UUID> selectedPlaceIds = flattenSelectedPlaceIds(dayPlans);
         String markdown = buildTripMarkdown(conversation, dayPlans);
+        PlannerDayPlanRef currentDayPlan = findDayPlan(dayPlans, latestSnapshot.getCurrentDayIndex())
+                .orElse(latestSnapshot.getCurrentDayPlan());
 
         PlannerSnapshot snapshot = PlannerSnapshot.builder()
                 .id(UUID.randomUUID())
@@ -412,7 +429,7 @@ public class PlannerSnapshotService {
                 .assistantText(markdown)
                 .places(places)
                 .routes(routes)
-                .currentDayPlan(latestSnapshot.getCurrentDayPlan())
+                .currentDayPlan(currentDayPlan)
                 .dayPlans(dayPlans)
                 .selectedPlaceIds(selectedPlaceIds)
                 .rejectedPlaceIds(safeList(latestSnapshot.getRejectedPlaceIds()))
@@ -669,6 +686,15 @@ public class PlannerSnapshotService {
         }
         return fallbackTopLevelDayPlan(snapshot)
                 .filter(dayPlan -> dayIndex.equals(dayPlan.getDayIndex()));
+    }
+
+    private Optional<PlannerDayPlanRef> findDayPlan(List<PlannerDayPlanRef> dayPlans, Integer dayIndex) {
+        if (dayIndex == null) {
+            return Optional.empty();
+        }
+        return safeList(dayPlans).stream()
+                .filter(dayPlan -> dayIndex.equals(dayPlan.getDayIndex()))
+                .findFirst();
     }
 
     private void validateDayIndex(Integer dayIndex) {
@@ -1054,8 +1080,9 @@ public class PlannerSnapshotService {
             if (!hasText(place.getAddress())) {
                 place.setAddress(previous.getAddress());
             }
-            if (!hasText(place.getImageUrl())) {
+            if (!hasImage(place)) {
                 place.setImageUrl(previous.getImageUrl());
+                place.setImageUrls(safeList(previous.getImageUrls()));
             }
             if (!hasText(place.getAmapPoiId())) {
                 place.setAmapPoiId(previous.getAmapPoiId());
@@ -1083,6 +1110,11 @@ public class PlannerSnapshotService {
         String name = place.getName() == null ? "" : place.getName().trim().toLowerCase(Locale.ROOT);
         String type = place.getType() == null ? "" : place.getType().name();
         return name + "|" + type;
+    }
+
+    private boolean hasImage(PlannerPlaceSuggestion place) {
+        return hasText(place.getImageUrl())
+                || safeList(place.getImageUrls()).stream().anyMatch(this::hasText);
     }
 
     private boolean hasText(String value) {
@@ -1180,6 +1212,82 @@ public class PlannerSnapshotService {
                 .filter(dayIndex -> dayIndex != null)
                 .sorted()
                 .toList();
+    }
+
+    private List<PlannerDayPlanRef> appendImageReferencesToDayPlans(List<PlannerDayPlanRef> dayPlans) {
+        return safeList(dayPlans).stream()
+                .map(this::dayPlanWithImageReference)
+                .toList();
+    }
+
+    private List<PlannerDayPlanRef> backfillCurrentDayPlanPlaces(List<PlannerDayPlanRef> dayPlans, PlannerDayPlanRef currentDayPlan, List<PlannerPlaceSuggestion> fallbackPlaces) {
+        List<PlannerPlaceSuggestion> places = safeList(fallbackPlaces);
+        if (currentDayPlan == null || currentDayPlan.getDayIndex() == null || places.isEmpty()) {
+            return safeList(dayPlans);
+        }
+
+        Integer currentDayIndex = currentDayPlan.getDayIndex();
+        return safeList(dayPlans).stream()
+                .map(dayPlan -> {
+                    if (!currentDayIndex.equals(dayPlan.getDayIndex())) {
+                        return dayPlan;
+                    }
+                    List<PlannerPlaceSuggestion> mergedPlaces = mergeDayPlanPlaces(safeList(dayPlan.getPlaces()), places);
+                    if (mergedPlaces.isEmpty()) {
+                        return dayPlan;
+                    }
+                    return dayPlanWithPlaces(dayPlan, mergedPlaces);
+                })
+                .toList();
+    }
+
+    private List<PlannerPlaceSuggestion> mergeDayPlanPlaces(List<PlannerPlaceSuggestion> dayPlanPlaces, List<PlannerPlaceSuggestion> fallbackPlaces) {
+        if (dayPlanPlaces == null || dayPlanPlaces.isEmpty()) {
+            return safeList(fallbackPlaces);
+        }
+        return carryForwardPlaceIdentity(dayPlanPlaces, fallbackPlaces);
+    }
+
+    private List<PlannerDayPlanRef> enrichDayPlans(PlannerConversation conversation, List<PlannerDayPlanRef> dayPlans) {
+        return safeList(dayPlans).stream()
+                .map(dayPlan -> {
+                    List<PlannerPlaceSuggestion> places = placeEnrichmentService.enrichPlaces(
+                            conversation,
+                            safeList(dayPlan.getPlaces()),
+                            safeList(dayPlan.getSelectedPlaceIds())
+                    );
+                    return dayPlanWithPlaces(dayPlan, places);
+                })
+                .toList();
+    }
+
+    private PlannerDayPlanRef dayPlanWithImageReference(PlannerDayPlanRef dayPlan) {
+        List<PlannerPlaceSuggestion> places = safeList(dayPlan.getPlaces());
+        return dayPlanWithPlaces(
+                dayPlan,
+                places,
+                markdownBuilder.appendImageReferenceIfMissing(nonBlankOrDefault(dayPlan.getMarkdown(), ""), places)
+        );
+    }
+
+    private PlannerDayPlanRef dayPlanWithPlaces(PlannerDayPlanRef dayPlan, List<PlannerPlaceSuggestion> places) {
+        return dayPlanWithPlaces(dayPlan, places, nonBlankOrDefault(dayPlan.getMarkdown(), ""));
+    }
+
+    private PlannerDayPlanRef dayPlanWithPlaces(PlannerDayPlanRef dayPlan, List<PlannerPlaceSuggestion> places, String markdown) {
+        return PlannerDayPlanRef.builder()
+                .dayIndex(dayPlan.getDayIndex())
+                .date(dayPlan.getDate())
+                .status(dayPlan.getStatus())
+                .title(dayPlan.getTitle())
+                .markdown(markdown)
+                .places(places)
+                .routes(safeList(dayPlan.getRoutes()))
+                .selectedPlaceIds(safeList(dayPlan.getSelectedPlaceIds()))
+                .rejectedPlaceIds(safeList(dayPlan.getRejectedPlaceIds()))
+                .changeSummary(dayPlan.getChangeSummary())
+                .checksum(dayPlan.getChecksum())
+                .build();
     }
 
     private <T> List<T> safeList(List<T> values) {

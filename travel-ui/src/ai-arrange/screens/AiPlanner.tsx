@@ -203,6 +203,26 @@ function joinKeywords(value?: string[]) {
     return value && value.length > 0 ? value.join("、") : "";
 }
 
+interface MarkdownImage {
+    alt: string,
+    url: string,
+}
+
+function parseMarkdownImage(line: string): MarkdownImage | null {
+    const match = line.match(/^!\[([^\]]*)\]\((.*?)\)\s*$/);
+    if (!match) {
+        return null;
+    }
+    const url = match[2].trim();
+    if (!url) {
+        return null;
+    }
+    return {
+        alt: match[1].trim(),
+        url,
+    };
+}
+
 function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[] {
     return text.split(/(`[^`]+`|\*\*[^*]+?\*\*)/g).map((part, index) => {
         const key = `${keyPrefix}-${index}`;
@@ -218,6 +238,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[
 
 function isMarkdownBlockStart(line: string) {
     return /^(#{1,6})\s+/.test(line)
+        || /^!\[[^\]]*\]\(.+\)\s*$/.test(line)
         || /^[-*]\s+/.test(line)
         || /^\d+\.\s+/.test(line)
         || /^>\s+/.test(line)
@@ -252,6 +273,43 @@ function renderMarkdownPreview(markdown: string): React.ReactNode[] {
                 <pre key={key} className="my-3 overflow-x-auto rounded-md bg-[#111827] px-4 py-3 text-sm leading-6 text-gray-100">
                     <code>{codeLines.join("\n")}</code>
                 </pre>
+            );
+            continue;
+        }
+
+        const image = parseMarkdownImage(trimmed);
+        if (image) {
+            const images: MarkdownImage[] = [];
+            while (index < lines.length) {
+                const parsed = parseMarkdownImage(lines[index].trim());
+                if (!parsed) {
+                    break;
+                }
+                images.push(parsed);
+                index += 1;
+            }
+            nodes.push(
+                <div key={key} className="my-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {images.map((item, imageIndex) => (
+                        <a
+                            key={`${key}-image-${imageIndex}`}
+                            href={item.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="group overflow-hidden rounded-md border border-gray-200 bg-gray-50 no-underline shadow-sm transition hover:border-[#556cd6]"
+                        >
+                            <img
+                                src={item.url}
+                                alt={item.alt}
+                                loading="lazy"
+                                className="h-32 w-full object-cover transition duration-200 group-hover:scale-[1.02] sm:h-36"
+                            />
+                            {item.alt &&
+                                <div className="truncate px-2 py-1.5 text-xs text-gray-600">{item.alt}</div>
+                            }
+                        </a>
+                    ))}
+                </div>
             );
             continue;
         }
