@@ -363,6 +363,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
     const preferredTrainTypeFilters = bookingPreferences.preferredTrainTypes.filter(isTrainTypeFilter);
     const navigateTimerRef = useRef<number | null>(null);
     const checkoutSectionRef = useRef<HTMLDivElement | null>(null);
+    const checkoutSummaryRef = useRef<HTMLDivElement | null>(null);
     const [departures, setDepartures] = useState<string[]>([]);
     const [arrivals, setArrivals] = useState<string[]>([]);
     const [from, setFrom] = useState('');
@@ -471,7 +472,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
     };
 
     const scrollToCheckoutSection = () => {
-        checkoutSectionRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'});
+        (checkoutSummaryRef.current || checkoutSectionRef.current)?.scrollIntoView({behavior: 'smooth', block: 'center'});
     };
 
     useEffect(() => clearAutoNavigate, []);
@@ -1001,7 +1002,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                 />
                             }
                         </div>
-                        <div className='mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]'>
+                        <div className='mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]'>
                             <div className='space-y-4'>
                                 {selectedOffer ? (
                                     <div className='rounded-lg border border-slate-200 bg-slate-50 p-4'>
@@ -1025,7 +1026,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                 )}
                                 <TravelerSelector title={mode === 'flight' ? '选择乘机人' : '选择乘车人'} onChange={setSelectedTravelers}/>
                             </div>
-                            <section className='rounded-lg border border-slate-200 bg-slate-50 p-4'>
+                            <section ref={checkoutSummaryRef} className='rounded-lg border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-24 lg:self-start'>
                                 <h3 className='text-lg font-bold text-slate-900'>订单信息</h3>
                                 {selectedOffer ? (
                                     <div className='mt-4 space-y-3'>

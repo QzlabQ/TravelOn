@@ -81,6 +81,7 @@ const HotelBooking = () => {
     const bookingPreferences = useMemo(() => getBookingPreferences(), []);
     const navigateTimerRef = useRef<number | null>(null);
     const checkoutSectionRef = useRef<HTMLDivElement | null>(null);
+    const checkoutSummaryRef = useRef<HTMLDivElement | null>(null);
     const [destinations, setDestinations] = useState<Location[]>([]);
     const [destination, setDestination] = useState<Location | undefined>();
     const [dateFrom, setDateFrom] = useState(toDateInputValue(rebookState.dateFrom, formatDate(today)));
@@ -238,7 +239,7 @@ const HotelBooking = () => {
     };
 
     const scrollToCheckoutSection = () => {
-        checkoutSectionRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'});
+        (checkoutSummaryRef.current || checkoutSectionRef.current)?.scrollIntoView({behavior: 'smooth', block: 'center'});
     };
 
     useEffect(() => clearAutoNavigate, []);
@@ -575,7 +576,7 @@ const HotelBooking = () => {
                                 />
                             }
                         </div>
-                        <div className='mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]'>
+                        <div className='mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]'>
                             <div className='space-y-4'>
                                 {selectedOffer ? (
                                     <div className='rounded-lg border border-slate-200 bg-slate-50 p-4'>
@@ -599,7 +600,7 @@ const HotelBooking = () => {
                                 )}
                                 <TravelerSelector title='选择入住人' onChange={setSelectedTravelers}/>
                             </div>
-                            <section className='rounded-lg border border-slate-200 bg-slate-50 p-4'>
+                            <section ref={checkoutSummaryRef} className='rounded-lg border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-24 lg:self-start'>
                                 <h3 className='text-lg font-bold text-slate-900'>订单信息</h3>
                                 {selectedOffer ? (
                                     <div className='mt-4 space-y-3'>
