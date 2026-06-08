@@ -1,10 +1,10 @@
 server:
-  port: 8082
+  port: ${SERVER_PORT:8082}
 
 eureka:
   client:
     service-url:
-      defaultZone: http://discovery:8010/eureka
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://discovery:8010/eureka}
   instance:
     prefer-ip-address: true
 

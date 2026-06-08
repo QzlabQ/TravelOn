@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: travel_admin
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-55432}:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d:ro
@@ -26,8 +26,8 @@ services:
     image: rabbitmq:3.13-management
     hostname: rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${RABBITMQ_HOST_PORT:-55672}:5672"
+      - "${RABBITMQ_MANAGEMENT_HOST_PORT:-55673}:15672"
     volumes:
       - ./data/rabbitmq:/var/lib/rabbitmq #here hardcoded path to store rabbitmq data, change it to your local path
       - ./logs/rabbitmq:/var/log/rabbitmq
@@ -38,7 +38,7 @@ services:
     image: mongo:7
     hostname: mongo
     ports:
-      - "27017:27017"
+      - "${MONGO_HOST_PORT:-57017}:27017"
     volumes:
       - ./data/mongo:/data/db
     networks:
@@ -48,7 +48,7 @@ services:
     hostname: discovery
     build: ./discovery-service
     ports:
-      - "8010:8010"
+      - "${DISCOVERY_HOST_PORT:-58010}:8010"
     volumes:
       - ./logs/discovery:/logs
     depends_on:
@@ -59,7 +59,7 @@ services:
   gateway:
     build: ./api-gateway
     ports:
-      - "8082:8082"
+      - "${GATEWAY_HOST_PORT:-58082}:8082"
     volumes:
       - ./logs/gateway:/logs
     depends_on:
@@ -244,7 +244,7 @@ services:
       NO_PROXY: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
       no_proxy: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
     ports:
-      - "8090:8090"
+      - "${AI_ARRANGE_AGENT_HOST_PORT:-58090}:8090"
     networks:
       - backend
 

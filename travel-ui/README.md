@@ -74,7 +74,8 @@ Configure the API connection in the `.env` file
 
 ```env
 REACT_APP_API_HOSTNAME=localhost
-REACT_APP_API_PORT=8082
+PORT=53000
+REACT_APP_API_PORT=58082
 ```
 
 ### AMap key
@@ -95,7 +96,7 @@ In the project directory, you can run:
 ### `yarn start`
 
 Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Open [http://localhost:53000](http://localhost:53000) to view it in your browser.
 
 The page will reload when you make changes.\
 You may also see any lint errors in the console.

@@ -5,8 +5,8 @@ services:
     image: rabbitmq:3.13-management
     hostname: rabbitmq
     ports:
-      - "18424:5672"
-      - "18446:15672"
+      - "${DEPLOY_RABBITMQ_HOST_PORT:-59672}:5672"
+      - "${DEPLOY_RABBITMQ_MANAGEMENT_HOST_PORT:-59673}:15672"
     volumes:
       - E:/2026spring/26NULLptr/repositories/travel-api/data/rabbitmq-deploy:/var/lib/rabbitmq
       - E:/2026spring/26NULLptr/repositories/travel-api/logs/rabbitmq-deploy:/var/log/rabbitmq
@@ -17,7 +17,7 @@ services:
     image: mongo:7
     hostname: mongo
     ports:
-      - "18470:27017"
+      - "${DEPLOY_MONGO_HOST_PORT:-59017}:27017"
     volumes:
       - E:/2026spring/26NULLptr/repositories/travel-api/data/mongo-deploy:/data/db
     networks:
@@ -27,7 +27,7 @@ services:
     image: ghcr.io/microarchitecturovisco/travel-ui:dev
     hostname: front
     ports:
-      - "18453:80"
+      - "${DEPLOY_FRONT_HOST_PORT:-59080}:80"
     depends_on:
       - rabbitmq
       - discovery
@@ -40,7 +40,7 @@ services:
     image: ghcr.io/microarchitecturovisco/discovery:dev
     hostname: discovery
     ports:
-      - "18451:8010"
+      - "${DEPLOY_DISCOVERY_HOST_PORT:-59010}:8010"
     depends_on:
       - rabbitmq
     networks:
@@ -49,7 +49,7 @@ services:
   gateway:
     image: ghcr.io/microarchitecturovisco/gateway:dev
     ports:
-      - "18469:8082"
+      - "${DEPLOY_GATEWAY_HOST_PORT:-59082}:8082"
     depends_on:
       - rabbitmq
       - discovery

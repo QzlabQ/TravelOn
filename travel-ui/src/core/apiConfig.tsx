@@ -1,7 +1,10 @@
 import axios from "axios";
 
-export const baseAPIURL = `http://${process.env.REACT_APP_API_HOSTNAME}:${process.env.REACT_APP_API_PORT}/`;
-export const baseWSURL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${process.env.REACT_APP_API_HOSTNAME}:${process.env.REACT_APP_API_PORT}/`;
+const apiHostname = process.env.REACT_APP_API_HOSTNAME || "localhost";
+const apiPort = process.env.REACT_APP_API_PORT || "58082";
+
+export const baseAPIURL = `http://${apiHostname}:${apiPort}/`;
+export const baseWSURL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${apiHostname}:${apiPort}/`;
 
 export const axiosInstance = axios.create({
     baseURL: baseAPIURL,

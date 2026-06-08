@@ -32,7 +32,7 @@ Frontend side of this project can be found [here](https://github.com/Microarchit
 ## Microservices architecture
 
 This project is devided into 10 modules:
-- **api gateway** - entrypoint for every request; by default available at port `8082`
+- **api gateway** - entrypoint for every request; by default exposed on host port `58082`
 - **discovery service** - eureka-based discovery service
 - **hotel service** - module responsilbe for managing hotels-oriented data
 - **transport service** - module responsilbe for managing transports-oriented data
@@ -112,4 +112,16 @@ To stop all associated containers, run:
 ```bash
 docker compose down
 ```
+
+Default host ports are intentionally placed in a high, project-specific range to reduce collisions:
+
+| Service | Host port | Container port | Override variable |
+| --- | ---: | ---: | --- |
+| PostgreSQL | 55432 | 5432 | `POSTGRES_HOST_PORT` |
+| RabbitMQ AMQP | 55672 | 5672 | `RABBITMQ_HOST_PORT` |
+| RabbitMQ management | 55673 | 15672 | `RABBITMQ_MANAGEMENT_HOST_PORT` |
+| MongoDB | 57017 | 27017 | `MONGO_HOST_PORT` |
+| Eureka discovery | 58010 | 8010 | `DISCOVERY_HOST_PORT` |
+| API gateway | 58082 | 8082 | `GATEWAY_HOST_PORT` |
+| AI arrange agent | 58090 | 8090 | `AI_ARRANGE_AGENT_HOST_PORT` |
 

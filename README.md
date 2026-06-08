@@ -64,7 +64,7 @@ docker compose ps
 网关地址：
 
 ```text
-http://localhost:8082
+http://localhost:58082
 ```
 
 5. 配置前端环境变量
@@ -77,7 +77,8 @@ cd ..\travel-ui
 
 ```env
 REACT_APP_API_HOSTNAME=localhost
-REACT_APP_API_PORT=8082
+PORT=53000
+REACT_APP_API_PORT=58082
 REACT_APP_AMAP_JS_API_KEY=
 REACT_APP_AMAP_SECURITY_JS_CODE=
 ```
@@ -99,13 +100,13 @@ cmd /c yarn start
 打开：
 
 ```text
-http://localhost:3000
+http://localhost:53000
 ```
 
 社区页面：
 
 ```text
-http://localhost:3000/community
+http://localhost:53000/community
 ```
 
 ## 日常开发操作

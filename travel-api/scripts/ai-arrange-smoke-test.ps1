@@ -1,5 +1,5 @@
 param(
-    [string]$GatewayBaseUrl = "http://localhost:8082",
+    [string]$GatewayBaseUrl = "http://localhost:58082",
     [string]$UserId = "00000000-0000-0000-0000-000000000001",
     [string]$City = "Shanghai",
     [string]$TravelStartDate = "2026-06-01",
