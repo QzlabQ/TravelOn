@@ -1887,7 +1887,7 @@ export default function AiPlanner() {
     );
 
     const renderMarkdownPanel = () => (
-        <section className="flex min-h-[860px] flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-2">
                 <div className="min-w-0 flex-1">
                     {renderWorkspaceTabs()}
@@ -2044,7 +2044,7 @@ export default function AiPlanner() {
     };
 
     const renderChatPanel = () => (
-        <section className="flex min-h-[760px] flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-2">
                 <div className="min-w-0 flex-1">
                     {renderWorkspaceTabs()}
@@ -2114,7 +2114,7 @@ export default function AiPlanner() {
     );
 
     const renderRecommendationsPanel = () => (
-        <section className="flex min-h-[560px] flex-[1.35] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <section className="flex min-h-0 flex-[1.35] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
                 <Typography variant="h6">AI 推荐选项</Typography>
                 <Chip size="small" label={`已选 ${displayData.selectedPlaceIds.length}`} color="secondary" variant="outlined"/>
@@ -2181,7 +2181,7 @@ export default function AiPlanner() {
     );
 
     const renderPlanningReferencePanels = () => (
-        <div className="flex min-h-[1040px] flex-col gap-4 overflow-visible">
+        <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
             <PlannerMapPanel
                 places={displayData.places}
                 routes={displayData.routes}
@@ -2194,8 +2194,8 @@ export default function AiPlanner() {
     );
 
     return (
-        <div className="min-h-[calc(100dvh-88px)] overflow-y-auto bg-[#f6f7fb]">
-            <div className="flex min-h-[calc(100dvh-88px)] flex-col gap-3 p-4">
+        <div className="h-[calc(100dvh+320px)] overflow-hidden bg-[#f6f7fb]">
+            <div className="flex h-full min-h-0 flex-col gap-3 p-4">
                 <section className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-5 py-4">
                     <div className="flex items-center gap-3">
                         <AutoAwesome style={{color: "#556cd6"}}/>
@@ -2241,16 +2241,16 @@ export default function AiPlanner() {
                 }
 
                 {!conversation ? (
-                    <div className="grid min-h-[780px] gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
-                        <div className="flex min-h-0 flex-col gap-4 overflow-visible">
+                    <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
+                        <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
                             {renderSlotForm()}
                         </div>
                         {renderPlanningReferencePanels()}
                     </div>
                 ) : (
-                    <div className="grid min-h-[1120px] gap-4 xl:grid-cols-[440px_minmax(0,1fr)]">
+                    <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[440px_minmax(0,1fr)]">
                         {renderPlanningReferencePanels()}
-                        <div className="flex min-h-0 flex-col gap-4 overflow-visible">
+                        <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
                             {renderTripBar()}
                             {renderDayPlanBar()}
                             {workspaceTab === "markdown" ? renderMarkdownPanel() : renderChatPanel()}
