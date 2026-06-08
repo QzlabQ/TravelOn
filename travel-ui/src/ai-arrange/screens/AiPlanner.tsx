@@ -10,8 +10,12 @@ import {
     LinearProgress,
     MenuItem,
     Paper,
+    Tab,
+    Tabs,
     TextField,
     Tooltip,
+    ToggleButton,
+    ToggleButtonGroup,
     Typography
 } from "@mui/material";
 import {DatePicker} from "@mui/x-date-pickers";
@@ -19,10 +23,13 @@ import dayjs, {Dayjs} from "dayjs";
 import {v4 as uuidv4} from "uuid";
 import {
     AutoAwesome,
+    AutoFixHigh,
     BookmarkAdd,
     CalendarMonth,
+    ChatBubbleOutline,
     CheckCircle,
     Close,
+    Code,
     EditNote,
     ErrorOutline,
     Group,
@@ -31,23 +38,32 @@ import {
     Hotel,
     LocationOn,
     Map as MapIcon,
+    PlaylistAdd,
     RestartAlt,
+    Restore,
     Send,
-    TravelExplore
+    TaskAlt,
+    TravelExplore,
+    Visibility
 } from "@mui/icons-material";
 import {
     ApiRequests,
     buildPlannerWebSocketUrl,
     CreatePlannerConversationPayload,
+    PlannerChatSendPayload,
     PlannerChatStreamPayload,
     PlannerConversationResponse,
     PlannerCoreSlots,
     PlannerDataRefreshPayload,
+    PlannerDayVersion,
+    PlannerDayPlanRef,
     PlannerErrorPayload,
+    PlannerModelVariant,
     PlannerPlaceSuggestion,
     PlannerRouteSegment,
     PlannerTraceEvent,
     PlannerSnapshot,
+    PlannerSnapshotDiffResponse,
     PlannerSocketEnvelope
 } from "../../core/apiConfig";
 import {PlannerMapPanel} from "../components/PlannerMapPanel";
@@ -55,6 +71,8 @@ import {buildMockPlannerViewData} from "../mockPlannerData";
 
 type SocketStatus = "idle" | "connecting" | "connected" | "closed" | "error";
 type SnapshotView = "latest" | number;
+type PlannerWorkspaceTab = "markdown" | "chat";
+type PlannerMarkdownMode = "preview" | "edit";
 
 interface ChatMessage {
     id: string,
@@ -75,12 +93,17 @@ interface PlannerFormState {
     mustVisitKeywords: string,
     avoidKeywords: string,
     notes: string,
+    modelVariant: PlannerModelVariant,
 }
 
 interface PlannerViewData {
     title: string,
     summary: string,
     markdown: string,
+    scope?: string,
+    currentDayIndex: number | null,
+    completedDayIndexes: number[],
+    dayPlans: PlannerDayPlanRef[],
     places: PlannerPlaceSuggestion[],
     routes: PlannerRouteSegment[],
     selectedPlaceIds: string[],
@@ -98,6 +121,9 @@ interface PlannerStoredSession {
     snapshots: PlannerSnapshot[],
     plannerTraceEvents: PlannerTraceEvent[],
     viewingSnapshotVersion: SnapshotView,
+    workspaceTab?: PlannerWorkspaceTab,
+    markdownMode?: PlannerMarkdownMode,
+    targetDayIndex?: number,
 }
 
 const DEFAULT_DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -116,6 +142,7 @@ function defaultPlannerForm(): PlannerFormState {
         mustVisitKeywords: "",
         avoidKeywords: "",
         notes: "",
+        modelVariant: "FLASH",
     };
 }
 
@@ -124,6 +151,10 @@ function emptyPlannerView(): PlannerViewData {
         title: "行前智能规划",
         summary: "",
         markdown: "",
+        scope: undefined,
+        currentDayIndex: null,
+        completedDayIndexes: [],
+        dayPlans: [],
         places: [],
         routes: [],
         selectedPlaceIds: [],
@@ -142,9 +173,11 @@ function readStoredPlannerSession(): PlannerStoredSession | null {
 
 function normalizeFormState(value?: Partial<PlannerFormState> | null): PlannerFormState {
     const defaults = defaultPlannerForm();
+    const modelVariant: PlannerModelVariant = value?.modelVariant === "PRO" ? "PRO" : "FLASH";
     return {
         ...defaults,
         ...value,
+        modelVariant,
         peopleCount: Math.max(1, Number(value?.peopleCount ?? defaults.peopleCount) || defaults.peopleCount),
     };
 }
@@ -168,6 +201,141 @@ function splitKeywords(value: string) {
 
 function joinKeywords(value?: string[]) {
     return value && value.length > 0 ? value.join("、") : "";
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[] {
+    return text.split(/(`[^`]+`|\*\*[^*]+?\*\*)/g).map((part, index) => {
+        const key = `${keyPrefix}-${index}`;
+        if (part.startsWith("`") && part.endsWith("`")) {
+            return <code key={key} className="rounded bg-gray-100 px-1 py-0.5 text-[0.92em] text-[#374151]">{part.slice(1, -1)}</code>;
+        }
+        if (part.startsWith("**") && part.endsWith("**")) {
+            return <strong key={key}>{part.slice(2, -2)}</strong>;
+        }
+        return <React.Fragment key={key}>{part}</React.Fragment>;
+    });
+}
+
+function isMarkdownBlockStart(line: string) {
+    return /^(#{1,6})\s+/.test(line)
+        || /^[-*]\s+/.test(line)
+        || /^\d+\.\s+/.test(line)
+        || /^>\s+/.test(line)
+        || /^```/.test(line)
+        || /^-{3,}$/.test(line);
+}
+
+function renderMarkdownPreview(markdown: string): React.ReactNode[] {
+    const lines = markdown.split(/\r?\n/);
+    const nodes: React.ReactNode[] = [];
+    let index = 0;
+
+    while (index < lines.length) {
+        const line = lines[index];
+        const trimmed = line.trim();
+        const key = `md-${index}`;
+
+        if (!trimmed) {
+            index += 1;
+            continue;
+        }
+
+        if (trimmed.startsWith("```")) {
+            const codeLines: string[] = [];
+            index += 1;
+            while (index < lines.length && !lines[index].trim().startsWith("```")) {
+                codeLines.push(lines[index]);
+                index += 1;
+            }
+            index += 1;
+            nodes.push(
+                <pre key={key} className="my-3 overflow-x-auto rounded-md bg-[#111827] px-4 py-3 text-sm leading-6 text-gray-100">
+                    <code>{codeLines.join("\n")}</code>
+                </pre>
+            );
+            continue;
+        }
+
+        const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
+        if (heading) {
+            const level = heading[1].length;
+            const className = level <= 2
+                ? "mb-3 mt-5 text-xl font-semibold text-gray-950"
+                : "mb-2 mt-4 text-base font-semibold text-gray-900";
+            nodes.push(
+                <div key={key} className={className}>
+                    {renderInlineMarkdown(heading[2], key)}
+                </div>
+            );
+            index += 1;
+            continue;
+        }
+
+        if (/^[-*]\s+/.test(trimmed)) {
+            const items: React.ReactNode[] = [];
+            while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
+                const itemText = lines[index].trim().replace(/^[-*]\s+/, "");
+                items.push(<li key={`li-${index}`}>{renderInlineMarkdown(itemText, `li-${index}`)}</li>);
+                index += 1;
+            }
+            nodes.push(<ul key={key} className="my-3 list-disc space-y-1 pl-6">{items}</ul>);
+            continue;
+        }
+
+        if (/^\d+\.\s+/.test(trimmed)) {
+            const items: React.ReactNode[] = [];
+            while (index < lines.length && /^\d+\.\s+/.test(lines[index].trim())) {
+                const itemText = lines[index].trim().replace(/^\d+\.\s+/, "");
+                items.push(<li key={`oli-${index}`}>{renderInlineMarkdown(itemText, `oli-${index}`)}</li>);
+                index += 1;
+            }
+            nodes.push(<ol key={key} className="my-3 list-decimal space-y-1 pl-6">{items}</ol>);
+            continue;
+        }
+
+        if (/^>\s+/.test(trimmed)) {
+            const quoteLines: string[] = [];
+            while (index < lines.length && /^>\s+/.test(lines[index].trim())) {
+                quoteLines.push(lines[index].trim().replace(/^>\s+/, ""));
+                index += 1;
+            }
+            nodes.push(
+                <blockquote key={key} className="my-3 border-l-4 border-[#556cd6] bg-[#f6f7fb] px-4 py-3 text-gray-700">
+                    {quoteLines.map((quoteLine, quoteIndex) => (
+                        <p key={`quote-${quoteIndex}`} className="mb-1 last:mb-0">
+                            {renderInlineMarkdown(quoteLine, `${key}-quote-${quoteIndex}`)}
+                        </p>
+                    ))}
+                </blockquote>
+            );
+            continue;
+        }
+
+        if (/^-{3,}$/.test(trimmed)) {
+            nodes.push(<Divider key={key} className="my-4"/>);
+            index += 1;
+            continue;
+        }
+
+        const paragraphLines = [trimmed];
+        index += 1;
+        while (index < lines.length) {
+            const nextLine = lines[index].trim();
+            if (!nextLine || isMarkdownBlockStart(nextLine)) {
+                break;
+            }
+            paragraphLines.push(nextLine);
+            index += 1;
+        }
+        const paragraph = paragraphLines.join(" ");
+        nodes.push(
+            <p key={key} className="mb-3 leading-7 text-gray-800">
+                {renderInlineMarkdown(paragraph, key)}
+            </p>
+        );
+    }
+
+    return nodes;
 }
 
 function formFromCoreSlots(slots: PlannerCoreSlots): PlannerFormState {
@@ -202,10 +370,53 @@ function viewDataFromSnapshot(snapshot: PlannerSnapshot): PlannerViewData {
         title: snapshot.title || "行前智能规划",
         summary: snapshot.summary || "",
         markdown: snapshot.markdown || "",
+        scope: snapshot.scope,
+        currentDayIndex: snapshot.currentDayIndex ?? null,
+        completedDayIndexes: snapshot.completedDayIndexes || [],
+        dayPlans: snapshot.dayPlans || [],
         places: snapshot.places || [],
         routes: snapshot.routes || [],
         selectedPlaceIds: snapshot.selectedPlaceIds || [],
         snapshotVersion: snapshot.version ?? null,
+    };
+}
+
+function viewDataFromDayVersion(record: PlannerDayVersion, fallbackData: PlannerViewData): PlannerViewData {
+    return {
+        ...fallbackData,
+        title: record.title || fallbackData.title,
+        markdown: record.markdown || fallbackData.markdown,
+        currentDayIndex: record.dayIndex || fallbackData.currentDayIndex,
+        places: record.places || fallbackData.places,
+        routes: record.routes || fallbackData.routes,
+        selectedPlaceIds: record.selectedPlaceIds || fallbackData.selectedPlaceIds,
+        snapshotVersion: record.sourceSnapshotVersion ?? fallbackData.snapshotVersion,
+    };
+}
+
+function viewDataForDay(data: PlannerViewData, dayIndex: number): PlannerViewData {
+    if (data.scope === "TRIP_ASSEMBLE") {
+        return data;
+    }
+
+    const dayPlan = data.dayPlans.find(record => record.dayIndex === dayIndex);
+    if (!dayPlan) {
+        return {
+            ...data,
+            currentDayIndex: dayIndex,
+        };
+    }
+
+    return {
+        ...data,
+        title: dayPlan.title || data.title,
+        markdown: dayPlan.markdown || data.markdown,
+        currentDayIndex: dayIndex,
+        places: dayPlan.places && dayPlan.places.length > 0 ? dayPlan.places : data.places,
+        routes: dayPlan.routes && dayPlan.routes.length > 0 ? dayPlan.routes : data.routes,
+        selectedPlaceIds: dayPlan.selectedPlaceIds && dayPlan.selectedPlaceIds.length > 0
+            ? dayPlan.selectedPlaceIds
+            : data.selectedPlaceIds,
     };
 }
 
@@ -214,6 +425,10 @@ function viewDataFromRefresh(payload: PlannerDataRefreshPayload): PlannerViewDat
         title: payload.title || "行前智能规划",
         summary: payload.summary || "",
         markdown: payload.markdown || "",
+        scope: payload.scope,
+        currentDayIndex: payload.currentDayIndex ?? null,
+        completedDayIndexes: payload.completedDayIndexes || [],
+        dayPlans: payload.dayPlans || [],
         places: payload.places || [],
         routes: payload.routes || [],
         selectedPlaceIds: payload.selectedPlaceIds || [],
@@ -284,6 +499,34 @@ function traceMessage(event?: PlannerTraceEvent | null) {
     return event.message || `${traceToolLabel(event.tool)}${traceStatusLabel(event.status)}`;
 }
 
+function dayPlanStatusColor(status?: string): "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning" {
+    if (status === "CONFIRMED") return "success";
+    if (status === "DRAFT") return "warning";
+    if (status === "CURRENT") return "primary";
+    return "default";
+}
+
+function dayPlanStatusLabel(status?: string) {
+    if (status === "CONFIRMED") return "已确认";
+    if (status === "DRAFT") return "草稿";
+    if (status === "NEEDS_REVISION") return "待修改";
+    return status || "草稿";
+}
+
+function diffTypeColor(type?: string): "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning" {
+    if (type === "ADDED") return "success";
+    if (type === "REMOVED") return "error";
+    if (type === "CHANGED") return "warning";
+    return "default";
+}
+
+function diffTypeLabel(type?: string) {
+    if (type === "ADDED") return "新增";
+    if (type === "REMOVED") return "移除";
+    if (type === "CHANGED") return "变更";
+    return type || "变化";
+}
+
 function traceEventKey(event: PlannerTraceEvent, index: number) {
     return event.eventId || `${event.type}-${event.tool || "planner"}-${event.createdAt || index}`;
 }
@@ -312,6 +555,7 @@ export default function AiPlanner() {
     const pendingInitialPromptRef = useRef<{conversationId: string, prompt: string} | null>(null);
     const viewingSnapshotVersionRef = useRef<SnapshotView>("latest");
     const selectedPlaceIdsRef = useRef<string[]>([]);
+    const activeDayIndexRef = useRef(1);
     const initialSessionRef = useRef<PlannerStoredSession | null | undefined>(undefined);
 
     if (initialSessionRef.current === undefined) {
@@ -342,6 +586,7 @@ export default function AiPlanner() {
     const [mustVisitKeywords, setMustVisitKeywords] = useState(initialForm.mustVisitKeywords);
     const [avoidKeywords, setAvoidKeywords] = useState(initialForm.avoidKeywords);
     const [notes, setNotes] = useState(initialForm.notes);
+    const [modelVariant, setModelVariant] = useState<PlannerModelVariant>(initialForm.modelVariant);
 
     const [conversation, setConversation] = useState<PlannerConversationResponse | null>(initialSession?.conversation || null);
     const [socketStatus, setSocketStatus] = useState<SocketStatus>("idle");
@@ -356,6 +601,20 @@ export default function AiPlanner() {
     const [snapshots, setSnapshots] = useState<PlannerSnapshot[]>(sortSnapshots(initialSession?.snapshots || []));
     const [plannerTraceEvents, setPlannerTraceEvents] = useState<PlannerTraceEvent[]>(initialSession?.plannerTraceEvents || []);
     const [viewingSnapshotVersion, setViewingSnapshotVersion] = useState<SnapshotView>(initialSession?.viewingSnapshotVersion || "latest");
+    const [workspaceTab, setWorkspaceTab] = useState<PlannerWorkspaceTab>(initialSession?.workspaceTab || "markdown");
+    const [markdownMode, setMarkdownMode] = useState<PlannerMarkdownMode>(initialSession?.markdownMode || "preview");
+    const [snapshotDiff, setSnapshotDiff] = useState<PlannerSnapshotDiffResponse | null>(null);
+    const [snapshotDiffLoading, setSnapshotDiffLoading] = useState(false);
+    const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
+    const [dayVersions, setDayVersions] = useState<PlannerDayVersion[]>([]);
+    const [dayVersionsLoading, setDayVersionsLoading] = useState(false);
+    const [assemblingTrip, setAssemblingTrip] = useState(false);
+    const [targetDayIndex, setTargetDayIndex] = useState(
+        initialSession?.targetDayIndex
+        || initialDisplayData.currentDayIndex
+        || initialLiveData.currentDayIndex
+        || 1
+    );
 
     const formState = useMemo<PlannerFormState>(() => ({
         city,
@@ -369,6 +628,7 @@ export default function AiPlanner() {
         mustVisitKeywords,
         avoidKeywords,
         notes,
+        modelVariant,
     }), [
         city,
         travelStartDate,
@@ -381,6 +641,7 @@ export default function AiPlanner() {
         mustVisitKeywords,
         avoidKeywords,
         notes,
+        modelVariant,
     ]);
 
     const coreSlots = useMemo<PlannerCoreSlots>(() => ({
@@ -411,8 +672,6 @@ export default function AiPlanner() {
 
     const canStartPlanning = Boolean(coreSlots.city && coreSlots.travelStartDate && coreSlots.peopleCount > 0);
     const isSnapshotPreview = viewingSnapshotVersion !== "latest";
-    const snapshotSelectorValue = viewingSnapshotVersion === "latest" ? "latest" : String(viewingSnapshotVersion);
-    const snapshotCountLabel = snapshots.length > 0 ? `${snapshots.length} 个版本` : "暂无快照";
     const progressEvents = useMemo(
         () => plannerTraceEvents.filter(event => event.type !== "RUN_FINISHED" || event.message),
         [plannerTraceEvents]
@@ -423,6 +682,68 @@ export default function AiPlanner() {
     }, [progressEvents]);
     const recentTraceEvents = useMemo(() => progressEvents.slice(-5), [progressEvents]);
     const showPlannerProgress = chatSending || progressEvents.length > 0;
+    const displayedDayPlans = displayData.dayPlans || [];
+    const completedDaySet = useMemo(() => new Set(displayData.completedDayIndexes || []), [displayData.completedDayIndexes]);
+    const tripDayCount = useMemo(() => {
+        const start = dayjs(coreSlots.travelStartDate);
+        const end = coreSlots.travelEndDate ? dayjs(coreSlots.travelEndDate) : start;
+        if (!start.isValid() || !end.isValid()) return Math.max(1, displayedDayPlans.length || 1);
+        return Math.max(1, end.diff(start, "day") + 1);
+    }, [coreSlots.travelEndDate, coreSlots.travelStartDate, displayedDayPlans.length]);
+    const displayedDayPlanByIndex = useMemo(
+        () => new Map(displayedDayPlans.map(dayPlan => [dayPlan.dayIndex || 0, dayPlan])),
+        [displayedDayPlans]
+    );
+    const suggestedDayIndex = useMemo(() => {
+        const currentDayIndex = displayData.currentDayIndex;
+        const currentDayPlan = currentDayIndex ? displayedDayPlanByIndex.get(currentDayIndex) : undefined;
+        const currentDayConfirmed = currentDayIndex
+            ? completedDaySet.has(currentDayIndex) || currentDayPlan?.status === "CONFIRMED"
+            : false;
+
+        if (currentDayIndex && currentDayPlan && !currentDayConfirmed) {
+            return currentDayIndex;
+        }
+
+        for (let dayIndex = 1; dayIndex <= tripDayCount; dayIndex += 1) {
+            const dayPlan = displayedDayPlanByIndex.get(dayIndex);
+            const dayConfirmed = completedDaySet.has(dayIndex) || dayPlan?.status === "CONFIRMED";
+            if (!dayPlan || !dayConfirmed) {
+                return dayIndex;
+            }
+        }
+
+        return currentDayIndex || displayedDayPlans[0]?.dayIndex || 1;
+    }, [completedDaySet, displayData.currentDayIndex, displayedDayPlanByIndex, displayedDayPlans, tripDayCount]);
+    const dayOptions = useMemo(() => {
+        const indexes = new Set<number>();
+        for (let dayIndex = 1; dayIndex <= tripDayCount; dayIndex += 1) {
+            indexes.add(dayIndex);
+        }
+        displayedDayPlans.forEach(dayPlan => {
+            if (dayPlan.dayIndex) indexes.add(dayPlan.dayIndex);
+        });
+        indexes.add(suggestedDayIndex);
+        return Array.from(indexes).filter(dayIndex => dayIndex > 0).sort((left, right) => left - right);
+    }, [displayedDayPlans, suggestedDayIndex, tripDayCount]);
+    const activeDayIndex = dayOptions.includes(targetDayIndex) ? targetDayIndex : suggestedDayIndex;
+    const nextDayIndex = Math.min(tripDayCount, activeDayIndex + 1);
+    const canGenerateNextDay = nextDayIndex > activeDayIndex;
+    const selectedDayVersion = useMemo(
+        () => typeof viewingSnapshotVersion === "number"
+            ? dayVersions.find(record => record.dayVersion === viewingSnapshotVersion)
+            : undefined,
+        [dayVersions, viewingSnapshotVersion]
+    );
+    const currentDayVersion = useMemo(() => dayVersions.find(record => record.current), [dayVersions]);
+    const snapshotSelectorValue = viewingSnapshotVersion === "latest" || !selectedDayVersion
+        ? "latest"
+        : String(viewingSnapshotVersion);
+    const snapshotCountLabel = dayVersionsLoading
+        ? `第 ${activeDayIndex} 天版本加载中`
+        : dayVersions.length > 0
+        ? `第 ${activeDayIndex} 天 · ${dayVersions.length} 个版本`
+        : `第 ${activeDayIndex} 天暂无版本`;
 
     useEffect(() => {
         viewingSnapshotVersionRef.current = viewingSnapshotVersion;
@@ -431,6 +752,22 @@ export default function AiPlanner() {
     useEffect(() => {
         selectedPlaceIdsRef.current = liveData.selectedPlaceIds;
     }, [liveData.selectedPlaceIds]);
+
+    useEffect(() => {
+        activeDayIndexRef.current = activeDayIndex;
+    }, [activeDayIndex]);
+
+    useEffect(() => {
+        if (viewingSnapshotVersionRef.current === "latest") {
+            setTargetDayIndex(suggestedDayIndex);
+        }
+    }, [suggestedDayIndex]);
+
+    useEffect(() => {
+        if (viewingSnapshotVersionRef.current === "latest") {
+            setDisplayData(viewDataForDay(liveData, activeDayIndex));
+        }
+    }, [activeDayIndex, liveData]);
 
     useEffect(() => {
         const session: PlannerStoredSession = {
@@ -444,6 +781,9 @@ export default function AiPlanner() {
         snapshots,
         plannerTraceEvents,
         viewingSnapshotVersion,
+        workspaceTab,
+        markdownMode,
+        targetDayIndex,
     };
         localStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(session));
     }, [
@@ -457,6 +797,9 @@ export default function AiPlanner() {
         snapshots,
         plannerTraceEvents,
         viewingSnapshotVersion,
+        workspaceTab,
+        markdownMode,
+        targetDayIndex,
     ]);
 
     const applyCoreSlotsToForm = useCallback((slots: PlannerCoreSlots) => {
@@ -472,6 +815,7 @@ export default function AiPlanner() {
         setMustVisitKeywords(nextForm.mustVisitKeywords);
         setAvoidKeywords(nextForm.avoidKeywords);
         setNotes(nextForm.notes);
+        setModelVariant(nextForm.modelVariant);
     }, []);
 
     const setSnapshotView = useCallback((nextView: SnapshotView) => {
@@ -492,6 +836,19 @@ export default function AiPlanner() {
             setSnapshots(sortSnapshots(response.data));
         } catch (error) {
             console.error(error);
+        }
+    }, [userId]);
+
+    const loadDayVersions = useCallback(async (conversationId: string, dayIndex: number) => {
+        setDayVersionsLoading(true);
+        try {
+            const response = await ApiRequests.listPlannerDayVersions(conversationId, userId, dayIndex);
+            setDayVersions(response.data);
+        } catch (error) {
+            console.error(error);
+            setDayVersions([]);
+        } finally {
+            setDayVersionsLoading(false);
         }
     }, [userId]);
 
@@ -519,13 +876,8 @@ export default function AiPlanner() {
             if (currentView === "latest") {
                 setDisplayData(nextLiveData);
             } else {
-                const historicalSnapshot = nextSnapshots.find(snapshot => snapshot.version === currentView);
-                if (historicalSnapshot) {
-                    setDisplayData(viewDataFromSnapshot(historicalSnapshot));
-                } else {
-                    setSnapshotView("latest");
-                    setDisplayData(nextLiveData);
-                }
+                setSnapshotView("latest");
+                setDisplayData(nextLiveData);
             }
         } catch (error) {
             console.error(error);
@@ -535,6 +887,25 @@ export default function AiPlanner() {
         }
     }, [applyCoreSlotsToForm, setSnapshotView, userId]);
 
+    const loadSnapshotDiff = useCallback(async (fromVersion: number) => {
+        const toVersion = liveData.snapshotVersion;
+        if (!conversation?.id || !toVersion || fromVersion === toVersion) {
+            setSnapshotDiff(null);
+            return;
+        }
+
+        setSnapshotDiffLoading(true);
+        try {
+            const response = await ApiRequests.diffPlannerSnapshots(conversation.id, userId, fromVersion, toVersion);
+            setSnapshotDiff(response.data);
+        } catch (error) {
+            console.error(error);
+            setSnapshotDiff(null);
+        } finally {
+            setSnapshotDiffLoading(false);
+        }
+    }, [conversation?.id, liveData.snapshotVersion, userId]);
+
     useEffect(() => {
         if (conversation?.id) {
             void refreshConversationFromServer(conversation.id);
@@ -542,6 +913,26 @@ export default function AiPlanner() {
             setHydrating(false);
         }
     }, [conversation?.id, refreshConversationFromServer]);
+
+    useEffect(() => {
+        if (conversation?.id) {
+            void loadDayVersions(conversation.id, activeDayIndex);
+        } else {
+            setDayVersions([]);
+        }
+    }, [activeDayIndex, conversation?.id, loadDayVersions]);
+
+    useEffect(() => {
+        setSnapshotDiff(null);
+        setSnapshotDiffLoading(false);
+    }, [activeDayIndex, viewingSnapshotVersion]);
+
+    useEffect(() => {
+        if (!dayVersionsLoading && typeof viewingSnapshotVersion === "number" && !selectedDayVersion) {
+            setSnapshotView("latest");
+            setDisplayData(liveData);
+        }
+    }, [dayVersionsLoading, liveData, selectedDayVersion, setSnapshotView, viewingSnapshotVersion]);
 
     const appendAssistantDelta = useCallback((payload: PlannerChatStreamPayload) => {
         setChatSending(!payload.done);
@@ -613,7 +1004,9 @@ export default function AiPlanner() {
                 sendPlannerEnvelope(socket, conversationId, "PLANNER_CHAT_SEND", {
                     message: seed.prompt,
                     selectedPlaceIds: selectedPlaceIdsRef.current,
+                    modelVariant,
                 });
+                setWorkspaceTab("chat");
                 setChatSending(true);
             }
         };
@@ -638,8 +1031,10 @@ export default function AiPlanner() {
             if (envelope.type === "PLANNER_DATA_REFRESH") {
                 const payload = envelope.payload as PlannerDataRefreshPayload;
                 applyLiveData(viewDataFromRefresh(payload));
+                setWorkspaceTab("markdown");
                 setChatSending(false);
                 void refreshSnapshotList(conversationId);
+                void loadDayVersions(conversationId, payload.currentDayIndex || activeDayIndexRef.current);
                 return;
             }
 
@@ -674,6 +1069,8 @@ export default function AiPlanner() {
         appendAssistantDelta,
         applyLiveData,
         conversation?.id,
+        loadDayVersions,
+        modelVariant,
         refreshSnapshotList,
         sendPlannerEnvelope,
         userId,
@@ -707,8 +1104,12 @@ export default function AiPlanner() {
             setLiveData(nextData);
             setDisplayData(nextData);
             setSnapshots([]);
+            setDayVersions([]);
             setPlannerTraceEvents([]);
             setSnapshotView("latest");
+            setWorkspaceTab("chat");
+            setTargetDayIndex(1);
+            setAssemblingTrip(false);
             setChatMessages([]);
             setChatInput("");
         } catch (error) {
@@ -716,6 +1117,92 @@ export default function AiPlanner() {
             setErrorMessage("创建 AI 规划会话失败，请确认网关 /ai-arrange/api/conversations 可访问。");
         } finally {
             setCreating(false);
+        }
+    };
+
+    const applySnapshotToPlannerState = useCallback((snapshot: PlannerSnapshot, preferredDayIndex?: number) => {
+        const nextData = viewDataFromSnapshot(snapshot);
+
+        setConversation(prevConversation => prevConversation ? {
+            ...prevConversation,
+            title: snapshot.title || prevConversation.title,
+            currentMarkdown: snapshot.markdown || "",
+            latestSnapshotVersion: snapshot.version,
+            selectedPlaceIds: snapshot.selectedPlaceIds || [],
+            updatedAt: snapshot.createdAt || prevConversation.updatedAt,
+        } : prevConversation);
+        setSnapshots(prevSnapshots => sortSnapshots([
+            snapshot,
+            ...prevSnapshots.filter(item => item.id !== snapshot.id),
+        ]));
+        setLiveData(nextData);
+        setDisplayData(nextData);
+        setSnapshotView("latest");
+        setSnapshotDiff(null);
+        setTargetDayIndex(snapshot.currentDayIndex || snapshot.targetDayIndex || preferredDayIndex || 1);
+    }, [setSnapshotView]);
+
+    const sendPlannerActionMessage = async (message: string, extraPayload: Partial<PlannerChatSendPayload> = {}) => {
+        const trimmedInput = message.trim();
+        if (!trimmedInput || !conversation) return;
+
+        if (isSnapshotPreview) {
+            setErrorMessage("历史快照为只读状态，请先切回最新版本再继续操作。");
+            return;
+        }
+
+        const socket = plannerWSRef.current;
+        const payload: PlannerChatSendPayload = {
+            message: trimmedInput,
+            selectedPlaceIds: liveData.selectedPlaceIds,
+            modelVariant,
+            ...extraPayload,
+        };
+        setChatMessages(prevMessages => [
+            ...prevMessages,
+            {id: uuidv4(), role: "user", text: trimmedInput}
+        ]);
+        setErrorMessage("");
+        setPlannerTraceEvents([]);
+        setWorkspaceTab("chat");
+        setChatSending(true);
+
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            sendPlannerEnvelope(socket, conversation.id, "PLANNER_CHAT_SEND", payload);
+            return;
+        }
+
+        setChatMessages(prevMessages => [
+            ...prevMessages,
+            {
+                id: uuidv4(),
+                role: "system",
+                text: "规划连接已关闭，已改用非流式方式生成并保存快照。",
+            }
+        ]);
+
+        try {
+            const response = await ApiRequests.runPlannerAgent(conversation.id, {
+                ...payload,
+                userId,
+            });
+            applySnapshotToPlannerState(response.data, payload.targetDayIndex);
+            setWorkspaceTab("markdown");
+            setChatMessages(prevMessages => [
+                ...prevMessages,
+                {
+                    id: uuidv4(),
+                    role: "assistant",
+                    text: response.data.assistantText || response.data.summary || "日计划已生成。",
+                }
+            ]);
+            void refreshSnapshotList(conversation.id);
+            void loadDayVersions(conversation.id, payload.targetDayIndex || activeDayIndex);
+        } catch (error) {
+            console.error(error);
+            setErrorMessage("生成日计划失败，请确认 ai-arrange-service 与 Python Agent 可用后重试。");
+        } finally {
+            setChatSending(false);
         }
     };
 
@@ -741,9 +1228,11 @@ export default function AiPlanner() {
         setChatInput("");
         setErrorMessage("");
         setPlannerTraceEvents([]);
+        setWorkspaceTab("chat");
         sendPlannerEnvelope(socket, conversation.id, "PLANNER_CHAT_SEND", {
             message: trimmedInput,
             selectedPlaceIds: liveData.selectedPlaceIds,
+            modelVariant,
         });
         setChatSending(true);
     };
@@ -782,16 +1271,117 @@ export default function AiPlanner() {
     const handleSnapshotChange = (value: string) => {
         if (value === "latest") {
             setSnapshotView("latest");
-            setDisplayData(liveData);
+            setDisplayData(viewDataForDay(liveData, activeDayIndex));
+            setWorkspaceTab("markdown");
             return;
         }
 
-        const version = Number(value);
-        const snapshot = snapshots.find(item => item.version === version);
-        if (!snapshot) return;
+        const dayVersionValue = Number(value);
+        const dayVersion = dayVersions.find(record => record.dayVersion === dayVersionValue);
+        if (!dayVersion) return;
 
-        setSnapshotView(version);
-        setDisplayData(viewDataFromSnapshot(snapshot));
+        setSnapshotView(dayVersionValue);
+        setDisplayData(viewDataFromDayVersion(dayVersion, liveData));
+        setWorkspaceTab("markdown");
+    };
+
+    const handleRestoreSnapshot = async () => {
+        if (!conversation || typeof viewingSnapshotVersion !== "number") return;
+
+        const dayVersion = viewingSnapshotVersion;
+        const dayIndex = selectedDayVersion?.dayIndex || activeDayIndex;
+        const dayVersionLabel = selectedDayVersion ? `第 ${dayIndex} 天 v${selectedDayVersion.dayVersion}` : `第 ${dayIndex} 天`;
+        setRestoringVersion(dayVersion);
+        setErrorMessage("");
+        try {
+            const response = await ApiRequests.activatePlannerDayVersion(conversation.id, userId, dayIndex, dayVersion);
+            const restoredSnapshot = response.data;
+            const restoredData = viewDataFromSnapshot(restoredSnapshot);
+
+            setConversation(prevConversation => prevConversation ? {
+                ...prevConversation,
+                title: restoredSnapshot.title || prevConversation.title,
+                currentMarkdown: restoredSnapshot.markdown || "",
+                latestSnapshotVersion: restoredSnapshot.version,
+                selectedPlaceIds: restoredSnapshot.selectedPlaceIds || [],
+                updatedAt: restoredSnapshot.createdAt || prevConversation.updatedAt,
+            } : prevConversation);
+            setSnapshots(prevSnapshots => sortSnapshots([
+                restoredSnapshot,
+                ...prevSnapshots.filter(snapshot => snapshot.id !== restoredSnapshot.id),
+            ]));
+            setLiveData(restoredData);
+            setDisplayData(viewDataForDay(restoredData, dayIndex));
+            setSnapshotView("latest");
+            setSnapshotDiff(null);
+            setWorkspaceTab("markdown");
+            setTargetDayIndex(restoredSnapshot.currentDayIndex || restoredSnapshot.targetDayIndex || dayIndex);
+            setChatMessages(prevMessages => [
+                ...prevMessages,
+                {
+                    id: uuidv4(),
+                    role: "system",
+                    text: `已将 ${dayVersionLabel} 设为当前版本，其他日期保持最新内容。`,
+                }
+            ]);
+            void refreshSnapshotList(conversation.id);
+            void loadDayVersions(conversation.id, dayIndex);
+        } catch (error) {
+            console.error(error);
+            setErrorMessage(`恢复第 ${dayIndex} 天失败，请检查 ai-arrange-service 后重试。`);
+        } finally {
+            setRestoringVersion(null);
+        }
+    };
+
+    const handleAssembleTrip = async () => {
+        if (!conversation) return;
+
+        if (isSnapshotPreview) {
+            setErrorMessage("历史快照为只读状态，请先切回最新版本再汇总行程。");
+            return;
+        }
+
+        setAssemblingTrip(true);
+        setErrorMessage("");
+        setWorkspaceTab("markdown");
+        try {
+            const response = await ApiRequests.assemblePlannerTripSnapshot(conversation.id, userId);
+            const assembledSnapshot = response.data;
+            const assembledData = viewDataFromSnapshot(assembledSnapshot);
+
+            setConversation(prevConversation => prevConversation ? {
+                ...prevConversation,
+                title: assembledSnapshot.title || prevConversation.title,
+                currentMarkdown: assembledSnapshot.markdown || "",
+                latestSnapshotVersion: assembledSnapshot.version,
+                selectedPlaceIds: assembledSnapshot.selectedPlaceIds || [],
+                updatedAt: assembledSnapshot.createdAt || prevConversation.updatedAt,
+            } : prevConversation);
+            setSnapshots(prevSnapshots => sortSnapshots([
+                assembledSnapshot,
+                ...prevSnapshots.filter(snapshot => snapshot.id !== assembledSnapshot.id),
+            ]));
+            setLiveData(assembledData);
+            setDisplayData(assembledData);
+            setSnapshotView("latest");
+            setSnapshotDiff(null);
+            setTargetDayIndex(assembledSnapshot.currentDayIndex || assembledSnapshot.targetDayIndex || activeDayIndex);
+            setChatMessages(prevMessages => [
+                ...prevMessages,
+                {
+                    id: uuidv4(),
+                    role: "system",
+                    text: `已在后端本地汇总完整行程，保存为新的全局 v${assembledSnapshot.version}。`,
+                }
+            ]);
+            void refreshSnapshotList(conversation.id);
+        } catch (error) {
+            console.error(error);
+            setErrorMessage("汇总完整行程失败，请确认至少已有日计划快照后重试。");
+        } finally {
+            setAssemblingTrip(false);
+        }
     };
 
     const handleMarkdownChange = (nextMarkdown: string) => {
@@ -821,6 +1411,15 @@ export default function AiPlanner() {
         setSnapshots([]);
         setPlannerTraceEvents([]);
         setSnapshotView("latest");
+        setWorkspaceTab("markdown");
+        setMarkdownMode("preview");
+        setSnapshotDiff(null);
+        setSnapshotDiffLoading(false);
+        setRestoringVersion(null);
+        setDayVersions([]);
+        setDayVersionsLoading(false);
+        setAssemblingTrip(false);
+        setTargetDayIndex(1);
 
         setCity(nextForm.city);
         setTravelStartDate(dateValue(nextForm.travelStartDate));
@@ -833,6 +1432,7 @@ export default function AiPlanner() {
         setMustVisitKeywords(nextForm.mustVisitKeywords);
         setAvoidKeywords(nextForm.avoidKeywords);
         setNotes(nextForm.notes);
+        setModelVariant(nextForm.modelVariant);
     };
 
     const loadMockPlannerData = () => {
@@ -864,6 +1464,106 @@ export default function AiPlanner() {
         setSnapshots([]);
         setPlannerTraceEvents([]);
         setSnapshotView("latest");
+        setWorkspaceTab("markdown");
+        setMarkdownMode("preview");
+        setSnapshotDiff(null);
+        setSnapshotDiffLoading(false);
+        setRestoringVersion(null);
+        setDayVersions([]);
+        setDayVersionsLoading(false);
+        setAssemblingTrip(false);
+        setTargetDayIndex(1);
+    };
+
+    const handleModelVariantChange = (value: string) => {
+        setModelVariant(value === "PRO" ? "PRO" : "FLASH");
+    };
+
+    const renderModelVariantSelect = (fullWidth = false) => (
+        <TextField
+            select
+            label="模型模式"
+            value={modelVariant}
+            fullWidth={fullWidth}
+            size={fullWidth ? "medium" : "small"}
+            onChange={event => handleModelVariantChange(event.target.value)}
+            sx={fullWidth ? undefined : {minWidth: 150}}
+        >
+            <MenuItem value="FLASH">Flash 快速</MenuItem>
+            <MenuItem value="PRO">Pro 高质量</MenuItem>
+        </TextField>
+    );
+
+    const renderSnapshotDiffPanel = () => {
+        if (!isSnapshotPreview) return null;
+
+        const restoreLabel = selectedDayVersion
+            ? `设为当前：第 ${selectedDayVersion.dayIndex} 天 v${selectedDayVersion.dayVersion}`
+            : `设为当前：第 ${activeDayIndex} 天`;
+
+        if (snapshotDiffLoading) {
+            return (
+                <div className="mx-4 mt-3 rounded-md border border-gray-200 bg-white px-4 py-3">
+                    <LinearProgress/>
+                </div>
+            );
+        }
+
+        if (!snapshotDiff || snapshotDiff.changes.length === 0) {
+            return (
+                <Alert severity="info" className="mx-4 mt-3" action={
+                    <Button
+                        color="inherit"
+                        size="small"
+                        startIcon={<Restore/>}
+                        disabled={restoringVersion !== null}
+                        onClick={handleRestoreSnapshot}
+                    >
+                        {restoreLabel}
+                    </Button>
+                }>
+                    当前正在只读查看日版本。设为当前时只会切换当前选中的日期。
+                </Alert>
+            );
+        }
+
+        return (
+            <div className="mx-4 mt-3 rounded-md border border-gray-200 bg-[#fbfcff] px-4 py-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-gray-800">
+                        <History fontSize="small"/>
+                        <Typography variant="subtitle2">
+                            {selectedDayVersion ? `第 ${selectedDayVersion.dayIndex} 天 v${selectedDayVersion.dayVersion}` : `第 ${activeDayIndex} 天历史版本`}
+                        </Typography>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Chip size="small" variant="outlined" label={`${snapshotDiff.changes.length} 项变化`}/>
+                        <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<Restore/>}
+                            disabled={restoringVersion !== null}
+                            onClick={handleRestoreSnapshot}
+                        >
+                            {restoringVersion === viewingSnapshotVersion ? "恢复中" : restoreLabel}
+                        </Button>
+                    </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                    {snapshotDiff.changes.map(change => (
+                        <div key={`${change.field}-${change.type}`} className="rounded-md border border-gray-200 bg-white px-3 py-2">
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                                <Typography variant="body2" className="font-medium">{change.label || change.field}</Typography>
+                                <Chip size="small" color={diffTypeColor(change.type)} variant="outlined" label={diffTypeLabel(change.type)}/>
+                            </div>
+                            <Typography variant="caption" color="text.secondary">
+                                {change.summary || "已变化"}
+                            </Typography>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
     };
 
     const navigateToInternalOffer = (place: PlannerPlaceSuggestion) => {
@@ -874,6 +1574,149 @@ export default function AiPlanner() {
                 hotelName: place.name,
             },
         });
+    };
+
+    const renderDayPlanBar = () => {
+        if (!conversation) return null;
+
+        const canUseDayActions = !chatSending && !assemblingTrip && !isSnapshotPreview;
+        const dayPlanByIndex = new Map(displayedDayPlans.map(dayPlan => [dayPlan.dayIndex || 0, dayPlan]));
+        const activeDayPlan = dayPlanByIndex.get(activeDayIndex);
+        const hasActiveDayPlan = Boolean(activeDayPlan);
+        const hasAllTripDayPlans = Array.from({length: tripDayCount}, (_, index) => index + 1)
+                .every(dayIndex => dayPlanByIndex.has(dayIndex));
+        const canUseAssembleAction = !chatSending && !assemblingTrip && !isSnapshotPreview && hasAllTripDayPlans;
+        const activeDayDate = coreSlots.travelStartDate
+            ? dayjs(coreSlots.travelStartDate).add(activeDayIndex - 1, "day").format("YYYY-MM-DD")
+            : undefined;
+        const nextDayDate = coreSlots.travelStartDate
+            ? dayjs(coreSlots.travelStartDate).add(nextDayIndex - 1, "day").format("YYYY-MM-DD")
+            : undefined;
+        return (
+            <section className="shrink-0 rounded-lg border border-gray-200 bg-white px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <CalendarMonth style={{fontSize: 20, color: "#556cd6"}}/>
+                        {displayedDayPlans.length > 0 ? displayedDayPlans.map(dayPlan => {
+                            const dayIndex = dayPlan.dayIndex || 0;
+                            const isActiveDay = dayIndex === activeDayIndex;
+                            const status = completedDaySet.has(dayIndex) ? "CONFIRMED" : dayPlan.status;
+                            return (
+                                <Chip
+                                    key={`${dayIndex}-${dayPlan.title || "day"}`}
+                                    size="small"
+                                    color={isActiveDay ? "primary" : dayPlanStatusColor(status)}
+                                    variant={isActiveDay ? "filled" : "outlined"}
+                                    label={`第 ${dayIndex || "?"} 天${dayPlan.title ? ` · ${dayPlan.title}` : ""} · ${dayPlanStatusLabel(status)}`}
+                                    sx={{maxWidth: 220}}
+                                />
+                            );
+                        }) : (
+                            <Chip size="small" variant="outlined" label="日计划待生成"/>
+                        )}
+                    </div>
+
+                    <Chip
+                        size="small"
+                        color="primary"
+                        variant="filled"
+                        label={`当前操作：第 ${activeDayIndex} 天${activeDayDate ? `（${activeDayDate}）` : ""}`}
+                    />
+
+                    <ToggleButtonGroup
+                        size="small"
+                        exclusive
+                        value={activeDayIndex}
+                        onChange={(_, value) => {
+                            if (value) setTargetDayIndex(Number(value));
+                        }}
+                        disabled={isSnapshotPreview || chatSending || assemblingTrip}
+                    >
+                        {dayOptions.map(dayIndex => {
+                            const status = completedDaySet.has(dayIndex)
+                                ? "CONFIRMED"
+                                : dayPlanByIndex.get(dayIndex)?.status;
+                            return (
+                                <ToggleButton key={dayIndex} value={dayIndex}>
+                                    第 {dayIndex} 天{status === "CONFIRMED" ? "（已确认）" : ""}
+                                </ToggleButton>
+                            );
+                        })}
+                    </ToggleButtonGroup>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<AutoFixHigh/>}
+                            disabled={!canUseDayActions}
+                            onClick={() => sendPlannerActionMessage(
+                                hasActiveDayPlan
+                                    ? `请基于当前选中的地点和偏好，优化第 ${activeDayIndex} 天的行程。`
+                                    : `请基于已确认天数和当前偏好，生成第 ${activeDayIndex} 天行程。`,
+                                {
+                                planningMode: hasActiveDayPlan ? "REFINE_WITH_SELECTION" : "ASK_MORE_OPTIONS",
+                                planningScope: hasActiveDayPlan ? "DAY_REFINE" : "DAY_PLAN",
+                                targetDayIndex: activeDayIndex,
+                                targetDate: activeDayDate,
+                                interaction: {
+                                    selectedPlaceIds: liveData.selectedPlaceIds,
+                                    freeText: hasActiveDayPlan ? `优化第 ${activeDayIndex} 天` : `生成第 ${activeDayIndex} 天`,
+                                },
+                            })}
+                        >
+                            {hasActiveDayPlan ? "优化当天" : "生成当天"}
+                        </Button>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<TaskAlt/>}
+                            disabled={!canUseDayActions || !hasActiveDayPlan}
+                            onClick={() => sendPlannerActionMessage(`确认第 ${activeDayIndex} 天行程，并保留当前选中的地点。`, {
+                                planningMode: "REFINE_WITH_SELECTION",
+                                planningScope: "DAY_REFINE",
+                                targetDayIndex: activeDayIndex,
+                                targetDate: activeDayDate,
+                                interaction: {
+                                    selectedPlaceIds: liveData.selectedPlaceIds,
+                                    freeText: `确认第 ${activeDayIndex} 天`,
+                                    confirmCurrentPlan: true,
+                                },
+                            })}
+                        >
+                            确认当天
+                        </Button>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<PlaylistAdd/>}
+                            disabled={!canUseDayActions || !hasActiveDayPlan || !canGenerateNextDay}
+                            onClick={() => sendPlannerActionMessage(`请基于已确认天数和当前偏好，生成第 ${nextDayIndex} 天行程。`, {
+                                planningMode: "ASK_MORE_OPTIONS",
+                                planningScope: "DAY_PLAN",
+                                targetDayIndex: nextDayIndex,
+                                targetDate: nextDayDate,
+                                interaction: {
+                                    selectedPlaceIds: liveData.selectedPlaceIds,
+                                    freeText: `生成第 ${nextDayIndex} 天`,
+                                },
+                            })}
+                        >
+                            生成下一天
+                        </Button>
+                        <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<TravelExplore/>}
+                            disabled={!canUseAssembleAction}
+                            onClick={handleAssembleTrip}
+                        >
+                            {assemblingTrip ? "汇总中" : hasAllTripDayPlans ? "汇总行程" : "先补齐日计划"}
+                        </Button>
+                    </div>
+                </div>
+            </section>
+        );
     };
 
     const renderTripBar = () => (
@@ -927,15 +1770,18 @@ export default function AiPlanner() {
                         />
                     </div>
 
-                    <TextField
-                        label="人数"
-                        value={peopleCount}
-                        required
-                        fullWidth
-                        type="number"
-                        inputProps={{min: 1}}
-                        onChange={event => setPeopleCount(Math.max(1, Number(event.target.value) || 1))}
-                    />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <TextField
+                            label="人数"
+                            value={peopleCount}
+                            required
+                            fullWidth
+                            type="number"
+                            inputProps={{min: 1}}
+                            onChange={event => setPeopleCount(Math.max(1, Number(event.target.value) || 1))}
+                        />
+                        {renderModelVariantSelect(true)}
+                    </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <TextField
@@ -1022,33 +1868,62 @@ export default function AiPlanner() {
         </form>
     );
 
+    const renderWorkspaceTabs = () => (
+        <Tabs
+            value={workspaceTab}
+            onChange={(_, value) => value && setWorkspaceTab(value)}
+            textColor="primary"
+            indicatorColor="primary"
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+                minHeight: 40,
+                "& .MuiTab-root": {minHeight: 40, px: 1.5},
+            }}
+        >
+            <Tab value="markdown" icon={<EditNote fontSize="small"/>} iconPosition="start" label="规划 Markdown"/>
+            <Tab value="chat" icon={<ChatBubbleOutline fontSize="small"/>} iconPosition="start" label="对话协作"/>
+        </Tabs>
+    );
+
     const renderMarkdownPanel = () => (
-        <section className="flex min-h-0 flex-[1.15] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
-                <div className="flex items-center gap-2">
-                    <EditNote style={{color: "#556cd6"}}/>
-                    <div>
-                        <Typography variant="h6">规划 Markdown</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            {displayData.snapshotVersion ? `当前显示 v${displayData.snapshotVersion}` : "等待 AI 生成"}
-                        </Typography>
-                    </div>
+        <section className="flex min-h-[860px] flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-2">
+                <div className="min-w-0 flex-1">
+                    {renderWorkspaceTabs()}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                    <ToggleButtonGroup
+                        size="small"
+                        exclusive
+                        value={markdownMode}
+                        onChange={(_, value) => value && setMarkdownMode(value)}
+                    >
+                        <ToggleButton value="preview">
+                            <Visibility fontSize="small" className="mr-1"/>
+                            预览
+                        </ToggleButton>
+                        <ToggleButton value="edit">
+                            <Code fontSize="small" className="mr-1"/>
+                            编辑
+                        </ToggleButton>
+                    </ToggleButtonGroup>
                     <Chip size="small" variant="outlined" icon={<History/>} label={snapshotCountLabel}/>
                     <TextField
                         select
                         size="small"
-                        label="版本"
+                        label={`第 ${activeDayIndex} 天版本`}
                         value={snapshotSelectorValue}
                         onChange={event => handleSnapshotChange(event.target.value)}
-                        sx={{minWidth: 150}}
+                        sx={{minWidth: 210}}
                     >
-                        <MenuItem value="latest">最新版本</MenuItem>
-                        {snapshots.map(snapshot => (
-                            <MenuItem key={snapshot.id} value={String(snapshot.version)}>
-                                v{snapshot.version} · {dayjs(snapshot.createdAt).isValid() ? dayjs(snapshot.createdAt).format("MM-DD HH:mm") : "历史快照"}
+                        <MenuItem value="latest">
+                            当前版本{currentDayVersion ? `（v${currentDayVersion.dayVersion}）` : ""}
+                        </MenuItem>
+                        {dayVersions.map(record => (
+                            <MenuItem key={`${record.dayIndex}-${record.dayVersion}`} value={String(record.dayVersion)}>
+                                第 {record.dayIndex} 天 v{record.dayVersion}{record.current ? " · 当前使用" : ""} · {dayjs(record.createdAt).isValid() ? dayjs(record.createdAt).format("MM-DD HH:mm") : "历史版本"}
                             </MenuItem>
                         ))}
                     </TextField>
@@ -1066,35 +1941,53 @@ export default function AiPlanner() {
                         回到最新
                     </Button>
                 }>
-                    正在只读回看历史快照。切回最新版本后才能继续对话和调整点位。
+                    正在只读回看第 {activeDayIndex} 天的历史版本。切回当前版本后才能继续对话和调整点位。
                 </Alert>
             }
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+            {renderSnapshotDiffPanel()}
+
+            <div className="min-h-0 flex-1 overflow-hidden px-4 py-3">
                 {displayData.summary &&
                     <Typography variant="body2" color="text.secondary" className="mb-3">{displayData.summary}</Typography>
                 }
 
-                <TextField
-                    value={displayData.markdown}
-                    onChange={event => handleMarkdownChange(event.target.value)}
-                    placeholder="AI 生成的 Markdown 规划会显示在这里。"
-                    multiline
-                    minRows={12}
-                    maxRows={12}
-                    fullWidth
-                    InputProps={{readOnly: isSnapshotPreview}}
-                    sx={{
-                        "& textarea": {
-                            fontFamily: "Consolas, Menlo, Monaco, monospace",
-                            fontSize: 14,
-                            lineHeight: 1.7,
-                        },
-                        "& fieldset": {
-                            borderRadius: 1,
+                {markdownMode === "preview" ? (
+                    <div className="h-full overflow-y-auto rounded-md border border-gray-200 bg-white px-5 py-4 text-[15px] leading-7">
+                        {displayData.markdown
+                            ? renderMarkdownPreview(displayData.markdown)
+                            : <Typography variant="body2" color="text.secondary">AI 生成的规划会显示在这里。</Typography>
                         }
-                    }}
-                />
+                    </div>
+                ) : (
+                    <div className="h-full min-h-0">
+                        <TextField
+                            value={displayData.markdown}
+                            onChange={event => handleMarkdownChange(event.target.value)}
+                            placeholder="AI 生成的 Markdown 规划会显示在这里。"
+                            multiline
+                            fullWidth
+                            InputProps={{readOnly: isSnapshotPreview}}
+                            sx={{
+                                height: "100%",
+                                "& .MuiInputBase-root": {
+                                    height: "100%",
+                                    alignItems: "flex-start",
+                                },
+                                "& textarea": {
+                                    height: "100% !important",
+                                    overflow: "auto !important",
+                                    fontFamily: "Consolas, Menlo, Monaco, monospace",
+                                    fontSize: 14,
+                                    lineHeight: 1.7,
+                                },
+                                "& fieldset": {
+                                    borderRadius: 1,
+                                }
+                            }}
+                        />
+                    </div>
+                )}
             </div>
         </section>
     );
@@ -1151,10 +2044,19 @@ export default function AiPlanner() {
     };
 
     const renderChatPanel = () => (
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
-            <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
-                <Typography variant="h6">对话协作</Typography>
-                {chatSending && <Chip size="small" label="AI 生成中" color="primary" variant="outlined"/>}
+        <section className="flex min-h-[760px] flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-2">
+                <div className="min-w-0 flex-1">
+                    {renderWorkspaceTabs()}
+                </div>
+                <div className="flex items-center gap-2">
+                    {chatSending && <Chip size="small" label="AI 生成中" color="primary" variant="outlined"/>}
+                    <Tooltip title="重新填写槽位">
+                        <IconButton onClick={resetPlanner}>
+                            <RestartAlt/>
+                        </IconButton>
+                    </Tooltip>
+                </div>
             </div>
 
             {renderPlannerProgress()}
@@ -1195,13 +2097,13 @@ export default function AiPlanner() {
                         fullWidth
                         multiline
                         maxRows={3}
-                        disabled={!conversation || isSnapshotPreview}
+                        disabled={!conversation || isSnapshotPreview || assemblingTrip}
                         placeholder={isSnapshotPreview ? "历史快照只读，请切回最新版本后继续对话。" : "继续告诉 AI：想加一个亲子景点、减少换乘、调整酒店区域..."}
                     />
                     <Button
                         variant="contained"
                         onClick={handleSendChat}
-                        disabled={!chatInput.trim() || socketStatus !== "connected" || isSnapshotPreview}
+                        disabled={!chatInput.trim() || socketStatus !== "connected" || isSnapshotPreview || assemblingTrip}
                         startIcon={<Send/>}
                     >
                         发送
@@ -1212,7 +2114,7 @@ export default function AiPlanner() {
     );
 
     const renderRecommendationsPanel = () => (
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <section className="flex min-h-[560px] flex-[1.35] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
                 <Typography variant="h6">AI 推荐选项</Typography>
                 <Chip size="small" label={`已选 ${displayData.selectedPlaceIds.length}`} color="secondary" variant="outlined"/>
@@ -1278,9 +2180,22 @@ export default function AiPlanner() {
         </section>
     );
 
+    const renderPlanningReferencePanels = () => (
+        <div className="flex min-h-[1040px] flex-col gap-4 overflow-visible">
+            <PlannerMapPanel
+                places={displayData.places}
+                routes={displayData.routes}
+                selectedPlaceIds={displayData.selectedPlaceIds}
+                readOnly={isSnapshotPreview}
+                onTogglePlace={togglePlaceSelection}
+            />
+            {renderRecommendationsPanel()}
+        </div>
+    );
+
     return (
-        <div className="h-[calc(100dvh-88px)] overflow-hidden bg-[#f6f7fb]">
-            <div className="flex h-full flex-col gap-3 p-4">
+        <div className="min-h-[calc(100dvh-88px)] overflow-y-auto bg-[#f6f7fb]">
+            <div className="flex min-h-[calc(100dvh-88px)] flex-col gap-3 p-4">
                 <section className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-5 py-4">
                     <div className="flex items-center gap-3">
                         <AutoAwesome style={{color: "#556cd6"}}/>
@@ -1292,6 +2207,7 @@ export default function AiPlanner() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {conversation && renderModelVariantSelect(false)}
                         {displayData.snapshotVersion &&
                             <Chip size="small" color="secondary" variant="outlined" label={`v${displayData.snapshotVersion}`}/>
                         }
@@ -1303,7 +2219,7 @@ export default function AiPlanner() {
                     </div>
                 </section>
 
-                {(creating || chatSending || hydrating) &&
+                {(creating || chatSending || hydrating || assemblingTrip) &&
                     <Box sx={{height: 4}}>
                         <LinearProgress/>
                     </Box>
@@ -1324,32 +2240,23 @@ export default function AiPlanner() {
                     </Alert>
                 }
 
-                <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
-                    <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
-                        {!conversation && renderSlotForm()}
-
-                        {conversation &&
-                            <>
-                                {renderTripBar()}
-                                <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1.15fr)_minmax(260px,0.85fr)] gap-4">
-                                    {renderMarkdownPanel()}
-                                    {renderChatPanel()}
-                                </div>
-                            </>
-                        }
+                {!conversation ? (
+                    <div className="grid min-h-[780px] gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
+                        <div className="flex min-h-0 flex-col gap-4 overflow-visible">
+                            {renderSlotForm()}
+                        </div>
+                        {renderPlanningReferencePanels()}
                     </div>
-
-                    <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
-                        <PlannerMapPanel
-                            places={displayData.places}
-                            routes={displayData.routes}
-                            selectedPlaceIds={displayData.selectedPlaceIds}
-                            readOnly={isSnapshotPreview}
-                            onTogglePlace={togglePlaceSelection}
-                        />
-                        {renderRecommendationsPanel()}
+                ) : (
+                    <div className="grid min-h-[1120px] gap-4 xl:grid-cols-[440px_minmax(0,1fr)]">
+                        {renderPlanningReferencePanels()}
+                        <div className="flex min-h-0 flex-col gap-4 overflow-visible">
+                            {renderTripBar()}
+                            {renderDayPlanBar()}
+                            {workspaceTab === "markdown" ? renderMarkdownPanel() : renderChatPanel()}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

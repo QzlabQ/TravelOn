@@ -20,6 +20,7 @@ public class PlannerChatSendPayload {
     private String message;
     private String planningMode;
     private String planningScope;
+    private String modelVariant;
     private Integer targetDayIndex;
     private LocalDate targetDate;
     private PlannerInteractionInput interaction;

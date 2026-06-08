@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -8,7 +9,7 @@ import pytest
 from app.clients.deepseek_client import DeepSeekClient
 from app.config import AgentSettings, load_settings
 from app.harness.tool_result import ToolStatus
-from app.models import AgentRunRequest
+from app.models import AgentRunRequest, PlannerModelVariant
 from app.validation.planner_output import validate_planner_output_payload
 
 
@@ -20,11 +21,15 @@ def agent_settings() -> AgentSettings:
         deepseek_base_url="https://example.test",
         deepseek_chat_completions_path="/chat/completions",
         deepseek_model="model",
+        deepseek_flash_model="flash-model",
+        deepseek_pro_model="pro-model",
+        deepseek_thinking_type="disabled",
         deepseek_temperature=0.1,
         deepseek_timeout_seconds=5,
         deepseek_retry_count=0,
         deepseek_retry_backoff_seconds=0.1,
         deepseek_max_tokens=1200,
+        deepseek_slow_response_warning_ms=60000,
         amap_api_key="",
         amap_base_url="https://amap.test",
         amap_enabled=True,
@@ -48,6 +53,10 @@ def agent_settings() -> AgentSettings:
 def test_load_settings_defaults_match_documented_stage0_values(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DEEPSEEK_TIMEOUT_SECONDS", "")
     monkeypatch.setenv("DEEPSEEK_MAX_TOKENS", "")
+    monkeypatch.setenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
+    monkeypatch.setenv("DEEPSEEK_FLASH_MODEL", "")
+    monkeypatch.setenv("DEEPSEEK_PRO_MODEL", "")
+    monkeypatch.setenv("DEEPSEEK_THINKING_TYPE", "")
     monkeypatch.setenv("AGENT_MODEL_TIMEOUT_SECONDS", "")
     monkeypatch.setenv("AGENT_MAX_RUNTIME_SECONDS", "")
 
@@ -56,7 +65,10 @@ def test_load_settings_defaults_match_documented_stage0_values(monkeypatch: pyte
     assert settings.deepseek_timeout_seconds == 90
     assert settings.agent_model_timeout_seconds == 90
     assert settings.agent_max_runtime_seconds == 120
-    assert settings.deepseek_max_tokens == 6000
+    assert settings.deepseek_max_tokens == 12000
+    assert settings.deepseek_flash_model == "deepseek-v4-flash"
+    assert settings.deepseek_pro_model == "deepseek-v4-pro"
+    assert settings.deepseek_thinking_type == "disabled"
 
 
 def sample_request() -> AgentRunRequest:
@@ -164,11 +176,64 @@ def test_deepseek_payload_includes_day_scope_rules() -> None:
     assert user_payload["dayScope"]["targetDayIndex"] == 2
     assert user_payload["dayScope"]["targetDate"] == "2026-06-02"
     assert user_payload["dayScope"]["confirmedDaySummaries"][0]["dayIndex"] == 1
-    assert user_payload["responseBudget"]["markdownMaxChars"] == 2800
+    assert user_payload["responseBudget"]["markdownMaxChars"] == 5600
+    assert user_payload["responseBudget"]["markdownTargetMinChars"] == 2200
     assert "repairRules" not in user_payload
     assert "Return ONLY the target day plan" in user_payload["outputRules"]["markdown"]
     assert "backslash" in user_payload["outputRules"]["jsonEscaping"]
     assert payload["thinking"] == {"type": "disabled"}
+    assert payload["max_tokens"] == 1200
+    assert payload["model"] == "flash-model"
+
+
+def test_deepseek_payload_uses_flash_model_when_requested() -> None:
+    client = DeepSeekClient(agent_settings())
+    request = sample_request().model_copy(update={"modelVariant": PlannerModelVariant.FLASH})
+
+    payload = client._build_payload(  # noqa: SLF001 - regression covers provider payload contract.
+        request=request,
+        places=[],
+        weather=None,
+        transport_options=[],
+        budget=None,
+        react_observations=[],
+        planner_constraints={},
+    )
+
+    assert payload["model"] == "flash-model"
+
+
+def test_deepseek_payload_uses_pro_model_when_requested() -> None:
+    client = DeepSeekClient(agent_settings())
+    request = sample_request().model_copy(update={"modelVariant": PlannerModelVariant.PRO})
+
+    payload = client._build_payload(  # noqa: SLF001 - regression covers provider payload contract.
+        request=request,
+        places=[],
+        weather=None,
+        transport_options=[],
+        budget=None,
+        react_observations=[],
+        planner_constraints={},
+    )
+
+    assert payload["model"] == "pro-model"
+
+
+def test_deepseek_payload_can_omit_thinking_field_for_provider_ab_tests() -> None:
+    client = DeepSeekClient(replace(agent_settings(), deepseek_thinking_type="omit"))
+
+    payload = client._build_payload(  # noqa: SLF001 - regression covers provider payload contract.
+        request=sample_request(),
+        places=[],
+        weather=None,
+        transport_options=[],
+        budget=None,
+        react_observations=[],
+        planner_constraints={},
+    )
+
+    assert "thinking" not in payload
 
 
 def test_deepseek_parser_repairs_invalid_backslash_escapes() -> None:
@@ -205,6 +270,9 @@ async def test_deepseek_success_includes_timing_metadata(monkeypatch: pytest.Mon
 
     assert result.status == ToolStatus.SUCCESS
     assert result.metadata["payloadBytes"] > 0
+    assert result.metadata["model"] == "flash-model"
+    assert result.metadata["thinkingType"] == "disabled"
+    assert result.metadata["maxTokens"] == 1200
     assert result.metadata["responseChars"] > 0
     assert result.metadata["requestMs"] >= 0
     assert result.metadata["parseMs"] >= 0

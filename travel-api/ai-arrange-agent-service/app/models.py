@@ -34,6 +34,11 @@ class PlanningScope(str, Enum):
     TRIP_ASSEMBLE = "TRIP_ASSEMBLE"
 
 
+class PlannerModelVariant(str, Enum):
+    FLASH = "FLASH"
+    PRO = "PRO"
+
+
 class PlannerNextAction(str, Enum):
     ASK_USER_SELECTION = "ASK_USER_SELECTION"
     NEED_MORE_INFO = "NEED_MORE_INFO"
@@ -350,6 +355,7 @@ class AgentRunRequest(BaseModel):
     userId: UUID
     planningMode: PlanningMode = PlanningMode.INITIAL_PLAN
     planningScope: PlanningScope = PlanningScope.DAY_PLAN
+    modelVariant: PlannerModelVariant = PlannerModelVariant.FLASH
     targetDayIndex: int | None = Field(default=None, ge=1)
     targetDate: Date | None = None
     coreSlots: TripCoreSlots
@@ -373,6 +379,9 @@ class ToolCall(BaseModel):
     latencyMs: int = 0
     detail: str | None = None
     retryCount: int = 0
+    inputSummary: str | None = None
+    outputSummary: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class UserFacingEvent(BaseModel):

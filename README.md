@@ -45,7 +45,14 @@ cd travel-api
 DEEPSEEK_API_KEY=
 AMAP_API_KEY=
 DEEPSEEK_MODEL=
+DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
+DEEPSEEK_PRO_MODEL=deepseek-v4-pro
+DEEPSEEK_THINKING_TYPE=disabled
+DEEPSEEK_MAX_TOKENS=12000
+DEEPSEEK_SLOW_RESPONSE_WARNING_MS=60000
 ```
+
+AI 规划页默认使用 Flash 模型模式，页面中可切换为 Pro。
 
 AI 功能需要填 key；社区功能可以留空。
 
@@ -179,6 +186,11 @@ You need to add file .env under folder travel-api if ai module is needed. The fi
 DEEPSEEK_API_KEY=
 AMAP_API_KEY=
 DEEPSEEK_MODEL=
+DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
+DEEPSEEK_PRO_MODEL=deepseek-v4-pro
+DEEPSEEK_THINKING_TYPE=disabled
+DEEPSEEK_MAX_TOKENS=12000
+DEEPSEEK_SLOW_RESPONSE_WARNING_MS=60000
 ```
 
 Frontend AMap JavaScript map rendering is configured separately in `travel-ui/.env`:

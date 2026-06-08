@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerPlaceSuggestion;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerRouteSegment;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerDayPlanRef;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentToolCall;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentWarning;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -67,6 +69,12 @@ public class PlannerSnapshot {
 
     private String checksum;
     private String traceId;
+
+    @Builder.Default
+    private List<PlannerAgentToolCall> agentToolCalls = new ArrayList<>();
+
+    @Builder.Default
+    private List<PlannerAgentWarning> agentWarnings = new ArrayList<>();
 
     private Instant createdAt;
 }

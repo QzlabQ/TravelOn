@@ -163,6 +163,7 @@ class PlannerConversationServiceTest {
         assertThat(request.getLatestSnapshot().getVersion()).isEqualTo(4);
         assertThat(request.getPlanningMode()).isEqualTo("REFINE_WITH_SELECTION");
         assertThat(request.getPlanningScope()).isEqualTo("DAY_REFINE");
+        assertThat(request.getModelVariant()).isEqualTo("FLASH");
         assertThat(request.getTargetDayIndex()).isEqualTo(2);
 
         assertThat(snapshot.getVersion()).isEqualTo(5);

@@ -385,7 +385,7 @@ export function PlannerMapPanel(props: PlannerMapPanelProps) {
     const mapModeLabel = showAmap && mapLoadState === "ready" ? "高德地图" : "模拟地图";
 
     return (
-        <section className="flex min-h-0 flex-[1.35] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <section className="flex min-h-[420px] flex-[0.85] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
                 <div className="flex items-center gap-2">
                     <MapIcon style={{color: "#556cd6"}}/>

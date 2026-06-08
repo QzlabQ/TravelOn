@@ -155,6 +155,52 @@ export class ApiRequests {
         return await axiosInstance.get<PlannerSnapshot[]>(`ai-arrange/api/conversations/${conversationId}/snapshots?userId=${userId}`);
     }
 
+    static getPlannerSnapshot = async (conversationId: string, userId: string, version: number) => {
+        return await axiosInstance.get<PlannerSnapshot>(`ai-arrange/api/conversations/${conversationId}/snapshots/${version}`, {
+            params: {userId}
+        });
+    }
+
+    static rollbackPlannerSnapshot = async (conversationId: string, userId: string, version: number) => {
+        return await axiosInstance.post<PlannerSnapshot>(`ai-arrange/api/conversations/${conversationId}/snapshots/${version}/rollback`, {}, {
+            params: {userId}
+        });
+    }
+
+    static restorePlannerDaySnapshot = async (conversationId: string, userId: string, dayIndex: number, version: number) => {
+        return await axiosInstance.post<PlannerSnapshot>(`ai-arrange/api/conversations/${conversationId}/day-plans/${dayIndex}/snapshots/${version}/restore`, {}, {
+            params: {userId}
+        });
+    }
+
+    static listPlannerDayVersions = async (conversationId: string, userId: string, dayIndex: number) => {
+        return await axiosInstance.get<PlannerDayVersion[]>(`ai-arrange/api/conversations/${conversationId}/day-plans/${dayIndex}/versions`, {
+            params: {userId}
+        });
+    }
+
+    static activatePlannerDayVersion = async (conversationId: string, userId: string, dayIndex: number, dayVersion: number) => {
+        return await axiosInstance.post<PlannerSnapshot>(`ai-arrange/api/conversations/${conversationId}/day-plans/${dayIndex}/versions/${dayVersion}/activate`, {}, {
+            params: {userId}
+        });
+    }
+
+    static assemblePlannerTripSnapshot = async (conversationId: string, userId: string) => {
+        return await axiosInstance.post<PlannerSnapshot>(`ai-arrange/api/conversations/${conversationId}/day-plans/assemble`, {}, {
+            params: {userId}
+        });
+    }
+
+    static diffPlannerSnapshots = async (conversationId: string, userId: string, fromVersion: number, toVersion: number) => {
+        return await axiosInstance.get<PlannerSnapshotDiffResponse>(`ai-arrange/api/conversations/${conversationId}/snapshots/${fromVersion}/diff/${toVersion}`, {
+            params: {userId}
+        });
+    }
+
+    static runPlannerAgent = async (conversationId: string, payload: RunPlannerAgentPayload) => {
+        return await axiosInstance.post<PlannerSnapshot>(`ai-arrange/api/conversations/${conversationId}/planner/run`, payload);
+    }
+
     static listCommunityPosts = async (params: CommunityPostsQuery, token?: string) => {
         return await axiosInstance.get<PageResponse<CommunityPostResponse>>('community/posts', {
             params,
@@ -603,6 +649,29 @@ export type PlannerMessageType =
 export interface PlannerChatSendPayload {
     message: string,
     selectedPlaceIds: string[],
+    modelVariant?: PlannerModelVariant,
+    planningMode?: string,
+    planningScope?: PlannerPlanningScope,
+    targetDayIndex?: number,
+    targetDate?: string,
+    interaction?: PlannerInteractionInput,
+}
+
+export interface RunPlannerAgentPayload extends PlannerChatSendPayload {
+    userId: string,
+}
+
+export type PlannerModelVariant = 'FLASH' | 'PRO';
+
+export type PlannerPlanningScope = 'DAY_PLAN' | 'DAY_REFINE' | 'TRIP_ASSEMBLE' | string;
+
+export interface PlannerInteractionInput {
+    selectedOptionIds?: string[],
+    rejectedOptionIds?: string[],
+    selectedPlaceIds?: string[],
+    rejectedPlaceIds?: string[],
+    freeText?: string,
+    confirmCurrentPlan?: boolean,
 }
 
 export interface PlannerPlaceSelectionPayload {
@@ -654,6 +723,10 @@ export interface PlannerDataRefreshPayload {
     summary?: string,
     markdown: string,
     snapshotVersion: number,
+    scope?: PlannerPlanningScope,
+    currentDayIndex?: number,
+    completedDayIndexes?: number[],
+    dayPlans?: PlannerDayPlanRef[],
     places: PlannerPlaceSuggestion[],
     routes: PlannerRouteSegment[],
     selectedPlaceIds: string[],
@@ -689,19 +762,72 @@ export interface PlannerRouteSegment {
     summary?: string,
 }
 
+export interface PlannerDayPlanRef {
+    dayIndex?: number,
+    date?: string,
+    status?: 'DRAFT' | 'CONFIRMED' | string,
+    title?: string,
+    markdown?: string,
+    places?: PlannerPlaceSuggestion[],
+    routes?: PlannerRouteSegment[],
+    selectedPlaceIds?: string[],
+    rejectedPlaceIds?: string[],
+    changeSummary?: string,
+    checksum?: string,
+}
+
+export interface PlannerDayVersion extends PlannerDayPlanRef {
+    id: string,
+    dayVersion: number,
+    current: boolean,
+    sourceSnapshotVersion?: number,
+    createdAt: string,
+}
+
 export interface PlannerSnapshot {
     id: string,
     conversationId: string,
     userId: string,
     version: number,
+    baseVersion?: number,
+    scope?: PlannerPlanningScope,
+    targetDayIndex?: number,
+    currentDayIndex?: number,
+    completedDayIndexes?: number[],
     title: string,
     summary?: string,
     markdown: string,
+    nextQuestion?: string,
     assistantText?: string,
     places: PlannerPlaceSuggestion[],
     routes: PlannerRouteSegment[],
+    currentDayPlan?: PlannerDayPlanRef,
+    dayPlans?: PlannerDayPlanRef[],
     selectedPlaceIds: string[],
+    rejectedPlaceIds?: string[],
+    changeSummary?: string,
+    patchOps?: Record<string, unknown>[],
+    checksum?: string,
+    traceId?: string,
     createdAt: string,
+}
+
+export interface PlannerSnapshotDiffItem {
+    field: string,
+    label: string,
+    type: 'ADDED' | 'REMOVED' | 'CHANGED' | string,
+    beforeValue?: unknown,
+    afterValue?: unknown,
+    summary?: string,
+}
+
+export interface PlannerSnapshotDiffResponse {
+    conversationId: string,
+    fromVersion: number,
+    toVersion: number,
+    fromTitle?: string,
+    toTitle?: string,
+    changes: PlannerSnapshotDiffItem[],
 }
 
 export function buildPlannerWebSocketUrl(conversationId: string, userId: string) {

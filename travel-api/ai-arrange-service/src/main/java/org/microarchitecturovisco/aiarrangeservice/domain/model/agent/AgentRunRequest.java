@@ -27,6 +27,9 @@ public class AgentRunRequest {
     @Builder.Default
     private String planningScope = "DAY_PLAN";
 
+    @Builder.Default
+    private String modelVariant = "FLASH";
+
     private Integer targetDayIndex;
     private LocalDate targetDate;
     private TripCoreSlots coreSlots;

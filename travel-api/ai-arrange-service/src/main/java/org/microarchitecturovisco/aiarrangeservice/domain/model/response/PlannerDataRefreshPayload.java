@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapshot;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerConversationStatus;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerDayPlanRef;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerPlaceSuggestion;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerRouteSegment;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerOptionGroup;
@@ -25,6 +26,10 @@ public class PlannerDataRefreshPayload {
     private String markdown;
     private String nextQuestion;
     private Integer snapshotVersion;
+    private String scope;
+    private Integer currentDayIndex;
+    private List<Integer> completedDayIndexes;
+    private List<PlannerDayPlanRef> dayPlans;
     private List<PlannerPlaceSuggestion> places;
     private List<PlannerRouteSegment> routes;
     private List<UUID> selectedPlaceIds;
@@ -38,6 +43,10 @@ public class PlannerDataRefreshPayload {
                 .markdown(snapshot.getMarkdown())
                 .nextQuestion(snapshot.getNextQuestion())
                 .snapshotVersion(snapshot.getVersion())
+                .scope(snapshot.getScope())
+                .currentDayIndex(snapshot.getCurrentDayIndex())
+                .completedDayIndexes(snapshot.getCompletedDayIndexes())
+                .dayPlans(snapshot.getDayPlans())
                 .places(snapshot.getPlaces())
                 .routes(snapshot.getRoutes())
                 .selectedPlaceIds(snapshot.getSelectedPlaceIds())

@@ -154,9 +154,11 @@ services:
       ALL_PROXY: ""
       all_proxy: ""
       DEEPSEEK_TIMEOUT_SECONDS: "180"
+      DEEPSEEK_THINKING_TYPE: "disabled"
       AGENT_MODEL_TIMEOUT_SECONDS: "180"
       AGENT_MAX_RUNTIME_SECONDS: "240"
-      DEEPSEEK_MAX_TOKENS: "10000"
+      DEEPSEEK_MAX_TOKENS: "12000"
+      DEEPSEEK_SLOW_RESPONSE_WARNING_MS: "60000"
       NO_PROXY: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
       no_proxy: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
     ports:
@@ -175,6 +177,7 @@ services:
       - RABBITMQ_HOST=rabbitmq
       - AI_AGENT_ENABLED=true
       - AI_ARRANGE_AGENT_BASE_URL=http://ai-arrange-agent:8090
+      - AI_ARRANGE_AGENT_TIMEOUT_SECONDS=270
       - HTTP_PROXY=
       - HTTPS_PROXY=
       - http_proxy=
