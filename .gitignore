@@ -133,4 +133,4 @@ travel-api/data/reservation-service/
 travel-api/data/user-service/
 
 # vscode settings
-.vscode/settings.json
+.vscode/
