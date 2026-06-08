@@ -1,6 +1,7 @@
 import { Paper, TableContainer, Table, TableHead, TableBody, TableRow, TableCell } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import {ConnectingAirports, Explore, Hotel, MeetingRoom} from "@mui/icons-material";
+import {baseWSURL} from "../../core/apiConfig";
 
 type Reservation = {
     hotelName: string;
@@ -30,7 +31,7 @@ const Preferences = () => {
     const [topTransportTypes, setTopTransportTypes] = useState<string[]>([]);
 
     useEffect(() => {
-        const ws = new WebSocket(`ws://${process.env.REACT_APP_API_HOSTNAME}:${process.env.REACT_APP_API_PORT}/reservations/ws/reservationPreferences`);
+        const ws = new WebSocket(`${baseWSURL}reservations/ws/reservationPreferences`);
 
         ws.onmessage = (event) => {
             console.log("Received message: " + event.data);

@@ -209,7 +209,7 @@ cd E:\2026spring\26NULLptr\repositories\travel-api\ai-arrange-agent-service
 
 ```powershell
 cd E:\2026spring\26NULLptr\repositories\travel-api\ai-arrange-agent-service
-.\.venv\Scripts\python -m uvicorn app.main:app --reload --port 8090
+.\.venv\Scripts\python -m uvicorn app.main:app --reload --port 58090
 ```
 
 ## 7. 当前明确未做事项

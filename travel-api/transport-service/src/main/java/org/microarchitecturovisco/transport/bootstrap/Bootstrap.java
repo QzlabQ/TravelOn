@@ -44,17 +44,25 @@ public class Bootstrap implements CommandLineRunner {
     @Value("${app.seed-data.base-path:file:../seed-data/transport/}")
     private String seedDataBasePath;
 
+    @Value("${app.tour-products.enabled:false}")
+    private boolean tourProductsEnabled;
+
     @Override
     public void run(String... args) {
         Logger logger = Logger.getLogger("Bootstrap | Transports");
+
+        if (!tourProductsEnabled) {
+            logger.info("Skip legacy tour product transport seed import because tour products are being rebuilt");
+            return;
+        }
 
         if (transportRepository.count() > 0) {
             logger.info("Skip transport seed import because transport data already exists");
             return;
         }
 
-        Resource hotelCsvResource = seedResource("hotels.csv");
-        Resource hotelDepartureOptionsResource = seedResource("hotel_departure_options.csv");
+        Resource hotelCsvResource = packageSeedResource("hotels.csv");
+        Resource hotelDepartureOptionsResource = packageSeedResource("hotel_departure_options.csv");
 
         List<LocationDto> planeArrivalLocations = locationParser.importLocationsAbroad(hotelCsvResource, "PLANE");
         List<LocationDto> busArrivalLocations = locationParser.importLocationsAbroad(hotelCsvResource, "BUS");
@@ -201,8 +209,11 @@ public class Bootstrap implements CommandLineRunner {
         System.out.println(response + "\n");
     }
 
-    private Resource seedResource(String filename) {
-        String basePath = seedDataBasePath.endsWith("/") ? seedDataBasePath : seedDataBasePath + "/";
-        return resourceLoader.getResource(basePath + filename);
+    private Resource packageSeedResource(String filename) {
+        return resourceLoader.getResource(normalizeBasePath(seedDataBasePath) + "package/" + filename);
+    }
+
+    private String normalizeBasePath(String basePath) {
+        return basePath.endsWith("/") ? basePath : basePath + "/";
     }
 }

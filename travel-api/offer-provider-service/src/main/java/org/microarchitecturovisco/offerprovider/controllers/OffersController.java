@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.logging.Logger;
 
 @RestController
@@ -24,36 +23,28 @@ public class OffersController {
     public List<OfferDto> getOffersBasedOnSearchQuery(
             @RequestParam(name = "departureBus", required = false) List<String> departureBuses,
             @RequestParam(name = "departurePlane", required = false) List<String> departurePlane,
-            @RequestParam(name = "arrivals") List<String> arrivals,
-            @RequestParam(name = "date_from") String dateFrom,
-            @RequestParam(name = "date_to") String dateTo,
-            @RequestParam(name = "adults") Integer adults,
-            @RequestParam(name = "infants") Integer infants,
-            @RequestParam(name = "kids") Integer kids,
-            @RequestParam(name = "teens") Integer teens
+            @RequestParam(name = "arrivals", required = false) List<String> arrivals,
+            @RequestParam(name = "date_from", required = false) String dateFrom,
+            @RequestParam(name = "date_to", required = false) String dateTo,
+            @RequestParam(name = "adults", required = false) Integer adults,
+            @RequestParam(name = "infants", required = false) Integer infants,
+            @RequestParam(name = "kids", required = false) Integer kids,
+            @RequestParam(name = "teens", required = false) Integer teens
 
     ) {
 
         Logger logger = Logger.getLogger("getOffersBasedOnSearchQuery");
-        logger.info("Request for arrivals: " + arrivals);
+        logger.info("Legacy tour product search shell requested; old offer composition is disabled");
 
-        departureBuses = departureBuses != null ? departureBuses : new ArrayList<>();
-        departurePlane = departurePlane != null ? departurePlane : new ArrayList<>();
-
-        List<UUID> departureBusesWithUUIDs = departureBuses.stream().map(UUID::fromString).toList();
-        List<UUID> departurePlanesWithUUIDs = departurePlane.stream().map(UUID::fromString).toList();
-        List<UUID> arrivalsWithUUIDs = arrivals.stream().map(UUID::fromString).toList();
-
-
-        List<OfferDto> offerDtos = offersService.getOffersBasedOnSearchQuery(departureBusesWithUUIDs,
-                departurePlanesWithUUIDs,
-                arrivalsWithUUIDs,
+        List<OfferDto> offerDtos = offersService.getOffersBasedOnSearchQuery(List.of(),
+                List.of(),
+                List.of(),
                 dateFrom,
                 dateTo,
-                adults,
-                infants,
-                kids,
-                teens);
+                adults == null ? 0 : adults,
+                infants == null ? 0 : infants,
+                kids == null ? 0 : kids,
+                teens == null ? 0 : teens);
 
         logger.info("Response size: " + offerDtos.size());
         return offerDtos;

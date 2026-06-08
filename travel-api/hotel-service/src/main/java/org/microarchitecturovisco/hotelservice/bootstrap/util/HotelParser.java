@@ -70,7 +70,7 @@ public class HotelParser {
 
     private LocationDto findLocation(List<LocationDto> locationDtos, String country, String region) {
         return locationDtos.stream()
-                .filter(locationDto -> locationDto.getCountry().equals(country) && locationDto.getRegion().equals(region))
+                .filter(locationDto -> locationDto.getRegion().equals(region))
                 .findFirst()
                 .orElseThrow(() -> new NoSuchElementException("Location not found: " + country + ", " + region));
     }

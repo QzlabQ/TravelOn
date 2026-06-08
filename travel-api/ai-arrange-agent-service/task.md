@@ -351,13 +351,13 @@ ai-arrange-agent-service/tests/test_trace.py
 ```powershell
 cd ai-arrange-agent-service
 .\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --port 8090
+uvicorn app.main:app --reload --port 58090
 ```
 
 健康检查：
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri http://127.0.0.1:8090/agent/health
+Invoke-RestMethod -Method Get -Uri http://127.0.0.1:58090/agent/health
 ```
 
 规划请求：
@@ -387,7 +387,7 @@ $body = @{
 
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://127.0.0.1:8090/agent/planner/run `
+  -Uri http://127.0.0.1:58090/agent/planner/run `
   -ContentType "application/json" `
   -Body $body
 ```

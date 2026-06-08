@@ -14,8 +14,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-HOTELS_FILE = ROOT / "seed-data/transport/hotels.csv"
-TICKETS_FILE = ROOT / "seed-data/transport/ticket_offers.csv"
+COMMON_CITIES_FILE = ROOT / "seed-data/common/cities.csv"
+TRAIN_TICKETS_FILE = ROOT / "seed-data/transport/train/ticket_offers.csv"
+PLANE_TICKETS_FILE = ROOT / "seed-data/transport/plane/ticket_offers.csv"
 GENERATED_MARKER = "generated:nationwide-v1"
 EXTRA_TICKET_CITIES = ("满洲里", "温州")
 
@@ -101,11 +102,33 @@ HEADER = (
 )
 
 
-def cities_from_hotels() -> list[str]:
-    with HOTELS_FILE.open(encoding="utf-8-sig", newline="") as handle:
-        rows = csv.DictReader(handle, delimiter="\t")
-        cities = [row["city"] for row in rows]
-        return cities + [city for city in EXTRA_TICKET_CITIES if city not in cities]
+def ticket_cities() -> list[str]:
+    if COMMON_CITIES_FILE.exists():
+        with COMMON_CITIES_FILE.open(encoding="utf-8", newline="") as handle:
+            cities = [
+                normalize_city_name(row["cityName"])
+                for row in csv.DictReader(handle, delimiter="\t")
+                if normalize_city_name(row["cityName"]) in COORDINATES
+            ]
+    else:
+        cities = sorted(COORDINATES.keys())
+    return cities + [city for city in EXTRA_TICKET_CITIES if city not in cities]
+
+
+def normalize_city_name(value: str) -> str:
+    value = value.strip()
+    for suffix in ("特别行政区", "地区", "自治州", "盟", "市"):
+        if value.endswith(suffix) and len(value) > len(suffix):
+            return value[:-len(suffix)]
+    return value
+
+
+def read_ticket_rows(path: Path) -> list[list[str]]:
+    if not path.exists():
+        return []
+    with path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.reader(handle, delimiter="\t"))
+    return rows[1:]
 
 
 def distance_km(left: str, right: str) -> float:
@@ -152,17 +175,16 @@ def generated_train(left: str, right: str, seed: int) -> tuple[str, ...]:
 
 
 def main() -> None:
-    cities = cities_from_hotels()
+    cities = ticket_cities()
     missing = sorted(set(cities) - COORDINATES.keys())
     if missing:
         raise RuntimeError(f"Missing coordinates: {missing}")
 
-    with TICKETS_FILE.open(encoding="utf-8", newline="") as handle:
-        existing_rows = list(csv.reader(handle, delimiter="\t"))
-
-    historical_rows = [row for row in existing_rows[1:] if GENERATED_MARKER not in row[15]]
+    existing_rows = read_ticket_rows(TRAIN_TICKETS_FILE) + read_ticket_rows(PLANE_TICKETS_FILE)
+    historical_rows = [row for row in existing_rows if len(row) > 15 and GENERATED_MARKER not in row[15]]
     covered_routes = {(row[0], row[1], row[2]) for row in historical_rows}
-    generated_rows: list[tuple[str, ...]] = []
+    generated_flight_rows: list[tuple[str, ...]] = []
+    generated_train_rows: list[tuple[str, ...]] = []
 
     for left_index, left in enumerate(cities):
         for right_index, right in enumerate(cities):
@@ -170,17 +192,28 @@ def main() -> None:
                 continue
             seed = left_index * len(cities) + right_index
             if ("FLIGHT", left, right) not in covered_routes:
-                generated_rows.append(generated_flight(left, right, seed))
+                generated_flight_rows.append(generated_flight(left, right, seed))
             if ("TRAIN", left, right) not in covered_routes:
-                generated_rows.append(generated_train(left, right, seed))
+                generated_train_rows.append(generated_train(left, right, seed))
 
-    with TICKETS_FILE.open("w", encoding="utf-8", newline="") as handle:
+    historical_flight_rows = [row for row in historical_rows if row[0] == "FLIGHT"]
+    historical_train_rows = [row for row in historical_rows if row[0] == "TRAIN"]
+
+    PLANE_TICKETS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with TRAIN_TICKETS_FILE.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
         writer.writerow(HEADER)
-        writer.writerows(historical_rows)
-        writer.writerows(generated_rows)
+        writer.writerows(historical_train_rows)
+        writer.writerows(generated_train_rows)
 
-    print(f"cities={len(cities)} historical={len(historical_rows)} generated={len(generated_rows)} total={len(historical_rows) + len(generated_rows)}")
+    with PLANE_TICKETS_FILE.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+        writer.writerow(HEADER)
+        writer.writerows(historical_flight_rows)
+        writer.writerows(generated_flight_rows)
+
+    generated_total = len(generated_flight_rows) + len(generated_train_rows)
+    print(f"cities={len(cities)} historical={len(historical_rows)} generated={generated_total} total={len(historical_rows) + generated_total}")
 
 
 if __name__ == "__main__":

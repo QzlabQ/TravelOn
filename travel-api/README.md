@@ -45,6 +45,13 @@ This project is devided into 10 modules:
 
 **RabbitMQ** is used as the message broker.
 
+Transport ticket seed data is split by transport mode:
+
+- Shared city dictionary: `seed-data/common/cities.csv`
+- Train ticket TSV: `seed-data/transport/train/ticket_offers.csv`
+- Flight ticket TSV: `seed-data/transport/plane/ticket_offers.csv`
+- Detailed train source CSV files remain in `seed-data/transport/train/*.csv` and are used to regenerate train ticket templates during bootstrap.
+
 
 
 ## Services description

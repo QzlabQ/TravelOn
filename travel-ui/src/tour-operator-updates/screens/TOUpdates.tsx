@@ -1,6 +1,7 @@
 import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
 import { ConnectingAirports, Hotel } from "@mui/icons-material";
 import React, { useEffect, useState } from "react";
+import {baseWSURL} from "../../core/apiConfig";
 
 type HotelUpdate = {
     updateDateTime: string;
@@ -40,8 +41,8 @@ const TOUpdates = () => {
     const [transportUpdates, setTransportUpdates] = useState<TransportUpdate[]>([]);
 
     useEffect(() => {
-        const hotelWs = new WebSocket(`ws://${process.env.REACT_APP_API_HOSTNAME}:${process.env.REACT_APP_API_PORT}/data-generator/ws/hotel`);
-        const transportWs = new WebSocket(`ws://${process.env.REACT_APP_API_HOSTNAME}:${process.env.REACT_APP_API_PORT}/data-generator/ws/transport`);
+        const hotelWs = new WebSocket(`${baseWSURL}data-generator/ws/hotel`);
+        const transportWs = new WebSocket(`${baseWSURL}data-generator/ws/transport`);
 
         hotelWs.onmessage = (event) => {
             console.log("Received hotel message: " + event.data);

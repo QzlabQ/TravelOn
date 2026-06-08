@@ -131,3 +131,6 @@ travel-api/data/rabbitmq
 travel-api/data/rabbitmq/
 travel-api/data/reservation-service/
 travel-api/data/user-service/
+
+# vscode settings
+.vscode/settings.json

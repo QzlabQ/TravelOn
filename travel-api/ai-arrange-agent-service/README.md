@@ -58,7 +58,7 @@ cd ai-arrange-agent-service
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8090
+uvicorn app.main:app --reload --port 58090
 ```
 
 ## Test

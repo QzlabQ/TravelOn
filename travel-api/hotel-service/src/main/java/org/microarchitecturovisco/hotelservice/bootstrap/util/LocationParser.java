@@ -14,6 +14,11 @@ import java.util.UUID;
 
 @Component
 public class LocationParser {
+    private final CityCatalog cityCatalog;
+
+    public LocationParser(CityCatalog cityCatalog) {
+        this.cityCatalog = cityCatalog;
+    }
 
     public List<LocationDto> importLocations(Resource resource) {
         List<LocationDto> locationDtos = new ArrayList<>();
@@ -26,7 +31,8 @@ public class LocationParser {
                 String[] data = line.split("\t");
                 String country = data[4];
                 String region = data[5];
-                LocationDto locationDto = createNewLocation(locationDtos, country, region);
+                String cityId = data.length > 7 ? data[7] : "";
+                LocationDto locationDto = createNewLocation(locationDtos, country, region, cityId);
                 if (locationDto != null) {
                     locationDtos.add(locationDto);
                 }
@@ -39,20 +45,17 @@ public class LocationParser {
     }
 
 
-    private LocationDto createNewLocation(List<LocationDto> locationDtos, String country, String region) {
-        if (locationExists(locationDtos, country, region)) {
+    private LocationDto createNewLocation(List<LocationDto> locationDtos, String country, String region, String cityId) {
+        LocationDto location = cityCatalog.locationFor(country, region, cityId);
+        if (locationExists(locationDtos, location.getCityId())) {
             return null;
         }
 
-        return LocationDto.builder()
-                .idLocation(UUID.nameUUIDFromBytes((country+region).getBytes()))
-                .country(country)
-                .region(region)
-                .build();
+        return location;
     }
 
-    private boolean locationExists(List<LocationDto> locationDtos, String country, String region) {
+    private boolean locationExists(List<LocationDto> locationDtos, UUID cityId) {
         return locationDtos.stream()
-                .anyMatch(locationDto -> locationDto.getCountry().equals(country) && locationDto.getRegion().equals(region));
+                .anyMatch(locationDto -> locationDto.getCityId().equals(cityId));
     }
 }

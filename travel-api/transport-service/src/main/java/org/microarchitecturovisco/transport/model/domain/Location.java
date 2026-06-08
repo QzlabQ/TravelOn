@@ -18,10 +18,16 @@ public class Location {
     @Id
     private UUID id;
 
+    private UUID cityId;
+
     @NotNull
     private String country;
 
+    private String province;
+
     private String region;
+
+    private String normalizedName;
 
     @OneToMany(mappedBy = "departureFrom")
     private List<TransportCourse> transportCourseFrom;
@@ -31,7 +37,10 @@ public class Location {
 
     public Location(String country, String region) {
         this.id = null;
+        this.cityId = null;
         this.country = country;
+        this.province = null;
         this.region = region;
+        this.normalizedName = region;
     }
 }

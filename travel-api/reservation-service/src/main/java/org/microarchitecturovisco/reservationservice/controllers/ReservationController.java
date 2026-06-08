@@ -91,13 +91,8 @@ public class ReservationController {
 
     @PostMapping("/reservation")
     public String addReservation(@Valid @RequestBody ReservationRequest reservationRequest) {
-        try {
-            logger.info("RESERVATION REQUEST:" + reservationRequest.toString());
-            UUID reservationId = reservationService.bookOrchestration(reservationRequest);
-            return "Reservation with id " + reservationId.toString() + " created successfully!";
-        } catch (ReservationFailException exception) {
-            return "ReservationFailException exception occurred";
-        }
+        logger.info("Legacy tour product reservation shell requested; old package booking is disabled");
+        return "Tour product reservation is being rebuilt";
     }
 
     @PostMapping("/purchase")

@@ -10,6 +10,9 @@ import java.util.UUID;
 @Builder
 public class LocationDto implements Serializable {
     private UUID idLocation;
+    private UUID cityId;
     private String country;
+    private String province;
     private String region;
+    private String normalizedName;
 }

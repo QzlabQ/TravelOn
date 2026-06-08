@@ -1,6 +1,7 @@
 package org.microarchitecturovisco.transport.bootstrap;
 
 import lombok.RequiredArgsConstructor;
+import org.microarchitecturovisco.transport.bootstrap.util.CityCatalog;
 import org.microarchitecturovisco.transport.model.domain.TicketOfferTemplate;
 import org.microarchitecturovisco.transport.model.domain.TicketType;
 import org.microarchitecturovisco.transport.repositories.TicketOfferTemplateRepository;
@@ -44,9 +45,16 @@ public class TicketOfferBootstrap implements CommandLineRunner {
 
     private final TicketOfferTemplateRepository ticketOfferTemplateRepository;
     private final ResourceLoader resourceLoader;
+    private final CityCatalog cityCatalog;
 
     @Value("${app.seed-data.base-path:file:../seed-data/transport/}")
     private String seedDataBasePath;
+
+    @Value("${app.seed-data.train-base-path:}")
+    private String trainSeedDataBasePath;
+
+    @Value("${app.seed-data.plane-base-path:}")
+    private String planeSeedDataBasePath;
 
     @Override
     public void run(String... args) throws Exception {
@@ -56,14 +64,19 @@ public class TicketOfferBootstrap implements CommandLineRunner {
             return;
         }
 
-        Resource tsvResource = seedResource("ticket_offers.csv");
-        Resource trainNumberResource = seedResource("train_number.csv");
-        Resource trainRouteResource = seedResource("train_route.csv");
-        Resource trainTypeResource = seedResource("train_type.csv");
-        Resource trainTypeSeatsResource = seedResource("train_type_seats.csv");
-        Resource stationResource = seedResource("station.csv");
+        Resource tsvResource = trainSeedResource("ticket_offers.csv");
+        Resource planeTsvResource = planeSeedResource("ticket_offers.csv");
+        Resource trainNumberResource = trainSeedResource("train_number.csv");
+        Resource trainRouteResource = trainSeedResource("train_route.csv");
+        Resource trainTypeResource = trainSeedResource("train_type.csv");
+        Resource trainTypeSeatsResource = trainSeedResource("train_type_seats.csv");
+        Resource stationResource = trainSeedResource("station.csv");
 
-        List<TicketOfferTemplate> offers = new ArrayList<>(readTsvOffers(tsvResource));
+        List<TicketOfferTemplate> offers = new ArrayList<>();
+        if (planeTsvResource.exists()) {
+            offers.addAll(readTsvOffers(planeTsvResource, TicketType.FLIGHT));
+        }
+        offers.addAll(readTsvOffers(tsvResource, planeTsvResource.exists() ? TicketType.TRAIN : null));
         long tsvTrainOffers = offers.stream().filter(offer -> offer.getType() == TicketType.TRAIN).count();
 
         if (trainNumberResource.exists() && trainRouteResource.exists() && trainTypeResource.exists()
@@ -87,12 +100,33 @@ public class TicketOfferBootstrap implements CommandLineRunner {
         logger.info("Imported " + offers.size() + " ticket offer templates");
     }
 
-    private Resource seedResource(String filename) {
-        String basePath = seedDataBasePath.endsWith("/") ? seedDataBasePath : seedDataBasePath + "/";
-        return resourceLoader.getResource(basePath + filename);
+    private Resource trainSeedResource(String filename) {
+        String basePath = trainSeedDataBasePath == null || trainSeedDataBasePath.isBlank()
+                ? defaultTrainSeedDataBasePath()
+                : trainSeedDataBasePath;
+        return resourceLoader.getResource(normalizeBasePath(basePath) + filename);
     }
 
-    private List<TicketOfferTemplate> readTsvOffers(Resource resource) throws IOException {
+    private Resource planeSeedResource(String filename) {
+        String basePath = planeSeedDataBasePath == null || planeSeedDataBasePath.isBlank()
+                ? defaultPlaneSeedDataBasePath()
+                : planeSeedDataBasePath;
+        return resourceLoader.getResource(normalizeBasePath(basePath) + filename);
+    }
+
+    private String defaultTrainSeedDataBasePath() {
+        return normalizeBasePath(seedDataBasePath) + "train/";
+    }
+
+    private String defaultPlaneSeedDataBasePath() {
+        return normalizeBasePath(seedDataBasePath) + "plane/";
+    }
+
+    private String normalizeBasePath(String basePath) {
+        return basePath.endsWith("/") ? basePath : basePath + "/";
+    }
+
+    private List<TicketOfferTemplate> readTsvOffers(Resource resource, TicketType expectedType) throws IOException {
         List<TicketOfferTemplate> offers = new ArrayList<>();
 
         try (BufferedReader reader = new BufferedReader(
@@ -105,11 +139,22 @@ public class TicketOfferBootstrap implements CommandLineRunner {
                 }
 
                 String[] values = line.split("\t", -1);
+                TicketType type = TicketType.valueOf(values[0]);
+                if (expectedType != null && type != expectedType) {
+                    throw new IllegalStateException(resource.getDescription() +
+                            " must contain only " + expectedType + " rows, but found " + type);
+                }
                 offers.add(TicketOfferTemplate.builder()
                         .id(UUID.nameUUIDFromBytes(line.getBytes(StandardCharsets.UTF_8)))
-                        .type(TicketType.valueOf(values[0]))
-                        .departureCity(values[1])
-                        .arrivalCity(values[2])
+                        .type(type)
+                        .departureCity(cityCatalog.find(values[1]).cityName())
+                        .arrivalCity(cityCatalog.find(values[2]).cityName())
+                        .departureCityId(values.length > 16 && !values[16].isBlank()
+                                ? UUID.fromString(values[16])
+                                : cityCatalog.find(values[1]).cityId())
+                        .arrivalCityId(values.length > 17 && !values[17].isBlank()
+                                ? UUID.fromString(values[17])
+                                : cityCatalog.find(values[2]).cityId())
                         .departureStation(values[3])
                         .arrivalStation(values[4])
                         .departureTime(LocalTime.parse(values[5]))
@@ -189,8 +234,10 @@ public class TicketOfferBootstrap implements CommandLineRunner {
                     offers.add(TicketOfferTemplate.builder()
                             .id(UUID.nameUUIDFromBytes(idSource.getBytes(StandardCharsets.UTF_8)))
                             .type(TicketType.TRAIN)
-                            .departureCity(departureCity)
-                            .arrivalCity(arrivalCity)
+                            .departureCity(cityCatalog.find(departureCity).cityName())
+                            .arrivalCity(cityCatalog.find(arrivalCity).cityName())
+                            .departureCityId(cityCatalog.find(departureCity).cityId())
+                            .arrivalCityId(cityCatalog.find(arrivalCity).cityId())
                             .departureStation(from.station())
                             .arrivalStation(to.station())
                             .departureTime(toLocalTime(departureSeconds))
@@ -218,7 +265,7 @@ public class TicketOfferBootstrap implements CommandLineRunner {
         for (String[] values : readDelimitedRows(stationResource)) {
             if (values.length >= 2) {
                 String name = values[0].trim();
-                String city = normalizeCityName(values[1]);
+                String city = cityCatalog.find(values[1]).cityName();
                 if (!name.isBlank() && !city.isBlank()) {
                     stationCities.put(name, city);
                 }

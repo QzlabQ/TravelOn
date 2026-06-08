@@ -17,10 +17,16 @@ public class Location {
     @Id
     private UUID id;
 
+    private UUID cityId;
+
     @NotNull
     private String country;
 
+    private String province;
+
     private String region;
+
+    private String normalizedName;
 
     @OneToMany(mappedBy = "location", cascade = CascadeType.ALL)
     private List<Hotel> hotel;

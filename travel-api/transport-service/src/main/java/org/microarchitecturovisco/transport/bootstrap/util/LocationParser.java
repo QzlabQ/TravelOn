@@ -15,6 +15,11 @@ import java.util.UUID;
 public class LocationParser {
 
     private static final String DOMESTIC_COUNTRY = "中国";
+    private final CityCatalog cityCatalog;
+
+    public LocationParser(CityCatalog cityCatalog) {
+        this.cityCatalog = cityCatalog;
+    }
 
     public List<LocationDto> importLocationsAbroad(Resource resource, String transportType) {
         List<LocationDto> locationDtos = new ArrayList<>();
@@ -27,7 +32,8 @@ public class LocationParser {
                 String[] data = line.split("\t");
                 String country = data[4];
                 String region = data[5];
-                LocationDto locationDto = createNewLocation(locationDtos, country, region, transportType);
+                String cityId = data.length > 7 ? data[7] : "";
+                LocationDto locationDto = createNewLocation(locationDtos, country, region, cityId, transportType);
                 if (locationDto != null) {
                     locationDtos.add(locationDto);
                 }
@@ -49,8 +55,9 @@ public class LocationParser {
             while ((line = br.readLine()) != null) {
                 String[] data = line.split("\t");
                 String region = data[1];
+                String cityId = data.length > 2 ? data[2] : "";
                 if (!isSelfArrangedTransport(region)) {
-                    LocationDto locationDto = createNewLocation(locationDtos, DOMESTIC_COUNTRY, region, null);
+                    LocationDto locationDto = createNewLocation(locationDtos, DOMESTIC_COUNTRY, region, cityId, null);
                     if (locationDto != null) {
                         locationDtos.add(locationDto);
                     }
@@ -63,27 +70,24 @@ public class LocationParser {
         return locationDtos;
     }
 
-    private LocationDto createNewLocation(List<LocationDto> locationDtos, String country, String region, String transportType) {
+    private LocationDto createNewLocation(List<LocationDto> locationDtos, String country, String region, String cityId, String transportType) {
         if (transportType != null && transportType.equals("BUS")) {
             if (!locationAvailableByBus(country)) {
                 return null;
             }
         }
 
-        if (locationExists(locationDtos, country, region)) {
+        LocationDto location = cityCatalog.locationFor(country, region, cityId);
+        if (locationExists(locationDtos, location.getCityId())) {
             return null;
         }
 
-        return LocationDto.builder()
-                .idLocation(UUID.nameUUIDFromBytes((country + region).getBytes()))
-                .country(country)
-                .region(region)
-                .build();
+        return location;
     }
 
-    private boolean locationExists(List<LocationDto> locationDtos, String country, String region) {
+    private boolean locationExists(List<LocationDto> locationDtos, UUID cityId) {
         return locationDtos.stream()
-                .anyMatch(locationDto -> locationDto.getCountry().equals(country) && locationDto.getRegion().equals(region));
+                .anyMatch(locationDto -> locationDto.getCityId().equals(cityId));
     }
 
     private boolean locationAvailableByBus(String country) {

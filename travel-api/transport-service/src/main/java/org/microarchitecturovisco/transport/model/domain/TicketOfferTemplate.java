@@ -32,6 +32,8 @@ public class TicketOfferTemplate {
 
     private String departureCity;
     private String arrivalCity;
+    private UUID departureCityId;
+    private UUID arrivalCityId;
     private String departureStation;
     private String arrivalStation;
     private LocalTime departureTime;

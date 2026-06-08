@@ -1,6 +1,7 @@
 package org.microarchitecturovisco.transport.services;
 
 import lombok.RequiredArgsConstructor;
+import org.microarchitecturovisco.transport.bootstrap.util.CityCatalog;
 import org.microarchitecturovisco.transport.model.domain.*;
 import org.microarchitecturovisco.transport.model.dto.TransportDto;
 import org.microarchitecturovisco.transport.model.dto.request.GetTransportsBetweenLocationsRequestDto;
@@ -43,6 +44,7 @@ public class TransportsQueryService {
     private final LocationRepository locationRepository;
     private final TransportEventSourcingHandler transportEventSourcingHandler;
     private final TransportEventStore transportEventStore;
+    private final CityCatalog cityCatalog;
 
     public List<TransportDto> getAllTransports() {
         List<Transport> transports = transportRepository.findAll();
@@ -121,7 +123,11 @@ public class TransportsQueryService {
             String sortBy
     ) {
         return ticketOfferTemplateRepository
-                .findByTypeAndDepartureCityAndArrivalCityOrderByDepartureTimeAsc(type, departureCity, arrivalCity)
+                .findByTypeAndDepartureCityIdAndArrivalCityIdOrderByDepartureTimeAsc(
+                        type,
+                        cityCatalog.find(departureCity).cityId(),
+                        cityCatalog.find(arrivalCity).cityId()
+                )
                 .stream()
                 .filter(offer -> minPrice == null || offer.getPrice() >= minPrice)
                 .filter(offer -> maxPrice == null || offer.getPrice() <= maxPrice)

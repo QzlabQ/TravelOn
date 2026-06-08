@@ -1,98 +1,25 @@
-import OfferComponent from "../components/OfferComponent";
-import {useEffect, useState} from "react";
-import {ApiRequests, GetOffersBySearchQueryOffer} from "../../core/apiConfig";
-import {SentimentVeryDissatisfied} from "@mui/icons-material";
-import SearchBar from "../../home/components/SearchBar";
-import {Location} from "../../core/domain/DomainInterfaces";
-import {formatDate} from "../../core/utils";
-import {Box, LinearProgress} from "@mui/material";
+import {Button, Paper} from "@mui/material";
+import {Construction, Refresh} from "@mui/icons-material";
 
 const Offers = () => {
-
-    const [offers, setOffers] = useState<GetOffersBySearchQueryOffer[]>([]);
-
-    const [noResults, setNoResults] = useState(false);
-
-    const [error, setError] = useState(false);
-
-    const [loading, setLoading] = useState(false);
-
-    const searchOffers = async () => {
-        setLoading(true);
-        let searchParams = JSON.parse(localStorage.getItem("searchParams") ?? '{}');
-
-        searchParams = {...searchParams,
-            departurePlane: searchParams.departurePlane ? searchParams.departurePlane.map((dpt: Location) => dpt.idLocation) : [],
-            departureBus: searchParams.departureBus ? searchParams.departureBus.map((dpt: Location) => dpt.idLocation) : [],
-            departureTrain: searchParams.departureTrain ? searchParams.departureTrain.map((dpt: Location) => dpt.idLocation) : [],
-            arrivals: searchParams.arrivals ? searchParams.arrivals.map((dst: Location) => dst.idLocation) : [],
-            dateFrom: formatDate(searchParams.dateFrom ? new Date(searchParams.dateFrom) : new Date()),
-            dateTo: formatDate(searchParams.dateFrom ? new Date(searchParams.dateTo) : new Date()),
-        }
-
-        ApiRequests.getOffersBySearchQuery(searchParams)
-            .then(response => {
-                setOffers(response.data);
-                setNoResults(response.data.length === 0);
-                setLoading(false);
-            })
-            .catch(e => {
-                console.log(e);
-                setLoading(false);
-                setError(true);
-            });
-    }
-
-    useEffect(() => {
-        searchOffers().then(r => r);
-    }, []);
-
-    return(
-        <div className='flex flex-col py-16 px-[28rem] justify-center'>
-            <SearchBar
-                onSearch={searchOffers}
-            />
-
-            <Box sx={{height: 5}} className='mb-7'>
-                {loading &&
-                    <LinearProgress/>
-                }
-            </Box>
-
-            {offers
-                .sort((a, b) => a.price > b.price ? 1 : -1)
-                .map((offer, index) => (
-                    <OfferComponent
-                        idHotel={offer.idHotel}
-                        name={offer.hotelName}
-                        key={offer.hotelName}
-                        location={offer.destination}
-                        rating={offer.rating}
-                        pricePerPerson={Math.ceil(offer.price)}
-                        photoURL={offer.imageUrl}
-                        bestSeller={index < 3}
-                    />
-                ))}
-
-            {noResults &&
-                <div className='flex flex-col gap-4 mt-4'>
-                    <div className='flex flex-row items-center gap-2'>
-                        <SentimentVeryDissatisfied style={{fontSize: 36}}/>
-                        <p className='text-2xl'>未找到任何旅游产品</p>
-                    </div>
-                    <p>请调整搜索条件后重试...</p>
+    return (
+        <div className="flex min-h-[calc(100vh-80px)] items-start justify-center px-8 py-16">
+            <Paper className="w-full max-w-3xl px-8 py-8" elevation={1} style={{borderRadius: 8}}>
+                <div className="flex items-center gap-3">
+                    <Construction color="primary"/>
+                    <h1 className="text-2xl font-semibold text-slate-900">旅游产品</h1>
                 </div>
-            }
 
-            {error &&
-                <div className='flex flex-col gap-4 mt-4'>
-                    <div className='flex flex-row items-center gap-2'>
-                        <SentimentVeryDissatisfied style={{fontSize: 36}}/>
-                        <p className='text-2xl'>发生了意外错误</p>
-                    </div>
-                    <p>请稍后再试...</p>
+                <p className="mt-5 text-slate-600">
+                    旅游产品功能正在重构，旧的套餐搜索和组合报价已停用。
+                </p>
+
+                <div className="mt-8">
+                    <Button variant="outlined" startIcon={<Refresh/>} disabled>
+                        即将更新
+                    </Button>
                 </div>
-            }
+            </Paper>
         </div>
     );
 }

@@ -15,4 +15,10 @@ public interface TicketOfferTemplateRepository extends JpaRepository<TicketOffer
             String departureCity,
             String arrivalCity
     );
+
+    List<TicketOfferTemplate> findByTypeAndDepartureCityIdAndArrivalCityIdOrderByDepartureTimeAsc(
+            TicketType type,
+            UUID departureCityId,
+            UUID arrivalCityId
+    );
 }

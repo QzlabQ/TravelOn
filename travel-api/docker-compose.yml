@@ -74,11 +74,13 @@ services:
     volumes:
       - ./logs/hotel:/logs
       - ./seed-data/hotel:/seed-data/hotel:ro
+      - ./seed-data/common:/seed-data/common:ro
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hotel_db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
       APP_SEED_DATA_BASE_PATH: file:/seed-data/hotel/
+      APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
     depends_on:
       postgres:
         condition: service_healthy
@@ -147,11 +149,16 @@ services:
     volumes:
       - ./logs/transport:/logs
       - ./seed-data/transport:/seed-data/transport:ro
+      - ./seed-data/common:/seed-data/common:ro
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/transport_db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
       APP_SEED_DATA_BASE_PATH: file:/seed-data/transport/
+      APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
+      APP_SEED_DATA_TRAIN_BASE_PATH: file:/seed-data/transport/train/
+      APP_SEED_DATA_PLANE_BASE_PATH: file:/seed-data/transport/plane/
+      APP_TOUR_PRODUCTS_ENABLED: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -256,7 +263,9 @@ services:
       - ./logs/ai-arrange:/logs
     environment:
       - MONGO_HOST=mongo
+      - MONGO_PORT=27017
       - RABBITMQ_HOST=rabbitmq
+      - MONGODB_URI=mongodb://mongo:27017/ai-arrange-db
       - AI_AGENT_ENABLED=true
       - AI_ARRANGE_AGENT_BASE_URL=http://ai-arrange-agent:8090
       - HTTP_PROXY=
