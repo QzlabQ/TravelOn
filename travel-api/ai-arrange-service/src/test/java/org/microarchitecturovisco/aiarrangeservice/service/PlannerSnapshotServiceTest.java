@@ -304,9 +304,13 @@ class PlannerSnapshotServiceTest {
 
         PlannerSnapshot snapshot = service.createSnapshotFromAgentResponse(conversation, response);
 
-        assertThat(snapshot.getMarkdown()).contains("### 景点图片参考", "![The Bund 1](https://img.test/bund-1.jpg)");
-        assertThat(snapshot.getCurrentDayPlan().getMarkdown()).contains("### 景点图片参考", "![The Bund 2](https://img.test/bund-2.jpg)");
-        assertThat(snapshot.getDayPlans().getFirst().getMarkdown()).contains("### 景点图片参考");
+        assertThat(snapshot.getMarkdown())
+                .contains("- Walk the Bund.\n\n![The Bund 1](https://img.test/bund-1.jpg)")
+                .doesNotContain("### 景点图片参考");
+        assertThat(snapshot.getCurrentDayPlan().getMarkdown())
+                .contains("- Walk the Bund.\n\n![The Bund 1](https://img.test/bund-1.jpg)", "![The Bund 2](https://img.test/bund-2.jpg)")
+                .doesNotContain("### 景点图片参考");
+        assertThat(snapshot.getDayPlans().getFirst().getMarkdown()).doesNotContain("### 景点图片参考");
     }
 
     @Test
@@ -372,9 +376,13 @@ class PlannerSnapshotServiceTest {
 
         PlannerSnapshot snapshot = service.createSnapshotFromAgentResponse(conversation, response);
 
-        assertThat(snapshot.getMarkdown()).contains("### 景点图片参考", "暂无可展示图片");
-        assertThat(snapshot.getCurrentDayPlan().getMarkdown()).contains("### 景点图片参考", "暂无可展示图片");
-        assertThat(snapshot.getDayPlans().getFirst().getMarkdown()).contains("### 景点图片参考", "暂无可展示图片");
+        assertThat(snapshot.getMarkdown())
+                .contains("- Walk the Bund.\n\n- 暂无可展示图片")
+                .doesNotContain("### 景点图片参考");
+        assertThat(snapshot.getCurrentDayPlan().getMarkdown())
+                .contains("- Walk the Bund.\n\n- 暂无可展示图片")
+                .doesNotContain("### 景点图片参考");
+        assertThat(snapshot.getDayPlans().getFirst().getMarkdown()).doesNotContain("### 景点图片参考");
     }
 
     @Test
@@ -443,9 +451,11 @@ class PlannerSnapshotServiceTest {
 
         assertThat(snapshot.getCurrentDayPlan().getPlaces()).extracting(PlannerPlaceSuggestion::getName).containsExactly("The Bund");
         assertThat(snapshot.getCurrentDayPlan().getMarkdown())
-                .contains("### 景点图片参考", "![The Bund 1](https://img.test/bund-1.jpg)", "![The Bund 2](https://img.test/bund-2.jpg)");
+                .contains("- Walk the Bund.\n\n![The Bund 1](https://img.test/bund-1.jpg)", "![The Bund 2](https://img.test/bund-2.jpg)")
+                .doesNotContain("### 景点图片参考");
         assertThat(snapshot.getDayPlans().getFirst().getMarkdown())
-                .contains("### 景点图片参考", "![The Bund 1](https://img.test/bund-1.jpg)");
+                .contains("- Walk the Bund.\n\n![The Bund 1](https://img.test/bund-1.jpg)")
+                .doesNotContain("### 景点图片参考");
     }
 
     @Test

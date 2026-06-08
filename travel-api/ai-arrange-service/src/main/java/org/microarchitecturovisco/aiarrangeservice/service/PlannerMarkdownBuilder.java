@@ -9,6 +9,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -59,7 +60,16 @@ public class PlannerMarkdownBuilder {
     }
 
     public String appendImageReferenceIfMissing(String markdown, List<PlannerPlaceSuggestion> places) {
-        return appendSectionIfMissing(markdown, 3, IMAGE_REFERENCE_HEADER, renderImageSection(places)).trim();
+        String normalized = hasText(markdown) ? stripImageReferenceSection(markdown.trim()) : "";
+        List<PlannerPlaceSuggestion> safePlaces = places == null ? List.of() : places;
+        if (safePlaces.isEmpty()) {
+            return appendSectionIfMissing(normalized, 3, IMAGE_REFERENCE_HEADER, IMAGE_REFERENCE_PLACEHOLDER).trim();
+        }
+        InlineImageResult inlineResult = appendInlineImageReferences(normalized, safePlaces);
+        if (inlineResult.unmatchedPlaces().isEmpty()) {
+            return inlineResult.markdown().trim();
+        }
+        return appendSectionIfMissing(inlineResult.markdown(), 3, IMAGE_REFERENCE_HEADER, renderImageSection(inlineResult.unmatchedPlaces())).trim();
     }
 
     private String appendSectionIfMissing(String markdown, String header, String body) {
@@ -100,6 +110,26 @@ public class PlannerMarkdownBuilder {
                 .collect(Collectors.joining("\n"));
     }
 
+    private InlineImageResult appendInlineImageReferences(String markdown, List<PlannerPlaceSuggestion> places) {
+        if (!hasText(markdown) || places == null || places.isEmpty()) {
+            return new InlineImageResult(markdown, places == null ? List.of() : places);
+        }
+
+        List<String> lines = new ArrayList<>(markdown.lines().toList());
+        List<PlannerPlaceSuggestion> unmatchedPlaces = new ArrayList<>();
+        for (PlannerPlaceSuggestion place : places) {
+            int placeLineIndex = findPlaceLine(lines, place);
+            if (placeLineIndex < 0) {
+                unmatchedPlaces.add(place);
+                continue;
+            }
+            if (!hasInlineImageReference(lines, placeLineIndex, place)) {
+                lines.addAll(placeLineIndex + 1, blockLines(renderImageBlock(place)));
+            }
+        }
+        return new InlineImageResult(trimBlankLines(String.join("\n", lines)), unmatchedPlaces);
+    }
+
     private String renderImageSection(List<PlannerPlaceSuggestion> places) {
         if (places == null || places.isEmpty()) {
             return IMAGE_REFERENCE_PLACEHOLDER;
@@ -108,24 +138,160 @@ public class PlannerMarkdownBuilder {
         return places.stream()
                 .map(place -> {
                     String placeName = nullToDefault(place.getName(), "未命名地点");
-                    List<String> urls = imageUrls(place);
-                    StringBuilder section = new StringBuilder("#### ").append(placeName);
-                    if (urls.isEmpty()) {
-                        return section.append("\n").append(IMAGE_REFERENCE_PLACEHOLDER).toString();
-                    }
-                    for (int index = 0; index < urls.size(); index++) {
-                        section.append("\n")
-                                .append("![")
-                                .append(escapeImageAlt(placeName))
-                                .append(" ")
-                                .append(index + 1)
-                                .append("](")
-                                .append(urls.get(index))
-                                .append(")");
-                    }
-                    return section.toString();
+                    return "#### " + placeName + "\n" + renderImageBlock(place);
                 })
                 .collect(Collectors.joining("\n\n"));
+    }
+
+    private String renderImageBlock(PlannerPlaceSuggestion place) {
+        String placeName = nullToDefault(place.getName(), "未命名地点");
+        List<String> urls = imageUrls(place);
+        if (urls.isEmpty()) {
+            return IMAGE_REFERENCE_PLACEHOLDER;
+        }
+
+        StringBuilder section = new StringBuilder();
+        for (int index = 0; index < urls.size(); index++) {
+            if (section.length() > 0) {
+                section.append("\n");
+            }
+            section.append("![")
+                    .append(escapeImageAlt(placeName))
+                    .append(" ")
+                    .append(index + 1)
+                    .append("](")
+                    .append(urls.get(index))
+                    .append(")");
+        }
+        return section.toString();
+    }
+
+    private List<String> blockLines(String block) {
+        List<String> lines = new ArrayList<>();
+        lines.add("");
+        block.lines().forEach(lines::add);
+        lines.add("");
+        return lines;
+    }
+
+    private int findPlaceLine(List<String> lines, PlannerPlaceSuggestion place) {
+        for (int index = 0; index < lines.size(); index++) {
+            if (markdownHeadingLevel(lines.get(index).trim()) > 0 && lineMatchesPlace(lines.get(index), place)) {
+                return index;
+            }
+        }
+        for (int index = 0; index < lines.size(); index++) {
+            String trimmed = lines.get(index).trim();
+            if (!trimmed.startsWith("!") && lineMatchesPlace(trimmed, place)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private boolean lineMatchesPlace(String line, PlannerPlaceSuggestion place) {
+        if (place == null || !hasText(place.getName())) {
+            return false;
+        }
+        String lineText = normalizeMatchText(line);
+        String placeText = normalizeMatchText(place.getName());
+        return hasText(placeText) && lineText.contains(placeText);
+    }
+
+    private boolean hasInlineImageReference(List<String> lines, int placeLineIndex, PlannerPlaceSuggestion place) {
+        int scanEnd = inlineScanEnd(lines, placeLineIndex);
+        List<String> urls = imageUrls(place);
+        for (int index = placeLineIndex + 1; index < scanEnd; index++) {
+            String trimmed = lines.get(index).trim();
+            if (trimmed.contains(IMAGE_REFERENCE_PLACEHOLDER)) {
+                return true;
+            }
+            if (isMarkdownImage(trimmed)) {
+                return true;
+            }
+            if (urls.stream().anyMatch(trimmed::contains)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int inlineScanEnd(List<String> lines, int placeLineIndex) {
+        int currentLevel = markdownHeadingLevel(lines.get(placeLineIndex).trim());
+        if (currentLevel == 0) {
+            return Math.min(lines.size(), placeLineIndex + 8);
+        }
+
+        for (int index = placeLineIndex + 1; index < lines.size(); index++) {
+            int nextLevel = markdownHeadingLevel(lines.get(index).trim());
+            if (nextLevel > 0 && nextLevel <= currentLevel) {
+                return index;
+            }
+        }
+        return lines.size();
+    }
+
+    private String stripImageReferenceSection(String markdown) {
+        if (!hasMarkdownHeader(markdown, IMAGE_REFERENCE_HEADER)) {
+            return markdown;
+        }
+
+        List<String> result = new ArrayList<>();
+        boolean skipping = false;
+        int skipLevel = 0;
+        for (String line : markdown.lines().toList()) {
+            String trimmed = line.trim();
+            int headingLevel = markdownHeadingLevel(trimmed);
+            if (headingLevel > 0 && headingText(trimmed).equals(IMAGE_REFERENCE_HEADER)) {
+                skipping = true;
+                skipLevel = headingLevel;
+                continue;
+            }
+            if (skipping) {
+                if (headingLevel > 0 && headingLevel <= skipLevel) {
+                    skipping = false;
+                    result.add(line);
+                }
+                continue;
+            }
+            result.add(line);
+        }
+        return trimBlankLines(String.join("\n", result));
+    }
+
+    private int markdownHeadingLevel(String line) {
+        int index = 0;
+        while (index < line.length() && line.charAt(index) == '#') {
+            index++;
+        }
+        return index > 0 && index < line.length() && Character.isWhitespace(line.charAt(index)) ? index : 0;
+    }
+
+    private boolean isMarkdownImage(String line) {
+        return line.matches("^!\\[[^]]*]\\(.+\\)\\s*$");
+    }
+
+    private String headingText(String line) {
+        int headingLevel = markdownHeadingLevel(line);
+        return headingLevel == 0 ? "" : line.substring(headingLevel).trim();
+    }
+
+    private String normalizeMatchText(String value) {
+        return value == null ? "" : value.toLowerCase(Locale.ROOT)
+                .replaceAll("[\\s`*_#>\\-+.:：,，、;；()（）\\[\\]【】]+", "");
+    }
+
+    private String trimBlankLines(String value) {
+        String[] lines = value.split("\\R", -1);
+        int start = 0;
+        int end = lines.length;
+        while (start < end && lines[start].isBlank()) {
+            start++;
+        }
+        while (end > start && lines[end - 1].isBlank()) {
+            end--;
+        }
+        return String.join("\n", List.of(lines).subList(start, end));
     }
 
     private List<String> imageUrls(PlannerPlaceSuggestion place) {
@@ -191,5 +357,8 @@ public class PlannerMarkdownBuilder {
 
     private boolean hasText(String value) {
         return StringUtils.hasText(value);
+    }
+
+    private record InlineImageResult(String markdown, List<PlannerPlaceSuggestion> unmatchedPlaces) {
     }
 }

@@ -15,7 +15,7 @@ class PlannerMarkdownBuilderTest {
     private final PlannerMarkdownBuilder builder = new PlannerMarkdownBuilder();
 
     @Test
-    void normalizeMarkdownAppendsPlaceImageReferenceSection() {
+    void normalizeMarkdownEmbedsImagesBelowMatchedPlaceSection() {
         PlannerPlaceSuggestion place = PlannerPlaceSuggestion.builder()
                 .name("The Bund")
                 .imageUrl("https://img.test/bund-1.jpg")
@@ -24,7 +24,7 @@ class PlannerMarkdownBuilderTest {
 
         String markdown = builder.normalizeMarkdown(
                 PlannerSnapshotDraft.builder()
-                        .markdown("# Day 1\n\n- Walk along the river.")
+                        .markdown("# Day 1\n\n### The Bund\nWalk along the river.")
                         .places(List.of(place))
                         .build(),
                 conversation(),
@@ -32,14 +32,29 @@ class PlannerMarkdownBuilderTest {
         );
 
         assertThat(markdown)
-                .contains("### \u666f\u70b9\u56fe\u7247\u53c2\u8003")
-                .contains("#### The Bund")
-                .contains("![The Bund 1](https://img.test/bund-1.jpg)")
+                .doesNotContain("### \u666f\u70b9\u56fe\u7247\u53c2\u8003")
+                .contains("### The Bund\n\n![The Bund 1](https://img.test/bund-1.jpg)")
                 .contains("![The Bund 2](https://img.test/bund-2.jpg)");
     }
 
     @Test
-    void normalizeMarkdownDoesNotDuplicateExistingImageReferenceSection() {
+    void appendImageReferenceFallsBackToSectionWhenPlaceIsUnmatched() {
+        PlannerPlaceSuggestion place = PlannerPlaceSuggestion.builder()
+                .name("The Bund")
+                .imageUrl("https://img.test/bund-1.jpg")
+                .build();
+
+        String markdown = builder.appendImageReferenceIfMissing("# Day 1\n\n- Walk along the river.", List.of(place));
+
+        assertThat(markdown)
+                .contains("### \u666f\u70b9\u56fe\u7247\u53c2\u8003")
+                .contains("#### The Bund")
+                .contains("![The Bund 1](https://img.test/bund-1.jpg)")
+                .doesNotContain("![The Bund 2]");
+    }
+
+    @Test
+    void normalizeMarkdownReplacesExistingImageReferenceSectionBeforeRendering() {
         PlannerPlaceSuggestion place = PlannerPlaceSuggestion.builder()
                 .name("The Bund")
                 .imageUrls(List.of("https://img.test/bund-1.jpg"))
@@ -54,7 +69,10 @@ class PlannerMarkdownBuilderTest {
                 "assistant"
         );
 
-        assertThat(markdown).containsOnlyOnce("\u666f\u70b9\u56fe\u7247\u53c2\u8003");
+        assertThat(markdown)
+                .doesNotContain("\u666f\u70b9\u56fe\u7247\u53c2\u8003", "existing")
+                .contains("- The Bund")
+                .contains("![The Bund 1](https://img.test/bund-1.jpg)");
     }
 
     private PlannerConversation conversation() {
