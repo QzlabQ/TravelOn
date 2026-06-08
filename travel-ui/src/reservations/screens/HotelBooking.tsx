@@ -80,6 +80,7 @@ const HotelBooking = () => {
     const rebookState = (location.state ?? {}) as HotelRebookState;
     const bookingPreferences = useMemo(() => getBookingPreferences(), []);
     const navigateTimerRef = useRef<number | null>(null);
+    const checkoutSectionRef = useRef<HTMLDivElement | null>(null);
     const [destinations, setDestinations] = useState<Location[]>([]);
     const [destination, setDestination] = useState<Location | undefined>();
     const [dateFrom, setDateFrom] = useState(toDateInputValue(rebookState.dateFrom, formatDate(today)));
@@ -236,6 +237,10 @@ const HotelBooking = () => {
         setToastOpen(true);
     };
 
+    const scrollToCheckoutSection = () => {
+        checkoutSectionRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'});
+    };
+
     useEffect(() => clearAutoNavigate, []);
 
     useEffect(() => {
@@ -259,6 +264,7 @@ const HotelBooking = () => {
         setSelectedOffer(offer);
         setBookingError(false);
         setBookingMessage('');
+        scrollToCheckoutSection();
     };
 
     const openCheckoutConfirm = () => {
@@ -332,7 +338,7 @@ const HotelBooking = () => {
             showToast('订单提交成功，即将进入订单详情');
             clearAutoNavigate();
             navigateTimerRef.current = window.setTimeout(() => {
-                navigate(`/reservations/${response.data.id}`);
+                navigate(`/reservations/${response.data.id}#payment-countdown`);
             }, 2000);
         } catch (e) {
             console.log(e);
@@ -358,7 +364,7 @@ const HotelBooking = () => {
                     action={!toastError && reservationId ?
                         <Button
                             component={Link}
-                            to={`/reservations/${reservationId}`}
+                            to={`/reservations/${reservationId}#payment-countdown`}
                             color='inherit'
                             size='small'
                             onClick={clearAutoNavigate}
@@ -377,7 +383,7 @@ const HotelBooking = () => {
                 <Chip icon={<Hotel/>} label='酒店服务' sx={{backgroundColor: '#eff6ff', color: '#2563eb'}}/>
                 <div className='mt-4 flex flex-wrap items-end justify-between gap-4'>
                     <div>
-                        <h1 className='text-3xl font-bold text-slate-950'>酒店预定</h1>
+                        <h1 className='text-3xl font-bold text-slate-950'>酒店预订</h1>
                         <p className='mt-2 text-slate-500'>按目的地、日期、评分和房型筛选可预订酒店</p>
                     </div>
                     <div className='flex gap-2'>
@@ -391,7 +397,7 @@ const HotelBooking = () => {
             {stayDateError && <Alert severity='warning' className='mb-4'>{stayDateError}</Alert>}
             {!isAuthenticated && <Alert severity='info' className='mb-4'>未登录时可以查询酒店价格和查看详情；登录后才能选择入住人、选择酒店并提交订单。</Alert>}
             {bookingError && <Alert severity='error' className='mb-4'>创建酒店预订失败，请检查日期或后端服务。</Alert>}
-            {bookingMessage && <Alert severity={bookingError ? 'warning' : 'success'} className='mb-4' action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}`} color='inherit' size='small'>订单详情</Button> : undefined}>{bookingMessage}</Alert>}
+            {bookingMessage && <Alert severity={bookingError ? 'warning' : 'success'} className='mb-4' action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}#payment-countdown`} color='inherit' size='small'>订单详情</Button> : undefined}>{bookingMessage}</Alert>}
 
             <div className='grid grid-cols-[360px_1fr] gap-6 items-start'>
                 <aside className='sticky top-24 self-start flex max-h-[calc(100vh-7rem)] flex-col gap-5 overflow-y-auto pr-1'>
@@ -446,53 +452,6 @@ const HotelBooking = () => {
                         <Button fullWidth variant='contained' size='large' startIcon={<Search/>} sx={{mt: 2, borderRadius: 2}} onClick={() => searchHotels(true)} disabled={loading || !destination || hasInvalidPriceRange || Boolean(stayDateError)}>
                             查询
                         </Button>
-                    </section>
-
-                    <TravelerSelector title='选择入住人' onChange={setSelectedTravelers}/>
-
-                    <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
-                        <h2 className='text-lg font-bold text-slate-900 mb-4'>订单填写</h2>
-                        {selectedOffer ? (
-                            <div className='space-y-3'>
-                                <div className='rounded-lg bg-slate-50 p-3'>
-                                    <p className='text-sm font-semibold text-slate-900'>{selectedOffer.hotelName}</p>
-                                    <p className='mt-1 text-sm text-slate-600'>{dateFrom} 入住，{dateTo} 离店</p>
-                                    <p className='mt-1 text-xs text-slate-500'>{selectedOffer.destination} · {roomType === 'DOUBLE' ? '大床优先' : roomType === 'FAMILY' ? '家庭房优先' : '房型不限'}</p>
-                                </div>
-                                <div className='flex items-center justify-between text-sm text-slate-600'>
-                                    <span>入住人</span>
-                                    <span>{selectedGuestCount} 人</span>
-                                </div>
-                                <div className='flex items-center justify-between text-sm text-slate-600'>
-                                    <span>参考单价</span>
-                                    <span>¥{Math.ceil(selectedOffer.price)}</span>
-                                </div>
-                                <div className='flex items-center justify-between border-t border-slate-200 pt-3'>
-                                    <span className='font-semibold text-slate-900'>应付金额</span>
-                                    <span className='text-2xl font-bold text-blue-600'>¥{Math.ceil(selectedTotalPrice)}</span>
-                                </div>
-                                <Button
-                                    fullWidth
-                                    variant='contained'
-                                    size='large'
-                                    sx={{borderRadius: 2}}
-                                    disabled={!isAuthenticated || bookingHotelId === selectedOffer.idHotel || selectedGuestCount === 0 || Boolean(stayDateError)}
-                                    onClick={openCheckoutConfirm}
-                                >
-                                    {!isAuthenticated ? '登录后提交' : bookingHotelId === selectedOffer.idHotel ? '提交中' : '提交订单'}
-                                </Button>
-                                {!isAuthenticated &&
-                                    <p className='text-xs text-orange-500'>请先登录账户，才能选择入住人并提交订单。</p>
-                                }
-                                {selectedGuestCount === 0 &&
-                                    <p className='text-xs text-orange-500'>请先在上方选择或填写入住人。</p>
-                                }
-                            </div>
-                        ) : (
-                            <div className='rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500'>
-                                先在右侧选择一家酒店，再填写入住人并提交订单。
-                            </div>
-                        )}
                     </section>
 
                     <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
@@ -601,6 +560,90 @@ const HotelBooking = () => {
                             </div>
                         }
                     </section>
+
+                    <section ref={checkoutSectionRef} className='mt-5 rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
+                        <div className='flex flex-wrap items-center justify-between gap-3'>
+                            <div>
+                                <h2 className='text-xl font-bold text-slate-950'>填写订单</h2>
+                                <p className='mt-1 text-sm text-slate-500'>确认酒店后，请在这里填写入住人并提交订单。</p>
+                            </div>
+                            {selectedOffer &&
+                                <Chip
+                                    color='primary'
+                                    variant='outlined'
+                                    label={selectedOffer.hotelName}
+                                />
+                            }
+                        </div>
+                        <div className='mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]'>
+                            <div className='space-y-4'>
+                                {selectedOffer ? (
+                                    <div className='rounded-lg border border-slate-200 bg-slate-50 p-4'>
+                                        <div className='flex flex-wrap items-start justify-between gap-4'>
+                                            <div>
+                                                <p className='text-lg font-semibold text-slate-900'>{selectedOffer.hotelName}</p>
+                                                <p className='mt-2 text-sm text-slate-600'>{selectedOffer.destination}</p>
+                                                <p className='mt-1 text-sm text-slate-600'>{dateFrom} 入住 · {dateTo} 离店 · {selectedNightCount} 晚</p>
+                                            </div>
+                                            <div className='text-right'>
+                                                <p className='text-sm text-slate-500'>评分</p>
+                                                <p className='mt-1 text-base font-semibold text-slate-900'>{selectedOffer.rating.toFixed(1)}</p>
+                                                <p className='mt-1 text-xs text-slate-500'>{selectedRoomName}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className='rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500'>
+                                        请选择要预订的酒店。
+                                    </div>
+                                )}
+                                <TravelerSelector title='选择入住人' onChange={setSelectedTravelers}/>
+                            </div>
+                            <section className='rounded-lg border border-slate-200 bg-slate-50 p-4'>
+                                <h3 className='text-lg font-bold text-slate-900'>订单信息</h3>
+                                {selectedOffer ? (
+                                    <div className='mt-4 space-y-3'>
+                                        <div className='flex items-center justify-between text-sm text-slate-600'>
+                                            <span>入住人</span>
+                                            <span>{selectedGuestCount} 人</span>
+                                        </div>
+                                        <div className='flex items-center justify-between text-sm text-slate-600'>
+                                            <span>参考单价</span>
+                                            <span>¥{Math.ceil(selectedOffer.price)}</span>
+                                        </div>
+                                        <div className='flex items-center justify-between text-sm text-slate-600'>
+                                            <span>入住晚数</span>
+                                            <span>{selectedNightCount} 晚</span>
+                                        </div>
+                                        <div className='flex items-center justify-between border-t border-slate-200 pt-3'>
+                                            <span className='font-semibold text-slate-900'>应付金额</span>
+                                            <span className='text-2xl font-bold text-blue-600'>¥{Math.ceil(selectedTotalPrice)}</span>
+                                        </div>
+                                        <Button
+                                            fullWidth
+                                            variant='contained'
+                                            size='large'
+                                            sx={{borderRadius: 2}}
+                                            disabled={!isAuthenticated || bookingHotelId === selectedOffer.idHotel || selectedGuestCount === 0 || Boolean(stayDateError)}
+                                            onClick={openCheckoutConfirm}
+                                        >
+                                            {!isAuthenticated ? '登录后提交' : bookingHotelId === selectedOffer.idHotel ? '提交中' : '提交订单'}
+                                        </Button>
+                                        {!isAuthenticated &&
+                                            <p className='text-xs text-orange-500'>请先登录账户，才能选择入住人并提交订单。</p>
+                                        }
+                                        {selectedGuestCount === 0 &&
+                                            <p className='text-xs text-orange-500'>请先选择或填写入住人。</p>
+                                        }
+                                    </div>
+                                ) : (
+                                    <div className='mt-4 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500'>
+                                        选择酒店后显示订单金额与提交入口。
+                                    </div>
+                                )}
+                            </section>
+                        </div>
+                    </section>
                 </main>
             </div>
             {selectedOffer &&
@@ -625,7 +668,7 @@ const HotelBooking = () => {
                     rules={[
                         "未支付订单将在 30 分钟后自动超时。",
                         "已支付订单取消后会直接完成退款，钱包支付退回余额。",
-                        "房型和价格来自后端酒店数据库，当前用于课程项目演示。",
+                        "房型和价格会随库存与日期变化，提交订单前请再次确认。",
                     ]}
                     submitting={bookingHotelId === selectedOffer.idHotel}
                     onClose={() => setCheckoutConfirmOpen(false)}
@@ -676,7 +719,7 @@ const HotelResultCard = ({
                 <p className='mt-3 text-sm text-emerald-600'>订单确认后 30 分钟内免费取消</p>
             </div>
             <div className='flex flex-col items-end justify-end border-l border-slate-200 p-5 text-right'>
-                <p className='text-xs text-orange-500'>历史展示参考价</p>
+                <p className='text-xs text-orange-500'>参考价</p>
                 <p className='mt-2 text-slate-400 line-through'>¥{Math.ceil(offer.price * 1.18).toLocaleString()}</p>
                 <p className='text-3xl font-bold text-blue-600'>¥{Math.ceil(offer.price).toLocaleString()} <span className='text-sm'>起</span></p>
                 <div className='mt-2 flex flex-col gap-2'>
@@ -687,7 +730,7 @@ const HotelResultCard = ({
                         disabled={reserving || !canBook}
                         onClick={() => onBook(offer)}
                     >
-                        {!canBook ? '登录后选择' : reserving ? '提交中' : selected ? '已选择' : '选择'}
+                        {!canBook ? '登录后选择' : reserving ? '提交中' : selected ? '继续预订' : '去预订'}
                     </Button>
                     <Link
                         to={`/reservations/hotels/${offer.idHotel}?dateFrom=${dateFrom}&dateTo=${dateTo}&adults=${adults}`}
