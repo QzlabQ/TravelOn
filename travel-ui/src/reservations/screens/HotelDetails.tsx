@@ -217,7 +217,7 @@ const HotelDetails = () => {
             showToast("订单提交成功，即将进入订单详情");
             clearAutoNavigate();
             navigateTimerRef.current = window.setTimeout(() => {
-                navigate(`/reservations/${response.data.id}`);
+                navigate(`/reservations/${response.data.id}#payment-countdown`);
             }, 2000);
         } catch (e) {
             console.log(e);
@@ -244,7 +244,7 @@ const HotelDetails = () => {
                     action={!toastError && reservationId ?
                         <Button
                             component={Link}
-                            to={`/reservations/${reservationId}`}
+                            to={`/reservations/${reservationId}#payment-countdown`}
                             color="inherit"
                             size="small"
                             onClick={clearAutoNavigate}
@@ -270,7 +270,7 @@ const HotelDetails = () => {
             {error && <Alert severity="warning" className="mb-4">酒店详情暂时不可用，请确认酒店服务已启动。</Alert>}
             {stayDateError && <Alert severity="warning" className="mb-4">{stayDateError}</Alert>}
             {!isAuthenticated && <Alert severity="info" className="mb-4">未登录时可以查看酒店价格、房型和评价；登录后才能选择房型、填写入住人并提交订单。</Alert>}
-            {bookingMessage && <Alert severity={bookingError ? "error" : "success"} className="mb-4" action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}`} color="inherit" size="small">订单详情</Button> : undefined}>{bookingMessage}</Alert>}
+            {bookingMessage && <Alert severity={bookingError ? "error" : "success"} className="mb-4" action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}#payment-countdown`} color="inherit" size="small">订单详情</Button> : undefined}>{bookingMessage}</Alert>}
 
             <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                 <div className="grid min-h-[360px] grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
@@ -423,7 +423,7 @@ const HotelDetails = () => {
                         <div className="mt-3 space-y-2 text-sm text-slate-600">
                             <p>订单创建后可在订单详情页完成支付。</p>
                             <p>已支付订单取消后会进入退款流程，退款完成时间以订单状态为准。</p>
-                            <p>房型和价格来自后端酒店数据库，当前用于课程项目演示。</p>
+                            <p>房型与价格会随日期和库存变化，请以下单页展示为准。</p>
                         </div>
                     </section>
                 </aside>
@@ -450,7 +450,7 @@ const HotelDetails = () => {
                     rules={[
                         "未支付订单将在 30 分钟后自动超时。",
                         "已支付订单取消后会直接完成退款，钱包支付退回余额。",
-                        "房型和价格来自后端酒店数据库，当前用于课程项目演示。",
+                        "房型与价格会随日期和库存变化，请以下单页展示为准。",
                     ]}
                     submitting={submitting}
                     onClose={() => setCheckoutConfirmOpen(false)}

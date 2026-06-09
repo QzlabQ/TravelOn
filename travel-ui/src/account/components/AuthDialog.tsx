@@ -6,7 +6,6 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
-    Divider,
     InputAdornment,
     Tab,
     Tabs,
@@ -35,7 +34,6 @@ const defaultLoginForm = {
 const defaultRegisterForm = {
     email: "",
     password: "",
-    confirmPassword: "",
     realName: "",
     phone: ""
 };
@@ -48,9 +46,6 @@ export default function AuthDialog({open, initialMode = "login", onClose, onAuth
     const [errorMessage, setErrorMessage] = useState("");
     const registerPhoneError = validateChinaMainlandPhone(registerForm.phone, false);
     const registerRealNameError = registerForm.realName.trim() ? "" : "请输入真实姓名。";
-    const registerConfirmPasswordError = !registerForm.confirmPassword
-        ? "请再次输入密码。"
-        : (registerForm.password === registerForm.confirmPassword ? "" : "两次输入的密码不一致。");
 
     useEffect(() => {
         if (open) {
@@ -92,10 +87,6 @@ export default function AuthDialog({open, initialMode = "login", onClose, onAuth
             setErrorMessage("密码不少于 6 位。");
             return;
         }
-        if (registerConfirmPasswordError) {
-            setErrorMessage(registerConfirmPasswordError);
-            return;
-        }
 
         setSubmitting(true);
         setErrorMessage("");
@@ -125,8 +116,6 @@ export default function AuthDialog({open, initialMode = "login", onClose, onAuth
         registerForm.email.trim() &&
         registerForm.password.length >= 6 &&
         registerForm.realName.trim() &&
-        registerForm.confirmPassword &&
-        !registerConfirmPasswordError &&
         !registerPhoneError;
 
     return (
@@ -138,26 +127,26 @@ export default function AuthDialog({open, initialMode = "login", onClose, onAuth
                             <TravelExplore/>
                         </div>
                         <Typography variant="h4" className="font-semibold">
-                            让下一段旅程从账户开始
+                            登录后即可查看订单与账户信息
                         </Typography>
                         <Typography className="mt-4 text-white/80">
-                            登录后会把预订、偏好、AI 行程和常用旅客信息放在同一个地方，下一次规划会更快。
+                            一个账号即可统一查看订单，保存常用出行人、入住人和支付信息，后续预订会更方便。
                         </Typography>
                     </div>
                     <div className="grid gap-3 text-sm text-white/85">
-                        <div className="rounded-lg border border-white/15 bg-white/10 p-4">统一管理机票、火车票、酒店和套餐订单</div>
-                        <div className="rounded-lg border border-white/15 bg-white/10 p-4">保留你的出发城市、同行人数和旅行偏好</div>
-                        <div className="rounded-lg border border-white/15 bg-white/10 p-4">账户资料会同步到后端 user-service</div>
+                        <div className="rounded-lg border border-white/15 bg-white/10 p-4">机票、火车票、酒店和度假订单可统一查看</div>
+                        <div className="rounded-lg border border-white/15 bg-white/10 p-4">常用出行人、入住人和支付方式可长期保存</div>
+                        <div className="rounded-lg border border-white/15 bg-white/10 p-4">更换设备登录后，订单和账户资料也会同步显示</div>
                     </div>
                 </div>
 
                 <div className="px-6 py-6 md:px-8">
                     <DialogTitle className="px-0 pb-2">
                         <Typography variant="h5" className="font-semibold">
-                            {mode === "login" ? "欢迎回来" : "注册账号"}
+                            {mode === "login" ? "欢迎登录" : "注册账号"}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" className="mt-1">
-                            {mode === "login" ? "继续查看你的预订与旅程。" : "填写常用信息，像国内旅行应用一样快速注册。"}
+                            {mode === "login" ? "登录后可查看订单、常用出行人和支付信息。" : "注册后可保存订单、常用出行人和支付信息。"}
                         </Typography>
                     </DialogTitle>
 
@@ -202,10 +191,6 @@ export default function AuthDialog({open, initialMode = "login", onClose, onAuth
                                 >
                                     {submitting ? "登录中..." : "登录"}
                                 </Button>
-                                <Divider/>
-                                <Typography variant="body2" color="text.secondary">
-                                    可用演示账号：john0@gmail.com / password1
-                                </Typography>
                             </Box>
                         }
 
@@ -254,25 +239,13 @@ export default function AuthDialog({open, initialMode = "login", onClose, onAuth
                                         startAdornment: <InputAdornment position="start"><Lock fontSize="small"/></InputAdornment>
                                     }}
                                 />
-                                <TextField
-                                    label="再次输入密码"
-                                    type="password"
-                                    value={registerForm.confirmPassword}
-                                    onChange={event => setRegisterForm({...registerForm, confirmPassword: event.target.value})}
-                                    error={Boolean(registerForm.confirmPassword && registerConfirmPasswordError)}
-                                    helperText={registerForm.confirmPassword ? registerConfirmPasswordError || "请再次输入密码确认。" : "请再次输入密码确认。"}
-                                    fullWidth
-                                    InputProps={{
-                                        startAdornment: <InputAdornment position="start"><Lock fontSize="small"/></InputAdornment>
-                                    }}
-                                />
                                 <Button
                                     variant="contained"
                                     size="large"
                                     disabled={!canRegister || submitting}
                                     onClick={submitRegister}
                                 >
-                                    {submitting ? "注册中..." : "注册账号"}
+                                    {submitting ? "注册中..." : "立即注册"}
                                 </Button>
                             </Box>
                         }

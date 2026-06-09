@@ -527,19 +527,19 @@ export default function Account() {
             <main className="min-h-[calc(100vh-80px)] bg-[#f6f8fb] px-10 py-14">
                 <section className="mx-auto grid max-w-6xl grid-cols-1 gap-8 lg:grid-cols-[1.05fr_0.95fr]">
                     <div className="flex flex-col justify-center">
-                        <Chip className="mb-5 w-fit" color="primary" variant="outlined" label="Tour Central 账户"/>
+                        <Chip className="mb-5 w-fit" color="primary" variant="outlined" label="我的账户"/>
                         <Typography variant="h3" className="font-semibold">
-                            登录后，旅程会跟着你走。
+                            登录后可查看订单并管理常用信息
                         </Typography>
                         <Typography className="mt-4 max-w-2xl text-gray-600">
-                            把套餐预订、机票火车票、酒店订单和 AI 行程规划放在同一个账户里。现在仍可游客浏览，登录后会使用账户 ID 保存新订单。
+                            登录后可统一查看机票、火车票、酒店和度假订单，并保存常用出行人、入住人和支付信息。未登录时仍可先浏览价格和详情。
                         </Typography>
                         <div className="mt-8 flex gap-3">
                             <Button variant="contained" size="large" onClick={() => setAuthOpen(true)}>
                                 登录 / 注册
                             </Button>
-                            <Button variant="outlined" size="large" component={Link} to="/offers">
-                                继续看产品
+                            <Button variant="outlined" size="large" component={Link} to="/reservations/flights">
+                                继续浏览
                             </Button>
                         </div>
                     </div>
@@ -547,18 +547,18 @@ export default function Account() {
                     <div className="grid gap-4">
                         <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                             <TravelExplore className="mb-3 text-[#0f766e]"/>
-                            <Typography variant="h6">智能规划</Typography>
-                            <Typography variant="body2" color="text.secondary">AI 行程和收藏点位可随账户继续维护。</Typography>
+                            <Typography variant="h6">出行偏好</Typography>
+                            <Typography variant="body2" color="text.secondary">常用出发城市、席别偏好和筛选设置可随账户保存。</Typography>
                         </div>
                         <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                             <Bookmarks className="mb-3 text-[#556cd6]"/>
-                            <Typography variant="h6">订单中枢</Typography>
-                            <Typography variant="body2" color="text.secondary">集中查看套餐、酒店、机票与火车票预订。</Typography>
+                            <Typography variant="h6">我的订单</Typography>
+                            <Typography variant="body2" color="text.secondary">机票、火车票、酒店和度假订单都可以在这里统一查看。</Typography>
                         </div>
                         <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                             <Badge className="mb-3 text-[#d97706]"/>
-                            <Typography variant="h6">会员身份</Typography>
-                            <Typography variant="body2" color="text.secondary">资料越完整，后续推荐和预订流程越省心。</Typography>
+                            <Typography variant="h6">账户资料</Typography>
+                            <Typography variant="body2" color="text.secondary">实名信息、联系人和支付方式越完整，后续预订会更顺畅。</Typography>
                         </div>
                     </div>
                 </section>
@@ -707,7 +707,7 @@ export default function Account() {
                                 <div className="mb-4 flex items-center justify-between">
                                     <div>
                                         <p className="font-semibold text-gray-900">实名信息</p>
-                                        <p className="text-xs text-gray-500">支付前会要求填写付款人实名信息，证件号仅保存在本地演示数据中。</p>
+                                        <p className="text-xs text-gray-500">支付前会要求填写付款人实名信息，证件号仅用于当前账户的出行与支付校验。</p>
                                     </div>
                                     <CreditCard className="text-[#0f766e]"/>
                                 </div>

@@ -121,7 +121,7 @@ export default function WalletTopUpDialog({
             <DialogTitle>钱包充值</DialogTitle>
             <DialogContent className="space-y-4 pt-2">
                 <Alert severity="info">
-                    演示环境不会调用真实支付接口。请先绑定银联卡，充值时直接选择银联卡完成快捷充值。
+                    充值前请先绑定银联卡，确认后会实时计入钱包余额。
                 </Alert>
                 {dialogError && <Alert severity="error">{dialogError}</Alert>}
 

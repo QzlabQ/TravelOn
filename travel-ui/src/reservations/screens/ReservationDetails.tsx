@@ -1,5 +1,5 @@
-import React, {useEffect, useMemo, useState} from "react";
-import {Link, useNavigate, useParams} from "react-router-dom";
+import React, {useEffect, useMemo, useRef, useState} from "react";
+import {Link, useLocation, useNavigate, useParams} from "react-router-dom";
 import Countdown, {CountdownRenderProps} from "react-countdown";
 import {
     Alert,
@@ -150,8 +150,11 @@ const validatePayerIdentity = (identity: AccountIdentity) => {
 export default function ReservationDetails() {
     const {reservationId = ""} = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const session = useAuthSession();
     const isAuthenticated = Boolean(session);
+    const summarySectionRef = useRef<HTMLElement | null>(null);
+    const paymentCountdownRef = useRef<HTMLDivElement | null>(null);
     const [reservation, setReservation] = useState<ReservationResponse>();
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState("");
@@ -169,6 +172,7 @@ export default function ReservationDetails() {
     const [payments, setPayments] = useState<PaymentTransactionResponse[]>([]);
     const [refunds, setRefunds] = useState<RefundRecordResponse[]>([]);
     const [submitting, setSubmitting] = useState(false);
+    const paymentDeadline = useMemo(() => getPaymentDeadlineMillis(reservation), [reservation?.createdAt, reservation?.paymentDeadline]);
 
     const refundWalletIfReservationAlreadyRefunded = (loadedReservation: ReservationResponse, loadedRefunds: RefundRecordResponse[]) => {
         const completedRefundRecord = loadedRefunds.find(refund => refund.status === "COMPLETED");
@@ -255,9 +259,17 @@ export default function ReservationDetails() {
         };
     }, []);
 
-    const paymentDeadline = useMemo(() => {
-        return getPaymentDeadlineMillis(reservation);
-    }, [reservation?.createdAt, reservation?.paymentDeadline]);
+    useEffect(() => {
+        if (loading || !reservation) return;
+
+        const timerId = window.setTimeout(() => {
+            const shouldFocusPaymentCountdown = location.hash === "#payment-countdown" && canPayReservation(reservation, refunds);
+            const target = shouldFocusPaymentCountdown ? paymentCountdownRef.current : summarySectionRef.current;
+            target?.scrollIntoView({behavior: "auto", block: "start"});
+        }, 0);
+
+        return () => window.clearTimeout(timerId);
+    }, [loading, location.hash, refunds, reservation]);
 
     if (loading && !reservation) {
         return <main className="min-h-screen bg-slate-50 px-8 py-10"><LinearProgress/></main>;
@@ -433,7 +445,7 @@ export default function ReservationDetails() {
             setSuccessMessage(paymentMethod === "WALLET" ? "钱包支付成功，订单状态已经更新。" : "银联卡支付成功，订单状态已经更新。");
             await loadReservation();
         } catch (error: any) {
-            setErrorMessage(error?.message || "支付未通过。请检查银联卡号后重试，演示卡可使用 6222020000000056。");
+            setErrorMessage(error?.message || "支付未通过。请检查银联卡号后重试。");
         } finally {
             setSubmitting(false);
         }
@@ -477,7 +489,7 @@ export default function ReservationDetails() {
             <div className="mx-auto max-w-6xl">
                 <Button component={Link} to="/reservations" startIcon={<ArrowBack/>}>返回我的预订</Button>
 
-                <section className="mt-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+                <section ref={summarySectionRef} className="mt-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
                             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -500,7 +512,7 @@ export default function ReservationDetails() {
                     }
 
                     {canPay &&
-                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                        <div ref={paymentCountdownRef} className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
                             <div>
                                 <p className="text-sm font-semibold text-amber-900">支付剩余时间</p>
                                 <Countdown date={paymentDeadline} renderer={renderPaymentCountdown} onComplete={() => loadReservation().then(r => r)}/>
@@ -640,10 +652,10 @@ export default function ReservationDetails() {
             </div>
 
             <Dialog open={payDialogOpen} onClose={() => setPayDialogOpen(false)} fullWidth maxWidth="sm">
-                <DialogTitle>模拟支付</DialogTitle>
+                <DialogTitle>支付订单</DialogTitle>
                 <DialogContent>
                     <Alert severity="info" className="mb-4">
-                        演示环境不会调用真实支付接口；钱包会本地扣款，银联卡仍走后端模拟校验。
+                        可使用钱包余额或银联卡完成支付，支付成功后订单状态会立即更新。
                     </Alert>
 
                     <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
@@ -775,8 +787,8 @@ export default function ReservationDetails() {
                                         onChange={event => setCardNumber(normalizeDigits(event.target.value).slice(0, 19))}
                                         error={Boolean(cardNumber && bankCardError)}
                                         helperText={cardNumber
-                                            ? bankCardError || `${cardIssuerInfo ? `已识别 ${cardIssuerInfo.displayName}；` : ""}仅支持 16-19 位银联卡号；演示卡可用 6222020000000056。`
-                                            : "仅支持 16-19 位银联卡号；演示卡可用 6222020000000056。"}
+                                            ? bankCardError || `${cardIssuerInfo ? `已识别 ${cardIssuerInfo.displayName}；` : ""}仅支持 16-19 位银联卡号。`
+                                            : "仅支持 16-19 位银联卡号。"}
                                     />
                                 </div>
                             }

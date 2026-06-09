@@ -162,10 +162,69 @@ function emptyPlannerView(): PlannerViewData {
     };
 }
 
+function normalizePlannerViewData(value?: Partial<PlannerViewData> | null): PlannerViewData {
+    const defaults = emptyPlannerView();
+    return {
+        ...defaults,
+        ...value,
+        title: typeof value?.title === "string" && value.title.trim() ? value.title : defaults.title,
+        summary: typeof value?.summary === "string" ? value.summary : defaults.summary,
+        markdown: typeof value?.markdown === "string" ? value.markdown : defaults.markdown,
+        scope: typeof value?.scope === "string" ? value.scope : defaults.scope,
+        currentDayIndex: typeof value?.currentDayIndex === "number" ? value.currentDayIndex : null,
+        completedDayIndexes: Array.isArray(value?.completedDayIndexes)
+            ? value.completedDayIndexes.filter((item): item is number => typeof item === "number")
+            : [],
+        dayPlans: Array.isArray(value?.dayPlans) ? value.dayPlans : [],
+        places: Array.isArray(value?.places) ? value.places : [],
+        routes: Array.isArray(value?.routes) ? value.routes : [],
+        selectedPlaceIds: Array.isArray(value?.selectedPlaceIds)
+            ? value.selectedPlaceIds.filter((item): item is string => typeof item === "string")
+            : [],
+        snapshotVersion: typeof value?.snapshotVersion === "number" ? value.snapshotVersion : null,
+    };
+}
+
+function normalizeStoredPlannerSession(value?: Partial<PlannerStoredSession> | null): PlannerStoredSession | null {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+
+    const conversation = value.conversation || null;
+    const baseViewData = viewDataFromConversation(conversation);
+    const liveData = normalizePlannerViewData({
+        ...baseViewData,
+        ...(value.liveData || {}),
+    });
+    const displayData = normalizePlannerViewData({
+        ...liveData,
+        ...(value.displayData || {}),
+    });
+
+    return {
+        userId: typeof value.userId === "string" && value.userId.trim() ? value.userId : DEFAULT_DEV_USER_ID,
+        form: normalizeFormState(value.form),
+        conversation,
+        chatMessages: Array.isArray(value.chatMessages) ? value.chatMessages : [],
+        chatInput: typeof value.chatInput === "string" ? value.chatInput : "",
+        liveData,
+        displayData,
+        snapshots: Array.isArray(value.snapshots) ? value.snapshots : [],
+        plannerTraceEvents: Array.isArray(value.plannerTraceEvents) ? value.plannerTraceEvents : [],
+        viewingSnapshotVersion: value.viewingSnapshotVersion === "latest" || typeof value.viewingSnapshotVersion === "number"
+            ? value.viewingSnapshotVersion
+            : "latest",
+        workspaceTab: value.workspaceTab === "chat" ? "chat" : "markdown",
+        markdownMode: value.markdownMode === "edit" ? "edit" : "preview",
+        targetDayIndex: typeof value.targetDayIndex === "number" && value.targetDayIndex > 0 ? value.targetDayIndex : undefined,
+    };
+}
+
 function readStoredPlannerSession(): PlannerStoredSession | null {
     try {
         const raw = localStorage.getItem(PLANNER_STORAGE_KEY);
-        return raw ? JSON.parse(raw) as PlannerStoredSession : null;
+        const parsed = raw ? JSON.parse(raw) as Partial<PlannerStoredSession> : null;
+        return normalizeStoredPlannerSession(parsed);
     } catch {
         return null;
     }
@@ -453,29 +512,30 @@ function viewDataFromDayVersion(record: PlannerDayVersion, fallbackData: Planner
 }
 
 function viewDataForDay(data: PlannerViewData, dayIndex: number): PlannerViewData {
-    if (data.scope === "TRIP_ASSEMBLE") {
-        return data;
+    const normalizedData = normalizePlannerViewData(data);
+    if (normalizedData.scope === "TRIP_ASSEMBLE") {
+        return normalizedData;
     }
 
-    const dayPlan = data.dayPlans.find(record => record.dayIndex === dayIndex);
+    const dayPlan = normalizedData.dayPlans.find(record => record.dayIndex === dayIndex);
     if (!dayPlan) {
         return {
-            ...data,
+            ...normalizedData,
             currentDayIndex: dayIndex,
         };
     }
 
-    return {
-        ...data,
-        title: dayPlan.title || data.title,
-        markdown: dayPlan.markdown || data.markdown,
+    return normalizePlannerViewData({
+        ...normalizedData,
+        title: dayPlan.title || normalizedData.title,
+        markdown: dayPlan.markdown || normalizedData.markdown,
         currentDayIndex: dayIndex,
-        places: dayPlan.places && dayPlan.places.length > 0 ? dayPlan.places : data.places,
-        routes: dayPlan.routes && dayPlan.routes.length > 0 ? dayPlan.routes : data.routes,
+        places: dayPlan.places && dayPlan.places.length > 0 ? dayPlan.places : normalizedData.places,
+        routes: dayPlan.routes && dayPlan.routes.length > 0 ? dayPlan.routes : normalizedData.routes,
         selectedPlaceIds: dayPlan.selectedPlaceIds && dayPlan.selectedPlaceIds.length > 0
             ? dayPlan.selectedPlaceIds
-            : data.selectedPlaceIds,
-    };
+            : normalizedData.selectedPlaceIds,
+    });
 }
 
 function viewDataFromRefresh(payload: PlannerDataRefreshPayload): PlannerViewData {
