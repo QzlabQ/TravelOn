@@ -28,6 +28,8 @@ public class Room {
     @NotNull
     private int guestCapacity;
 
+    private String roomType;
+
     @NotNull
     private float pricePerAdult;
     @Column(columnDefinition = "TEXT")

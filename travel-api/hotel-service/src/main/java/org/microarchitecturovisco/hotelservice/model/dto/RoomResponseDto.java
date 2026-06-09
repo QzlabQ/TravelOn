@@ -16,6 +16,8 @@ public class RoomResponseDto {
 
     private int guestCapacity;
 
+    private String roomType;
+
     @Lob
     private String description;
 }

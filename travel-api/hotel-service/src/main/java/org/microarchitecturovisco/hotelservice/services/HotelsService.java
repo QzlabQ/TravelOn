@@ -99,9 +99,10 @@ public class HotelsService {
     }
 
     private boolean matchesRoomType(Room room, String roomType) {
+        String type = room.getRoomType() != null ? room.getRoomType() : "";
         return switch (normalizeFilter(roomType)) {
-            case "DOUBLE" -> room.getGuestCapacity() <= 2;
-            case "FAMILY" -> room.getGuestCapacity() >= 3;
+            case "DOUBLE" -> "DOUBLE".equals(type) || "SUITE".equals(type);
+            case "FAMILY" -> "FAMILY".equals(type);
             default -> true;
         };
     }

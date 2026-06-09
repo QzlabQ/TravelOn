@@ -17,7 +17,9 @@ CREATE TEMP TABLE seed_hotel_rooms (
     name text,
     description text,
     price real,
-    id bigint
+    id bigint,
+    guest_capacity integer,
+    room_type text
 );
 
 CREATE TEMP TABLE seed_hotel_photos (
@@ -62,13 +64,12 @@ FROM seed_hotel_photos p
 JOIN seed_hotels h ON h.source_id = p.source_hotel_id
 ON CONFLICT DO NOTHING;
 
-INSERT INTO public.room (id, name, description, guest_capacity, price_per_adult, hotel_id)
+INSERT INTO public.room (id, name, description, guest_capacity, room_type, price_per_adult, hotel_id)
 SELECT r.id,
        r.name,
        r.description,
-       COALESCE((regexp_match(r.name, '\d+(?= os\.)'))[1]::integer, 0)
-           + CASE WHEN r.name LIKE '%dostawka%' THEN 1 ELSE 0 END
-           + CASE WHEN r.name LIKE '%dostawki%' THEN 2 ELSE 0 END,
+       COALESCE(r.guest_capacity, 2),
+       COALESCE(r.room_type, 'STANDARD'),
        r.price,
        h.source_id
 FROM seed_hotel_rooms r

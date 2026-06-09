@@ -132,12 +132,11 @@ const getTrainTypeGroup = (code: string): TrainTypeFilter => {
 
 const getTrainOfferGroupKey = (offer: TicketSearchOffer) => ([
     offer.code,
-    offer.departureStation,
-    offer.arrivalStation,
+    offer.departureCity,
+    offer.arrivalCity,
     offer.departureTime,
     offer.arrivalTime,
     offer.carrier,
-    offer.departureDate,
 ]).join("::");
 
 const getTrainSeatRank = (seatClass: string) => {
@@ -296,7 +295,7 @@ const TrainTicketCard = ({
             <div className='mt-5 flex flex-row items-center gap-5'>
                 <div className='w-28'>
                     <p className='text-3xl font-bold' style={{color: config.accent}}>{displayedOffer.departureTime}</p>
-                    <p className='mt-1 text-sm font-semibold text-slate-800'>{displayedOffer.departureStation}</p>
+                    <p className='mt-1 text-sm font-semibold text-slate-800'>{[displayedOffer.departureStationCode, displayedOffer.departureTerminalName].filter(Boolean).join(" ")}</p>
                 </div>
                 <div className='flex-1 flex flex-col items-center text-slate-500'>
                     <p className='text-sm'>{displayedOffer.duration}</p>
@@ -309,13 +308,12 @@ const TrainTicketCard = ({
                 </div>
                 <div className='w-28'>
                     <p className='text-3xl font-bold text-slate-900'>{displayedOffer.arrivalTime}</p>
-                    <p className='mt-1 text-sm font-semibold text-slate-800'>{displayedOffer.arrivalStation}</p>
+                    <p className='mt-1 text-sm font-semibold text-slate-800'>{[displayedOffer.arrivalStationCode, displayedOffer.arrivalTerminalName].filter(Boolean).join(" ")}</p>
                 </div>
                 <div className='w-36 text-right'>
                     <p className='text-sm text-slate-400'>{group.offers.length > 1 ? '当前席别价格' : '参考价'}</p>
                     <p className='text-3xl font-bold text-orange-500'>¥{displayedOffer.price}</p>
                     {group.offers.length > 1 && <p className='mt-1 text-xs text-slate-400'>最低 ¥{minPrice} 起</p>}
-                    <a className='mt-1 block text-xs text-blue-600 hover:underline' href={displayedOffer.sourceUrl} target='_blank' rel='noreferrer'>查看来源</a>
                 </div>
                 <Button
                     variant='contained'

@@ -67,6 +67,7 @@ public class HotelEventProjector {
                 .name(event.getName())
                 .description(event.getDescription())
                 .guestCapacity(event.getGuestCapacity())
+                .roomType(event.getRoomType())
                 .pricePerAdult(event.getPricePerAdult())
                 .roomReservations(new ArrayList<>())
                 .hotel(hotel)

@@ -18,6 +18,8 @@ public class RoomDto {
 
     private int guestCapacity;
 
+    private String roomType;
+
     private float pricePerAdult;
     @Lob
     private String description;

@@ -2,7 +2,6 @@ package org.microarchitecturovisco.hotelservice.bootstrap.util;
 
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.hotelservice.bootstrap.util.hotel.HotelCsvReader;
-import org.microarchitecturovisco.hotelservice.bootstrap.util.room.RoomCapacityCalculator;
 import org.microarchitecturovisco.hotelservice.model.dto.HotelDto;
 import org.microarchitecturovisco.hotelservice.model.dto.RoomDto;
 import org.springframework.core.io.Resource;
@@ -11,7 +10,6 @@ import org.springframework.stereotype.Component;
 import java.io.*;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.logging.Logger;
 
 @Component
@@ -22,13 +20,12 @@ public class RoomParser {
 
     public void importRooms(Resource resource, List<HotelDto> hotelDtos) {
         Logger logger = Logger.getLogger("Bootstrap | Rooms");
-        RoomCapacityCalculator capacityCalculator = new RoomCapacityCalculator();
         try (BufferedReader br = new BufferedReader(new InputStreamReader(resource.getInputStream()))) {
             String line;
             br.readLine(); // Skip header line
             while ((line = br.readLine()) != null) {
                 String[] data = line.split("\t");
-                RoomDto roomDto = createNewRoom(logger, capacityCalculator, data, hotelDtos);
+                RoomDto roomDto = createNewRoom(logger, data, hotelDtos);
 
                 // Add room to the corresponding hotel
                 if (roomDto != null) {
@@ -43,13 +40,14 @@ public class RoomParser {
         }
     }
 
-    private RoomDto createNewRoom(Logger logger, RoomCapacityCalculator capacityCalculator, String[] data, List<HotelDto> hotelDtos) throws FileNotFoundException {
-        int hotelId = Integer.parseInt(data[0]);
-        String roomName = data[1];
+    private RoomDto createNewRoom(Logger logger, String[] data, List<HotelDto> hotelDtos) throws FileNotFoundException {
+        int hotelId      = Integer.parseInt(data[0]);
+        String roomName  = data[1];
         String description = data[2];
-        int guestCapacity = capacityCalculator.calculateGuestCapacity(roomName);
         float pricePerAdult = Float.parseFloat(data[3]);
-        Long roomId = Long.parseLong(data[4].trim());
+        Long roomId      = Long.parseLong(data[4].trim());
+        int guestCapacity = data.length > 5 && !data[5].isBlank() ? Integer.parseInt(data[5].trim()) : 2;
+        String roomType  = data.length > 6 && !data[6].isBlank() ? data[6].trim() : "STANDARD";
 
         Optional<HotelDto> hotelOpt = searchForHotel(hotelDtos, hotelId);
 
@@ -60,6 +58,7 @@ public class RoomParser {
                     .name(roomName)
                     .description(description)
                     .guestCapacity(guestCapacity)
+                    .roomType(roomType)
                     .pricePerAdult(pricePerAdult)
                     .build();
         } else {
