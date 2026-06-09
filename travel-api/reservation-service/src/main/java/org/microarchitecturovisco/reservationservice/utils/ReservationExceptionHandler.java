@@ -14,11 +14,15 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @ControllerAdvice
 public class ReservationExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler({
-            ReservationNotFoundAfterPaymentException.class,
-            PurchaseFailedException.class
+            ReservationNotFoundAfterPaymentException.class
     })
     protected ResponseEntity handleInternalServerError(RuntimeException ex, WebRequest request) {
         return handleExceptionInternal(ex, ResponseEntity.internalServerError().body(ex.getMessage()), new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR, request);
 
+    }
+
+    @ExceptionHandler(PurchaseFailedException.class)
+    protected ResponseEntity handlePurchaseFailed(RuntimeException ex, WebRequest request) {
+        return handleExceptionInternal(ex, ex.getMessage(), new HttpHeaders(), HttpStatus.BAD_REQUEST, request);
     }
 }

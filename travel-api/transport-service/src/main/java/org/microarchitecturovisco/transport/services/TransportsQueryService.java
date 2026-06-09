@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -154,17 +155,23 @@ public class TransportsQueryService {
     }
 
     private TicketOfferDto mapTicketOffer(TicketOfferTemplate offer, LocalDate departureDate) {
-        Duration duration = Duration.between(offer.getDepartureDateTime(), offer.getArrivalDateTime());
+        LocalDateTime departureAt = departureDate.atTime(offer.getDepartureDateTime().toLocalTime());
+        LocalDateTime arrivalAt = departureDate.atTime(offer.getArrivalDateTime().toLocalTime());
+        if (!arrivalAt.isAfter(departureAt)) {
+            arrivalAt = arrivalAt.plusDays(1);
+        }
+        Duration duration = Duration.between(departureAt, arrivalAt);
 
         String successRate = offer.getRemainingSeats() >= 15
-                ? "杈冮珮"
-                : offer.getRemainingSeats() >= 5 ? "涓瓑" : "杈冧綆";
+                ? "较高"
+                : offer.getRemainingSeats() >= 5 ? "中等" : "较低";
         String notice = offer.getRemainingSeats() > 0
-                ? "鍓╀綑 " + offer.getRemainingSeats() + " 寮狅紝鍘嗗彶鏍锋湰鍙傝€冧环"
-                : "褰撳墠鏍锋湰鏃犱綑绁紝鍙€欒ˉ";
+                ? "余票 " + offer.getRemainingSeats() + " 张，历史样本参考价"
+                : "当前无余票，请尝试其他班次";
 
         return TicketOfferDto.builder()
                 .id(UUID.nameUUIDFromBytes((offer.getId().toString() + departureDate).getBytes(StandardCharsets.UTF_8)).toString())
+                .ticketOfferId(offer.getId().toString())
                 .type(offer.getType().name())
                 .departureCity(cityCatalog.findByCityId(offer.getDepartureCityId()).cityName())
                 .arrivalCity(cityCatalog.findByCityId(offer.getArrivalCityId()).cityName())
@@ -174,8 +181,8 @@ public class TransportsQueryService {
                 .departureTerminalName(offer.getDepartureTerminalName())
                 .arrivalStationCode(offer.getArrivalStationCode())
                 .arrivalTerminalName(offer.getArrivalTerminalName())
-                .departureTime(offer.getDepartureDateTime().toString())
-                .arrivalTime(offer.getArrivalDateTime().toString())
+                .departureTime(departureAt.toString())
+                .arrivalTime(arrivalAt.toString())
                 .duration(duration.toHours() + "h " + duration.toMinutesPart() + "m")
                 .carrier(offer.getCarrier())
                 .code(offer.getCode())

@@ -517,7 +517,8 @@ function viewDataForDay(data: PlannerViewData, dayIndex: number): PlannerViewDat
         return normalizedData;
     }
 
-    const dayPlan = normalizedData.dayPlans.find(record => record.dayIndex === dayIndex);
+    const dayPlans = Array.isArray(normalizedData.dayPlans) ? normalizedData.dayPlans : [];
+    const dayPlan = dayPlans.find(record => record.dayIndex === dayIndex);
     if (!dayPlan) {
         return {
             ...normalizedData,
@@ -999,6 +1000,23 @@ export default function AiPlanner() {
             }
         } catch (error) {
             console.error(error);
+            const status = (error as {response?: {status?: number}}).response?.status;
+            if (status === 404 || status === 410) {
+                const emptyData = emptyPlannerView();
+                localStorage.removeItem(PLANNER_STORAGE_KEY);
+                setConversation(null);
+                setSnapshots([]);
+                setDayVersions([]);
+                setPlannerTraceEvents([]);
+                setLiveData(emptyData);
+                setDisplayData(emptyData);
+                setSnapshotView("latest");
+                setTargetDayIndex(1);
+                setChatMessages([]);
+                setChatInput("");
+                setErrorMessage("之前缓存的 AI 规划会话已随数据库重置清理，请重新开始规划。");
+                return;
+            }
             setErrorMessage("恢复 AI 规划会话失败，已保留本地缓存内容。请确认网关和 ai-arrange-service 可访问。");
         } finally {
             setHydrating(false);

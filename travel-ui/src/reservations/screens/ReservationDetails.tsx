@@ -133,6 +133,7 @@ const TimelineItem = ({
 );
 
 const documentTypeOptions = ["身份证", "护照", "港澳通行证", "台胞证", "其他"];
+const WALLET_PAYMENT_CARD_NUMBER = "6222020000078888";
 
 const walletTransactionMeta = {
     TOP_UP: {label: "充值", color: "success" as const},
@@ -428,7 +429,7 @@ export default function ReservationDetails() {
         try {
             const nextIdentity = setAccountIdentity(normalizedIdentity);
             setPayerIdentity(nextIdentity);
-            const paymentCardNumber = paymentMethod === "WALLET" ? "8888888888888888" : normalizedPaymentCardNumber;
+            const paymentCardNumber = paymentMethod === "WALLET" ? WALLET_PAYMENT_CARD_NUMBER : normalizedPaymentCardNumber;
             await ApiRequests.payForReservation({reservationId: reservation.id, cardNumber: paymentCardNumber});
             if (paymentMethod === "WALLET") {
                 const nextWallet = spendWallet(reservationAmount, `支付订单 ${reservation.title || reservation.id}`, reservation.id);
@@ -445,7 +446,11 @@ export default function ReservationDetails() {
             setSuccessMessage(paymentMethod === "WALLET" ? "钱包支付成功，订单状态已经更新。" : "银联卡支付成功，订单状态已经更新。");
             await loadReservation();
         } catch (error: any) {
-            setErrorMessage(error?.message || "支付未通过。请检查银联卡号后重试。");
+            const responseData = error?.response?.data;
+            const paymentError = typeof responseData === "string"
+                ? responseData
+                : responseData?.message || responseData?.error || error?.message;
+            setErrorMessage(paymentError || "支付未通过。请检查银联卡号后重试。");
         } finally {
             setSubmitting(false);
         }

@@ -46,6 +46,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
@@ -548,10 +549,19 @@ public class ReservationService {
     }
 
     private LocalTime parseTime(String value) {
+        String normalized = value == null ? "" : value.trim();
         try {
-            return LocalTime.parse(value.trim());
-        } catch (RuntimeException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Time must use HH:mm format");
+            return LocalTime.parse(normalized);
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            return LocalDateTime.parse(normalized).toLocalTime();
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            return OffsetDateTime.parse(normalized).toLocalTime();
+        } catch (RuntimeException ignored) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Time must use HH:mm format or ISO datetime format");
         }
     }
 

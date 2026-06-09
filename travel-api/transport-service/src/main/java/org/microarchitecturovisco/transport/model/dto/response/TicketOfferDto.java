@@ -7,6 +7,7 @@ import lombok.Data;
 @Builder
 public class TicketOfferDto {
     private String id;
+    private String ticketOfferId;
     private String type;
     private String departureCity;
     private String arrivalCity;

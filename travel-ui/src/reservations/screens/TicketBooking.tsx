@@ -186,6 +186,30 @@ const buildTrainOfferGroups = (offers: TicketSearchOffer[]): TrainOfferGroup[] =
         }));
 };
 
+const formatTicketClock = (value: string) => {
+    const trimmedValue = value?.trim() ?? "";
+    const isoMatch = trimmedValue.match(/T(\d{2}:\d{2})/);
+    if (isoMatch) return isoMatch[1];
+
+    const timeMatch = trimmedValue.match(/^(\d{1,2}:\d{2})/);
+    if (timeMatch) {
+        const [hour, minute] = timeMatch[1].split(":");
+        return `${hour.padStart(2, "0")}:${minute}`;
+    }
+
+    return trimmedValue;
+};
+
+const formatTicketDate = (value: string) => {
+    const trimmedValue = value?.trim() ?? "";
+    const isoMatch = trimmedValue.match(/^(\d{4}-\d{2}-\d{2})T/);
+    return isoMatch ? isoMatch[1] : "";
+};
+
+const formatTicketTimeRange = (offer: TicketSearchOffer) => {
+    return `${formatTicketClock(offer.departureTime)} - ${formatTicketClock(offer.arrivalTime)}`;
+};
+
 const TicketCard = ({
     offer,
     mode,
@@ -208,6 +232,8 @@ const TicketCard = ({
     const config = modeConfig[mode];
     const departureStation = [offer.departureStationCode, offer.departureTerminalName].filter(Boolean).join(" ");
     const arrivalStation = [offer.arrivalStationCode, offer.arrivalTerminalName].filter(Boolean).join(" ");
+    const departureDateLabel = formatTicketDate(offer.departureTime);
+    const arrivalDateLabel = formatTicketDate(offer.arrivalTime);
 
     return (
         <div className={`bg-white rounded-lg border ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'} ${compact ? 'w-full' : 'min-w-[760px]'} p-5 shadow-sm hover:shadow-md transition-shadow`}>
@@ -223,7 +249,8 @@ const TicketCard = ({
 
             <div className='mt-5 flex flex-row items-center gap-5'>
                 <div className='w-28'>
-                    <p className='text-3xl font-bold' style={{color: config.accent}}>{offer.departureTime}</p>
+                    <p className='text-3xl font-bold' style={{color: config.accent}}>{formatTicketClock(offer.departureTime)}</p>
+                    {departureDateLabel && <p className='mt-1 text-xs text-slate-400'>{departureDateLabel}</p>}
                     <p className='mt-1 text-sm font-semibold text-slate-800'>{departureStation}</p>
                 </div>
                 <div className='flex-1 flex flex-col items-center text-slate-500'>
@@ -236,7 +263,8 @@ const TicketCard = ({
                     <p className='text-xs'>{offer.carrier} · {offer.seatClass}</p>
                 </div>
                 <div className='w-28'>
-                    <p className='text-3xl font-bold text-slate-900'>{offer.arrivalTime}</p>
+                    <p className='text-3xl font-bold text-slate-900'>{formatTicketClock(offer.arrivalTime)}</p>
+                    {arrivalDateLabel && <p className='mt-1 text-xs text-slate-400'>{arrivalDateLabel}</p>}
                     <p className='mt-1 text-sm font-semibold text-slate-800'>{arrivalStation}</p>
                 </div>
                 <div className='w-32 text-right'>
@@ -279,6 +307,8 @@ const TrainTicketCard = ({
 }) => {
     const config = modeConfig.train;
     const minPrice = Math.min(...group.offers.map(offer => offer.price));
+    const departureDateLabel = formatTicketDate(displayedOffer.departureTime);
+    const arrivalDateLabel = formatTicketDate(displayedOffer.arrivalTime);
 
     return (
         <div className={`bg-white rounded-lg border ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'} p-5 shadow-sm hover:shadow-md transition-shadow`}>
@@ -294,7 +324,8 @@ const TrainTicketCard = ({
 
             <div className='mt-5 flex flex-row items-center gap-5'>
                 <div className='w-28'>
-                    <p className='text-3xl font-bold' style={{color: config.accent}}>{displayedOffer.departureTime}</p>
+                    <p className='text-3xl font-bold' style={{color: config.accent}}>{formatTicketClock(displayedOffer.departureTime)}</p>
+                    {departureDateLabel && <p className='mt-1 text-xs text-slate-400'>{departureDateLabel}</p>}
                     <p className='mt-1 text-sm font-semibold text-slate-800'>{[displayedOffer.departureStationCode, displayedOffer.departureTerminalName].filter(Boolean).join(" ")}</p>
                 </div>
                 <div className='flex-1 flex flex-col items-center text-slate-500'>
@@ -307,7 +338,8 @@ const TrainTicketCard = ({
                     <p className='text-xs'>{displayedOffer.carrier} · 当前席别 {displayedOffer.seatClass}</p>
                 </div>
                 <div className='w-28'>
-                    <p className='text-3xl font-bold text-slate-900'>{displayedOffer.arrivalTime}</p>
+                    <p className='text-3xl font-bold text-slate-900'>{formatTicketClock(displayedOffer.arrivalTime)}</p>
+                    {arrivalDateLabel && <p className='mt-1 text-xs text-slate-400'>{arrivalDateLabel}</p>}
                     <p className='mt-1 text-sm font-semibold text-slate-800'>{[displayedOffer.arrivalStationCode, displayedOffer.arrivalTerminalName].filter(Boolean).join(" ")}</p>
                 </div>
                 <div className='w-36 text-right'>
@@ -683,13 +715,14 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                 routeFrom: from || '出发地',
                 routeTo: to || '目的地',
                 departureDate: date,
-                departureTime: selectedOffer.departureTime,
-                arrivalTime: selectedOffer.arrivalTime,
+                departureTime: formatTicketClock(selectedOffer.departureTime),
+                arrivalTime: formatTicketClock(selectedOffer.arrivalTime),
                 provider: selectedOffer.carrier,
                 bookingCode: selectedOffer.code,
                 passengerCount: selectedTravelers.length,
                 price: selectedOffer.price * selectedTravelers.length,
                 travelers: selectedTravelers,
+                ticketOfferId: selectedOffer.ticketOfferId ?? selectedOffer.id,
             });
             setReservationId(response.data.id);
             addNotification({
@@ -707,6 +740,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
         } catch (e) {
             console.log(e);
             setBookingError(true);
+            setBookingMessage('创建预订失败，请确认余票充足并检查后端服务状态。');
             showToast('提交失败，请稍后再试', true);
         } finally {
             setBookingId('');
@@ -762,31 +796,35 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
 
             {error && <Alert severity='warning' className='mb-4'>后端票务数据暂时不可用，请确认交通服务已启动。</Alert>}
             {!isAuthenticated && <Alert severity='info' className='mb-4'>未登录时可以查询票价和查看方案；登录后才能选择班次、填写出行人并提交订单。</Alert>}
-            {bookingError && <Alert severity='error' className='mb-4'>创建预订失败，请确认后端服务已启动。</Alert>}
+            {bookingError && !bookingMessage && <Alert severity='error' className='mb-4'>创建预订失败，请确认后端服务已启动。</Alert>}
             {bookingMessage && <Alert severity={bookingError ? 'warning' : 'success'} className='mb-4' action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}#payment-countdown`} color='inherit' size='small'>订单详情</Button> : undefined}>{bookingMessage}</Alert>}
 
             <div className='grid grid-cols-[360px_1fr] gap-6 items-start'>
                 <aside className='sticky top-24 self-start flex max-h-[calc(100vh-7rem)] flex-col gap-5 overflow-y-auto pr-1'>
                     <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
                         <h2 className='text-lg font-bold text-slate-900 mb-4'>查询行程</h2>
-                        <div className='grid grid-cols-[1fr_44px_1fr] items-center gap-2'>
+                        <div className='space-y-3'>
                             <Autocomplete
                                 size='small'
                                 options={departures}
                                 value={from || null}
                                 noOptionsText='没有匹配城市'
                                 onChange={(_, value) => setFrom(value ?? '')}
+                                sx={{width: '100%'}}
                                 renderInput={(params) => <TextField {...params} label={config.fromLabel}/>}
                             />
-                            <Button onClick={swapLocations} variant='outlined' sx={{minWidth: 44, height: 40, borderRadius: 2}}>
-                                <SwapHoriz/>
-                            </Button>
+                            <div className='flex justify-center'>
+                                <Button onClick={swapLocations} variant='outlined' sx={{minWidth: 44, height: 40, borderRadius: 2}}>
+                                    <SwapHoriz/>
+                                </Button>
+                            </div>
                             <Autocomplete
                                 size='small'
                                 options={arrivals}
                                 value={to || null}
                                 noOptionsText='没有匹配城市'
                                 onChange={(_, value) => setTo(value ?? '')}
+                                sx={{width: '100%'}}
                                 renderInput={(params) => <TextField {...params} label={config.toLabel}/>}
                             />
                         </div>
@@ -1009,7 +1047,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                                             <div>
                                                 <p className='text-lg font-semibold text-slate-900'>{selectedOffer.carrier} {selectedOffer.code}</p>
                                                 <p className='mt-2 text-sm text-slate-600'>{from} → {to} · {date}</p>
-                                                <p className='mt-1 text-sm text-slate-600'>{selectedOffer.departureTime} - {selectedOffer.arrivalTime} · {selectedOffer.duration}</p>
+                                                <p className='mt-1 text-sm text-slate-600'>{formatTicketTimeRange(selectedOffer)} · {selectedOffer.duration}</p>
                                             </div>
                                             <div className='text-right'>
                                                 <p className='text-sm text-slate-500'>{mode === 'flight' ? '舱位' : '席别'}</p>
@@ -1099,7 +1137,7 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
                         {label: "线路", value: `${from} → ${to}`},
                         {label: "日期", value: date},
                         {label: "班次", value: `${selectedOffer.carrier} ${selectedOffer.code}`},
-                        {label: "时间", value: `${selectedOffer.departureTime} - ${selectedOffer.arrivalTime}`},
+                        {label: "时间", value: formatTicketTimeRange(selectedOffer)},
                         {label: "席别", value: selectedOffer.seatClass},
                     ]}
                     priceRows={[

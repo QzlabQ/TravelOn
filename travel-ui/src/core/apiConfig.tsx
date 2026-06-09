@@ -391,6 +391,7 @@ export interface CreateTicketReservationPayload {
     passengerCount: number,
     price: number,
     travelers: BookingPersonPayload[],
+    ticketOfferId?: string,
 }
 
 export interface CreateHotelReservationPayload {
@@ -465,6 +466,7 @@ export interface SearchTicketsParams {
 
 export interface TicketSearchOffer {
     id: string,
+    ticketOfferId?: string,
     type: TicketType,
     departureCity: string,
     arrivalCity: string,
