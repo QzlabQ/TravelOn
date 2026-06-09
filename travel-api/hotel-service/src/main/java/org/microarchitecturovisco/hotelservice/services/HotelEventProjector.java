@@ -3,7 +3,6 @@ package org.microarchitecturovisco.hotelservice.services;
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.hotelservice.model.domain.*;
 import org.microarchitecturovisco.hotelservice.model.events.*;
-import org.microarchitecturovisco.hotelservice.repositories.HotelEventStore;
 import org.microarchitecturovisco.hotelservice.repositories.HotelRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomReservationRepository;
@@ -16,9 +15,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class HotelEventProjector {
-
-    private final HotelEventStore eventStore;
-
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
     private final RoomReservationRepository roomReservationRepository;
@@ -27,9 +23,6 @@ public class HotelEventProjector {
         for (HotelEvent hotelEvent : hotelEvents) {
             if (hotelEvent instanceof HotelCreatedEvent){
                 apply((HotelCreatedEvent) hotelEvent);
-            }
-            else if (hotelEvent instanceof CateringOptionCreatedEvent){
-                apply((CateringOptionCreatedEvent) hotelEvent);
             }
             else if (hotelEvent instanceof RoomCreatedEvent){
                 apply((RoomCreatedEvent) hotelEvent);
@@ -63,24 +56,8 @@ public class HotelEventProjector {
         hotel.setDescription(event.getDescription());
         hotel.setPhotos(event.getPhotos());
         hotel.setRating(event.getRating());
-        hotel.setCateringOptions(new ArrayList<>());
         hotel.setRooms(new ArrayList<>());
         hotelRepository.save(hotel);
-    }
-
-    private void apply(CateringOptionCreatedEvent event){
-        Hotel hotel = hotelRepository.findById(event.getIdHotel()).orElseThrow(RuntimeException::new);
-
-        CateringOption cateringOption = CateringOption.builder()
-                .id(event.getIdCatering())
-                .price(event.getPrice())
-                .hotel(hotel)
-                .rating(event.getRating())
-                .type(event.getType())
-                .build();
-        hotel.getCateringOptions().add(cateringOption);
-        hotelRepository.save(hotel);
-
     }
 
     private void apply(RoomCreatedEvent event){
@@ -117,7 +94,7 @@ public class HotelEventProjector {
 
     }
     private void apply(RoomReservationDeletedEvent event) {
-        UUID roomId = event.getIdRoom();
+        Long roomId = event.getIdRoom();
         UUID reservationId = event.getIdRoomReservation();
 
         Room room = roomRepository.findById(roomId).orElse(null);

@@ -7,7 +7,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
@@ -47,31 +46,28 @@ public class HotelParser {
         int hotelScrappedId = Integer.parseInt(data[0]);
         String name = data[1];
         String description = data[2];
-        float rating = Float.parseFloat(data[3]);
-        String country = data[4];
-        String region = data[5];
-        UUID hotelIdAsUUID = UUID.fromString(data[6]);
+        Integer hotelId = hotelScrappedId;
+        String cityId = data[3];
 
         // Find the LocationDto in the list
-        LocationDto location = findLocation(hotelLocations, country, region);
+        LocationDto location = findLocation(hotelLocations, cityId);
         List<String> photos = photoParser.hotelPhotosMap.getOrDefault(hotelScrappedId, Collections.emptyList());
 
         return HotelDto.builder()
-                .hotelId(hotelIdAsUUID)
+                .hotelId(hotelId)
                 .name(name)
                 .description(description)
-                .rating(rating)
+                .rating(0)
                 .location(location)
-                .cateringOptions(new ArrayList<>())
                 .photos(photos)
                 .rooms(new ArrayList<>())
                 .build();
     }
 
-    private LocationDto findLocation(List<LocationDto> locationDtos, String country, String region) {
+    private LocationDto findLocation(List<LocationDto> locationDtos, String cityId) {
         return locationDtos.stream()
-                .filter(locationDto -> locationDto.getRegion().equals(region))
+                .filter(locationDto -> locationDto.getCityId().equals(cityId))
                 .findFirst()
-                .orElseThrow(() -> new NoSuchElementException("Location not found: " + country + ", " + region));
+                .orElseThrow(() -> new NoSuchElementException("Location not found for cityId: " + cityId));
     }
 }

@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.microarchitecturovisco.offerprovider.domain.dto.CateringOptionDto;
 import org.microarchitecturovisco.offerprovider.domain.dto.LocationDto;
 import org.microarchitecturovisco.offerprovider.domain.dto.RoomsConfigurationDto;
 
@@ -17,7 +16,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class GetHotelDetailsResponseDto implements Serializable {
-    private UUID hotelId;
+    private Integer hotelId;
     private String hotelName;
 
     private float rating;
@@ -25,8 +24,6 @@ public class GetHotelDetailsResponseDto implements Serializable {
     private String description;
 
     private LocationDto location;
-
-    private List<CateringOptionDto> cateringOptions;
 
     private List<String> photos;
 

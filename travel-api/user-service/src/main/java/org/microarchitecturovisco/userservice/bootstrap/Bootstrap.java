@@ -6,6 +6,7 @@ import org.microarchitecturovisco.userservice.repositories.UserRepository;
 import org.microarchitecturovisco.userservice.services.UserService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -18,6 +19,7 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 @Component
+@ConditionalOnProperty(name = "app.seed-data.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class Bootstrap implements CommandLineRunner {
 

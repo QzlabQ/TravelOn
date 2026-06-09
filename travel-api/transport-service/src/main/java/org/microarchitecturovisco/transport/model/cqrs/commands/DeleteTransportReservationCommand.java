@@ -12,4 +12,5 @@ public class DeleteTransportReservationCommand {
     private UUID reservationId;
     private UUID transportId;
     private LocalDateTime commandTimeStamp;
+    private int numberOfSeats;
 }

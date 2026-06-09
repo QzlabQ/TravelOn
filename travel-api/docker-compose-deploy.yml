@@ -8,8 +8,8 @@ services:
       - "${DEPLOY_RABBITMQ_HOST_PORT:-59672}:5672"
       - "${DEPLOY_RABBITMQ_MANAGEMENT_HOST_PORT:-59673}:15672"
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/data/rabbitmq-deploy:/var/lib/rabbitmq
-      - E:/2026spring/26NULLptr/repositories/travel-api/logs/rabbitmq-deploy:/var/log/rabbitmq
+      - ./data/rabbitmq-deploy:/var/lib/rabbitmq
+      - ./logs/rabbitmq-deploy:/var/log/rabbitmq
     networks:
       - backend
 
@@ -19,7 +19,7 @@ services:
     ports:
       - "${DEPLOY_MONGO_HOST_PORT:-59017}:27017"
     volumes:
-      - E:/2026spring/26NULLptr/repositories/travel-api/data/mongo-deploy:/data/db
+      - ./data/mongo-deploy:/data/db
     networks:
       - backend
 
@@ -113,17 +113,6 @@ services:
       - rabbitmq
       - discovery
       - gateway
-    networks:
-      - backend
-
-  data-generator:
-    image: ghcr.io/microarchitecturovisco/data-generator:dev
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-      - hotel
-      - transport
     networks:
       - backend
 

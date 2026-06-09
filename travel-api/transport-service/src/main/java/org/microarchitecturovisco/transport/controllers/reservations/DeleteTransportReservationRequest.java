@@ -16,4 +16,5 @@ import java.util.UUID;
 public class DeleteTransportReservationRequest implements Serializable {
     private UUID reservationId;
     private List<UUID> transportReservationsIds;
+    private int numberOfSeats;
 }

@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.microarchitecturovisco.offerprovider.domain.dto.CateringOptionDto;
 import org.microarchitecturovisco.offerprovider.domain.dto.LocationDto;
 import org.microarchitecturovisco.offerprovider.domain.dto.RoomResponseDto;
 import org.microarchitecturovisco.offerprovider.domain.dto.RoomsConfigurationDto;
@@ -18,19 +17,15 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class GetOfferDetailsResponseDto {
-    private UUID idHotel;
+    private Integer idHotel;
     private String hotelName;
     private String description;
     private Float price;
     private LocationDto destination;
     private List<String> imageUrls;
 
-    private boolean dataGeneratorUpdate = false;
-
     private RoomsConfigurationDto roomConfiguration;
     private List<RoomsConfigurationDto> possibleRoomConfigurations;
-
-    private List<CateringOptionDto> cateringOptions;
 
     private List<TransportDto> departure;
     private List<List<TransportDto>> possibleDepartures;

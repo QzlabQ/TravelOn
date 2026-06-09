@@ -13,7 +13,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class GetOfferDetailsRequestDto {
-    UUID idHotel;
+    Integer idHotel;
     String dateFrom;
     String dateTo;
     List<UUID> departureBuses;

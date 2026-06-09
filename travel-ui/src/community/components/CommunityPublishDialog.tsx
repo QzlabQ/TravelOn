@@ -33,26 +33,30 @@ const postCategories: CommunityCategory[] = ["TRAVEL_NOTE", "HOTEL", "FOOD", "TR
 const reviewCategories: CommunityCategory[] = ["SCENIC_SPOT", "ROUTE", "MERCHANT", "HOTEL", "FOOD", "OTHER"];
 const targetTypes: ReviewTargetType[] = ["SCENIC_SPOT", "ROUTE", "MERCHANT", "HOTEL"];
 
+const defaultPostPayload: CreateCommunityPostPayload = {
+    title: "",
+    content: "",
+    category: "TRAVEL_NOTE",
+    destination: "",
+    imageUrls: [],
+};
+
+const defaultReviewPayload: CreateCommunityReviewPayload = {
+    targetType: "SCENIC_SPOT",
+    targetName: "",
+    targetId: "",
+    rating: 5,
+    content: "",
+    category: "SCENIC_SPOT",
+};
+
 const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
     const [mode, setMode] = useState<"post" | "review">("post");
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
-    const [postPayload, setPostPayload] = useState<CreateCommunityPostPayload>({
-        title: "",
-        content: "",
-        category: "TRAVEL_NOTE",
-        destination: "",
-        imageUrls: [],
-    });
+    const [postPayload, setPostPayload] = useState<CreateCommunityPostPayload>(defaultPostPayload);
     const [imageUrlText, setImageUrlText] = useState("");
-    const [reviewPayload, setReviewPayload] = useState<CreateCommunityReviewPayload>({
-        targetType: "SCENIC_SPOT",
-        targetName: "",
-        targetId: "",
-        rating: 5,
-        content: "",
-        category: "SCENIC_SPOT",
-    });
+    const [reviewPayload, setReviewPayload] = useState<CreateCommunityReviewPayload>(defaultReviewPayload);
 
     const closeDialog = () => {
         if (!submitting) {
@@ -61,26 +65,51 @@ const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
         }
     };
 
+    const resetForm = () => {
+        setPostPayload(defaultPostPayload);
+        setReviewPayload(defaultReviewPayload);
+        setImageUrlText("");
+    };
+
     const submit = async () => {
         if (!token) {
             setError("请先登录后再发布内容。");
             return;
         }
+
+        if (mode === "post" && (!postPayload.title.trim() || !postPayload.content.trim())) {
+            setError("标题和正文不能为空。");
+            return;
+        }
+
+        if (mode === "review" && (!reviewPayload.targetName.trim() || !reviewPayload.content.trim())) {
+            setError("评价对象和评价内容不能为空。");
+            return;
+        }
+
         setSubmitting(true);
         setError("");
         try {
             if (mode === "post") {
                 await ApiRequests.createCommunityPost(token, {
-                    ...postPayload,
+                    title: postPayload.title.trim(),
+                    content: postPayload.content.trim(),
+                    category: postPayload.category,
+                    destination: postPayload.destination?.trim() || undefined,
                     imageUrls: imageUrlText.split("\n").map(item => item.trim()).filter(Boolean),
                 });
             } else {
-                await ApiRequests.createCommunityReview(token, reviewPayload);
+                await ApiRequests.createCommunityReview(token, {
+                    ...reviewPayload,
+                    targetName: reviewPayload.targetName.trim(),
+                    targetId: reviewPayload.targetId?.trim() || undefined,
+                    content: reviewPayload.content.trim(),
+                });
             }
+            resetForm();
             onPublished();
-            setError("");
             onClose();
-        } catch (e) {
+        } catch {
             setError("发布失败，请检查内容或稍后重试。");
         } finally {
             setSubmitting(false);
@@ -93,9 +122,10 @@ const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
             <DialogContent dividers>
                 {error && <Alert severity="error" className="mb-4">{error}</Alert>}
                 <Tabs value={mode} onChange={(_, value) => setMode(value)} className="mb-4">
-                    <Tab value="post" label="旅游分享"/>
+                    <Tab value="post" label="旅行分享"/>
                     <Tab value="review" label="写评价"/>
                 </Tabs>
+
                 {mode === "post" ?
                     <Box className="grid gap-4">
                         <TextField
@@ -147,7 +177,7 @@ const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
                             value={reviewPayload.targetType}
                             onChange={event => {
                                 const targetType = event.target.value as ReviewTargetType;
-                                setReviewPayload({...reviewPayload, targetType, category: targetType === "SCENIC_SPOT" ? "SCENIC_SPOT" : targetType});
+                                setReviewPayload({...reviewPayload, targetType, category: targetType as CommunityCategory});
                             }}
                             select
                             fullWidth

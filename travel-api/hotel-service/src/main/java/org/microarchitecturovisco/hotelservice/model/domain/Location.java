@@ -17,7 +17,7 @@ public class Location {
     @Id
     private UUID id;
 
-    private UUID cityId;
+    private String cityId;
 
     @NotNull
     private String country;

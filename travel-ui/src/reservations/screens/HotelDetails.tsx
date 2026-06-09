@@ -6,7 +6,6 @@ import {
     CalendarMonth,
     CheckCircle,
     Hotel as HotelIcon,
-    LocalDining,
     LocationOn,
     Payments,
     People,
@@ -40,17 +39,9 @@ type HotelDetailsState = {
     roomType?: string,
 };
 
-const cateringLabels: Record<string, string> = {
-    BREAKFAST: "含早餐",
-    NO_CATERING: "无餐食",
-    ALL_INCLUSIVE: "全包",
-    THREE_COURSES: "三餐",
-    TWO_COURSES: "两餐",
-    ACCORDING_TO_PROGRAMME: "按套餐安排",
-};
-
 const HotelDetails = () => {
     const {hotelId = ""} = useParams();
+    const numericHotelId = Number(hotelId);
     const [searchParams] = useSearchParams();
     const location = useLocation();
     const navigate = useNavigate();
@@ -113,11 +104,11 @@ const HotelDetails = () => {
     useEffect(() => clearAutoNavigate, []);
 
     useEffect(() => {
-        if (!hotelId || stayDateError) return;
+        if (!hotelId || Number.isNaN(numericHotelId) || stayDateError) return;
 
         setLoading(true);
         setError(false);
-        ApiRequests.getHotelDetails(hotelId, {
+        ApiRequests.getHotelDetails(numericHotelId, {
             dateFrom,
             dateTo,
             adults: adultCount,
@@ -139,7 +130,7 @@ const HotelDetails = () => {
                 setError(true);
             })
             .finally(() => setLoading(false));
-    }, [hotelId, dateFrom, dateTo, adultCount, childCount, stayDateError]);
+    }, [hotelId, numericHotelId, dateFrom, dateTo, adultCount, childCount, stayDateError]);
 
     useEffect(() => {
         if (!hotelId) {
@@ -149,11 +140,11 @@ const HotelDetails = () => {
 
         ApiRequests.getCommunitySummary({
             targetType: "HOTEL",
-            targetId: hotelId,
+            targetId: String(numericHotelId),
         })
             .then(response => setCommunitySummary(response.data))
             .catch(() => setCommunitySummary(null));
-    }, [hotelId]);
+    }, [hotelId, numericHotelId]);
 
     const openCheckoutConfirm = () => {
         if (!isAuthenticated) {
@@ -290,7 +281,6 @@ const HotelDetails = () => {
                         <div className="flex flex-wrap gap-2">
                             <Chip size="small" icon={<CheckCircle/>} label="立即确认"/>
                             <Chip size="small" icon={<Payments/>} label="到店前可取消"/>
-                            <Chip size="small" icon={<LocalDining/>} label={details?.cateringOptions?.some(item => item.type === "BREAKFAST") ? "可选早餐" : "餐食自选"}/>
                         </div>
                         <h1 className="mt-5 text-4xl font-bold text-slate-950">{displayName}</h1>
                         <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-600">

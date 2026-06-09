@@ -12,4 +12,5 @@ import java.util.List;
 public class AvailableTransportsDepartures {
     private List<LocationDto> bus;
     private List<LocationDto> plane;
+    private List<LocationDto> train;
 }

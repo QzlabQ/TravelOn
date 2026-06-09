@@ -14,7 +14,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class RoomResponseDto {
-    private UUID roomId;
+    private Long roomId;
 
     private String name;
 

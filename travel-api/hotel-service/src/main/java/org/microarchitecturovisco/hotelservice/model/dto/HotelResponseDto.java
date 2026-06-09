@@ -12,7 +12,7 @@ import java.util.List;
 @Data
 @Builder
 public class HotelResponseDto implements Serializable {
-    private UUID hotelId;
+    private Integer hotelId;
 
     private String name;
 

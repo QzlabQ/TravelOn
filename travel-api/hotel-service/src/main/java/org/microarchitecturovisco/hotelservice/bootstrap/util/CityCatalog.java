@@ -20,6 +20,7 @@ public class CityCatalog {
     private final String seedDataBasePath;
     private final String commonSeedDataBasePath;
     private Map<String, CityRecord> citiesByAlias;
+    private Map<String, CityRecord> citiesById;
 
     public CityCatalog(
             ResourceLoader resourceLoader,
@@ -31,19 +32,16 @@ public class CityCatalog {
         this.commonSeedDataBasePath = commonSeedDataBasePath;
     }
 
+    public LocationDto locationForCityId(String cityId) {
+        CityRecord city = findByCityId(cityId);
+        return toLocation(city);
+    }
+
     public LocationDto locationFor(String country, String cityName, String cityId) {
-        CityRecord city = find(cityName);
-        UUID id = cityId == null || cityId.isBlank()
-                ? city.cityId()
-                : UUID.fromString(cityId);
-        return LocationDto.builder()
-                .idLocation(id)
-                .cityId(id)
-                .country(city.country().isBlank() ? country : city.country())
-                .province(city.province())
-                .region(city.cityName())
-                .normalizedName(city.cityName())
-                .build();
+        CityRecord city = cityId == null || cityId.isBlank()
+                ? find(cityName)
+                : findByCityId(cityId);
+        return toLocation(city);
     }
 
     public CityRecord find(String value) {
@@ -53,15 +51,37 @@ public class CityCatalog {
         if (city != null) {
             return city;
         }
-        UUID id = UUID.nameUUIDFromBytes(("CN:" + alias).getBytes(StandardCharsets.UTF_8));
-        return new CityRecord(id, "中国", "", alias);
+        return new CityRecord(alias, "", "", alias);
+    }
+
+    public CityRecord findByCityId(String cityId) {
+        ensureLoaded();
+        String normalizedId = cityId == null ? "" : cityId.trim();
+        CityRecord city = citiesById.get(normalizedId);
+        if (city != null) {
+            return city;
+        }
+        return new CityRecord(normalizedId, "", "", normalizedId);
+    }
+
+    private LocationDto toLocation(CityRecord city) {
+        UUID locationId = UUID.nameUUIDFromBytes(("CITY:" + city.cityId()).getBytes(StandardCharsets.UTF_8));
+        return LocationDto.builder()
+                .idLocation(locationId)
+                .cityId(city.cityId())
+                .country(city.country())
+                .province(city.province())
+                .region(city.cityName())
+                .normalizedName(city.cityName())
+                .build();
     }
 
     private void ensureLoaded() {
-        if (citiesByAlias != null) {
+        if (citiesByAlias != null && citiesById != null) {
             return;
         }
         citiesByAlias = new HashMap<>();
+        citiesById = new HashMap<>();
         Resource resource = resourceLoader.getResource(normalizeBasePath(commonBasePath()) + "cities.csv");
         if (!resource.exists()) {
             return;
@@ -75,12 +95,8 @@ public class CityCatalog {
                     continue;
                 }
                 String[] values = line.split("\t", -1);
-                CityRecord city = new CityRecord(
-                        UUID.fromString(values[0]),
-                        values[1],
-                        values[2],
-                        values[3]
-                );
+                CityRecord city = new CityRecord(values[0], values[1], values[2], values[3]);
+                citiesById.put(city.cityId(), city);
                 citiesByAlias.put(normalize(city.cityName()), city);
             }
         } catch (IOException e) {
@@ -110,6 +126,6 @@ public class CityCatalog {
         return normalized;
     }
 
-    public record CityRecord(UUID cityId, String country, String province, String cityName) {
+    public record CityRecord(String cityId, String country, String province, String cityName) {
     }
 }

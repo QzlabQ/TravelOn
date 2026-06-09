@@ -13,6 +13,6 @@ public class CreateRoomReservationCommand {
     private LocalDateTime commandTimeStamp;
 
     private RoomReservationDto roomReservationDto;
-    private UUID roomId;
-    private UUID hotelId;
+    private Long roomId;
+    private Integer hotelId;
 }

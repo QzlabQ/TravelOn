@@ -4,7 +4,6 @@ import logo from "../../assets/tourcentral.png";
 import LoginIcon from "@mui/icons-material/Login";
 import {Link} from "react-router-dom";
 import {
-    Apartment,
     AutoAwesome,
     Bookmarks,
     Explore,
@@ -13,7 +12,6 @@ import {
     Hotel,
     Notifications,
     Person,
-    Star,
     Train
 } from "@mui/icons-material";
 import React, {useEffect, useState} from "react";
@@ -30,7 +28,7 @@ import {
 
 const formatNotificationTime = (value: string) => {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("zh-CN");
 };
 
 export default function Navbar() {
@@ -91,15 +89,14 @@ export default function Navbar() {
 
     return (
         <div
-            className="flex flex-row items-center justify-between mx-6 px-6 py-2 border-b-gray-200"
-            style={{borderBottomWidth: 1.2}}
+            className="mx-4 flex flex-col items-center gap-3 border-b border-gray-200 px-0 py-3 lg:mx-6 lg:px-6 xl:flex-row xl:justify-between"
         >
-            <Link to="/">
-                <img src={logo} style={{maxHeight: "60px", pointerEvents: "none"}} alt="logo"/>
+            <Link to="/" className="shrink-0">
+                <img src={logo} style={{maxHeight: "60px", pointerEvents: "none"}} alt="TourCentral"/>
             </Link>
 
             <ClickAwayListener onClickAway={closeNavPoppers}>
-                <ul className="flex flex-row gap-12">
+                <ul className="flex w-full flex-wrap items-center justify-center gap-2 md:gap-4 xl:w-auto xl:gap-8">
                     <li className="flex flex-row items-center">
                         <Link to="/offers">
                             <Button
@@ -108,28 +105,6 @@ export default function Navbar() {
                                 style={{color: "#333"}}
                             >
                                 旅游产品
-                            </Button>
-                        </Link>
-                    </li>
-                    <li className="flex flex-row items-center">
-                        <Link to="/clientPreferences">
-                            <Button
-                                variant="text"
-                                startIcon={<Star style={{color: "#333"}}/>}
-                                style={{color: "#333"}}
-                            >
-                                客户偏好
-                            </Button>
-                        </Link>
-                    </li>
-                    <li className="flex flex-row items-center">
-                        <Link to="/TOUpdates">
-                            <Button
-                                variant="text"
-                                startIcon={<Apartment style={{color: "#333"}}/>}
-                                style={{color: "#333"}}
-                            >
-                                运营商更新
                             </Button>
                         </Link>
                     </li>
@@ -166,8 +141,7 @@ export default function Navbar() {
                         </Button>
                         <Popper open={Boolean(reservationAnchorEl)} anchorEl={reservationAnchorEl} placement="bottom-start">
                             <div
-                                className="flex flex-col gap-1 px-3 py-3 mt-2 bg-white border-gray-200 rounded-xl shadow-lg"
-                                style={{borderWidth: 0.5, minWidth: 160}}
+                                className="mt-2 flex min-w-40 flex-col gap-1 rounded-lg border border-gray-200 bg-white px-3 py-3 shadow-lg"
                             >
                                 {reservationLinks.map((item) => (
                                     <Link key={item.to} to={item.to} onClick={closeNavPoppers}>
@@ -198,16 +172,14 @@ export default function Navbar() {
                 </ul>
             </ClickAwayListener>
 
-            <div className="relative flex items-center gap-3">
+            <div className="relative flex flex-wrap items-center justify-center gap-2">
                 <IconButton onClick={handleNotificationClick} color={unreadCount > 0 ? "primary" : "default"}>
                     <Badge badgeContent={unreadCount} color="error">
                         <Notifications/>
                     </Badge>
                 </IconButton>
                 <Popper open={Boolean(notificationAnchorEl)} anchorEl={notificationAnchorEl} placement="bottom-end" style={{zIndex: 1300}}>
-                    <div
-                        className="mt-2 w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-lg"
-                    >
+                    <div className="mt-2 w-80 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
                         <div className="mb-2 flex items-center justify-between gap-2">
                             <p className="font-semibold text-gray-900">站内通知</p>
                             <Button size="small" onClick={markAllRead} disabled={notifications.length === 0}>全部已读</Button>

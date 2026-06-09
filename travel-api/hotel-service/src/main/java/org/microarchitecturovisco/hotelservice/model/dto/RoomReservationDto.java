@@ -12,9 +12,9 @@ public class RoomReservationDto {
 
     private UUID reservationId;
 
-    private UUID roomId;
+    private Long roomId;
 
-    private UUID hotelId;
+    private Integer hotelId;
 
     private LocalDateTime dateFrom;
 

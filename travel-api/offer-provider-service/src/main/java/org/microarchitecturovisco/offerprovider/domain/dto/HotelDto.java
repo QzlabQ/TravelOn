@@ -14,7 +14,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class HotelDto implements Serializable {
-    private UUID hotelId;
+    private Integer hotelId;
     private String name;
     private float rating;
     private String description;

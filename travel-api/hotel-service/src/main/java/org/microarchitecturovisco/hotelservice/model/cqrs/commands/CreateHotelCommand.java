@@ -6,12 +6,10 @@ import org.microarchitecturovisco.hotelservice.model.dto.HotelDto;
 
 
 import java.time.LocalDateTime;
-import java.util.UUID;
-
 @Data
 @Builder
 public class CreateHotelCommand {
-    private UUID uuid;
+    private Integer hotelId;
     private LocalDateTime commandTimeStamp;
 
     private HotelDto hotelDto;

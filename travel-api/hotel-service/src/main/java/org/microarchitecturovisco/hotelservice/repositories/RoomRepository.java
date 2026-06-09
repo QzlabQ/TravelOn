@@ -9,7 +9,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-public interface RoomRepository extends JpaRepository<Room, UUID> {
+public interface RoomRepository extends JpaRepository<Room, Long> {
+    @Query("SELECT COALESCE(MAX(r.id), 0) FROM Room r")
+    long findMaxId();
+
     @Query("SELECT DISTINCT r FROM Room r " +
             "JOIN r.hotel h " +
             "JOIN h.location l " +
@@ -33,11 +36,11 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
             "                               AND (:dateFrom BETWEEN rrv.dateFrom AND rrv.dateTo " +
             "                                    OR :dateTo BETWEEN rrv.dateFrom AND rrv.dateTo)))")
     List<Room> findAvailableRoomsByHotelAndDate(
-            @Param("hotelId") UUID hotelId,
+            @Param("hotelId") Integer hotelId,
             @Param("dateFrom") LocalDateTime dateFrom,
             @Param("dateTo") LocalDateTime dateTo);
 
     @Query("SELECT r FROM Room r WHERE r.hotel.id = :hotelId")
-    List<Room> findAllRoomsByHotelId(@Param("hotelId") UUID hotelId);
+    List<Room> findAllRoomsByHotelId(@Param("hotelId") Integer hotelId);
 }
 

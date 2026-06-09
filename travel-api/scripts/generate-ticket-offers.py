@@ -18,7 +18,7 @@ COMMON_CITIES_FILE = ROOT / "seed-data/common/cities.csv"
 TRAIN_TICKETS_FILE = ROOT / "seed-data/transport/train/ticket_offers.csv"
 PLANE_TICKETS_FILE = ROOT / "seed-data/transport/plane/ticket_offers.csv"
 GENERATED_MARKER = "generated:nationwide-v1"
-EXTRA_TICKET_CITIES = ("满洲里", "温州")
+EXTRA_TICKET_CITIES = ()
 
 COORDINATES = {
     "北京": (39.90, 116.40), "上海": (31.23, 121.47), "天津": (39.08, 117.20),
@@ -96,9 +96,9 @@ TRAIN_STATIONS = {
 
 FLIGHT_CARRIERS = (("中国国航", "CA"), ("东方航空", "MU"), ("南方航空", "CZ"), ("海南航空", "HU"))
 HEADER = (
-    "type", "departureCity", "arrivalCity", "departureStation", "arrivalStation",
-    "departureTime", "arrivalTime", "carrier", "code", "seatClass", "price",
-    "remainingSeats", "studentEligible", "referenceDate", "sourceUrl", "sourceNote",
+    "type", "departureCityId", "arrivalCityId", "departureStationCode", "departureTerminalName",
+    "arrivalStationCode", "arrivalTerminalName", "departureDateTime", "arrivalDateTime",
+    "carrier", "code", "seatClass", "price", "remainingSeats", "totalSeats",
 )
 
 
@@ -131,6 +131,16 @@ def read_ticket_rows(path: Path) -> list[list[str]]:
     return rows[1:]
 
 
+def city_ids() -> dict[str, str]:
+    if not COMMON_CITIES_FILE.exists():
+        return {}
+    with COMMON_CITIES_FILE.open(encoding="utf-8", newline="") as handle:
+        return {
+            normalize_city_name(row["cityName"]): row["cityId"]
+            for row in csv.DictReader(handle, delimiter="\t")
+        }
+
+
 def distance_km(left: str, right: str) -> float:
     lat1, lon1 = COORDINATES[left]
     lat2, lon2 = COORDINATES[right]
@@ -145,32 +155,36 @@ def format_time(total_minutes: int) -> str:
     return (datetime(2026, 1, 1) + timedelta(minutes=total_minutes)).strftime("%H:%M")
 
 
-def generated_flight(left: str, right: str, seed: int) -> tuple[str, ...]:
+def format_datetime(base_date: str, total_minutes: int) -> str:
+    return (datetime.fromisoformat(base_date) + timedelta(minutes=total_minutes)).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def generated_flight(left: str, right: str, seed: int, ids: dict[str, str]) -> tuple[str, ...]:
     distance = distance_km(left, right)
     carrier, prefix = FLIGHT_CARRIERS[seed % len(FLIGHT_CARRIERS)]
     departure = 360 + (seed * 37) % 840
     duration = max(70, round(55 + distance / 10))
     price = max(260, round((230 + distance * 0.45 + seed % 170) / 10) * 10)
+    seats = str(3 + seed % 35)
     return (
-        "FLIGHT", left, right, AIRPORTS.get(left, f"{left}机场"), AIRPORTS.get(right, f"{right}机场"),
-        format_time(departure), format_time(departure + duration), carrier, f"{prefix}{1000 + seed}",
-        "经济舱", str(price), str(3 + seed % 35), "false", "2026-05-01",
-        "https://wap.ctrip.com/html5/flight/?orphanapp=1",
-        f"全国覆盖演示模板 {GENERATED_MARKER}：城市、机场和距离分档用于扩展查询覆盖；班次号、时刻与价格为可重复生成的演示数据，不是实时库存或售卖报价。",
+        "FLIGHT", ids.get(left, left), ids.get(right, right), AIRPORTS.get(left, left), "",
+        AIRPORTS.get(right, right), "", format_datetime("2026-05-01", departure),
+        format_datetime("2026-05-01", departure + duration), carrier, f"{prefix}{1000 + seed}",
+        "经济舱", str(price), seats, seats,
     )
 
 
-def generated_train(left: str, right: str, seed: int) -> tuple[str, ...]:
+def generated_train(left: str, right: str, seed: int, ids: dict[str, str]) -> tuple[str, ...]:
     distance = distance_km(left, right)
     departure = 330 + (seed * 29) % 900
     duration = max(35, round(25 + distance / 3.1))
     price = max(24, round((18 + distance * 0.36 + seed % 55) / 5) * 5)
+    seats = str(5 + seed % 31)
     return (
-        "TRAIN", left, right, TRAIN_STATIONS.get(left, f"{left}站"), TRAIN_STATIONS.get(right, f"{right}站"),
-        format_time(departure), format_time(departure + duration), "中国铁路", f"G{1000 + seed}",
-        "二等座", str(price), str(5 + seed % 31), "true", "2026-05-01",
-        "https://www.12306.cn/index/",
-        f"全国覆盖演示模板 {GENERATED_MARKER}：城市、车站和距离分档用于扩展查询覆盖；车次号、时刻与价格为可重复生成的演示数据，不是实时库存或售卖报价。",
+        "TRAIN", ids.get(left, left), ids.get(right, right), TRAIN_STATIONS.get(left, f"{left}站"), "",
+        TRAIN_STATIONS.get(right, f"{right}站"), "", format_datetime("2026-05-01", departure),
+        format_datetime("2026-05-01", departure + duration), "中国铁路", f"G{1000 + seed}",
+        "二等座", str(price), seats, seats,
     )
 
 
@@ -179,9 +193,10 @@ def main() -> None:
     missing = sorted(set(cities) - COORDINATES.keys())
     if missing:
         raise RuntimeError(f"Missing coordinates: {missing}")
+    ids = city_ids()
 
     existing_rows = read_ticket_rows(TRAIN_TICKETS_FILE) + read_ticket_rows(PLANE_TICKETS_FILE)
-    historical_rows = [row for row in existing_rows if len(row) > 15 and GENERATED_MARKER not in row[15]]
+    historical_rows = [row for row in existing_rows if len(row) == len(HEADER)]
     covered_routes = {(row[0], row[1], row[2]) for row in historical_rows}
     generated_flight_rows: list[tuple[str, ...]] = []
     generated_train_rows: list[tuple[str, ...]] = []
@@ -191,10 +206,12 @@ def main() -> None:
             if left == right:
                 continue
             seed = left_index * len(cities) + right_index
-            if ("FLIGHT", left, right) not in covered_routes:
-                generated_flight_rows.append(generated_flight(left, right, seed))
-            if ("TRAIN", left, right) not in covered_routes:
-                generated_train_rows.append(generated_train(left, right, seed))
+            left_id = ids.get(left, left)
+            right_id = ids.get(right, right)
+            if ("FLIGHT", left_id, right_id) not in covered_routes:
+                generated_flight_rows.append(generated_flight(left, right, seed, ids))
+            if ("TRAIN", left_id, right_id) not in covered_routes:
+                generated_train_rows.append(generated_train(left, right, seed, ids))
 
     historical_flight_rows = [row for row in historical_rows if row[0] == "FLIGHT"]
     historical_train_rows = [row for row in historical_rows if row[0] == "TRAIN"]

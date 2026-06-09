@@ -5,7 +5,7 @@ import {Place, Recommend, SentimentVerySatisfied, ThumbUp} from "@mui/icons-mate
 import {Link} from "react-router-dom";
 
 interface OfferProps {
-    idHotel: string,
+    idHotel: number,
     name: string;
     location: string;
     rating: number;

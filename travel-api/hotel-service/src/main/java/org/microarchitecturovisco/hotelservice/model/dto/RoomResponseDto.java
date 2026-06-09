@@ -10,7 +10,7 @@ import java.util.UUID;
 @Builder
 public class RoomResponseDto {
     @Id
-    private UUID roomId;
+    private Long roomId;
 
     private String name;
 

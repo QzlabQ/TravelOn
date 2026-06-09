@@ -21,5 +21,21 @@ export const targetTypeLabels: Record<ReviewTargetType, string> = {
 export const formatCommunityTime = (value?: string | null) => {
     if (!value) return "";
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
+    if (Number.isNaN(date.getTime())) return "";
+
+    const diffMs = Date.now() - date.getTime();
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+
+    if (diffMs >= 0 && diffMs < minute) return "刚刚";
+    if (diffMs >= 0 && diffMs < hour) return `${Math.floor(diffMs / minute)} 分钟前`;
+    if (diffMs >= 0 && diffMs < day) return `${Math.floor(diffMs / hour)} 小时前`;
+
+    return date.toLocaleString("zh-CN", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 };

@@ -1,0 +1,9 @@
+\connect reservation_db
+
+DROP TABLE IF EXISTS create_reservation_command_room_reservations_ids;
+DROP TABLE IF EXISTS create_reservation_command_transport_reservations_ids;
+DROP TABLE IF EXISTS create_reservation_command_travelers;
+DROP TABLE IF EXISTS delete_reservation_command_room_reservations_ids;
+DROP TABLE IF EXISTS delete_reservation_command_transport_reservations_ids;
+DROP TABLE IF EXISTS create_reservation_command;
+DROP TABLE IF EXISTS delete_reservation_command;

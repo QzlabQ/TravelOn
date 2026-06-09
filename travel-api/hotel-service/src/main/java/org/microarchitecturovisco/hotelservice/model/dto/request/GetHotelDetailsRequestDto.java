@@ -18,7 +18,7 @@ public class GetHotelDetailsRequestDto implements Serializable {
     private LocalDateTime dateFrom;
     private LocalDateTime dateTo;
 
-    private UUID hotelId;
+    private Integer hotelId;
 
     private Integer adults;
     private Integer childrenUnderThree;

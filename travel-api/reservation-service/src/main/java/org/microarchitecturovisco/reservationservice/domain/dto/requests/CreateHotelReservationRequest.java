@@ -16,8 +16,8 @@ import java.util.UUID;
 @NoArgsConstructor
 public class CreateHotelReservationRequest implements Serializable {
     private UUID reservationId;
-    private UUID hotelId;
+    private Integer hotelId;
     private LocalDateTime hotelTimeFrom;
     private LocalDateTime hotelTimeTo;
-    private List<UUID> roomIds;
+    private List<Long> roomIds;
 }

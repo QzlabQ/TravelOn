@@ -78,45 +78,4 @@ public class OfferDetailsWebSocketHandler extends TextWebSocketHandler {
         super.afterConnectionClosed(session, status);
     }
 
-    public void sendOfferDetailsToSubscribedByHotelId(String idHotel) {
-        Logger logger = Logger.getLogger("ReservationWebSocketHandler");
-        logger.info("Sending message to clients subscribed to hotel " + idHotel);
-
-        for (WebSocketSession session : sessions.stream().filter(sess -> sess.getAttributes().get("idHotel").equals(idHotel)).toList()) {
-            try {
-                if (session.isOpen()) {
-                    GetOfferDetailsResponseDto responseDto = offersController.getOfferDetails((GetOfferDetailsRequestDto) session.getAttributes().get("searchParams"));
-
-                    responseDto.setDataGeneratorUpdate(true);
-
-                    session.sendMessage(new TextMessage(JsonConverter.convert(responseDto)));
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    public void sendOfferDetailsToSubscribedByLocationIds(String idFromLocation, String idToLocation) {
-        Logger logger = Logger.getLogger("ReservationWebSocketHandler");
-        logger.info("Sending message to clients subscribed to one of those locations: " + idFromLocation + " " + idToLocation);
-
-        for (WebSocketSession session : sessions.stream().filter(sess ->
-                sess.getAttributes().get("idHotelLocation") != null &&
-                        (sess.getAttributes().get("idHotelLocation").equals(idFromLocation) || sess.getAttributes().get("idHotelLocation").equals(idToLocation))).toList()) {
-            try {
-                if (session.isOpen()) {
-                    logger.info("sending message to session with hotel id " + session.getAttributes().get("idHotel"));
-
-                    GetOfferDetailsResponseDto responseDto = offersController.getOfferDetails((GetOfferDetailsRequestDto) session.getAttributes().get("searchParams"));
-
-                    responseDto.setDataGeneratorUpdate(true);
-
-                    session.sendMessage(new TextMessage(JsonConverter.convert(responseDto)));
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
 }

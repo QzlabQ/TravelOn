@@ -144,6 +144,8 @@ const TicketCard = ({
     selected?: boolean
 }) => {
     const config = modeConfig[mode];
+    const departureStation = [offer.departureStationCode, offer.departureTerminalName].filter(Boolean).join(" ");
+    const arrivalStation = [offer.arrivalStationCode, offer.arrivalTerminalName].filter(Boolean).join(" ");
 
     return (
         <div className={`bg-white rounded-lg border ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'} ${compact ? 'w-full' : 'min-w-[760px]'} p-5 shadow-sm hover:shadow-md transition-shadow`}>
@@ -160,7 +162,7 @@ const TicketCard = ({
             <div className='mt-5 flex flex-row items-center gap-5'>
                 <div className='w-28'>
                     <p className='text-3xl font-bold' style={{color: config.accent}}>{offer.departureTime}</p>
-                    <p className='mt-1 text-sm font-semibold text-slate-800'>{offer.departureStation}</p>
+                    <p className='mt-1 text-sm font-semibold text-slate-800'>{departureStation}</p>
                 </div>
                 <div className='flex-1 flex flex-col items-center text-slate-500'>
                     <p className='text-sm'>{offer.duration}</p>
@@ -173,12 +175,12 @@ const TicketCard = ({
                 </div>
                 <div className='w-28'>
                     <p className='text-3xl font-bold text-slate-900'>{offer.arrivalTime}</p>
-                    <p className='mt-1 text-sm font-semibold text-slate-800'>{offer.arrivalStation}</p>
+                    <p className='mt-1 text-sm font-semibold text-slate-800'>{arrivalStation}</p>
                 </div>
                 <div className='w-32 text-right'>
-                    <p className='text-sm text-slate-400'>样本参考价</p>
+                    <p className='text-sm text-slate-400'>参考价</p>
                     <p className='text-3xl font-bold text-orange-500'>¥{offer.price}</p>
-                    <a className='mt-1 block text-xs text-blue-600 hover:underline' href={offer.sourceUrl} target='_blank' rel='noreferrer'>查看样本来源</a>
+                    <p className='mt-1 text-xs text-slate-500'>余票 {offer.remainingSeats}/{offer.totalSeats}</p>
                 </div>
                 <Button
                     variant='contained'
@@ -259,7 +261,6 @@ const TicketBooking = ({mode}: TicketBookingProps) => {
     const selectedTotalPrice = selectedOffer ? selectedOffer.price * selectedPassengerCount : 0;
     const travelerRuleError = validateTicketTravelerRules(selectedTravelers, {
         studentOnly,
-        studentEligible: selectedOffer?.studentEligible ?? null,
         transportType: mode === "flight" ? "FLIGHT" : "TRAIN",
         departureDate: date,
     });

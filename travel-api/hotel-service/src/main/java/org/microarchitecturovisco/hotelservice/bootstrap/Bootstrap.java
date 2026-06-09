@@ -10,6 +10,7 @@ import org.microarchitecturovisco.hotelservice.repositories.HotelRepository;
 import org.microarchitecturovisco.hotelservice.services.HotelsCommandService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
@@ -25,11 +26,11 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 @Component
+@ConditionalOnProperty(name = "app.seed-data.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class Bootstrap implements CommandLineRunner {
     private final LocationParser locationParser;
     private final HotelParser hotelParser;
-    private final CateringOptionParser cateringOptionParser;
     private final RoomReservationParser roomReservationParser;
     private final HotelsCommandService hotelsCommandService;
     private final RoomParser roomParser;
@@ -58,18 +59,16 @@ public class Bootstrap implements CommandLineRunner {
         Resource hotelCsvFile = seedResource("hotels.csv");
         Resource hotelPhotosCsvFile = seedResource("hotel_photos.csv");
         Resource hotelRoomsCsvFile = seedResource("hotel_rooms.csv");
-        Resource hotelCateringOptionsCsvFile = seedResource("hotel_food_options.csv");
 
         List<LocationDto> hotelLocations = locationParser.importLocations(hotelCsvFile);
         List<HotelDto> hotels = hotelParser.importHotels(hotelCsvFile, hotelPhotosCsvFile, hotelLocations);
-        cateringOptionParser.importCateringOptions(hotelCateringOptionsCsvFile, hotels);
         roomParser.importRooms(hotelRoomsCsvFile, hotels);
         List<RoomReservationDto> roomReservations = roomReservationParser.importRoomReservations(hotels);
         logger.info("Imported " + hotels.size() + " hotels from hotels.csv");
 
         for (HotelDto hotelDto : hotels){
             hotelsCommandService.createHotel(CreateHotelCommand.builder()
-                    .uuid(hotelDto.getHotelId())
+                    .hotelId(hotelDto.getHotelId())
                     .commandTimeStamp(LocalDateTime.now())
                     .hotelDto(hotelDto)
                     .build());

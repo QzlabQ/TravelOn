@@ -36,7 +36,6 @@ public class OffersService {
                 .imageUrls(List.of())
                 .roomConfiguration(RoomsConfigurationDto.builder().rooms(List.of()).pricePerAdult(-1.0f).build())
                 .possibleRoomConfigurations(List.of())
-                .cateringOptions(List.of())
                 .departure(List.of())
                 .possibleDepartures(List.of())
                 .build();

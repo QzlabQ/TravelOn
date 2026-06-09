@@ -6,6 +6,7 @@ import org.microarchitecturovisco.communityservice.domain.Review;
 import org.microarchitecturovisco.communityservice.domain.ReviewTargetType;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.Resource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,10 +19,13 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Component
+@ConditionalOnProperty(name = "app.seed-data.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class HotelReviewSeedLoader implements CommandLineRunner {
 
@@ -34,6 +38,9 @@ public class HotelReviewSeedLoader implements CommandLineRunner {
     @Value("${app.seed-data.hotel-reviews-csv:file:seed-data/hotel/hotel_reviews.csv}")
     private Resource hotelReviewsCsv;
 
+    @Value("${app.seed-data.hotels-csv:file:seed-data/hotel/hotels.csv}")
+    private Resource hotelsCsv;
+
     @Override
     public void run(String... args) throws Exception {
         updateReviewTargetTypeConstraint();
@@ -41,6 +48,8 @@ public class HotelReviewSeedLoader implements CommandLineRunner {
         if (!hotelReviewsCsv.exists() || reviewRepository.existsByTargetType(ReviewTargetType.HOTEL)) {
             return;
         }
+
+        Map<String, String> hotelNamesById = loadHotelNames();
 
         List<Review> reviews = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(
@@ -53,18 +62,18 @@ public class HotelReviewSeedLoader implements CommandLineRunner {
                 }
 
                 String[] values = line.split("\t", -1);
-                if (values.length < 6 || values[4].isBlank()) {
+                if (values.length < 5 || values[3].isBlank()) {
                     continue;
                 }
 
-                Instant createdAt = readCreatedAt(values[5]);
+                Instant createdAt = readCreatedAt(values[4]);
                 reviews.add(Review.builder()
-                        .id(UUID.fromString(values[0]))
+                        .id(Long.parseLong(values[0]))
                         .targetType(ReviewTargetType.HOTEL)
                         .targetId(values[1])
-                        .targetName(values[2])
-                        .rating(normalizeRating(Double.parseDouble(values[3])))
-                        .content(values[4])
+                        .targetName(hotelNamesById.getOrDefault(values[1], ""))
+                        .rating(normalizeRating(Double.parseDouble(values[2])))
+                        .content(values[3])
                         .category(CommunityCategory.HOTEL)
                         .authorUserId(SYSTEM_AUTHOR_ID)
                         .authorName(SYSTEM_AUTHOR_NAME)
@@ -77,6 +86,28 @@ public class HotelReviewSeedLoader implements CommandLineRunner {
         if (!reviews.isEmpty()) {
             reviewRepository.saveAll(reviews);
         }
+    }
+
+    private Map<String, String> loadHotelNames() throws Exception {
+        Map<String, String> namesById = new HashMap<>();
+        if (!hotelsCsv.exists()) {
+            return namesById;
+        }
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(hotelsCsv.getInputStream(), StandardCharsets.UTF_8))) {
+            reader.readLine();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isBlank()) {
+                    continue;
+                }
+                String[] values = line.split("\t", -1);
+                if (values.length >= 2) {
+                    namesById.put(values[0], values[1]);
+                }
+            }
+        }
+        return namesById;
     }
 
     private void updateReviewTargetTypeConstraint() {

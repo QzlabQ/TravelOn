@@ -4,103 +4,72 @@ import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.transport.model.cqrs.commands.CreateTransportCommand;
 import org.microarchitecturovisco.transport.model.cqrs.commands.CreateTransportReservationCommand;
 import org.microarchitecturovisco.transport.model.cqrs.commands.DeleteTransportReservationCommand;
-import org.microarchitecturovisco.transport.model.domain.TransportCourse;
-import org.microarchitecturovisco.transport.model.events.*;
-import org.microarchitecturovisco.transport.repositories.TransportCourseRepository;
-import org.microarchitecturovisco.transport.repositories.TransportEventStore;
-import org.microarchitecturovisco.transport.repositories.TransportRepository;
-import org.microarchitecturovisco.transport.repositories.TransportReservationRepository;
+import org.microarchitecturovisco.transport.model.domain.TicketOfferTemplate;
+import org.microarchitecturovisco.transport.repositories.TicketOfferTemplateRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class TransportCommandService {
+    private static final Logger log = LoggerFactory.getLogger(TransportCommandService.class);
 
-    private final TransportEventStore transportEventStore;
-
-    private final TransportEventSourcingHandler eventSourcingHandler;
-    private final TransportCourseRepository transportCourseRepository;
-    private final TransportRepository transportRepository;
-    private final TransportReservationRepository transportReservationRepository;
+    private final TicketOfferTemplateRepository ticketOfferTemplateRepository;
 
     public void createTransport(CreateTransportCommand command) {
-        TransportCreatedEvent transportCreatedEvent = new TransportCreatedEvent(
-                command.getUuid(), command.getCommandTimeStamp(), command.getTransportDto()
-        );
-
-        transportEventStore.save(transportCreatedEvent);
-        eventSourcingHandler.project(List.of(transportCreatedEvent));
+        log.warn("Ignoring legacy createTransport command {}", command.getUuid());
     }
 
+    @Transactional
     public void createReservation(CreateTransportReservationCommand command) {
-        TransportReservationCreatedEvent transportReservationCreatedEvent = TransportReservationCreatedEvent.builder()
-                .id(command.getUuid())
-                .eventTimeStamp(command.getCommandTimeStamp())
-                .reservationId(command.getTransportReservationDto().getReservationId())
-                .numberOfSeats(command.getTransportReservationDto().getNumberOfSeats())
-                .idTransport(command.getTransportReservationDto().getIdTransport())
-                .build();
+        UUID templateId = command.getTransportReservationDto().getIdTransport();
+        int seats = command.getTransportReservationDto().getNumberOfSeats();
 
-
-        transportEventStore.save(transportReservationCreatedEvent);
-        eventSourcingHandler.project(List.of(transportReservationCreatedEvent));
+        Optional<TicketOfferTemplate> opt = ticketOfferTemplateRepository.findById(templateId);
+        if (opt.isEmpty()) {
+            log.warn("TicketOfferTemplate {} not found, cannot decrement seats", templateId);
+            return;
+        }
+        TicketOfferTemplate template = opt.get();
+        int updated = Math.max(0, template.getRemainingSeats() - seats);
+        template.setRemainingSeats(updated);
+        ticketOfferTemplateRepository.save(template);
+        log.info("Decremented {} seats for template {}, remaining: {}", seats, templateId, updated);
     }
 
+    @Transactional
     public void deleteReservation(DeleteTransportReservationCommand command) {
-        TransportReservationDeletedEvent reservationDeletedEvent =  TransportReservationDeletedEvent.builder()
-                .id(UUID.randomUUID())
-                .eventTimeStamp(command.getCommandTimeStamp())
-                .reservationId(command.getReservationId())
-                .idTransport(command.getTransportId())
-                .build();
+        UUID templateId = command.getTransportId();
+        int seats = command.getNumberOfSeats();
 
-        System.out.println("TransportReservationDeletedEvent: " + reservationDeletedEvent);
-
-        transportEventStore.save(reservationDeletedEvent);
-        eventSourcingHandler.project(List.of(reservationDeletedEvent));
+        Optional<TicketOfferTemplate> opt = ticketOfferTemplateRepository.findById(templateId);
+        if (opt.isEmpty()) {
+            log.warn("TicketOfferTemplate {} not found, cannot restore seats", templateId);
+            return;
+        }
+        TicketOfferTemplate template = opt.get();
+        int updated = Math.min(template.getTotalSeats(), template.getRemainingSeats() + seats);
+        template.setRemainingSeats(updated);
+        ticketOfferTemplateRepository.save(template);
+        log.info("Restored {} seats for template {}, remaining: {}", seats, templateId, updated);
     }
 
     public void updateTransport(UUID transportId, int capacity, float pricePerAdult) {
-        TransportUpdateEvent transportUpdateEvent =  new TransportUpdateEvent(transportId, capacity, pricePerAdult);
-        transportEventStore.save(transportUpdateEvent);
-        eventSourcingHandler.project(List.of(transportUpdateEvent));
+        log.warn("Ignoring legacy updateTransport command {}", transportId);
     }
 
     public void createTransport(UUID transportId, UUID courseId, LocalDateTime departureDate, int capacity,
                                 float pricePerAdult) {
-        TransportCourse transportCourse = transportCourseRepository.findById(courseId).orElse(null);
-        if (transportCourse == null) return;
-
-        TransportCreatedEvent transportCreatedEvent = TransportCreatedEvent.builder()
-                .idTransport(transportId)
-                .idTransportCourse(courseId)
-                .departureDate(departureDate)
-                .eventTimeStamp(LocalDateTime.now())
-                .capacity(capacity)
-                .pricePerAdult(pricePerAdult)
-                .idDepartureLocation(transportCourse.getDepartureFrom().getId())
-                .departureLocationCountry(transportCourse.getDepartureFrom().getCountry())
-                .departureLocationRegion(transportCourse.getDepartureFrom().getRegion())
-                .arrivalLocationCountry(transportCourse.getArrivalAt().getCountry())
-                .arrivalLocationRegion(transportCourse.getArrivalAt().getRegion())
-                .idArrivalLocation(transportCourse.getArrivalAt().getId())
-                .type(transportCourse.getType())
-                .build();
-        transportEventStore.save(transportCreatedEvent);
-        eventSourcingHandler.project(List.of(transportCreatedEvent));
+        log.warn("Ignoring legacy createTransport overload {}", transportId);
     }
 
     public void deleteTransport(UUID transportId) {
-        transportRepository.findById(transportId).ifPresent(transport -> {
-            if (transport.getTransportReservations() != null) {
-                transportReservationRepository.deleteAll(transport.getTransportReservations());
-            }
-            transportRepository.delete(transport);
-        });
+        log.warn("Ignoring legacy deleteTransport command {}", transportId);
     }
-
 }

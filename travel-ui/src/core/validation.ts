@@ -367,7 +367,6 @@ export const validateTicketTravelerRules = (
     travelers: BookingPersonPayload[],
     options: {
         studentOnly?: boolean;
-        studentEligible?: boolean | null;
         transportType?: SupportedTransportType;
         departureDate?: string | null;
     } = {}
@@ -408,9 +407,6 @@ export const validateTicketTravelerRules = (
     }
 
     if (options.studentOnly) {
-        if (options.studentEligible === false) {
-            return "当前班次不支持学生票，请改选其他班次或关闭学生票筛选。";
-        }
         if (travelers.some(traveler => traveler.travelerType !== "STUDENT")) {
             return "学生票仅支持学生类型的出行人预订。";
         }

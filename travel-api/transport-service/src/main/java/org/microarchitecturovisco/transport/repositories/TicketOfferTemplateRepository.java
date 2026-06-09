@@ -8,17 +8,11 @@ import java.util.List;
 import java.util.UUID;
 
 public interface TicketOfferTemplateRepository extends JpaRepository<TicketOfferTemplate, UUID> {
-    List<TicketOfferTemplate> findByTypeOrderByDepartureTimeAsc(TicketType type);
+    List<TicketOfferTemplate> findByTypeOrderByDepartureDateTimeAsc(TicketType type);
 
-    List<TicketOfferTemplate> findByTypeAndDepartureCityAndArrivalCityOrderByDepartureTimeAsc(
+    List<TicketOfferTemplate> findByTypeAndDepartureCityIdAndArrivalCityIdOrderByDepartureDateTimeAsc(
             TicketType type,
-            String departureCity,
-            String arrivalCity
-    );
-
-    List<TicketOfferTemplate> findByTypeAndDepartureCityIdAndArrivalCityIdOrderByDepartureTimeAsc(
-            TicketType type,
-            UUID departureCityId,
-            UUID arrivalCityId
+            String departureCityId,
+            String arrivalCityId
     );
 }

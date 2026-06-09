@@ -85,8 +85,7 @@ public class CommunityService {
         return likeRepository.findByPostIdAndUserId(postId, user.id())
                 .map(existingLike -> {
                     likeRepository.delete(existingLike);
-                    post.setLikeCount(Math.max(0, post.getLikeCount() - 1));
-                    return new LikeResponse(post.getId(), false, postRepository.save(post).getLikeCount());
+                    return new LikeResponse(post.getId(), false, Math.toIntExact(likeRepository.countByPostId(postId)));
                 })
                 .orElseGet(() -> {
                     likeRepository.save(PostLike.builder()
@@ -95,8 +94,7 @@ public class CommunityService {
                             .userId(user.id())
                             .createdAt(Instant.now())
                             .build());
-                    post.setLikeCount(post.getLikeCount() + 1);
-                    return new LikeResponse(post.getId(), true, postRepository.save(post).getLikeCount());
+                    return new LikeResponse(post.getId(), true, Math.toIntExact(likeRepository.countByPostId(postId)));
                 });
     }
 
@@ -113,7 +111,7 @@ public class CommunityService {
     public ReviewResponse createReview(String token, CreateReviewRequest request) {
         UserProfileResponse user = userClient.requireUser(token);
         Review review = Review.builder()
-                .id(UUID.randomUUID())
+                .id(reviewRepository.findMaxId() + 1)
                 .targetType(request.targetType())
                 .targetId(normalizeOptional(request.targetId()))
                 .targetName(request.targetName().trim())

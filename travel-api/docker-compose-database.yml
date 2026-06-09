@@ -5,12 +5,12 @@ services:
   db:
     image: postgres
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: database
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      POSTGRES_DB: ${POSTGRES_DB:-database}
       PGDATA: /data/postgres
     volumes:
-      - postgres:/data/postgres
+      - ./data/postgres:/data/postgres
     ports:
       - "${DATABASE_POSTGRES_HOST_PORT:-55433}:5432"
     restart: unless-stopped
@@ -25,15 +25,15 @@ services:
   userdb:
     image: postgres
     environment:
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=admin
-      - POSTGRES_DB=users
+      - POSTGRES_USER=${POSTGRES_USER:-admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin}
+      - POSTGRES_DB=${USERDB_DB_NAME:-users}
       - PGDATA=/data/postgres
     expose:
       - "5432"
     restart: unless-stopped
     volumes:
-      - userdb:/data/postgres
+      - ./data/userdb:/data/postgres
     networks:
       - backend
     healthcheck:
@@ -41,20 +41,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
-
-volumes:
-  postgres:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: E:/2026spring/26NULLptr/repositories/travel-api/data/postgres
-  userdb:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: E:/2026spring/26NULLptr/repositories/travel-api/data/userdb
 
 networks:
   backend:

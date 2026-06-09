@@ -1,5 +1,6 @@
 package org.microarchitecturovisco.reservationservice.domain.dto.requests;
 
+import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -11,7 +12,7 @@ import java.util.UUID;
 
 public record CreateHotelOnlyReservationRequest(
         @NotNull UUID userId,
-        @NotNull UUID hotelId,
+        @NotNull Integer hotelId,
         @NotBlank String hotelName,
         @NotNull LocalDate dateFrom,
         @NotNull LocalDate dateTo,
@@ -21,6 +22,7 @@ public record CreateHotelOnlyReservationRequest(
         @Min(0) int childrenUnder18Quantity,
         @Min(0) float price,
         String roomName,
-        List<@Valid BookingPersonRequest> travelers
+        List<@Valid BookingPersonRequest> travelers,
+        @Nullable Long roomId
 ) {
 }

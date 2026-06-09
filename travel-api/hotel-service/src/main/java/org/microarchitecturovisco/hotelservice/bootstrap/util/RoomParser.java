@@ -49,7 +49,7 @@ public class RoomParser {
         String description = data[2];
         int guestCapacity = capacityCalculator.calculateGuestCapacity(roomName);
         float pricePerAdult = Float.parseFloat(data[3]);
-        UUID roomId = UUID.fromString((data[4]));
+        Long roomId = Long.parseLong(data[4].trim());
 
         Optional<HotelDto> hotelOpt = searchForHotel(hotelDtos, hotelId);
 

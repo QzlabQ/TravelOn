@@ -49,10 +49,10 @@ public class Reservation {
     @NotNull
     private String bookingType;
 
-    private UUID hotelId;
+    private Integer hotelId;
 
     @ElementCollection(fetch = FetchType.EAGER)
-    private List<UUID> roomReservationsIds;
+    private List<Long> roomReservationsIds;
 
     @ElementCollection(fetch = FetchType.EAGER)
     private List<UUID> transportReservationsIds;

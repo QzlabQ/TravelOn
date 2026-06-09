@@ -9,8 +9,6 @@ import {LocalizationProvider} from "@mui/x-date-pickers";
 import {AdapterDayjs} from "@mui/x-date-pickers/AdapterDayjs";
 import {useEffect} from "react";
 import BuyOffer from "./offers/screens/BuyOffer";
-import Preferences from "./preferences/screens/Preferences";
-import TOUpdates from "./tour-operator-updates/screens/TOUpdates";
 import AiPlanner from "./ai-arrange/screens/AiPlanner";
 import Reservations from "./reservations/screens/Reservations";
 import TicketBooking from "./reservations/screens/TicketBooking";
@@ -44,8 +42,6 @@ function App() {
                     <Route path='/account' element={<Account/>}/>
                     <Route path='/community' element={<Community/>}/>
                     <Route path='/community/posts/:postId' element={<CommunityPostDetails/>}/>
-                    <Route path='/clientPreferences' element={<Preferences/>}/>
-                    <Route path='/TOUpdates' element={<TOUpdates/>}/>
                     <Route path='/ai-planner' element={<AiPlanner/>}/>
                     <Route path="*" element={<NotFound />} />
                 </Routes>

@@ -16,7 +16,7 @@ import java.util.UUID;
 @Builder
 public class Room {
     @Id
-    private UUID id;
+    private Long id;
 
     @ManyToOne()
     @JoinColumn(name="hotel_id")

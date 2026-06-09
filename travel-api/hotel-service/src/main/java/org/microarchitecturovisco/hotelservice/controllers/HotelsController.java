@@ -7,19 +7,15 @@ import org.microarchitecturovisco.hotelservice.controllers.reservations.DeleteHo
 import org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateRoomReservationCommand;
 import org.microarchitecturovisco.hotelservice.model.cqrs.commands.DeleteRoomReservationCommand;
 import org.microarchitecturovisco.hotelservice.model.domain.Hotel;
-import org.microarchitecturovisco.hotelservice.model.domain.Room;
 import org.microarchitecturovisco.hotelservice.model.dto.LocationDto;
 import org.microarchitecturovisco.hotelservice.model.dto.RoomReservationDto;
 import org.microarchitecturovisco.hotelservice.model.dto.HotelResponseDto;
-import org.microarchitecturovisco.hotelservice.model.dto.data_generator.DataUpdateType;
-import org.microarchitecturovisco.hotelservice.model.dto.data_generator.RoomUpdateRequest;
 import org.microarchitecturovisco.hotelservice.model.dto.request.CheckHotelAvailabilityQueryRequestDto;
 import org.microarchitecturovisco.hotelservice.model.dto.request.GetHotelDetailsRequestDto;
 import org.microarchitecturovisco.hotelservice.model.dto.request.GetHotelsBySearchQueryRequestDto;
 import org.microarchitecturovisco.hotelservice.model.dto.response.CheckHotelAvailabilityResponseDto;
 import org.microarchitecturovisco.hotelservice.model.dto.response.GetHotelDetailsResponseDto;
 import org.microarchitecturovisco.hotelservice.model.dto.response.GetHotelsBySearchQueryResponseDto;
-import org.microarchitecturovisco.hotelservice.model.exceptions.HotelNoFoundException;
 import org.microarchitecturovisco.hotelservice.queues.config.QueuesConfig;
 import org.microarchitecturovisco.hotelservice.services.HotelsCommandService;
 import org.microarchitecturovisco.hotelservice.services.HotelsService;
@@ -63,7 +59,7 @@ public class HotelsController {
     @ResponseStatus(HttpStatus.CREATED)
     public void createHotel(@RequestBody org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto) {
         hotelsCommandService.createHotel(org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateHotelCommand.builder()
-                .uuid(hotelDto.getHotelId())
+                .hotelId(hotelDto.getHotelId())
                 .commandTimeStamp(LocalDateTime.now())
                 .hotelDto(hotelDto)
                 .build());
@@ -71,7 +67,7 @@ public class HotelsController {
 
     @PutMapping("/admin/{hotelId}")
     public Hotel updateHotel(
-            @PathVariable UUID hotelId,
+            @PathVariable Integer hotelId,
             @RequestBody org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto
     ) {
         return hotelsService.updateHotel(hotelId, hotelDto);
@@ -79,25 +75,25 @@ public class HotelsController {
 
     @DeleteMapping("/admin/{hotelId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteHotel(@PathVariable UUID hotelId) {
+    public void deleteHotel(@PathVariable Integer hotelId) {
         hotelsService.deleteHotel(hotelId);
     }
 
     @PostMapping("/admin/{hotelId}/rooms")
     @ResponseStatus(HttpStatus.CREATED)
     public void createRoom(
-            @PathVariable UUID hotelId,
+            @PathVariable Integer hotelId,
             @RequestBody org.microarchitecturovisco.hotelservice.model.dto.RoomDto roomDto
     ) {
-        UUID roomId = roomDto.getRoomId() == null ? UUID.randomUUID() : roomDto.getRoomId();
+        Long roomId = roomDto.getRoomId() == null ? hotelsService.generateNewRoomId() : roomDto.getRoomId();
         hotelsService.createRoomFromHotel(hotelId, roomId, roomDto.getName(),
                 roomDto.getGuestCapacity(), roomDto.getPricePerAdult(), roomDto.getDescription());
     }
 
     @PutMapping("/admin/{hotelId}/rooms/{roomId}")
     public void updateRoom(
-            @PathVariable UUID hotelId,
-            @PathVariable UUID roomId,
+            @PathVariable Integer hotelId,
+            @PathVariable Long roomId,
             @RequestBody org.microarchitecturovisco.hotelservice.model.dto.RoomDto roomDto
     ) {
         hotelsService.updateRoomFromHotel(hotelId, roomId, roomDto.getName(),
@@ -106,13 +102,13 @@ public class HotelsController {
 
     @DeleteMapping("/admin/rooms/{roomId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteRoom(@PathVariable UUID roomId) {
+    public void deleteRoom(@PathVariable Long roomId) {
         hotelsService.deleteRoom(roomId);
     }
 
     @GetMapping("/{hotelId}")
     public GetHotelDetailsResponseDto getHotelDetails(
-            @PathVariable UUID hotelId,
+            @PathVariable Integer hotelId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(defaultValue = "2") int adults,
@@ -221,7 +217,7 @@ public class HotelsController {
         List<RoomReservationDto> roomReservations = new ArrayList<>();
 
         for (int i = 0; i < numberOfRoomsInReservation; i++) {
-            UUID roomId = request.getRoomIds().get(i);
+            Long roomId = request.getRoomIds().get(i);
 
             RoomReservationDto roomReservation = new RoomReservationDto();
             roomReservation.setReservationId(request.getReservationId());
@@ -250,7 +246,7 @@ public class HotelsController {
         DeleteHotelReservationRequest request = JsonReader.readDeleteHotelReservationRequestCommand(requestJson);
         System.out.println("Deleting hotel reservations: " + request);
 
-        for (UUID roomId : request.getRoomIds()){
+        for (Long roomId : request.getRoomIds()){
             DeleteRoomReservationCommand command = DeleteRoomReservationCommand.builder()
                     .commandTimeStamp(LocalDateTime.now())
                     .reservationId(request.getReservationId())
@@ -260,57 +256,6 @@ public class HotelsController {
 
             hotelsCommandService.deleteReservation(command);
         }
-    }
-
-    @RabbitListener(queues = "#{handleDataGeneratorCreateQueue}")
-    public void consumeDataGeneratorMessage(String requestJson) {
-        Logger logger = Logger.getLogger("HotelController");
-        logger.info("Got hotel data generator: " + requestJson);
-
-        RoomUpdateRequest request = JsonReader.readDtoFromJson(requestJson, RoomUpdateRequest.class);
-
-        if (request.getUpdateType() == DataUpdateType.DELETE) {
-            System.out.println("Deleted room: " + request);
-            hotelsService.deleteRoom(request.getId());
-            return;
-        }
-
-        // perform data update
-        Hotel hotel;
-        try {
-            hotel = hotelsService.getHotel(request.getHotelId());
-        } catch (HotelNoFoundException e) {
-            logger.warning("Skip room update because hotel was not found: " + request.getHotelId());
-            return;
-        }
-
-        // create room
-        if (request.getUpdateType() == DataUpdateType.CREATE) {
-            System.out.println("Created room: " + request);
-            hotelsService.createRoomFromHotel(request.getHotelId(), request.getId(), request.getName(),
-                    request.getGuestCapacity(), request.getPricePerAdult(), request.getDescription());
-
-            return;
-        }
-
-        // update room
-        if (request.getUpdateType() == DataUpdateType.UPDATE) {
-            System.out.println("Updated room: " + request);
-
-            Room roomToUpdate;
-            try {
-                roomToUpdate = hotelsService.getRoomById(request.getId());
-            } catch (RuntimeException e) {
-                logger.warning("Skip room update because room was not found: " + request.getId());
-                return;
-            }
-            if(hotelsService.doesRoomHaveAnyReservationsInFuture(roomToUpdate)) return;
-
-            hotelsService.updateRoomFromHotel(request.getHotelId(), request.getId(), request.getName(),
-                    request.getGuestCapacity(), request.getPricePerAdult(), request.getDescription());
-
-        }
-
     }
 
 }

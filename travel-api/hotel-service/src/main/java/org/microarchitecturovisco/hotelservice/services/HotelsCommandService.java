@@ -4,10 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateHotelCommand;
 import org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateRoomReservationCommand;
 import org.microarchitecturovisco.hotelservice.model.cqrs.commands.DeleteRoomReservationCommand;
-import org.microarchitecturovisco.hotelservice.model.dto.CateringOptionDto;
 import org.microarchitecturovisco.hotelservice.model.dto.RoomDto;
 import org.microarchitecturovisco.hotelservice.model.events.*;
-import org.microarchitecturovisco.hotelservice.repositories.HotelEventStore;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,7 +14,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class HotelsCommandService {
-    private final HotelEventStore hotelEventStore;
     private final HotelEventProjector hotelEventProjector;
 
 
@@ -24,28 +21,13 @@ public class HotelsCommandService {
         HotelCreatedEvent hotelCreatedEvent =  new HotelCreatedEvent(command.getCommandTimeStamp(),
                 command.getHotelDto());
         hotelCreatedEvent.setId(UUID.randomUUID());
-        hotelEventStore.save(hotelCreatedEvent);
         hotelEventProjector.project(List.of(hotelCreatedEvent));
 
         for (RoomDto roomDto : command.getHotelDto().getRooms()){
             RoomCreatedEvent roomCreatedEvent = new RoomCreatedEvent(command.getCommandTimeStamp(),
                     roomDto, command.getHotelDto().getHotelId());
             roomCreatedEvent.setId(UUID.randomUUID());
-            hotelEventStore.save(roomCreatedEvent);
             hotelEventProjector.project(List.of(roomCreatedEvent));
-        }
-        for (CateringOptionDto cateringOptionDto : command.getHotelDto().getCateringOptions()){
-            CateringOptionCreatedEvent cateringOptionCreatedEvent = CateringOptionCreatedEvent.builder()
-                    .id(UUID.randomUUID())
-                    .idHotel(command.getHotelDto().getHotelId())
-                    .eventTimeStamp(command.getCommandTimeStamp())
-                    .idCatering(cateringOptionDto.getCateringId())
-                    .type(cateringOptionDto.getType())
-                    .rating(cateringOptionDto.getRating())
-                    .price(cateringOptionDto.getPrice())
-                    .build();
-            hotelEventStore.save(cateringOptionCreatedEvent);
-            hotelEventProjector.project(List.of(cateringOptionCreatedEvent));
         }
     }
 
@@ -60,7 +42,6 @@ public class HotelsCommandService {
                 .id(UUID.randomUUID())
                 .build();
 
-        hotelEventStore.save(reservationCreatedEvent);
         hotelEventProjector.project(List.of(reservationCreatedEvent));
     }
 
@@ -73,7 +54,6 @@ public class HotelsCommandService {
                 .id(UUID.randomUUID()) // event id
                 .build();
 
-        hotelEventStore.save(reservationDeletedEvent);
         hotelEventProjector.project(List.of(reservationDeletedEvent));
     }
 
