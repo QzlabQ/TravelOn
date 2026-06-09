@@ -3,7 +3,6 @@ package org.microarchitecturovisco.hotelservice.model.dto.response;
 import jakarta.persistence.Lob;
 import lombok.Builder;
 import lombok.Data;
-import org.microarchitecturovisco.hotelservice.model.dto.CateringOptionDto;
 import org.microarchitecturovisco.hotelservice.model.dto.LocationDto;
 import org.microarchitecturovisco.hotelservice.model.dto.RoomsConfigurationDto;
 
@@ -13,7 +12,7 @@ import java.util.UUID;
 @Data
 @Builder
 public class GetHotelDetailsResponseDto implements Serializable {
-    private UUID hotelId;
+    private Integer hotelId;
     private String hotelName;
 
     private float rating;
@@ -21,8 +20,6 @@ public class GetHotelDetailsResponseDto implements Serializable {
     private String description;
 
     private LocationDto location;
-
-    private List<CateringOptionDto> cateringOptions;
 
     private List<String> photos;
 

@@ -127,10 +127,12 @@ travel-ui/yarn-error.*
 # Ignore runtime DB and broker data
 travel-api/data/mongo
 travel-api/data/postgres/
+travel-api/data/postgres.failed-*/
 travel-api/data/rabbitmq
 travel-api/data/rabbitmq/
 travel-api/data/reservation-service/
 travel-api/data/user-service/
+travel-ui/logs/
 
 # vscode settings
 .vscode/

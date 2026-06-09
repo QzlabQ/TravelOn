@@ -1,6 +1,5 @@
 package org.microarchitecturovisco.hotelservice.model.events;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,19 +11,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-@Entity
 @AllArgsConstructor
 @NoArgsConstructor
 @SuperBuilder
 @Getter
 @Setter
 public class HotelCreatedEvent extends HotelEvent {
-    private UUID idHotel;
+    private Integer idHotel;
     private String name;
     private float rating;
-    @Column(columnDefinition = "TEXT")
     private String description;
-    @ElementCollection
     private List<String> photos = new ArrayList<>();
 
     private UUID idLocation;

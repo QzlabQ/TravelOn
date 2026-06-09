@@ -41,8 +41,8 @@ public class RoomReservationParser {
             while (hotel.getRooms().isEmpty()) {
                 hotel= selectRandomHotel(hotels);
             }
-            UUID hotelId = hotel.getHotelId();
-            UUID roomId = selectRandomRoom(hotel.getRooms()).getRoomId();
+            Integer hotelId = hotel.getHotelId();
+            Long roomId = selectRandomRoom(hotel.getRooms()).getRoomId();
             RoomReservationDto roomReservation = new RoomReservationDto();
             roomReservation.setReservationId(UUID.randomUUID());
             roomReservation.setDateFrom(randomDateFrom);

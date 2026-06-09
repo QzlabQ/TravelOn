@@ -16,6 +16,7 @@ public class RoomMapper {
                 .name(room.getName())
                 .description(room.getDescription())
                 .guestCapacity(room.getGuestCapacity())
+                .roomType(room.getRoomType())
                 .build();
     }
 

@@ -15,6 +15,6 @@ import java.util.UUID;
 @Setter
 public class DeleteHotelReservationRequest implements Serializable {
     private UUID reservationId;
-    private UUID hotelId;
-    private List<UUID> roomIds;
+    private Integer hotelId;
+    private List<Long> roomIds;
 }

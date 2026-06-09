@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.reservationservice.domain.commands.DeleteReservationCommand;
 import org.microarchitecturovisco.reservationservice.domain.commands.UpdateReservationCommand;
-import org.microarchitecturovisco.reservationservice.domain.dto.ReservationPreference;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateHotelOnlyReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateTicketReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CancelReservationRequest;
@@ -21,7 +20,6 @@ import org.microarchitecturovisco.reservationservice.domain.model.ReservationCon
 import org.microarchitecturovisco.reservationservice.services.ReservationAggregate;
 import org.microarchitecturovisco.reservationservice.services.ReservationService;
 import org.microarchitecturovisco.reservationservice.utils.json.JsonReader;
-import org.microarchitecturovisco.reservationservice.websockets.ReservationWebSocketHandlerPreferences;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,7 +29,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -42,7 +39,6 @@ import java.util.logging.Logger;
 public class ReservationController {
 
     private final ReservationService reservationService;
-    private final ReservationWebSocketHandlerPreferences reservationWebSocketHandlerPreferences;
     private final ReservationAggregate reservationAggregate;
     public static Logger logger = Logger.getLogger(ReservationController.class.getName());
 
@@ -105,8 +101,6 @@ public class ReservationController {
 
         ReservationRequest reservationRequest = JsonReader.readDtoFromJson(reservationRequestJson, ReservationRequest.class);
 
-        updateBookingPreferences(reservationRequest);
-
         Reservation reservation = reservationService.createReservation(
                 reservationRequest.getHotelTimeFrom(),
                 reservationRequest.getHotelTimeTo(),
@@ -122,26 +116,6 @@ public class ReservationController {
                 reservationRequest.getId()
         );
         logger.info("Reservation in Reservation module created successfully: " + reservation.getId());
-    }
-
-    private void updateBookingPreferences(ReservationRequest reservationRequest) {
-
-        ReservationPreference reservationPreference = ReservationPreference.builder()
-                .hotelName(reservationRequest.getHotelName())
-                .roomReservationsNames(reservationRequest.getRoomReservationsNames())
-                .locationFromNameRegionAndCountry(reservationRequest.getLocationFromNameRegionAndCountry())
-                .locationToNameRegionAndCountry(reservationRequest.getLocationToNameRegionAndCountry())
-                .transportType(reservationRequest.getTransportType())
-                .reservationTime(getCurrentTime())
-                .build();
-
-        reservationWebSocketHandlerPreferences.updateReservationPreferences(reservationPreference);
-    }
-
-    private String getCurrentTime(){
-        LocalDateTime now = LocalDateTime.now();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        return now.format(formatter);
     }
     
     @RabbitListener(queues = "#{handleReservationDeleteQueue.name}")
@@ -169,7 +143,7 @@ public class ReservationController {
 
     private void deleteReservation(LocalDateTime hotelTimeFrom, LocalDateTime hotelTimeTo,
                                    int infantsQuantity, int kidsQuantity, int teensQuantity, int adultsQuantity,
-                                   float price, UUID hotelId, List<UUID> roomReservationsIds,
+                                   float price, Integer hotelId, List<Long> roomReservationsIds,
                                    List<UUID> transportReservationsIds, UUID userId, UUID reservationId) {
 
         DeleteReservationCommand command = DeleteReservationCommand.builder()

@@ -1,5 +1,6 @@
 package org.microarchitecturovisco.reservationservice.domain.dto.requests;
 
+import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -21,6 +22,7 @@ public record CreateTicketReservationRequest(
         @NotBlank String bookingCode,
         @Min(1) int passengerCount,
         @Min(0) float price,
-        List<@Valid BookingPersonRequest> travelers
+        List<@Valid BookingPersonRequest> travelers,
+        @Nullable UUID ticketOfferId
 ) {
 }

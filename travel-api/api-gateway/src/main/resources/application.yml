@@ -101,14 +101,5 @@ spring:
             - Path=/ai-arrange/**
           filters:
             - RemoveRequestHeader=Cookie
-        - id: data-generator
-          uri: lb://data-generator
-          predicates:
-            - Path=/data-generator/**
-          metadata:
-            cors:
-              allowedOrigins: '*'
-              allowedMethods: '*'
-              allowedHeaders: '*'
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin

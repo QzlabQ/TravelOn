@@ -15,6 +15,6 @@ import java.util.UUID;
 @NoArgsConstructor
 public class HotelReservationDeleteRequest implements Serializable {
     private UUID reservationId;
-    private UUID hotelId;
-    private List<UUID> roomIds;
+    private Integer hotelId;
+    private List<Long> roomIds;
 }

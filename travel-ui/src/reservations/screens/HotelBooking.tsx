@@ -59,7 +59,7 @@ const withCommunityHotelRatings = async (offers: GetOffersBySearchQueryOffer[]) 
         try {
             const response = await ApiRequests.getCommunitySummary({
                 targetType: 'HOTEL',
-                targetId: offer.idHotel,
+                targetId: String(offer.idHotel),
             });
             return response.data.reviewCount > 0
                 ? {...offer, rating: response.data.averageRating}
@@ -96,7 +96,7 @@ const HotelBooking = () => {
     const [offers, setOffers] = useState<GetOffersBySearchQueryOffer[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
-    const [bookingHotelId, setBookingHotelId] = useState('');
+    const [bookingHotelId, setBookingHotelId] = useState<number | null>(null);
     const [bookingMessage, setBookingMessage] = useState('');
     const [bookingError, setBookingError] = useState(false);
     const [toastOpen, setToastOpen] = useState(false);
@@ -346,7 +346,7 @@ const HotelBooking = () => {
             setBookingError(true);
             showToast('提交失败，请稍后再试', true);
         } finally {
-            setBookingHotelId('');
+            setBookingHotelId(null);
         }
     };
 

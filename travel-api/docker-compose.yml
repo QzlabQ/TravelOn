@@ -6,16 +6,18 @@ services:
     image: postgres:16
     hostname: postgres
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: travel_admin
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      POSTGRES_DB: ${POSTGRES_DB:-travel_admin}
     ports:
       - "${POSTGRES_HOST_PORT:-55432}:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
+      - ./database:/database:ro
+      - ./seed-data:/seed-data:ro
       - ./database/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "test \"$$(head -n 1 \"$${PGDATA}/postmaster.pid\" 2>/dev/null)\" = \"1\" && pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -76,9 +78,9 @@ services:
       - ./seed-data/hotel:/seed-data/hotel:ro
       - ./seed-data/common:/seed-data/common:ro
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hotel_db
-      SPRING_DATASOURCE_USERNAME: admin
-      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${HOTEL_DB_NAME:-hotel_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       APP_SEED_DATA_BASE_PATH: file:/seed-data/hotel/
       APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
     depends_on:
@@ -109,9 +111,9 @@ services:
     volumes:
       - ./logs/payment:/logs
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payment_db
-      SPRING_DATASOURCE_USERNAME: admin
-      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${PAYMENT_DB_NAME:-payment_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
     depends_on:
       postgres:
         condition: service_healthy
@@ -129,9 +131,9 @@ services:
     volumes:
       - ./logs/reservation:/logs
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/reservation_db
-      SPRING_DATASOURCE_USERNAME: admin
-      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${RESERVATION_DB_NAME:-reservation_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
     depends_on:
       postgres:
         condition: service_healthy
@@ -151,14 +153,13 @@ services:
       - ./seed-data/transport:/seed-data/transport:ro
       - ./seed-data/common:/seed-data/common:ro
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/transport_db
-      SPRING_DATASOURCE_USERNAME: admin
-      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${TRANSPORT_DB_NAME:-transport_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       APP_SEED_DATA_BASE_PATH: file:/seed-data/transport/
       APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
       APP_SEED_DATA_TRAIN_BASE_PATH: file:/seed-data/transport/train/
       APP_SEED_DATA_PLANE_BASE_PATH: file:/seed-data/transport/plane/
-      APP_TOUR_PRODUCTS_ENABLED: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -177,9 +178,9 @@ services:
       - ./logs/user:/logs
       - ./seed-data/user:/seed-data/user:ro
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
-      SPRING_DATASOURCE_USERNAME: admin
-      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${USER_DB_NAME:-user_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       APP_SEED_DATA_BASE_PATH: file:/seed-data/user/
     depends_on:
       postgres:
@@ -199,9 +200,9 @@ services:
       - ./logs/community:/logs
       - ./seed-data/hotel:/seed-data/hotel:ro
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/community_db
-      SPRING_DATASOURCE_USERNAME: admin
-      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${COMMUNITY_DB_NAME:-community_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       APP_SEED_DATA_HOTEL_REVIEWS_CSV: file:/seed-data/hotel/hotel_reviews.csv
     depends_on:
       postgres:
@@ -212,24 +213,6 @@ services:
         condition: service_started
       user:
         condition: service_started
-    networks:
-      - backend
-
-  data-generator:
-    build: ./data-generator
-    profiles:
-      - simulator
-    volumes:
-      - ./logs/data-generator:/logs
-      - ./seed-data/hotel:/seed-data/hotel:ro
-    environment:
-      APP_SEED_DATA_BASE_PATH: file:/seed-data/hotel/
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-      - hotel
-      - transport
     networks:
       - backend
 

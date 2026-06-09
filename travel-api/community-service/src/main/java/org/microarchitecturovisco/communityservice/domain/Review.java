@@ -25,7 +25,7 @@ import java.util.UUID;
 public class Review {
 
     @Id
-    private UUID id;
+    private Long id;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

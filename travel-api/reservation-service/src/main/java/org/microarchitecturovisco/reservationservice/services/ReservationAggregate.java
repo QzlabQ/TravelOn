@@ -10,7 +10,6 @@ import org.microarchitecturovisco.reservationservice.domain.events.ReservationDe
 import org.microarchitecturovisco.reservationservice.domain.events.ReservationEvent;
 import org.microarchitecturovisco.reservationservice.domain.events.ReservationUpdateEvent;
 import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
-import org.microarchitecturovisco.reservationservice.repositories.ReservationEventStore;
 import org.microarchitecturovisco.reservationservice.repositories.ReservationRepository;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +22,6 @@ import java.util.logging.Logger;
 public class ReservationAggregate {
     static Logger logger = Logger.getLogger("ReservationAggregate");
     private final ReservationProjector reservationProjector;
-    private final ReservationEventStore reservationEventStore;
     private final ReservationRepository reservationRepository;
 
     public List<ReservationEvent> handleCreateReservationCommand(CreateReservationCommand command) {
@@ -50,7 +48,6 @@ public class ReservationAggregate {
                 .bookingCode(command.getBookingCode())
                 .travelers(command.getTravelers())
                 .build();
-        reservationEventStore.save(event);
         reservationProjector.project(List.of(event));
         return List.of(event);
     }
@@ -71,7 +68,6 @@ public class ReservationAggregate {
                 .transportReservationsIds(command.getTransportReservationsIds())
                 .userId(command.getUserId())
                 .build();
-        reservationEventStore.save(event);
         reservationProjector.project(List.of(event));
         return List.of(event);
     }
@@ -93,7 +89,6 @@ public class ReservationAggregate {
                 .paidAt(command.getPaidAt())
                 .refundedAt(command.getRefundedAt())
                 .build();
-        reservationEventStore.save(event);
         reservationProjector.project(List.of(event));
 
         return List.of(event);

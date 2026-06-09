@@ -10,13 +10,15 @@ import java.util.UUID;
 @Builder
 public class RoomDto {
     @Id
-    private UUID roomId;
+    private Long roomId;
 
-    private UUID hotelId;
+    private Integer hotelId;
 
     private String name;
 
     private int guestCapacity;
+
+    private String roomType;
 
     private float pricePerAdult;
     @Lob

@@ -1,6 +1,6 @@
 
 export interface Offer {
-    idHotel: string,
+    idHotel: number,
     hotelName: string,
     description: string,
     price: number,
@@ -9,8 +9,6 @@ export interface Offer {
 
     roomConfiguration: RoomConfiguration,
     possibleRoomConfigurations: RoomConfiguration[],
-
-    cateringOptions: CateringOption[],
 
     departure: Transport[],
     possibleDepartures: Transport[][],
@@ -32,13 +30,6 @@ export interface Room {
 export interface RoomConfiguration {
     rooms: Room[],
     pricePerAdult: number,
-}
-
-export interface CateringOption {
-    idCateringOption: string,
-    type: 'ALL_INCLUSIVE' | 'THREE_COURSES' | 'TWO_COURSES' | 'BREAKFAST' | 'NO_CATERING' | 'ACCORDING_TO_PROGRAMME',
-    rating: number,
-    price: number,
 }
 
 export interface Transport {

@@ -18,6 +18,6 @@ public class CheckHotelAvailabilityRequestDto implements Serializable {
     private LocalDateTime dateFrom;
     private LocalDateTime dateTo;
 
-    private List<UUID> roomIds;
-    private UUID hotelId;
+    private List<Long> roomIds;
+    private Integer hotelId;
 }

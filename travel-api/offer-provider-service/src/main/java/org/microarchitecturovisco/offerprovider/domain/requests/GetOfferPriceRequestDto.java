@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.microarchitecturovisco.offerprovider.domain.dto.CateringOptionDto;
 import org.microarchitecturovisco.offerprovider.domain.dto.RoomsConfigurationDto;
 import org.microarchitecturovisco.offerprovider.domain.dto.responses.TransportDto;
 
@@ -24,7 +23,6 @@ public class GetOfferPriceRequestDto {
     Integer teens;
 
     private RoomsConfigurationDto roomConfiguration;
-    private CateringOptionDto cateringOption;
     private List<TransportDto> departure;
 
 }

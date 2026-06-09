@@ -14,6 +14,6 @@ import java.util.UUID;
 public class CheckHotelAvailabilityRequest implements Serializable {
     private LocalDateTime dateFrom;
     private LocalDateTime dateTo;
-    private List<UUID> roomReservationsIds;
-    private UUID hotelId;
+    private List<Long> roomReservationsIds;
+    private Integer hotelId;
 }

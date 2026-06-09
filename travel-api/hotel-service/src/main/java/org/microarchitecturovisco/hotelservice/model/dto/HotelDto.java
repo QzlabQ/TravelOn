@@ -13,7 +13,7 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 public class HotelDto implements Serializable {
-    private UUID hotelId;
+    private Integer hotelId;
 
     private String name;
 
@@ -22,8 +22,6 @@ public class HotelDto implements Serializable {
     private String description;
 
     private LocationDto location;
-
-    private List<CateringOptionDto> cateringOptions;
 
     private List<String> photos;
     

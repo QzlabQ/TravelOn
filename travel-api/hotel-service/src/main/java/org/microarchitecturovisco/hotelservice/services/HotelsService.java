@@ -11,7 +11,6 @@ import org.microarchitecturovisco.hotelservice.model.dto.response.GetHotelDetail
 import org.microarchitecturovisco.hotelservice.model.events.RoomCreatedEvent;
 import org.microarchitecturovisco.hotelservice.model.events.RoomUpdateEvent;
 import org.microarchitecturovisco.hotelservice.model.exceptions.HotelNoFoundException;
-import org.microarchitecturovisco.hotelservice.model.mappers.CateringMapper;
 import org.microarchitecturovisco.hotelservice.model.mappers.HotelMapper;
 import org.microarchitecturovisco.hotelservice.model.mappers.LocationMapper;
 import org.microarchitecturovisco.hotelservice.model.mappers.RoomMapper;
@@ -100,9 +99,10 @@ public class HotelsService {
     }
 
     private boolean matchesRoomType(Room room, String roomType) {
+        String type = room.getRoomType() != null ? room.getRoomType() : "";
         return switch (normalizeFilter(roomType)) {
-            case "DOUBLE" -> room.getGuestCapacity() <= 2;
-            case "FAMILY" -> room.getGuestCapacity() >= 3;
+            case "DOUBLE" -> "DOUBLE".equals(type) || "SUITE".equals(type);
+            case "FAMILY" -> "FAMILY".equals(type);
             default -> true;
         };
     }
@@ -166,7 +166,6 @@ public class HotelsService {
                 .hotelName(hotel.getName())
                 .photos(hotel.getPhotos())
                 .location(LocationMapper.map(hotel.getLocation()))
-                .cateringOptions(CateringMapper.mapList(hotel.getCateringOptions()))
                 .roomsConfigurations(new ArrayList<>())
                 .build();
 
@@ -252,8 +251,8 @@ public class HotelsService {
         LocalDateTime dateFrom = requestDto.getDateFrom();
         LocalDateTime dateTo = requestDto.getDateTo();
 
-        UUID hotelId = requestDto.getHotelId();
-        List<UUID> roomIds = requestDto.getRoomReservationsIds();
+        Integer hotelId = requestDto.getHotelId();
+        List<Long> roomIds = requestDto.getRoomReservationsIds();
 
         // Step 2: Retrieve the hotel from the repository
         Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId);
@@ -286,8 +285,12 @@ public class HotelsService {
         return true;
     }
 
-    public Room getRoomById(UUID uuid) {
+    public Room getRoomById(Long uuid) {
         return roomRepository.findById(uuid).orElseThrow(RuntimeException::new);
+    }
+
+    public Long generateNewRoomId() {
+        return roomRepository.findMaxId() + 1;
     }
 
     public boolean doesRoomHaveAnyReservationsInFuture(Room room) {
@@ -298,11 +301,11 @@ public class HotelsService {
         return false;
     }
 
-    public Hotel getHotel(UUID id) throws HotelNoFoundException {
+    public Hotel getHotel(Integer id) throws HotelNoFoundException {
         return hotelRepository.findById(id).orElseThrow(HotelNoFoundException::new);
     }
 
-    public void createRoomFromHotel(UUID hotelId, UUID roomId, String name, int guestCapacity, float pricePerAdult,
+    public void createRoomFromHotel(Integer hotelId, Long roomId, String name, int guestCapacity, float pricePerAdult,
                                     String description) {
         // hotel event projector
         RoomCreatedEvent roomCreatedEvent = RoomCreatedEvent.builder()
@@ -317,13 +320,13 @@ public class HotelsService {
         hotelEventProjector.project(List.of(roomCreatedEvent));
     }
 
-    public void updateRoomFromHotel(UUID hotelId, UUID roomId, String name, int guestCapacity, float pricePerAdult,
+    public void updateRoomFromHotel(Integer hotelId, Long roomId, String name, int guestCapacity, float pricePerAdult,
                                     String description) {
         RoomUpdateEvent roomUpdateEvent = new RoomUpdateEvent(hotelId, roomId, name, guestCapacity, pricePerAdult, description);
         hotelEventProjector.project(List.of(roomUpdateEvent));
     }
 
-    public Hotel updateHotel(UUID hotelId, org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto) {
+    public Hotel updateHotel(Integer hotelId, org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto) {
         Hotel hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hotel not found"));
         hotel.setName(hotelDto.getName());
@@ -333,7 +336,7 @@ public class HotelsService {
         return hotelRepository.save(hotel);
     }
 
-    public void deleteRoom(UUID roomId) {
+    public void deleteRoom(Long roomId) {
         Room room = roomRepository.findById(roomId).orElseThrow(RuntimeException::new);
         if (doesRoomHaveAnyReservationsInFuture(room)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Room has future reservations");
@@ -349,7 +352,7 @@ public class HotelsService {
         roomRepository.delete(room);
     }
 
-    public void deleteHotel(UUID hotelId) {
+    public void deleteHotel(Integer hotelId) {
         Hotel hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hotel not found"));
         boolean hasFutureReservations = hotel.getRooms() != null && hotel.getRooms().stream()

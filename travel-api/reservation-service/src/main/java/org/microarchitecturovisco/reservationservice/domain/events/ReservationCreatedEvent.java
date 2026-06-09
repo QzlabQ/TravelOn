@@ -1,7 +1,5 @@
 package org.microarchitecturovisco.reservationservice.domain.events;
 
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Entity;
 import lombok.*;
 import org.microarchitecturovisco.reservationservice.domain.entity.ReservationStatus;
 import org.microarchitecturovisco.reservationservice.domain.entity.BookingPersonSnapshot;
@@ -12,7 +10,6 @@ import java.util.UUID;
 
 @Getter
 @Setter
-@Entity
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
@@ -28,10 +25,8 @@ public class ReservationCreatedEvent extends ReservationEvent {
     private boolean paid;
     private ReservationStatus status;
     private String bookingType;
-    private UUID hotelId;
-    @ElementCollection
-    private List<UUID> roomReservationsIds;
-    @ElementCollection
+    private Integer hotelId;
+    private List<Long> roomReservationsIds;
     private List<UUID> transportReservationsIds;
     private UUID userId;
     private String title;
@@ -39,6 +34,5 @@ public class ReservationCreatedEvent extends ReservationEvent {
     private String routeTo;
     private String provider;
     private String bookingCode;
-    @ElementCollection
     private List<BookingPersonSnapshot> travelers;
 }

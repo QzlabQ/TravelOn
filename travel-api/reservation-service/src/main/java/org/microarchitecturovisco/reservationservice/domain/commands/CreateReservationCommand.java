@@ -1,8 +1,5 @@
 package org.microarchitecturovisco.reservationservice.domain.commands;
 
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,10 +14,8 @@ import java.util.UUID;
 @Data
 @Builder
 @AllArgsConstructor
-@Entity
 @NoArgsConstructor
 public class CreateReservationCommand {
-    @Id
     private UUID id;
     private LocalDateTime hotelTimeFrom;
     private LocalDateTime hotelTimeTo;
@@ -32,10 +27,8 @@ public class CreateReservationCommand {
     private boolean paid;
     private ReservationStatus status;
     private String bookingType;
-    private UUID hotelId;
-    @ElementCollection
-    private List<UUID> roomReservationsIds;
-    @ElementCollection
+    private Integer hotelId;
+    private List<Long> roomReservationsIds;
     private List<UUID> transportReservationsIds;
     private UUID userId;
     private String title;
@@ -43,6 +36,5 @@ public class CreateReservationCommand {
     private String routeTo;
     private String provider;
     private String bookingCode;
-    @ElementCollection
     private List<BookingPersonSnapshot> travelers;
 }

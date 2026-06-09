@@ -14,16 +14,13 @@ import java.util.UUID;
 @Builder
 public class Hotel {
     @Id
-    private UUID id;
+    private Integer id;
 
     private String name;
 
     private float rating;
     @Column(columnDefinition = "TEXT")
     private String description;
-
-    @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
-    private List<CateringOption> cateringOptions;
 
     @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "location_id")

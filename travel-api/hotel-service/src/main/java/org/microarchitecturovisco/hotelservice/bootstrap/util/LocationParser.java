@@ -5,12 +5,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Component
 public class LocationParser {
@@ -29,10 +27,8 @@ public class LocationParser {
 
             while ((line = br.readLine()) != null) {
                 String[] data = line.split("\t");
-                String country = data[4];
-                String region = data[5];
-                String cityId = data.length > 7 ? data[7] : "";
-                LocationDto locationDto = createNewLocation(locationDtos, country, region, cityId);
+                String cityId = data[5];
+                LocationDto locationDto = createNewLocation(locationDtos, cityId);
                 if (locationDto != null) {
                     locationDtos.add(locationDto);
                 }
@@ -45,8 +41,8 @@ public class LocationParser {
     }
 
 
-    private LocationDto createNewLocation(List<LocationDto> locationDtos, String country, String region, String cityId) {
-        LocationDto location = cityCatalog.locationFor(country, region, cityId);
+    private LocationDto createNewLocation(List<LocationDto> locationDtos, String cityId) {
+        LocationDto location = cityCatalog.locationForCityId(cityId);
         if (locationExists(locationDtos, location.getCityId())) {
             return null;
         }
@@ -54,7 +50,7 @@ public class LocationParser {
         return location;
     }
 
-    private boolean locationExists(List<LocationDto> locationDtos, UUID cityId) {
+    private boolean locationExists(List<LocationDto> locationDtos, String cityId) {
         return locationDtos.stream()
                 .anyMatch(locationDto -> locationDto.getCityId().equals(cityId));
     }

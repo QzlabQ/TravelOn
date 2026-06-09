@@ -38,7 +38,7 @@ export class ApiRequests {
         });
     }
 
-    static getHotelDetails = async (hotelId: string, params: HotelDetailsParams) => {
+    static getHotelDetails = async (hotelId: number, params: HotelDetailsParams) => {
         return await axiosInstance.get<HotelDetailsResponse>(`hotels/${hotelId}`, {
             params
         });
@@ -253,7 +253,7 @@ export interface PageResponse<T> {
 }
 
 export interface GetOffersBySearchQueryOffer {
-    idHotel: string,
+    idHotel: number,
     hotelName: string,
     description: string,
     price: number,
@@ -276,7 +276,7 @@ export interface GetOffersBySearchQueryParams {
 }
 
 export interface GetOfferDetailsParams {
-    idHotel: string,
+    idHotel: number,
     departurePlane: string[],
     departureBus: string[],
     departureTrain: string[],
@@ -296,7 +296,7 @@ export enum TransportType {
 
 export interface ReservationRequestPayload {
     id: string,
-    hotelId: string,
+    hotelId: number,
     hotelTimeFrom: string,
     hotelTimeTo: string,
 
@@ -336,7 +336,7 @@ export interface ReservationResponse {
     paid: boolean,
     status: ReservationStatus,
     bookingType: 'PACKAGE' | 'FLIGHT' | 'TRAIN' | 'HOTEL' | string,
-    hotelId?: string | null,
+    hotelId?: number | null,
     roomReservationsIds: string[],
     transportReservationsIds: string[],
     userId: string,
@@ -395,7 +395,7 @@ export interface CreateTicketReservationPayload {
 
 export interface CreateHotelReservationPayload {
     userId: string,
-    hotelId: string,
+    hotelId: number,
     hotelName: string,
     dateFrom: string,
     dateTo: string,
@@ -468,8 +468,12 @@ export interface TicketSearchOffer {
     type: TicketType,
     departureCity: string,
     arrivalCity: string,
-    departureStation: string,
-    arrivalStation: string,
+    departureCityId: string,
+    arrivalCityId: string,
+    departureStationCode: string,
+    departureTerminalName: string,
+    arrivalStationCode: string,
+    arrivalTerminalName: string,
     departureTime: string,
     arrivalTime: string,
     duration: string,
@@ -478,13 +482,9 @@ export interface TicketSearchOffer {
     seatClass: string,
     price: number,
     remainingSeats: number,
-    studentEligible: boolean,
+    totalSeats: number,
     successRate: string,
     notice: string,
-    departureDate: string,
-    referenceDate: string,
-    sourceUrl: string,
-    sourceNote: string,
 }
 
 export interface SearchHotelsParams {
@@ -502,7 +502,7 @@ export interface SearchHotelsParams {
 }
 
 export interface HotelSearchOffer {
-    hotelId: string,
+    hotelId: number,
     name: string,
     rating: number,
     description: string,
@@ -536,16 +536,8 @@ export interface HotelRoomConfiguration {
     pricePerAdult: number,
 }
 
-export interface HotelCateringOption {
-    cateringId: string,
-    type: string,
-    rating: number,
-    price: number,
-    hotelId: string,
-}
-
 export interface HotelDetailsResponse {
-    hotelId: string,
+    hotelId: number,
     hotelName: string,
     rating: number,
     description: string,
@@ -554,7 +546,6 @@ export interface HotelDetailsResponse {
         region: string,
         country: string,
     },
-    cateringOptions: HotelCateringOption[],
     photos: string[],
     roomsConfigurations: HotelRoomConfiguration[],
 }

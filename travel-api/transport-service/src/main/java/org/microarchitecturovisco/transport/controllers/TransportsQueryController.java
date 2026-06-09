@@ -5,23 +5,21 @@ import org.microarchitecturovisco.transport.controllers.reservations.CreateTrans
 import org.microarchitecturovisco.transport.controllers.reservations.DeleteTransportReservationRequest;
 import org.microarchitecturovisco.transport.model.cqrs.commands.CreateTransportReservationCommand;
 import org.microarchitecturovisco.transport.model.cqrs.commands.DeleteTransportReservationCommand;
-import org.microarchitecturovisco.transport.model.domain.Transport;
-import org.microarchitecturovisco.transport.model.domain.TransportReservation;
 import org.microarchitecturovisco.transport.model.domain.TicketOfferTemplate;
 import org.microarchitecturovisco.transport.model.domain.TicketType;
-import org.microarchitecturovisco.transport.model.cqrs.commands.CreateTransportCommand;
 import org.microarchitecturovisco.transport.model.dto.LocationDto;
 import org.microarchitecturovisco.transport.model.dto.TransportDto;
 import org.microarchitecturovisco.transport.model.dto.TransportReservationDto;
-import org.microarchitecturovisco.transport.model.dto.data_generator.TransportUpdateRequest;
-import org.microarchitecturovisco.transport.model.dto.request.*;
+import org.microarchitecturovisco.transport.model.dto.request.CheckTransportAvailabilityRequestDto;
+import org.microarchitecturovisco.transport.model.dto.request.GetTransportsBetweenLocationsRequestDto;
+import org.microarchitecturovisco.transport.model.dto.request.GetTransportsBetweenMultipleLocationsRequestDto;
+import org.microarchitecturovisco.transport.model.dto.request.GetTransportsBySearchQueryRequestDto;
 import org.microarchitecturovisco.transport.model.dto.response.AvailableTransportsDto;
 import org.microarchitecturovisco.transport.model.dto.response.CheckTransportAvailabilityResponseDto;
 import org.microarchitecturovisco.transport.model.dto.response.GetTransportsBetweenLocationsResponseDto;
 import org.microarchitecturovisco.transport.model.dto.response.GetTransportsBySearchQueryResponseDto;
 import org.microarchitecturovisco.transport.model.dto.response.TicketOfferDto;
 import org.microarchitecturovisco.transport.model.dto.response.TicketOptionsDto;
-import org.microarchitecturovisco.transport.model.mappers.LocationMapper;
 import org.microarchitecturovisco.transport.queues.config.QueuesConfig;
 import org.microarchitecturovisco.transport.repositories.TicketOfferTemplateRepository;
 import org.microarchitecturovisco.transport.services.TransportCommandService;
@@ -30,26 +28,25 @@ import org.microarchitecturovisco.transport.utils.json.JsonConverter;
 import org.microarchitecturovisco.transport.utils.json.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.http.HttpStatus;
-import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
-import org.microarchitecturovisco.transport.model.dto.data_generator.DataUpdateType;
-
 
 @RestController()
 @RequestMapping("/transports")
@@ -71,39 +68,31 @@ public class TransportsQueryController {
     @PostMapping("/admin")
     @ResponseStatus(HttpStatus.CREATED)
     public void createTransport(@RequestBody TransportDto transportDto) {
-        UUID transportId = transportDto.getIdTransport() == null ? UUID.randomUUID() : transportDto.getIdTransport();
-        transportDto.setIdTransport(transportId);
-        transportCommandService.createTransport(CreateTransportCommand.builder()
-                .uuid(transportId)
-                .commandTimeStamp(LocalDateTime.now())
-                .transportDto(transportDto)
-                .build());
+        throw new ResponseStatusException(HttpStatus.GONE, "Legacy package transport inventory was removed");
     }
 
     @PutMapping("/admin/{transportId}")
     public void updateTransport(
             @PathVariable UUID transportId,
-            @RequestBody TransportUpdateRequest request
+            @RequestBody TransportDto request
     ) {
-        transportCommandService.updateTransport(transportId, request.getCapacity(), request.getPricePerAdult());
+        throw new ResponseStatusException(HttpStatus.GONE, "Legacy package transport inventory was removed");
     }
 
     @DeleteMapping("/admin/{transportId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteTransport(@PathVariable UUID transportId) {
-        transportCommandService.deleteTransport(transportId);
+        throw new ResponseStatusException(HttpStatus.GONE, "Legacy package transport inventory was removed");
     }
 
     @GetMapping("/locations")
     public List<LocationDto> getLocations() {
-        return LocationMapper.mapList(transportsQueryService.getAllLocations());
+        return transportsQueryService.getAllLocations();
     }
 
     @GetMapping("/locations/{region}")
-    public LocationDto getLocationByRegionName(
-            @PathVariable String region
-    ) {
-        return LocationMapper.map(transportsQueryService.getLocationByRegionName(region));
+    public LocationDto getLocationByRegionName(@PathVariable String region) {
+        return transportsQueryService.getLocationByRegionName(region);
     }
 
     @GetMapping("/available")
@@ -172,16 +161,12 @@ public class TransportsQueryController {
 
     @RabbitListener(queues = "transports.requests.getTransportsBySearchQuery")
     public String consumeGetTransportsRequest(String requestDtoJson) {
-
         Logger logger = Logger.getLogger("getTransportsBySearchQuery");
         logger.info("Request: " + requestDtoJson);
 
         GetTransportsBySearchQueryRequestDto requestDto = JsonReader.readGetTransportsBySearchQueryRequestFromJson(requestDtoJson);
-
         GetTransportsBySearchQueryResponseDto responseDto = transportsQueryService.getTransportsBySearchQuery(requestDto);
-
         logger.info("Response size: " + responseDto.getTransportDtoList().size());
-
         return JsonConverter.convertGetTransportsBySearchQueryResponseDto(responseDto);
     }
 
@@ -191,11 +176,8 @@ public class TransportsQueryController {
         logger.info("Request: " + requestDtoJson);
 
         GetTransportsBetweenLocationsRequestDto requestDto = JsonReader.readGetTransportsBetweenLocationsRequestDtoFromJson(requestDtoJson);
-
         GetTransportsBetweenLocationsResponseDto responseDto = transportsQueryService.getTransportsBetweenLocations(requestDto);
-
         logger.info("Response size: " + responseDto.getTransportPairs().size());
-
         return JsonConverter.convertGetTransportsBetweenLocationsResponseDto(responseDto);
     }
 
@@ -205,11 +187,8 @@ public class TransportsQueryController {
         logger.info("Request: " + requestDtoJson);
 
         GetTransportsBetweenMultipleLocationsRequestDto requestDto = JsonReader.readDtoFromJson(requestDtoJson, GetTransportsBetweenMultipleLocationsRequestDto.class);
-
         GetTransportsBetweenLocationsResponseDto responseDto = transportsQueryService.getTransportsBetweenMultipleLocations(requestDto);
-
         logger.info("Response size: " + responseDto.getTransportPairs().size());
-
         return JsonConverter.convertGetTransportsBetweenLocationsResponseDto(responseDto);
     }
 
@@ -218,56 +197,20 @@ public class TransportsQueryController {
         CheckTransportAvailabilityRequestDto request = JsonReader.readDtoFromJson(requestDtoJson, CheckTransportAvailabilityRequestDto.class);
         logger.info("Checking transport availability: " + request);
 
-        UUID transportReservationsIdFrom = request.getTransportReservationsIdFrom();
-        UUID transportReservationsIdArrival = request.getTransportReservationsIdArrival();
-
-        Transport transportFrom = transportsQueryService.getTransportById(transportReservationsIdFrom);
-        Transport transportArrival = transportsQueryService.getTransportById(transportReservationsIdArrival);
-
-        if (transportFrom == null || transportArrival == null) {
-            CheckTransportAvailabilityResponseDto response = CheckTransportAvailabilityResponseDto.builder()
-                    .ifAvailable(false)
-                    .build();
-            logger.info("Transport available:" + response.isIfAvailable());
-            String responseJson = JsonConverter.convertToJsonWithLocalDateTime(response);
-            return responseJson;
-        }
-
-        int totalCapacityNeeded = request.getNumberOfGuests();
-
-        boolean ifAvailable = checkCapacity(transportFrom, totalCapacityNeeded) &&
-                checkCapacity(transportArrival, totalCapacityNeeded);
-
         CheckTransportAvailabilityResponseDto response = CheckTransportAvailabilityResponseDto.builder()
-                .ifAvailable(ifAvailable)
+                .ifAvailable(false)
                 .build();
 
         logger.info("Transport available:" + response.isIfAvailable());
-        String responseJson = JsonConverter.convertToJsonWithLocalDateTime(response);
-
-        return responseJson;
+        return JsonConverter.convertToJsonWithLocalDateTime(response);
     }
-
-    private boolean checkCapacity(Transport transport, int totalCapacityNeeded) {
-
-        int remainingCapacity = transport.getCapacity();
-
-        for (TransportReservation reservation : transport.getTransportReservations()) {
-            remainingCapacity -= reservation.getNumberOfSeats();
-        }
-
-        return remainingCapacity >= totalCapacityNeeded;
-    }
-
 
     @RabbitListener(queues = "#{handleCreateTransportReservationQueue.name}")
     public void consumeMessageCreateTransportReservation(String requestDtoJson) {
         CreateTransportReservationRequest request = JsonReader.readDtoFromJson(requestDtoJson, CreateTransportReservationRequest.class);
+        logger.info("Creating transport reservation: " + request);
 
-        logger.info("Creating transport reservations: " + request);
-
-        for (UUID idTransport: request.getTransportIds()) {
-
+        for (UUID idTransport : request.getTransportIds()) {
             TransportReservationDto reservationDto = TransportReservationDto.builder()
                     .numberOfSeats(request.getAmountOfQuests())
                     .idTransport(idTransport)
@@ -287,18 +230,17 @@ public class TransportsQueryController {
     @RabbitListener(queues = "#{handleDeleteTransportReservationQueue.name}")
     public void consumeMessageDeleteTransportReservation(String requestJson) {
         DeleteTransportReservationRequest request = JsonReader.readDtoFromJson(requestJson, DeleteTransportReservationRequest.class);
+        logger.info("Deleting transport reservation: " + request);
 
-        logger.info("Deleting transport reservations: " + request);
-
-        for (UUID transportId : request.getTransportReservationsIds()){
+        for (UUID transportId : request.getTransportReservationsIds()) {
             DeleteTransportReservationCommand command = DeleteTransportReservationCommand.builder()
                     .commandTimeStamp(LocalDateTime.now())
                     .reservationId(request.getReservationId())
                     .transportId(transportId)
+                    .numberOfSeats(request.getNumberOfSeats())
                     .build();
 
             transportCommandService.deleteReservation(command);
         }
     }
-
 }

@@ -11,6 +11,6 @@ import java.util.UUID;
 public class DeleteRoomReservationCommand {
     private LocalDateTime commandTimeStamp;
     private UUID reservationId;
-    private UUID roomId;
-    private UUID hotelId;
+    private Long roomId;
+    private Integer hotelId;
 }

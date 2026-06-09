@@ -1,7 +1,5 @@
 package org.microarchitecturovisco.hotelservice.model.events;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -9,23 +7,20 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
-@Entity
 @AllArgsConstructor
 @NoArgsConstructor
 @SuperBuilder
 @Getter
 @Setter
 public class RoomUpdateEvent extends HotelEvent{
-    private UUID roomId;
+    private Long roomId;
     private String name;
     private int guestCapacity;
     private float pricePerAdult;
-    @Column(columnDefinition = "TEXT")
     private String description;
 
-    public RoomUpdateEvent(UUID idHotel, UUID roomId, String name, int guestCapacity, float pricePerAdult,
+    public RoomUpdateEvent(Integer idHotel, Long roomId, String name, int guestCapacity, float pricePerAdult,
                            String description) {
         this.setEventTimeStamp(LocalDateTime.now());
         this.setIdHotel(idHotel);

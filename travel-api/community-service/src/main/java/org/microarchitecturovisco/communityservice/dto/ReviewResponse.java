@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record ReviewResponse(
-        UUID id,
+        Long id,
         ReviewTargetType targetType,
         String targetId,
         String targetName,

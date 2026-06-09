@@ -63,9 +63,14 @@ public class InvalidPaymentHandler {
     }
 
     private void rollbackForTransportReservation(ReservationRequest reservationRequest) {
+        int totalPassengers = reservationRequest.getAdultsQuantity()
+                + reservationRequest.getChildrenUnder18Quantity()
+                + reservationRequest.getChildrenUnder10Quantity()
+                + reservationRequest.getChildrenUnder3Quantity();
         TransportReservationDeleteRequest transportReservationDeleteRequest = TransportReservationDeleteRequest.builder()
                 .transportReservationsIds(reservationRequest.getTransportReservationsIds())
                 .reservationId(reservationRequest.getId())
+                .numberOfSeats(totalPassengers)
                 .build();
         bookTransportsSaga.deleteTransportReservation(transportReservationDeleteRequest);
     }

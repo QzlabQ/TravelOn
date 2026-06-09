@@ -31,8 +31,8 @@ public class ReservationRequest implements Serializable {
     private List<UUID> arrivalLocationIds;
 
     private float price;
-    private UUID hotelId;
-    private List<UUID> roomReservationsIds;
+    private Integer hotelId;
+    private List<Long> roomReservationsIds;
     private List<UUID> transportReservationsIds;
     private UUID userId;
 }

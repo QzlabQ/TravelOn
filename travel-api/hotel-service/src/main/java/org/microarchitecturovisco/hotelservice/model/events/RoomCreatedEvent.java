@@ -1,7 +1,5 @@
 package org.microarchitecturovisco.hotelservice.model.events;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -9,9 +7,7 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import org.microarchitecturovisco.hotelservice.model.dto.RoomDto;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
-@Entity
 @AllArgsConstructor
 @NoArgsConstructor
 @SuperBuilder
@@ -20,23 +16,22 @@ import java.util.UUID;
 public class RoomCreatedEvent extends HotelEvent  {
 
 
-    private UUID roomId;
+    private Long roomId;
     private String name;
     private int guestCapacity;
+    private String roomType;
     private float pricePerAdult;
-    @Column(columnDefinition = "TEXT")
     private String description;
 
-    public RoomCreatedEvent(LocalDateTime eventTimeStamp, RoomDto roomDto, UUID idHotel) {
+    public RoomCreatedEvent(LocalDateTime eventTimeStamp, RoomDto roomDto, Integer idHotel) {
         this.setEventTimeStamp(eventTimeStamp);
         this.setIdHotel(idHotel);
 
         this.roomId = roomDto.getRoomId();
         this.name = roomDto.getName();
         this.guestCapacity = roomDto.getGuestCapacity();
+        this.roomType = roomDto.getRoomType();
         this.pricePerAdult = roomDto.getPricePerAdult();
         this.description = roomDto.getDescription();
-
-
     }
 }

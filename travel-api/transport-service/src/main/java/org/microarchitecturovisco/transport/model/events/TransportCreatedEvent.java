@@ -1,6 +1,5 @@
 package org.microarchitecturovisco.transport.model.events;
 
-import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.microarchitecturovisco.transport.model.domain.TransportType;
@@ -9,7 +8,6 @@ import org.microarchitecturovisco.transport.model.dto.TransportDto;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Entity
 @AllArgsConstructor
 @NoArgsConstructor
 @SuperBuilder

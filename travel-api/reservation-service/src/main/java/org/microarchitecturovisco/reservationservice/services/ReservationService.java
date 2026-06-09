@@ -3,7 +3,6 @@ package org.microarchitecturovisco.reservationservice.services;
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.reservationservice.domain.commands.CreateReservationCommand;
 import org.microarchitecturovisco.reservationservice.domain.commands.UpdateReservationCommand;
-import org.microarchitecturovisco.reservationservice.domain.dto.HotelInfo;
 import org.microarchitecturovisco.reservationservice.domain.dto.PaymentRequestDto;
 import org.microarchitecturovisco.reservationservice.domain.dto.PaymentResponseDto;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateHotelOnlyReservationRequest;
@@ -50,7 +49,6 @@ import java.time.LocalTime;
 import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -79,7 +77,7 @@ public class ReservationService {
 
     public Reservation createReservation(LocalDateTime hotelTimeFrom, LocalDateTime hotelTimeTo,
                                                       int infantsQuantity, int kidsQuantity, int teensQuantity, int adultsQuantity,
-                                                      float price, UUID hotelId, List<UUID> roomReservationsIds,
+                                                      float price, Integer hotelId, List<Long> roomReservationsIds,
                                                       List<UUID> transportReservationsIds, UUID userId, UUID reservationId) {
 
         CreateReservationCommand command = CreateReservationCommand.builder()
@@ -172,10 +170,16 @@ public class ReservationService {
         String bookingType = normalizeTicketType(request.transportType());
         List<BookingPersonSnapshot> travelers = normalizeTravelers(request.travelers(), request.passengerCount());
         UUID reservationId = UUID.randomUUID();
-        UUID transportReservationId = UUID.nameUUIDFromBytes(
-                (bookingType + request.bookingCode() + request.routeFrom() + request.routeTo() + departureAt)
-                        .getBytes(StandardCharsets.UTF_8)
-        );
+
+        // Use the actual ticketOfferId when available so the transport-service can decrement inventory.
+        // Fall back to a derived UUID for backwards compatibility when the field is absent.
+        UUID transportReservationId = request.ticketOfferId() != null
+                ? request.ticketOfferId()
+                : UUID.nameUUIDFromBytes(
+                        (bookingType + request.bookingCode() + request.routeFrom() + request.routeTo() + departureAt)
+                                .getBytes(StandardCharsets.UTF_8));
+
+        int adultsCount = countTravelers(travelers, "ADULT", "STUDENT");
 
         CreateReservationCommand command = CreateReservationCommand.builder()
                 .id(reservationId)
@@ -184,7 +188,7 @@ public class ReservationService {
                 .infantsQuantity(0)
                 .kidsQuantity(0)
                 .teensQuantity(0)
-                .adultsQuantity(countTravelers(travelers, "ADULT", "STUDENT"))
+                .adultsQuantity(adultsCount)
                 .price(request.price())
                 .paid(false)
                 .status(ReservationStatus.PENDING_PAYMENT)
@@ -201,6 +205,25 @@ public class ReservationService {
                 .build();
 
         reservationAggregate.handleCreateReservationCommand(command);
+
+        // Wire into the saga so transport-service decrements remaining_seats and rollback works on timeout.
+        ReservationRequest rollbackRequest = ReservationRequest.builder()
+                .id(reservationId)
+                .transportReservationsIds(List.of(transportReservationId))
+                .roomReservationsIds(Collections.emptyList())
+                .hotelId(null)
+                .adultsQuantity(adultsCount)
+                .childrenUnder3Quantity(0)
+                .childrenUnder10Quantity(0)
+                .childrenUnder18Quantity(0)
+                .hotelTimeFrom(departureAt)
+                .hotelTimeTo(arrivalAt)
+                .price(request.price())
+                .userId(request.userId())
+                .build();
+        bookTransportsSaga.createTransportReservation(rollbackRequest);
+        invalidPaymentHandler.schedulePaymentTimeoutCheck(rollbackRequest);
+
         return getReservation(reservationId);
     }
 
@@ -214,15 +237,23 @@ public class ReservationService {
                 request.childrenUnder10Quantity() + request.childrenUnder18Quantity();
         List<BookingPersonSnapshot> travelers = normalizeTravelers(request.travelers(), requestedGuestCount);
         String roomName = hasText(request.roomName()) ? request.roomName().trim() : "标准房";
-        UUID roomReservationId = UUID.nameUUIDFromBytes(
-                (request.hotelId() + roomName + request.dateFrom() + request.dateTo() + request.userId())
-                        .getBytes(StandardCharsets.UTF_8)
-        );
+        LocalDateTime checkIn = request.dateFrom().atTime(14, 0);
+        LocalDateTime checkOut = request.dateTo().atTime(12, 0);
+
+        // Use the actual roomId from the hotel-service when provided so the hotel-service can
+        // create a real RoomReservation record linked to the correct Room entity.
+        // Fall back to a hash-based ID when the field is absent (backwards compat).
+        long roomReservationId = request.roomId() != null
+                ? request.roomId()
+                : Math.abs(UUID.nameUUIDFromBytes(
+                        (request.hotelId() + roomName + request.dateFrom() + request.dateTo() + request.userId())
+                                .getBytes(StandardCharsets.UTF_8)
+                ).getMostSignificantBits());
 
         CreateReservationCommand command = CreateReservationCommand.builder()
                 .id(reservationId)
-                .hotelTimeFrom(request.dateFrom().atTime(14, 0))
-                .hotelTimeTo(request.dateTo().atTime(12, 0))
+                .hotelTimeFrom(checkIn)
+                .hotelTimeTo(checkOut)
                 .infantsQuantity(request.childrenUnder3Quantity())
                 .kidsQuantity(request.childrenUnder10Quantity())
                 .teensQuantity(request.childrenUnder18Quantity())
@@ -242,6 +273,26 @@ public class ReservationService {
                 .build();
 
         reservationAggregate.handleCreateReservationCommand(command);
+
+        // Wire into the saga so hotel-service creates a real RoomReservation record
+        // and rollback works on payment timeout.
+        ReservationRequest rollbackRequest = ReservationRequest.builder()
+                .id(reservationId)
+                .transportReservationsIds(Collections.emptyList())
+                .roomReservationsIds(List.of(roomReservationId))
+                .hotelId(request.hotelId())
+                .adultsQuantity(request.adultsQuantity())
+                .childrenUnder3Quantity(request.childrenUnder3Quantity())
+                .childrenUnder10Quantity(request.childrenUnder10Quantity())
+                .childrenUnder18Quantity(request.childrenUnder18Quantity())
+                .hotelTimeFrom(checkIn)
+                .hotelTimeTo(checkOut)
+                .price(request.price())
+                .userId(request.userId())
+                .build();
+        bookHotelsSaga.createHotelReservation(rollbackRequest);
+        invalidPaymentHandler.schedulePaymentTimeoutCheck(rollbackRequest);
+
         return getReservation(reservationId);
     }
 
@@ -352,15 +403,22 @@ public class ReservationService {
     }
 
     private ReservationConfirmationResponse buildConfirmation(Reservation reservation) {
-        HotelInfo hotelInfo = getHotelInformation(reservation.getHotelId());
-        TransportReservationResponse transportInfo = getTransportInformation(reservation.getTransportReservationsIds().stream().map(UUID::toString).toList());
+        TransportReservationResponse transportInfo = getTransportInformation(
+                reservation.getTransportReservationsIds().stream().map(UUID::toString).toList());
 
         logger.info("Purchased reservation: " + reservation);
 
-        sendBoughtOfferWebsocketMessages("Ktoś kupił wycieczkę do aktualnie przeglądanego hotelu!", String.valueOf(reservation.getHotelId()));
+        if (reservation.getHotelId() != null) {
+            sendBoughtOfferWebsocketMessages(
+                    "Ktoś kupił wycieczkę do aktualnie przeglądanego hotelu!",
+                    String.valueOf(reservation.getHotelId()));
+        }
+
+        // Use the title already stored on the reservation (set at booking time) as the hotel name snapshot.
+        String displayName = hasText(reservation.getTitle()) ? reservation.getTitle() : "订单确认";
 
         return ReservationConfirmationResponse.builder()
-                .hotelName(hotelInfo.getName())
+                .hotelName(displayName)
                 .price(reservation.getPrice())
                 .dateFrom(reservation.getHotelTimeFrom())
                 .dateTo(reservation.getHotelTimeTo())
@@ -368,7 +426,7 @@ public class ReservationService {
                 .infants(reservation.getChildrenUnder3Quantity())
                 .kids(reservation.getChildrenUnder10Quantity())
                 .teens(reservation.getChildrenUnder18Quantity())
-                .roomTypes(hotelInfo.getRoomTypes())
+                .roomTypes(Collections.emptyMap())
                 .transport(transportInfo)
                 .build();
     }
@@ -423,17 +481,6 @@ public class ReservationService {
 
     private void sendBoughtOfferWebsocketMessages(String message, String idHotel) {
         reservationWebSocketHandler.sendMessageToSubscribedByIdHotel(message, idHotel);
-    }
-
-    private HotelInfo getHotelInformation(UUID hotelId) {
-        if (hotelId == null) {
-            return HotelInfo.builder()
-                    .hotelPrice(0.0f)
-                    .name("票务订单")
-                    .roomTypes(Collections.emptyMap())
-                    .build();
-        }
-        return HotelInfo.builder().hotelPrice(1500.0f).name("Hotel testowy").roomTypes(Map.of("Pokój dwuosobowy", 1)).build();
     }
 
     private TransportReservationResponse getTransportInformation(List<String> transportIds) {
@@ -519,7 +566,7 @@ public class ReservationService {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported transport type");
     }
 
-    private List<UUID> emptyIfNull(List<UUID> values) {
+    private <T> List<T> emptyIfNull(List<T> values) {
         return values == null ? Collections.emptyList() : values;
     }
 

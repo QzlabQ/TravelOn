@@ -33,12 +33,13 @@ public class CityCatalog {
 
     public LocationDto locationFor(String country, String cityName, String cityId) {
         CityRecord city = find(cityName);
-        UUID id = cityId == null || cityId.isBlank()
+        String shortCityId = cityId == null || cityId.isBlank()
                 ? city.cityId()
-                : UUID.fromString(cityId);
+                : cityId.trim();
+        UUID locationId = UUID.nameUUIDFromBytes(("CITY:" + shortCityId).getBytes(StandardCharsets.UTF_8));
         return LocationDto.builder()
-                .idLocation(id)
-                .cityId(id)
+                .idLocation(locationId)
+                .cityId(shortCityId)
                 .country(city.country().isBlank() ? country : city.country())
                 .province(city.province())
                 .region(city.cityName())
@@ -53,8 +54,17 @@ public class CityCatalog {
         if (city != null) {
             return city;
         }
-        UUID id = UUID.nameUUIDFromBytes(("CN:" + alias).getBytes(StandardCharsets.UTF_8));
+        String id = "C" + Integer.toUnsignedString(alias.hashCode(), 36).toUpperCase();
         return new CityRecord(id, "中国", "", alias);
+    }
+
+    public CityRecord findByCityId(String cityId) {
+        ensureLoaded();
+        return citiesByAlias.values()
+                .stream()
+                .filter(city -> city.cityId().equals(cityId))
+                .findFirst()
+                .orElse(new CityRecord(cityId, "中国", "", cityId));
     }
 
     private void ensureLoaded() {
@@ -76,7 +86,7 @@ public class CityCatalog {
                 }
                 String[] values = line.split("\t", -1);
                 CityRecord city = new CityRecord(
-                        UUID.fromString(values[0]),
+                        values[0],
                         values[1],
                         values[2],
                         values[3]
@@ -110,6 +120,6 @@ public class CityCatalog {
         return normalized;
     }
 
-    public record CityRecord(UUID cityId, String country, String province, String cityName) {
+    public record CityRecord(String cityId, String country, String province, String cityName) {
     }
 }

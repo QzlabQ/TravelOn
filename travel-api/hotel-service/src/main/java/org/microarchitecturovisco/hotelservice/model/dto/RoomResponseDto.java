@@ -10,11 +10,13 @@ import java.util.UUID;
 @Builder
 public class RoomResponseDto {
     @Id
-    private UUID roomId;
+    private Long roomId;
 
     private String name;
 
     private int guestCapacity;
+
+    private String roomType;
 
     @Lob
     private String description;

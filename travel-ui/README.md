@@ -17,12 +17,6 @@ This is the home page, where you can search for trips depending on your choise (
   <img src="photos/main_view.png" width="800"/>
 </div>
 
-### Clients Preferences
-You can easly switch to view with preferences of clients, where you can see which destinations, rooms, hotels, and transport types are most popular. You can also check information about last reservation to find an inspiration. This view is update in real time with usage of websockets.
-<div align="center">
-  <img src="photos/clients_preferences_view.png" width="800"/>
-</div>
-
 ### Available Offers
 After you hit the search button, you will see Hotels which satisfie choosen parameters. From this view you also check hotel price and hotel rate.
 <div align="center">

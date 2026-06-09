@@ -45,55 +45,78 @@ const CommunityPostDetails = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 px-8 py-8">
-            <Snackbar open={Boolean(toast)} autoHideDuration={2200} onClose={() => setToast("")} message={toast}/>
-            <Button component={Link} to="/community" startIcon={<ArrowBack/>} variant="outlined" sx={{borderRadius: 2}}>
-                返回社区
-            </Button>
-            {loading && <Box sx={{height: 5}} className="mt-5"><LinearProgress/></Box>}
-            {error && <Alert severity="warning" className="mt-5">{error}</Alert>}
-            {post &&
-                <main className="mt-6 grid grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
-                    <article className="rounded-lg border border-slate-200 bg-white p-7 shadow-sm">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Chip size="small" label={categoryLabels[post.category]} color="primary" variant="outlined"/>
-                            {post.destination && <Chip size="small" icon={<LocationOn/>} label={post.destination}/>}
-                        </div>
-                        <h1 className="mt-4 text-4xl font-bold text-slate-950">{post.title}</h1>
-                        <p className="mt-3 text-sm text-slate-500">{post.authorName} · {formatCommunityTime(post.createdAt)}</p>
-                        {post.imageUrls.length > 0 &&
-                            <div className="mt-6 grid gap-3">
-                                {post.imageUrls.map(url => (
-                                    <img key={url} src={url} alt={post.title} className="max-h-[520px] w-full rounded-lg object-cover"/>
-                                ))}
+        <div className="min-h-screen bg-[#f6f7fb]">
+            <Snackbar
+                open={Boolean(toast)}
+                autoHideDuration={2200}
+                onClose={() => setToast("")}
+                message={toast}
+                anchorOrigin={{vertical: "top", horizontal: "center"}}
+            />
+
+            <main className="mx-auto max-w-7xl px-6 py-8">
+                <Button component={Link} to="/community" startIcon={<ArrowBack/>} variant="outlined">
+                    返回社区
+                </Button>
+
+                {loading && <Box sx={{height: 5}} className="mt-5"><LinearProgress/></Box>}
+                {error && <Alert severity="warning" className="mt-5">{error}</Alert>}
+
+                {post &&
+                    <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+                        <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                            {post.imageUrls.length > 0 &&
+                                <div className="grid gap-2 bg-slate-100 p-2">
+                                    {post.imageUrls.map(url => (
+                                        <img key={url} src={url} alt={post.title} className="max-h-[540px] w-full rounded-lg object-cover"/>
+                                    ))}
+                                </div>
+                            }
+
+                            <div className="p-7">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Chip size="small" label={categoryLabels[post.category]} color="primary" variant="outlined"/>
+                                    {post.destination && <Chip size="small" icon={<LocationOn/>} label={post.destination}/>}
+                                </div>
+                                <h1 className="mt-4 text-4xl font-bold leading-tight text-slate-950">{post.title}</h1>
+                                <p className="mt-3 text-sm text-slate-500">
+                                    {post.authorName} · {formatCommunityTime(post.createdAt)}
+                                </p>
+                                <div className="mt-6 whitespace-pre-wrap text-base leading-8 text-slate-700">{post.content}</div>
                             </div>
-                        }
-                        <div className="mt-6 whitespace-pre-wrap text-base leading-8 text-slate-700">{post.content}</div>
-                    </article>
-                    <aside className="sticky top-24 space-y-5">
-                        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-lg font-bold text-slate-950">互动</h2>
-                            <Button
-                                fullWidth
-                                sx={{mt: 2, borderRadius: 2}}
-                                variant={post.likedByCurrentUser ? "contained" : "outlined"}
-                                color={post.likedByCurrentUser ? "error" : "primary"}
-                                startIcon={post.likedByCurrentUser ? <Favorite/> : <FavoriteBorder/>}
-                                onClick={handleLike}
-                            >
-                                {post.likeCount} 人点赞
-                            </Button>
-                        </section>
-                        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                            <h2 className="text-lg font-bold text-slate-950">相关评价</h2>
-                            <div className="mt-4 grid gap-3">
+                        </article>
+
+                        <aside className="space-y-5 lg:sticky lg:top-24">
+                            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                                <h2 className="text-lg font-bold text-slate-950">互动</h2>
+                                <Button
+                                    fullWidth
+                                    sx={{mt: 2}}
+                                    variant={post.likedByCurrentUser ? "contained" : "outlined"}
+                                    color={post.likedByCurrentUser ? "error" : "primary"}
+                                    startIcon={post.likedByCurrentUser ? <Favorite/> : <FavoriteBorder/>}
+                                    onClick={handleLike}
+                                >
+                                    {post.likeCount} 人点赞
+                                </Button>
+                            </section>
+
+                            <section className="space-y-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h2 className="text-lg font-bold text-slate-950">相关评价</h2>
+                                    <Chip size="small" label={`${reviews.length} 条`} variant="outlined"/>
+                                </div>
                                 {reviews.map(review => <CommunityReviewCard key={review.id} review={review}/>)}
-                                {reviews.length === 0 && <p className="rounded-lg bg-slate-50 px-3 py-8 text-center text-sm text-slate-500">暂无相关评价</p>}
-                            </div>
-                        </section>
-                    </aside>
-                </main>
-            }
+                                {reviews.length === 0 &&
+                                    <p className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-8 text-center text-sm text-slate-500">
+                                        暂无相关评价
+                                    </p>
+                                }
+                            </section>
+                        </aside>
+                    </div>
+                }
+            </main>
         </div>
     );
 };
