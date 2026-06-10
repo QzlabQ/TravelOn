@@ -160,6 +160,39 @@ const getTrainSeatRank = (seatClass: string) => {
   return 11;
 };
 
+const getTrainSeatKey = (seatClass: string) => seatClass.replace(/\s/g, "");
+
+const compareTrainSeatOffers = (
+  left: TicketSearchOffer,
+  right: TicketSearchOffer,
+) => {
+  const rankDiff =
+    getTrainSeatRank(left.seatClass) - getTrainSeatRank(right.seatClass);
+  if (rankDiff !== 0) {
+    return rankDiff;
+  }
+  return left.price - right.price;
+};
+
+const dedupeTrainSeatOffers = (offers: TicketSearchOffer[]) => {
+  const seats = new Map<string, TicketSearchOffer>();
+
+  offers.forEach((offer) => {
+    const seatKey = getTrainSeatKey(offer.seatClass);
+    const existingOffer = seats.get(seatKey);
+    if (
+      !existingOffer ||
+      offer.price < existingOffer.price ||
+      (offer.price === existingOffer.price &&
+        offer.remainingSeats > existingOffer.remainingSeats)
+    ) {
+      seats.set(seatKey, offer);
+    }
+  });
+
+  return Array.from(seats.values()).sort(compareTrainSeatOffers);
+};
+
 const buildTrainOfferGroups = (
   offers: TicketSearchOffer[],
 ): TrainOfferGroup[] => {
@@ -183,14 +216,7 @@ const buildTrainOfferGroups = (
     .sort((left, right) => left.order - right.order)
     .map((group) => ({
       ...group,
-      offers: group.offers.slice().sort((left, right) => {
-        const rankDiff =
-          getTrainSeatRank(left.seatClass) - getTrainSeatRank(right.seatClass);
-        if (rankDiff !== 0) {
-          return rankDiff;
-        }
-        return left.price - right.price;
-      }),
+      offers: dedupeTrainSeatOffers(group.offers),
     }));
 };
 
@@ -1042,7 +1068,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         <aside className="sticky top-24 self-start flex max-h-[calc(100vh-7rem)] flex-col gap-5 overflow-y-auto pr-1">
           <section className="rounded-lg bg-white border border-slate-200 p-5 shadow-sm">
             <h2 className="text-lg font-bold text-slate-900 mb-4">查询行程</h2>
-            <div className="grid grid-cols-[1fr_44px_1fr] items-center gap-2">
+            <div className="grid gap-3">
               <Autocomplete
                 size="small"
                 options={departures}
@@ -1056,7 +1082,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
               <Button
                 onClick={swapLocations}
                 variant="outlined"
-                sx={{ minWidth: 44, height: 40, borderRadius: 2 }}
+                sx={{ minWidth: 44, width: 64, height: 44, borderRadius: 2, justifySelf: "center" }}
               >
                 <SwapHoriz />
               </Button>

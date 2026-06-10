@@ -18,6 +18,7 @@ CREATE TEMP TABLE seed_ticket_offers (
 
 \copy seed_ticket_offers FROM '/seed-data/transport/plane/ticket_offers.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
 \copy seed_ticket_offers FROM '/seed-data/transport/train/ticket_offers.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
+\copy seed_ticket_offers FROM '/seed-data/transport/train/generated_ticket_offers.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
 
 INSERT INTO public.ticket_offer_templates (
     id,
