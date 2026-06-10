@@ -7,7 +7,7 @@ SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 
-CREATE TABLE public.location (
+CREATE TABLE public.city (
     id uuid NOT NULL,
     country character varying(255) NOT NULL,
     region character varying(255),
@@ -21,7 +21,7 @@ CREATE TABLE public.hotel (
     description text,
     name character varying(255),
     rating real NOT NULL,
-    location_id uuid
+    city_id uuid
 );
 
 CREATE TABLE public.hotel_photos (
@@ -52,8 +52,11 @@ CREATE TABLE public.room_reservation (
     room_id bigint NOT NULL
 );
 
-ALTER TABLE ONLY public.location
-    ADD CONSTRAINT location_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.city
+    ADD CONSTRAINT city_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.city
+    ADD CONSTRAINT uq_city_city_id UNIQUE (city_id);
 
 ALTER TABLE ONLY public.hotel
     ADD CONSTRAINT hotel_pkey PRIMARY KEY (id);
@@ -68,7 +71,7 @@ ALTER TABLE ONLY public.room_reservation
     ADD CONSTRAINT room_reservation_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.hotel
-    ADD CONSTRAINT fk_hotel_location FOREIGN KEY (location_id) REFERENCES public.location(id);
+    ADD CONSTRAINT fk_hotel_city FOREIGN KEY (city_id) REFERENCES public.city(id);
 
 ALTER TABLE ONLY public.hotel_photos
     ADD CONSTRAINT fk_hotel_photos_hotel FOREIGN KEY (hotel_id) REFERENCES public.hotel(id) ON DELETE CASCADE;
@@ -79,10 +82,10 @@ ALTER TABLE ONLY public.room
 ALTER TABLE ONLY public.room_reservation
     ADD CONSTRAINT fk_room_reservation_room FOREIGN KEY (room_id) REFERENCES public.room(id) ON DELETE CASCADE;
 
-CREATE INDEX idx_hotel_location ON public.hotel(location_id);
+CREATE INDEX idx_hotel_city ON public.hotel(city_id);
 CREATE INDEX idx_hotel_rating ON public.hotel(rating DESC);
-CREATE INDEX idx_location_city ON public.location(city_id);
-CREATE INDEX idx_location_normalized_name ON public.location(normalized_name);
+CREATE INDEX idx_city_city_id ON public.city(city_id);
+CREATE INDEX idx_city_normalized_name ON public.city(normalized_name);
 CREATE INDEX idx_room_hotel ON public.room(hotel_id);
 CREATE INDEX idx_room_price_capacity ON public.room(price_per_adult, guest_capacity);
 CREATE INDEX idx_room_reservation_room_dates ON public.room_reservation(room_id, date_from, date_to);
@@ -93,10 +96,10 @@ SELECT
     h.id AS hotel_id,
     h.name AS hotel_name,
     h.rating,
-    h.location_id,
+    h.city_id,
     count(r.id) AS room_count,
     min(r.price_per_adult) AS min_price_per_adult,
     max(r.guest_capacity) AS max_guest_capacity
 FROM public.hotel h
 LEFT JOIN public.room r ON r.hotel_id = h.id
-GROUP BY h.id, h.name, h.rating, h.location_id;
+GROUP BY h.id, h.name, h.rating, h.city_id;

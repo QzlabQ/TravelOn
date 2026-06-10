@@ -7,6 +7,17 @@ SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 
+CREATE TABLE public.city (
+    id uuid NOT NULL,
+    country character varying(255) NOT NULL,
+    region character varying(255),
+    city_id character varying(255),
+    normalized_name character varying(255),
+    province character varying(255),
+    CONSTRAINT city_pkey PRIMARY KEY (id),
+    CONSTRAINT uq_city_city_id UNIQUE (city_id)
+);
+
 CREATE TABLE public.ticket_offer_templates (
     id uuid NOT NULL,
     arrival_date_time timestamp(6) without time zone,
@@ -29,6 +40,12 @@ CREATE TABLE public.ticket_offer_templates (
 
 ALTER TABLE ONLY public.ticket_offer_templates
     ADD CONSTRAINT ticket_offer_templates_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ticket_offer_templates
+    ADD CONSTRAINT fk_ticket_departure_city FOREIGN KEY (departure_city_id) REFERENCES public.city(city_id);
+
+ALTER TABLE ONLY public.ticket_offer_templates
+    ADD CONSTRAINT fk_ticket_arrival_city FOREIGN KEY (arrival_city_id) REFERENCES public.city(city_id);
 
 CREATE INDEX idx_ticket_offer_search ON public.ticket_offer_templates(type, departure_city_id, arrival_city_id, departure_date_time);
 CREATE INDEX idx_ticket_offer_price ON public.ticket_offer_templates(price);

@@ -37,6 +37,7 @@ import {useAuthSession} from "../../core/useAuthSession";
 import CommunityPostCard from "../components/CommunityPostCard";
 import CommunityReviewCard from "../components/CommunityReviewCard";
 import CommunityPublishDialog from "../components/CommunityPublishDialog";
+import AttractionsBrowser from "../components/AttractionsBrowser";
 import {categoryLabels, formatCommunityTime, targetTypeLabels} from "../components/communityLabels";
 
 type CommunityTab = "ALL" | CommunityCategory;
@@ -217,31 +218,33 @@ const Community = () => {
                         </Tabs>
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                            <TextField
-                                size="small"
-                                placeholder="搜索帖子"
-                                value={keyword}
-                                onChange={event => setKeyword(event.target.value)}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <Search fontSize="small"/>
-                                        </InputAdornment>
-                                    )
-                                }}
-                                sx={{minWidth: {xs: "100%", sm: 260}}}
-                            />
-                            <TextField
-                                size="small"
-                                select
-                                label="排序"
-                                value={sort}
-                                onChange={event => setSort(event.target.value as "latest" | "popular")}
-                                sx={{width: {xs: "100%", sm: 132}}}
-                            >
-                                <MenuItem value="latest">最新</MenuItem>
-                                <MenuItem value="popular">热门</MenuItem>
-                            </TextField>
+                            {activeTab !== "SCENIC_SPOT" && <>
+                                <TextField
+                                    size="small"
+                                    placeholder="搜索帖子"
+                                    value={keyword}
+                                    onChange={event => setKeyword(event.target.value)}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <Search fontSize="small"/>
+                                            </InputAdornment>
+                                        )
+                                    }}
+                                    sx={{minWidth: {xs: "100%", sm: 260}}}
+                                />
+                                <TextField
+                                    size="small"
+                                    select
+                                    label="排序"
+                                    value={sort}
+                                    onChange={event => setSort(event.target.value as "latest" | "popular")}
+                                    sx={{width: {xs: "100%", sm: 132}}}
+                                >
+                                    <MenuItem value="latest">最新</MenuItem>
+                                    <MenuItem value="popular">热门</MenuItem>
+                                </TextField>
+                            </>}
                             <Button variant="contained" startIcon={<Add/>} onClick={openPublish} sx={{whiteSpace: "nowrap"}}>
                                 发布内容
                             </Button>
@@ -310,7 +313,9 @@ const Community = () => {
                             </section>
                         }
 
-                        {showReviews && reviews.length > 0 &&
+                        {activeTab === "SCENIC_SPOT" && <AttractionsBrowser/>}
+
+                        {showReviews && activeTab !== "SCENIC_SPOT" && reviews.length > 0 &&
                             <section className="grid gap-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <h2 className="text-xl font-bold text-slate-950">真实评价</h2>
@@ -322,7 +327,7 @@ const Community = () => {
                             </section>
                         }
 
-                        {!loading && !error && posts.length === 0 && reviews.length === 0 &&
+                        {!loading && !error && activeTab !== "SCENIC_SPOT" && posts.length === 0 && reviews.length === 0 &&
                             <section className="rounded-lg border border-dashed border-slate-300 bg-white py-16 text-center">
                                 <Forum className="text-slate-300" fontSize="large"/>
                                 <p className="mt-3 font-semibold text-slate-700">当前分类暂无内容</p>

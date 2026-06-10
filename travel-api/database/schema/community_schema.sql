@@ -22,6 +22,17 @@ SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
+CREATE TABLE public.city (
+    id uuid NOT NULL,
+    country character varying(255) NOT NULL,
+    region character varying(255),
+    city_id character varying(255),
+    normalized_name character varying(255),
+    province character varying(255),
+    CONSTRAINT city_pkey PRIMARY KEY (id),
+    CONSTRAINT uq_city_city_id UNIQUE (city_id)
+);
+
 --
 -- Name: community_post; Type: TABLE; Schema: public; Owner: -
 --
@@ -33,7 +44,7 @@ CREATE TABLE public.community_post (
     category character varying(255) NOT NULL,
     content character varying(4000) NOT NULL,
     created_at timestamp(6) with time zone NOT NULL,
-    destination character varying(255),
+    destination_city_id character varying(255),
     like_count integer NOT NULL,
     title character varying(120) NOT NULL,
     updated_at timestamp(6) with time zone NOT NULL,
@@ -125,7 +136,10 @@ ALTER TABLE ONLY public.community_post_images
 
 CREATE INDEX idx_community_post_category_created ON public.community_post(category, created_at DESC);
 CREATE INDEX idx_community_post_popular ON public.community_post(like_count DESC, created_at DESC);
-CREATE INDEX idx_community_post_destination ON public.community_post(destination);
+CREATE INDEX idx_community_post_destination ON public.community_post(destination_city_id);
+
+ALTER TABLE ONLY public.community_post
+    ADD CONSTRAINT fk_community_post_destination_city FOREIGN KEY (destination_city_id) REFERENCES public.city(city_id);
 CREATE INDEX idx_post_like_post ON public.post_like(post_id);
 CREATE INDEX idx_post_like_user ON public.post_like(user_id);
 CREATE INDEX idx_review_target_created ON public.review(target_type, target_id, created_at DESC);
@@ -190,6 +204,36 @@ SELECT
 FROM public.review
 WHERE target_id IS NOT NULL
 GROUP BY target_type, target_id;
+
+
+--
+-- Name: attraction; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.attraction (
+    id uuid NOT NULL,
+    name character varying(120) NOT NULL,
+    city_id character varying(255),
+    description character varying(2000),
+    cover_image_url character varying(1000),
+    created_by_user_id uuid NOT NULL,
+    created_by_name character varying(255) NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    updated_at timestamp(6) with time zone NOT NULL,
+    CONSTRAINT attraction_pkey PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX uq_attraction_name_city
+    ON public.attraction (lower(name), lower(coalesce(city_id, '')));
+CREATE INDEX idx_attraction_name ON public.attraction (name);
+CREATE INDEX idx_attraction_city ON public.attraction (city_id);
+
+ALTER TABLE ONLY public.attraction
+    ADD CONSTRAINT fk_attraction_city FOREIGN KEY (city_id) REFERENCES public.city(city_id);
+
+CREATE TRIGGER trg_attraction_set_updated_at
+BEFORE UPDATE ON public.attraction
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --

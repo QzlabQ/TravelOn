@@ -54,8 +54,6 @@ public class ReservationProjector {
                 .transportReservationsIds(mutableList(event.getTransportReservationsIds()))
                 .userId(event.getUserId())
                 .title(event.getTitle())
-                .routeFrom(event.getRouteFrom())
-                .routeTo(event.getRouteTo())
                 .provider(event.getProvider())
                 .bookingCode(event.getBookingCode())
                 .travelers(mutableList(event.getTravelers()))

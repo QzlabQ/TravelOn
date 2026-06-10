@@ -19,6 +19,33 @@ CREATE TEMP TABLE seed_ticket_offers (
 \copy seed_ticket_offers FROM '/seed-data/transport/plane/ticket_offers.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
 \copy seed_ticket_offers FROM '/seed-data/transport/train/ticket_offers.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
 
+CREATE TEMP TABLE seed_cities_transport (
+    city_id text,
+    country text,
+    province text,
+    city_name text
+);
+
+\copy seed_cities_transport FROM '/seed-data/common/cities.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
+
+INSERT INTO public.city (id, city_id, country, province, region, normalized_name)
+SELECT DISTINCT
+       (substr(md5(city_id), 1, 8) || '-' || substr(md5(city_id), 9, 4) || '-' ||
+        substr(md5(city_id), 13, 4) || '-' || substr(md5(city_id), 17, 4) || '-' ||
+        substr(md5(city_id), 21, 12))::uuid,
+       city_id,
+       country,
+       province,
+       city_name,
+       city_name
+FROM seed_cities_transport
+WHERE city_id IN (
+    SELECT DISTINCT departure_city_id FROM seed_ticket_offers WHERE departure_city_id IS NOT NULL AND departure_city_id <> ''
+    UNION
+    SELECT DISTINCT arrival_city_id FROM seed_ticket_offers WHERE arrival_city_id IS NOT NULL AND arrival_city_id <> ''
+)
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO public.ticket_offer_templates (
     id,
     type,

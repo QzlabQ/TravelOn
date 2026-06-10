@@ -62,10 +62,6 @@ public class Reservation {
 
     private String title;
 
-    private String routeFrom;
-
-    private String routeTo;
-
     private String provider;
 
     private String bookingCode;

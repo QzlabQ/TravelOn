@@ -1,8 +1,10 @@
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
+    Chip,
     Dialog,
     DialogActions,
     DialogContent,
@@ -13,14 +15,17 @@ import {
     Tabs,
     TextField
 } from "@mui/material";
+import {Landscape} from "@mui/icons-material";
 import {
     ApiRequests,
+    AttractionResponse,
     CommunityCategory,
     CreateCommunityPostPayload,
     CreateCommunityReviewPayload,
     ReviewTargetType
 } from "../../core/apiConfig";
 import {categoryLabels, targetTypeLabels} from "./communityLabels";
+import AttractionPickerDialog from "./AttractionPickerDialog";
 
 type Props = {
     open: boolean,
@@ -37,7 +42,7 @@ const defaultPostPayload: CreateCommunityPostPayload = {
     title: "",
     content: "",
     category: "TRAVEL_NOTE",
-    destination: "",
+    destinationCityId: "",
     imageUrls: [],
 };
 
@@ -57,6 +62,24 @@ const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
     const [postPayload, setPostPayload] = useState<CreateCommunityPostPayload>(defaultPostPayload);
     const [imageUrlText, setImageUrlText] = useState("");
     const [reviewPayload, setReviewPayload] = useState<CreateCommunityReviewPayload>(defaultReviewPayload);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [pickedAttraction, setPickedAttraction] = useState<AttractionResponse | null>(null);
+    const [cityOptions, setCityOptions] = useState<{cityId: string, label: string}[]>([]);
+
+    useEffect(() => {
+        if (!open || cityOptions.length > 0) return;
+        ApiRequests.getHotelDestinations()
+            .then(res => {
+                const seen = new Set<string>();
+                const opts = res.data
+                    .filter(d => d.cityId && d.region)
+                    .filter(d => { if (seen.has(d.cityId)) return false; seen.add(d.cityId); return true; })
+                    .map(d => ({cityId: d.cityId, label: d.region}))
+                    .sort((a, b) => a.label.localeCompare(b.label, "zh"));
+                setCityOptions(opts);
+            })
+            .catch(() => {});
+    }, [open, cityOptions.length]);
 
     const closeDialog = () => {
         if (!submitting) {
@@ -69,6 +92,7 @@ const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
         setPostPayload(defaultPostPayload);
         setReviewPayload(defaultReviewPayload);
         setImageUrlText("");
+        setPickedAttraction(null);
     };
 
     const submit = async () => {
@@ -82,9 +106,19 @@ const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
             return;
         }
 
-        if (mode === "review" && (!reviewPayload.targetName.trim() || !reviewPayload.content.trim())) {
-            setError("评价对象和评价内容不能为空。");
-            return;
+        if (mode === "review") {
+            if (reviewPayload.targetType === "SCENIC_SPOT" && !pickedAttraction) {
+                setError("请先选择一个景点。");
+                return;
+            }
+            if (reviewPayload.targetType !== "SCENIC_SPOT" && !reviewPayload.targetName.trim()) {
+                setError("评价对象不能为空。");
+                return;
+            }
+            if (!reviewPayload.content.trim()) {
+                setError("评价内容不能为空。");
+                return;
+            }
         }
 
         setSubmitting(true);
@@ -95,8 +129,14 @@ const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
                     title: postPayload.title.trim(),
                     content: postPayload.content.trim(),
                     category: postPayload.category,
-                    destination: postPayload.destination?.trim() || undefined,
+                    destinationCityId: postPayload.destinationCityId?.trim() || undefined,
                     imageUrls: imageUrlText.split("\n").map(item => item.trim()).filter(Boolean),
+                });
+            } else if (reviewPayload.targetType === "SCENIC_SPOT" && pickedAttraction) {
+                // Route through attraction-specific endpoint for accurate aggregation
+                await ApiRequests.createAttractionReview(token, pickedAttraction.id, {
+                    rating: reviewPayload.rating,
+                    content: reviewPayload.content.trim(),
                 });
             } else {
                 await ApiRequests.createCommunityReview(token, {
@@ -145,11 +185,16 @@ const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
                         >
                             {postCategories.map(category => <MenuItem key={category} value={category}>{categoryLabels[category]}</MenuItem>)}
                         </TextField>
-                        <TextField
-                            label="目的地"
-                            value={postPayload.destination}
-                            onChange={event => setPostPayload({...postPayload, destination: event.target.value})}
-                            fullWidth
+                        <Autocomplete
+                            options={cityOptions}
+                            getOptionLabel={o => o.label}
+                            isOptionEqualToValue={(o, v) => o.cityId === v.cityId}
+                            value={cityOptions.find(o => o.cityId === postPayload.destinationCityId) ?? null}
+                            onChange={(_, value) => setPostPayload({...postPayload, destinationCityId: value?.cityId ?? ""})}
+                            renderInput={params => (
+                                <TextField {...params} label="目的地城市" fullWidth placeholder="请选择目的地城市（可选）"/>
+                            )}
+                            noOptionsText="无匹配城市"
                         />
                         <TextField
                             label="正文"
@@ -178,25 +223,56 @@ const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
                             onChange={event => {
                                 const targetType = event.target.value as ReviewTargetType;
                                 setReviewPayload({...reviewPayload, targetType, category: targetType as CommunityCategory});
+                                setPickedAttraction(null);
                             }}
                             select
                             fullWidth
                         >
                             {targetTypes.map(type => <MenuItem key={type} value={type}>{targetTypeLabels[type]}</MenuItem>)}
                         </TextField>
-                        <TextField
-                            label="对象名称"
-                            value={reviewPayload.targetName}
-                            onChange={event => setReviewPayload({...reviewPayload, targetName: event.target.value})}
-                            fullWidth
-                            required
-                        />
-                        <TextField
-                            label="对象 ID（可选）"
-                            value={reviewPayload.targetId}
-                            onChange={event => setReviewPayload({...reviewPayload, targetId: event.target.value})}
-                            fullWidth
-                        />
+
+                        {reviewPayload.targetType === "SCENIC_SPOT" ? (
+                            <div>
+                                <p className="mb-1 text-sm font-semibold text-slate-700">选择景点</p>
+                                {pickedAttraction ? (
+                                    <div className="flex items-center gap-2">
+                                        <Chip
+                                            icon={<Landscape/>}
+                                            label={pickedAttraction.city ? `${pickedAttraction.name} · ${pickedAttraction.city}` : pickedAttraction.name}
+                                            color="primary"
+                                            variant="outlined"
+                                            onDelete={() => setPickedAttraction(null)}
+                                        />
+                                    </div>
+                                ) : (
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<Landscape/>}
+                                        onClick={() => setPickerOpen(true)}
+                                        fullWidth
+                                    >
+                                        从景点目录中选择
+                                    </Button>
+                                )}
+                            </div>
+                        ) : (
+                            <>
+                                <TextField
+                                    label="对象名称"
+                                    value={reviewPayload.targetName}
+                                    onChange={event => setReviewPayload({...reviewPayload, targetName: event.target.value})}
+                                    fullWidth
+                                    required
+                                />
+                                <TextField
+                                    label="对象 ID（可选）"
+                                    value={reviewPayload.targetId}
+                                    onChange={event => setReviewPayload({...reviewPayload, targetId: event.target.value})}
+                                    fullWidth
+                                />
+                            </>
+                        )}
+
                         <TextField
                             label="分类"
                             value={reviewPayload.category}
@@ -232,6 +308,16 @@ const CommunityPublishDialog = ({open, token, onClose, onPublished}: Props) => {
                     {submitting ? "发布中" : "发布"}
                 </Button>
             </DialogActions>
+
+            <AttractionPickerDialog
+                open={pickerOpen}
+                token={token}
+                onPick={attraction => {
+                    setPickedAttraction(attraction);
+                    setPickerOpen(false);
+                }}
+                onClose={() => setPickerOpen(false)}
+            />
         </Dialog>
     );
 };

@@ -4,12 +4,17 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
 import org.microarchitecturovisco.communityservice.domain.ReviewTargetType;
+import org.microarchitecturovisco.communityservice.dto.AttractionDetailResponse;
+import org.microarchitecturovisco.communityservice.dto.AttractionResponse;
 import org.microarchitecturovisco.communityservice.dto.CommunitySummaryResponse;
+import org.microarchitecturovisco.communityservice.dto.CreateAttractionRequest;
+import org.microarchitecturovisco.communityservice.dto.CreateAttractionReviewRequest;
 import org.microarchitecturovisco.communityservice.dto.CreatePostRequest;
 import org.microarchitecturovisco.communityservice.dto.CreateReviewRequest;
 import org.microarchitecturovisco.communityservice.dto.LikeResponse;
 import org.microarchitecturovisco.communityservice.dto.PostResponse;
 import org.microarchitecturovisco.communityservice.dto.ReviewResponse;
+import org.microarchitecturovisco.communityservice.service.AttractionService;
 import org.microarchitecturovisco.communityservice.service.CommunityService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -31,6 +36,7 @@ import java.util.UUID;
 public class CommunityController {
 
     private final CommunityService communityService;
+    private final AttractionService attractionService;
 
     @GetMapping("/posts")
     public Page<PostResponse> listPosts(
@@ -95,5 +101,44 @@ public class CommunityController {
             @RequestParam(required = false) String targetId
     ) {
         return communityService.getSummary(targetType, targetId);
+    }
+
+    // ── Attraction endpoints ──────────────────────────────────────────────────
+
+    @GetMapping("/attractions")
+    public Page<AttractionResponse> listAttractions(
+            @RequestParam(required = false) String cityId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "popular") String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size
+    ) {
+        return attractionService.list(cityId, keyword, sort, page, size);
+    }
+
+    @PostMapping("/attractions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AttractionResponse createAttraction(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @Valid @RequestBody CreateAttractionRequest request
+    ) {
+        return attractionService.create(token, request);
+    }
+
+    @GetMapping("/attractions/{attractionId}")
+    public AttractionDetailResponse getAttraction(
+            @PathVariable UUID attractionId
+    ) {
+        return attractionService.getDetail(attractionId);
+    }
+
+    @PostMapping("/attractions/{attractionId}/reviews")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ReviewResponse createAttractionReview(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable UUID attractionId,
+            @Valid @RequestBody CreateAttractionReviewRequest request
+    ) {
+        return attractionService.createReview(token, attractionId, request);
     }
 }

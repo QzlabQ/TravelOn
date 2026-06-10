@@ -32,8 +32,6 @@ public class CreateReservationCommand {
     private List<UUID> transportReservationsIds;
     private UUID userId;
     private String title;
-    private String routeFrom;
-    private String routeTo;
     private String provider;
     private String bookingCode;
     private List<BookingPersonSnapshot> travelers;

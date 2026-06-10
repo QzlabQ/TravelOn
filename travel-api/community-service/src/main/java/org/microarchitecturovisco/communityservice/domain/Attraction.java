@@ -1,11 +1,7 @@
 package org.microarchitecturovisco.communityservice.domain;
 
-import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -19,8 +15,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -29,39 +23,29 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CommunityPost {
+public class Attraction {
 
     @Id
     private UUID id;
 
     @Column(nullable = false, length = 120)
-    private String title;
-
-    @Column(nullable = false, length = 4000)
-    private String content;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CommunityCategory category;
+    private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "destination_city_id", referencedColumnName = "city_id")
-    private City destinationCity;
+    @JoinColumn(name = "city_id", referencedColumnName = "city_id")
+    private City city;
 
-    @ElementCollection
-    @CollectionTable(name = "community_post_images", joinColumns = @JoinColumn(name = "post_id"))
-    @Column(name = "image_url", length = 1000)
-    @Builder.Default
-    private List<String> imageUrls = new ArrayList<>();
+    @Column(length = 2000)
+    private String description;
 
-    @Column(nullable = false)
-    private UUID authorUserId;
+    @Column(length = 1000)
+    private String coverImageUrl;
 
     @Column(nullable = false)
-    private String authorName;
+    private UUID createdByUserId;
 
     @Column(nullable = false)
-    private int likeCount;
+    private String createdByName;
 
     @Column(nullable = false)
     private Instant createdAt;

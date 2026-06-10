@@ -11,9 +11,14 @@ export const axiosInstance = axios.create({
     timeout: 100000,
     headers: {
         'Accept': 'application/json',
-        'Content-Type': 'application/json; charset=utf-8',
     },
 });
+
+// Only set Content-Type for requests with a body (POST/PUT/PATCH).
+// Putting Content-Type in common headers causes unnecessary CORS preflights on GET requests.
+axiosInstance.defaults.headers.post['Content-Type'] = 'application/json; charset=utf-8';
+axiosInstance.defaults.headers.put['Content-Type'] = 'application/json; charset=utf-8';
+axiosInstance.defaults.headers.patch = {'Content-Type': 'application/json; charset=utf-8'};
 
 export class ApiRequests {
     static getAvailableDestinations = async () => {
@@ -45,7 +50,7 @@ export class ApiRequests {
     }
 
     static getHotelDestinations = async () => {
-        return await axiosInstance.get('hotels/destinations');
+        return await axiosInstance.get<HotelDestination[]>('hotels/destinations');
     }
 
     static getOffersBySearchQuery = async (params: GetOffersBySearchQueryParams) => {
@@ -242,6 +247,26 @@ export class ApiRequests {
     static getCommunitySummary = async (params: CommunitySummaryQuery) => {
         return await axiosInstance.get<CommunitySummaryResponse>('community/summary', {params});
     }
+
+    static listAttractions = async (params: AttractionsQuery) => {
+        return await axiosInstance.get<PageResponse<AttractionResponse>>('community/attractions', {params});
+    }
+
+    static createAttraction = async (token: string, payload: CreateAttractionPayload) => {
+        return await axiosInstance.post<AttractionResponse>('community/attractions', payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static getAttraction = async (attractionId: string) => {
+        return await axiosInstance.get<AttractionDetailResponse>(`community/attractions/${attractionId}`);
+    }
+
+    static createAttractionReview = async (token: string, attractionId: string, payload: CreateAttractionReviewPayload) => {
+        return await axiosInstance.post<CommunityReviewResponse>(`community/attractions/${attractionId}/reviews`, payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
 }
 
 export interface PageResponse<T> {
@@ -341,8 +366,6 @@ export interface ReservationResponse {
     transportReservationsIds: string[],
     userId: string,
     title?: string | null,
-    routeFrom?: string | null,
-    routeTo?: string | null,
     provider?: string | null,
     bookingCode?: string | null,
     travelers: BookingPersonResponse[],
@@ -381,8 +404,6 @@ export interface RefundRecordResponse {
 export interface CreateTicketReservationPayload {
     userId: string,
     transportType: 'FLIGHT' | 'TRAIN',
-    routeFrom: string,
-    routeTo: string,
     departureDate: string,
     departureTime: string,
     arrivalTime: string,
@@ -846,7 +867,7 @@ export interface CreateCommunityPostPayload {
     title: string,
     content: string,
     category: CommunityCategory,
-    destination?: string,
+    destinationCityId?: string,
     imageUrls?: string[],
 }
 
@@ -856,6 +877,7 @@ export interface CommunityPostResponse {
     content: string,
     category: CommunityCategory,
     destination?: string | null,
+    destinationCityId?: string | null,
     imageUrls: string[],
     authorUserId: string,
     authorName: string,
@@ -913,4 +935,50 @@ export interface CommunitySummaryResponse {
     averageRating: number,
     reviewCount: number,
     latestReviews: CommunityReviewResponse[],
+}
+
+export interface AttractionsQuery {
+    cityId?: string,
+    keyword?: string,
+    sort?: "popular" | "latest",
+    page?: number,
+    size?: number,
+}
+
+export interface CreateAttractionPayload {
+    name: string,
+    cityId?: string,
+    description?: string,
+    coverImageUrl?: string,
+}
+
+export interface AttractionResponse {
+    id: string,
+    name: string,
+    city?: string | null,
+    cityId?: string | null,
+    description?: string | null,
+    coverImageUrl?: string | null,
+    averageRating: number,
+    reviewCount: number,
+    createdByName: string,
+    createdAt: string,
+}
+
+export interface AttractionDetailResponse extends AttractionResponse {
+    latestReviews: CommunityReviewResponse[],
+}
+
+export interface CreateAttractionReviewPayload {
+    rating: number,
+    content: string,
+}
+
+export interface HotelDestination {
+    idLocation: string,
+    cityId: string,
+    country: string,
+    province: string,
+    region: string,
+    normalizedName: string,
 }

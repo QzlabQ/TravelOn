@@ -6,7 +6,9 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -39,6 +41,10 @@ public class UserClient {
             return user;
         } catch (HttpClientErrorException.Unauthorized e) {
             throw new ResponseStatusException(UNAUTHORIZED, "Invalid session token");
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(UNAUTHORIZED, "Invalid session token");
+        } catch (RestClientException e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "User service unavailable");
         }
     }
 }

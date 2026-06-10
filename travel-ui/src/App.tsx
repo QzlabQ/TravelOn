@@ -18,6 +18,8 @@ import Account from "./account/screens/Account";
 import ReservationDetails from "./reservations/screens/ReservationDetails";
 import Community from "./community/screens/Community";
 import CommunityPostDetails from "./community/screens/CommunityPostDetails";
+import Attractions from "./community/screens/Attractions";
+import AttractionDetails from "./community/screens/AttractionDetails";
 
 function App() {
     useEffect(() => {
@@ -42,6 +44,8 @@ function App() {
                     <Route path='/account' element={<Account/>}/>
                     <Route path='/community' element={<Community/>}/>
                     <Route path='/community/posts/:postId' element={<CommunityPostDetails/>}/>
+                    <Route path='/community/attractions' element={<Attractions/>}/>
+                    <Route path='/community/attractions/:attractionId' element={<AttractionDetails/>}/>
                     <Route path='/ai-planner' element={<AiPlanner/>}/>
                     <Route path="*" element={<NotFound />} />
                 </Routes>

@@ -1,6 +1,7 @@
 package org.microarchitecturovisco.communityservice.service;
 
 import lombok.RequiredArgsConstructor;
+import org.microarchitecturovisco.communityservice.domain.City;
 import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
 import org.microarchitecturovisco.communityservice.domain.CommunityPost;
 import org.microarchitecturovisco.communityservice.domain.PostLike;
@@ -13,6 +14,7 @@ import org.microarchitecturovisco.communityservice.dto.LikeResponse;
 import org.microarchitecturovisco.communityservice.dto.PostResponse;
 import org.microarchitecturovisco.communityservice.dto.ReviewResponse;
 import org.microarchitecturovisco.communityservice.dto.UserProfileResponse;
+import org.microarchitecturovisco.communityservice.repository.CityRepository;
 import org.microarchitecturovisco.communityservice.repository.CommunityPostRepository;
 import org.microarchitecturovisco.communityservice.repository.PostLikeRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
@@ -36,6 +38,7 @@ public class CommunityService {
     private final CommunityPostRepository postRepository;
     private final PostLikeRepository likeRepository;
     private final ReviewRepository reviewRepository;
+    private final CityRepository cityRepository;
     private final UserClient userClient;
 
     public Page<PostResponse> listPosts(CommunityCategory category, String keyword, int page, int size, String sort, String token) {
@@ -63,12 +66,16 @@ public class CommunityService {
 
     public PostResponse createPost(String token, CreatePostRequest request) {
         UserProfileResponse user = userClient.requireUser(token);
+        String normalizedCityId = normalizeOptional(request.destinationCityId());
+        City destinationCity = normalizedCityId != null
+                ? cityRepository.findByCityId(normalizedCityId).orElse(null)
+                : null;
         CommunityPost post = CommunityPost.builder()
                 .id(UUID.randomUUID())
                 .title(request.title().trim())
                 .content(request.content().trim())
                 .category(request.category())
-                .destination(normalizeOptional(request.destination()))
+                .destinationCity(destinationCity)
                 .imageUrls(normalizeImageUrls(request.imageUrls()))
                 .authorUserId(user.id())
                 .authorName(user.displayName())

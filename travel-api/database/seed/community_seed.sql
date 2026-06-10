@@ -1,3 +1,24 @@
+CREATE TEMP TABLE seed_cities_community (
+    city_id text,
+    country text,
+    province text,
+    city_name text
+);
+
+\copy seed_cities_community FROM '/seed-data/common/cities.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
+
+INSERT INTO public.city (id, city_id, country, province, region, normalized_name)
+SELECT (substr(md5(city_id), 1, 8) || '-' || substr(md5(city_id), 9, 4) || '-' ||
+        substr(md5(city_id), 13, 4) || '-' || substr(md5(city_id), 17, 4) || '-' ||
+        substr(md5(city_id), 21, 12))::uuid,
+       city_id,
+       country,
+       province,
+       city_name,
+       city_name
+FROM seed_cities_community
+ON CONFLICT (id) DO NOTHING;
+
 CREATE TEMP TABLE seed_hotel_reviews (
     id bigint,
     target_id text,
