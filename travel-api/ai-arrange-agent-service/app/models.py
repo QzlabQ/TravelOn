@@ -91,6 +91,7 @@ class PlannerOptionType(str, Enum):
 class TripCoreSlots(BaseModel):
     model_config = ConfigDict(extra="allow")
 
+    departureCity: str | None = None
     city: str | None = None
     travelStartDate: Date | None = None
     travelEndDate: Date | None = None
@@ -120,6 +121,22 @@ class TripCoreSlots(BaseModel):
         return max((end_date - self.travelStartDate).days + 1, 1)
 
 
+class PlannerBookingLink(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    type: str
+    label: str
+    url: str
+    hotelId: int | None = None
+    ticketOfferId: str | None = None
+    routeFrom: str | None = None
+    routeTo: str | None = None
+    departureDate: Date | None = None
+    bookingCode: str | None = None
+    provider: str | None = None
+    price: float | int | None = None
+
+
 class PlannerPlaceSuggestion(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -137,6 +154,7 @@ class PlannerPlaceSuggestion(BaseModel):
     description: str | None = None
     selected: bool = False
     tags: list[str] = Field(default_factory=list)
+    bookingLinks: list[PlannerBookingLink] = Field(default_factory=list)
 
     @field_validator("imageUrl", mode="before")
     @classmethod

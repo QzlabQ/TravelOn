@@ -1090,6 +1090,9 @@ public class PlannerSnapshotService {
             if (place.getInternalOfferId() == null) {
                 place.setInternalOfferId(previous.getInternalOfferId());
             }
+            if (safeList(place.getBookingLinks()).isEmpty() && !safeList(previous.getBookingLinks()).isEmpty()) {
+                place.setBookingLinks(safeList(previous.getBookingLinks()));
+            }
             if (previous.getSource() != null) {
                 place.setSource(previous.getSource());
             }

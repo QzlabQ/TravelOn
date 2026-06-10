@@ -32,7 +32,7 @@ import {
   getCurrentUserId,
 } from "../../core/currentUser";
 import TravelerSelector from "../../account/components/TravelerSelector";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
 import { useAuthSession } from "../../core/useAuthSession";
 import { validateTicketTravelerRules } from "../../core/validation";
@@ -429,9 +429,25 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   const config = modeConfig[mode];
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const session = useAuthSession();
   const isAuthenticated = Boolean(session);
   const rebookState = (location.state ?? {}) as TicketRebookState;
+  const bookingPrefill = useMemo<TicketRebookState>(
+    () => ({
+      routeFrom: searchParams.get("routeFrom") ?? rebookState.routeFrom,
+      routeTo: searchParams.get("routeTo") ?? rebookState.routeTo,
+      departureDate: searchParams.get("departureDate") ?? rebookState.departureDate,
+      bookingCode: searchParams.get("bookingCode") ?? rebookState.bookingCode,
+    }),
+    [
+      searchParams,
+      rebookState.routeFrom,
+      rebookState.routeTo,
+      rebookState.departureDate,
+      rebookState.bookingCode,
+    ],
+  );
   const bookingPreferences = useMemo(() => getBookingPreferences(), []);
   const preferredTrainTypeFilters =
     bookingPreferences.preferredTrainTypes.filter(isTrainTypeFilter);
@@ -442,7 +458,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   const [arrivals, setArrivals] = useState<string[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [date, setDate] = useState(rebookState.departureDate ?? today);
+  const [date, setDate] = useState(bookingPrefill.departureDate ?? today);
   const [sortBy, setSortBy] = useState("departure");
   const [priceRange, setPriceRange] = useState<number[]>([
     config.lowPrice,
@@ -479,7 +495,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       : defaultTrainTypeFilters,
   );
   const [trainCodeQuery, setTrainCodeQuery] = useState(
-    rebookState.bookingCode ?? "",
+    bookingPrefill.bookingCode ?? "",
   );
   const [trainSeatSelections, setTrainSeatSelections] = useState<
     Record<string, string>
@@ -606,6 +622,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     departureCity = from,
     arrivalCity = to,
     departureDate = date,
+    preferredBookingCode = bookingPrefill.bookingCode,
   ) => {
     if (!departureCity || !arrivalCity) return;
 
@@ -628,6 +645,8 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       setSelectedOffer((current) =>
         current
           ? (response.data.find((offer) => offer.id === current.id) ?? null)
+          : preferredBookingCode
+            ? (response.data.find((offer) => offer.code.toUpperCase() === preferredBookingCode.toUpperCase()) ?? null)
           : null,
       );
     } catch (e) {
@@ -641,12 +660,13 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
 
   useEffect(() => {
     setHasLoadedOptions(false);
+    setDate(bookingPrefill.departureDate ?? today);
     setSelectedTrainTypes(
       mode === "train" && preferredTrainTypeFilters.length > 0
         ? preferredTrainTypeFilters
         : defaultTrainTypeFilters,
     );
-    setTrainCodeQuery(mode === "train" ? (rebookState.bookingCode ?? "") : "");
+    setTrainCodeQuery(mode === "train" ? (bookingPrefill.bookingCode ?? "") : "");
     setLoading(true);
     setError(false);
     ApiRequests.getTicketOptions(mode === "flight" ? "FLIGHT" : "TRAIN")
@@ -654,9 +674,9 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         const nextDepartures = response.data.departures ?? [];
         const nextArrivals = response.data.arrivals ?? [];
         const nextFrom =
-          (rebookState.routeFrom &&
-          nextDepartures.includes(rebookState.routeFrom)
-            ? rebookState.routeFrom
+          (bookingPrefill.routeFrom &&
+          nextDepartures.includes(bookingPrefill.routeFrom)
+            ? bookingPrefill.routeFrom
             : undefined) ??
           findPreferredCity(
             nextDepartures,
@@ -669,9 +689,9 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
           (item) => item !== nextFrom,
         );
         const nextTo =
-          (rebookState.routeTo &&
-          nextArrivalCandidates.includes(rebookState.routeTo)
-            ? rebookState.routeTo
+          (bookingPrefill.routeTo &&
+          nextArrivalCandidates.includes(bookingPrefill.routeTo)
+            ? bookingPrefill.routeTo
             : undefined) ??
           findPreferredCity(
             nextArrivalCandidates,
@@ -685,7 +705,12 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         setArrivals(nextArrivals);
         setFrom(nextFrom);
         setTo(nextTo);
-        return searchTickets(nextFrom, nextTo);
+        return searchTickets(
+          nextFrom,
+          nextTo,
+          bookingPrefill.departureDate ?? today,
+          bookingPrefill.bookingCode ?? undefined,
+        );
       })
       .catch((e) => {
         console.log(e);
@@ -695,7 +720,13 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         setHasLoadedOptions(true);
         setLoading(false);
       });
-  }, [mode]);
+  }, [
+    mode,
+    bookingPrefill.routeFrom,
+    bookingPrefill.routeTo,
+    bookingPrefill.departureDate,
+    bookingPrefill.bookingCode,
+  ]);
 
   useEffect(() => {
     if (!hasLoadedOptions || !from || !to) return;
