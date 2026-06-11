@@ -103,6 +103,8 @@ public class PlannerWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+        Object conversationId = session.getAttributes().get("conversationId");
+        logger.info("Planner websocket closed for conversation " + conversationId + " with status " + status);
         sessionRegistry.unregister(session);
         super.afterConnectionClosed(session, status);
     }

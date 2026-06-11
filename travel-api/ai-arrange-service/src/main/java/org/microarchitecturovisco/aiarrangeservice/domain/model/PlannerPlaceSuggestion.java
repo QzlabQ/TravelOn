@@ -47,5 +47,8 @@ public class PlannerPlaceSuggestion {
     private List<String> tags = new ArrayList<>();
 
     @Builder.Default
+    private List<PlannerBookingLink> bookingLinks = new ArrayList<>();
+
+    @Builder.Default
     private List<Integer> dayIndexes = new ArrayList<>();
 }

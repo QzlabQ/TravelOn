@@ -729,6 +729,7 @@ export interface AuthResponse {
 }
 
 export interface PlannerCoreSlots {
+    departureCity?: string,
     city: string,
     travelStartDate: string,
     travelEndDate?: string,
@@ -880,6 +881,21 @@ export interface PlannerPlaceSuggestion {
     description?: string,
     selected?: boolean,
     tags?: string[],
+    bookingLinks?: PlannerBookingLink[],
+}
+
+export interface PlannerBookingLink {
+    type: 'HOTEL' | 'TRAIN' | 'FLIGHT' | string,
+    label: string,
+    url: string,
+    hotelId?: number,
+    ticketOfferId?: string,
+    routeFrom?: string,
+    routeTo?: string,
+    departureDate?: string,
+    bookingCode?: string,
+    provider?: string,
+    price?: number,
 }
 
 export type PlannerPlaceType = 'SCENIC' | 'RESTAURANT' | 'HOTEL' | 'TRANSPORT' | 'SHOPPING' | 'OTHER';

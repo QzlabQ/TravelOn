@@ -3,9 +3,41 @@ from __future__ import annotations
 from datetime import date as Date, datetime, timezone
 from enum import Enum
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+_ALLOWED_BOOKING_PATHS = ("/reservations/hotels", "/reservations/trains", "/reservations/flights")
+
+
+def _is_allowed_booking_path(path: str) -> bool:
+    return (
+        path == "/reservations/hotels"
+        or path.startswith("/reservations/hotels/")
+        or path == "/reservations/trains"
+        or path == "/reservations/flights"
+    )
+
+
+def _sanitize_booking_url(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+
+    parsed = urlsplit(text)
+    if parsed.scheme in {"http", "https"}:
+        if parsed.netloc.lower() == "example.com" and _is_allowed_booking_path(parsed.path):
+            return urlunsplit(("", "", parsed.path, parsed.query, parsed.fragment))
+        return ""
+
+    parsed = urlsplit(text)
+    if parsed.scheme or parsed.netloc or not _is_allowed_booking_path(parsed.path):
+        return ""
+    return urlunsplit(("", "", parsed.path, parsed.query, parsed.fragment))
 
 
 class AgentStatus(str, Enum):
@@ -91,6 +123,7 @@ class PlannerOptionType(str, Enum):
 class TripCoreSlots(BaseModel):
     model_config = ConfigDict(extra="allow")
 
+    departureCity: str | None = None
     city: str | None = None
     travelStartDate: Date | None = None
     travelEndDate: Date | None = None
@@ -120,6 +153,27 @@ class TripCoreSlots(BaseModel):
         return max((end_date - self.travelStartDate).days + 1, 1)
 
 
+class PlannerBookingLink(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    type: str
+    label: str
+    url: str
+    hotelId: int | None = None
+    ticketOfferId: str | None = None
+    routeFrom: str | None = None
+    routeTo: str | None = None
+    departureDate: Date | None = None
+    bookingCode: str | None = None
+    provider: str | None = None
+    price: float | int | None = None
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def _normalize_booking_url(cls, value: Any) -> str:
+        return _sanitize_booking_url(value)
+
+
 class PlannerPlaceSuggestion(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -137,6 +191,7 @@ class PlannerPlaceSuggestion(BaseModel):
     description: str | None = None
     selected: bool = False
     tags: list[str] = Field(default_factory=list)
+    bookingLinks: list[PlannerBookingLink] = Field(default_factory=list)
 
     @field_validator("imageUrl", mode="before")
     @classmethod
@@ -179,6 +234,7 @@ class PlannerPlaceSuggestion(BaseModel):
         self.imageUrls = urls
         if self.imageUrl is None and urls:
             self.imageUrl = urls[0]
+        self.bookingLinks = [link for link in self.bookingLinks if _sanitize_booking_url(link.url)]
         return self
 
     @field_validator("type", mode="before")

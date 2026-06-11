@@ -14,11 +14,15 @@ class AmapPoiTool:
     def __init__(self, settings: AgentSettings) -> None:
         self._settings = settings
 
+    def is_configured(self) -> bool:
+        return bool(self._settings and self._settings.amap_enabled and self._settings.amap_api_key)
+
     async def search_pois(
         self,
         city: str,
         keywords: list[str],
         limit: int = 8,
+        types: str | None = None,
         **_,
     ) -> ToolResult:
         started = time.perf_counter()
@@ -58,17 +62,17 @@ class AmapPoiTool:
                 if len(places) >= limit:
                     break
                 try:
-                    response = await client.get(
-                        url,
-                        params={
-                            "key": self._settings.amap_api_key,
-                            "city": city,
-                            "keywords": keyword,
-                            "offset": min(limit, 20),
-                            "page": 1,
-                            "extensions": "all",
-                        },
-                    )
+                    params = {
+                        "key": self._settings.amap_api_key,
+                        "city": city,
+                        "keywords": keyword,
+                        "offset": min(limit, 20),
+                        "page": 1,
+                        "extensions": "all",
+                    }
+                    if types:
+                        params["types"] = types
+                    response = await client.get(url, params=params)
                     response.raise_for_status()
                     data = response.json()
                     if data.get("status") != "1":

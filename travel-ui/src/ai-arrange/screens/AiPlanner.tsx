@@ -2,6 +2,7 @@ import React, {FormEvent, useCallback, useEffect, useMemo, useRef, useState} fro
 import {useNavigate} from "react-router-dom";
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Chip,
@@ -10,8 +11,6 @@ import {
     LinearProgress,
     MenuItem,
     Paper,
-    Tab,
-    Tabs,
     TextField,
     Tooltip,
     ToggleButton,
@@ -23,26 +22,21 @@ import dayjs, {Dayjs} from "dayjs";
 import {v4 as uuidv4} from "uuid";
 import {
     AutoAwesome,
-    AutoFixHigh,
     BookmarkAdd,
     CalendarMonth,
-    ChatBubbleOutline,
     CheckCircle,
     Close,
     Code,
     EditNote,
-    ErrorOutline,
+    Flight,
     Group,
     History,
-    HourglassTop,
     Hotel,
     LocationOn,
     Map as MapIcon,
-    PlaylistAdd,
     RestartAlt,
     Restore,
-    Send,
-    TaskAlt,
+    Train,
     TravelExplore,
     Visibility
 } from "@mui/icons-material";
@@ -52,6 +46,7 @@ import {
     CreatePlannerConversationPayload,
     PlannerChatSendPayload,
     PlannerChatStreamPayload,
+    PlannerBookingLink,
     PlannerConversationResponse,
     PlannerCoreSlots,
     PlannerDataRefreshPayload,
@@ -67,11 +62,11 @@ import {
     PlannerSocketEnvelope
 } from "../../core/apiConfig";
 import {PlannerMapPanel} from "../components/PlannerMapPanel";
+import {FloatingAiAssistant} from "../components/FloatingAiAssistant";
 import {buildMockPlannerViewData} from "../mockPlannerData";
 
 type SocketStatus = "idle" | "connecting" | "connected" | "closed" | "error";
 type SnapshotView = "latest" | number;
-type PlannerWorkspaceTab = "markdown" | "chat";
 type PlannerMarkdownMode = "preview" | "edit";
 
 interface ChatMessage {
@@ -82,6 +77,7 @@ interface ChatMessage {
 }
 
 interface PlannerFormState {
+    departureCity: string,
     city: string,
     travelStartDate: string,
     travelEndDate: string,
@@ -115,22 +111,39 @@ interface PlannerStoredSession {
     form: PlannerFormState,
     conversation: PlannerConversationResponse | null,
     chatMessages: ChatMessage[],
-    chatInput: string,
     liveData: PlannerViewData,
     displayData: PlannerViewData,
     snapshots: PlannerSnapshot[],
     plannerTraceEvents: PlannerTraceEvent[],
     viewingSnapshotVersion: SnapshotView,
-    workspaceTab?: PlannerWorkspaceTab,
     markdownMode?: PlannerMarkdownMode,
     targetDayIndex?: number,
 }
 
 const DEFAULT_DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 const PLANNER_STORAGE_KEY = "travel-ui.ai-planner.session.v1";
+const PLANNER_WS_RECONNECT_MESSAGE = "AI 连接已断开，正在自动重连。";
+const CITY_QUICK_OPTIONS = ["北京", "上海", "广州", "深圳", "杭州", "南京", "成都", "重庆", "西安", "苏州", "厦门", "青岛", "长沙", "武汉", "天津"];
+const PEOPLE_COUNT_QUICK_OPTIONS = ["1", "2", "3", "4", "5", "6"];
+const TRAVEL_STYLE_QUICK_OPTIONS = [
+    "轻松 citywalk + 经典地标",
+    "亲子友好",
+    "情侣慢旅行",
+    "美食优先",
+    "博物馆/展览",
+    "自然风景",
+    "夜景摄影",
+    "低强度少步行",
+];
+const BUDGET_QUICK_OPTIONS = ["人均 1000 以内", "人均 1000-2000", "人均 2000-3000", "人均 3000-5000", "不限制预算"];
+const ACCOMMODATION_QUICK_OPTIONS = ["地铁附近", "景区附近", "亲子酒店", "高性价比", "江景/海景", "安静舒适", "可步行到核心景点"];
+const TRANSPORT_QUICK_OPTIONS = ["公共交通优先", "少换乘", "少步行", "打车优先", "高铁优先", "飞机优先", "自驾友好"];
+const MUST_VISIT_QUICK_OPTIONS = ["地标建筑", "博物馆", "美食街", "咖啡店", "公园", "夜景", "历史街区", "亲子乐园", "购物中心"];
+const AVOID_QUICK_OPTIONS = ["排队过久", "人流密集", "夜市", "爬山", "长距离步行", "过度商业化", "早起行程"];
 
 function defaultPlannerForm(): PlannerFormState {
     return {
+        departureCity: "北京",
         city: "上海",
         travelStartDate: "2026-06-01",
         travelEndDate: "2026-06-03",
@@ -206,7 +219,6 @@ function normalizeStoredPlannerSession(value?: Partial<PlannerStoredSession> | n
         form: normalizeFormState(value.form),
         conversation,
         chatMessages: Array.isArray(value.chatMessages) ? value.chatMessages : [],
-        chatInput: typeof value.chatInput === "string" ? value.chatInput : "",
         liveData,
         displayData,
         snapshots: Array.isArray(value.snapshots) ? value.snapshots : [],
@@ -214,7 +226,6 @@ function normalizeStoredPlannerSession(value?: Partial<PlannerStoredSession> | n
         viewingSnapshotVersion: value.viewingSnapshotVersion === "latest" || typeof value.viewingSnapshotVersion === "number"
             ? value.viewingSnapshotVersion
             : "latest",
-        workspaceTab: value.workspaceTab === "chat" ? "chat" : "markdown",
         markdownMode: value.markdownMode === "edit" ? "edit" : "preview",
         targetDayIndex: typeof value.targetDayIndex === "number" && value.targetDayIndex > 0 ? value.targetDayIndex : undefined,
     };
@@ -283,13 +294,29 @@ function parseMarkdownImage(line: string): MarkdownImage | null {
 }
 
 function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[] {
-    return text.split(/(`[^`]+`|\*\*[^*]+?\*\*)/g).map((part, index) => {
+    return text.split(/(`[^`]+`|\*\*[^*]+?\*\*|\[[^\]]+\]\([^)]+\))/g).map((part, index) => {
         const key = `${keyPrefix}-${index}`;
         if (part.startsWith("`") && part.endsWith("`")) {
             return <code key={key} className="rounded bg-gray-100 px-1 py-0.5 text-[0.92em] text-[#374151]">{part.slice(1, -1)}</code>;
         }
         if (part.startsWith("**") && part.endsWith("**")) {
             return <strong key={key}>{part.slice(2, -2)}</strong>;
+        }
+        const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        if (link) {
+            const href = link[2].trim();
+            const external = /^https?:\/\//i.test(href);
+            return (
+                <a
+                    key={key}
+                    href={href}
+                    target={external ? "_blank" : undefined}
+                    rel={external ? "noreferrer" : undefined}
+                    className="font-medium text-[#4659c8] underline-offset-2 hover:underline"
+                >
+                    {link[1]}
+                </a>
+            );
         }
         return <React.Fragment key={key}>{part}</React.Fragment>;
     });
@@ -457,6 +484,7 @@ function renderMarkdownPreview(markdown: string): React.ReactNode[] {
 
 function formFromCoreSlots(slots: PlannerCoreSlots): PlannerFormState {
     return normalizeFormState({
+        departureCity: slots.departureCity || "",
         city: slots.city || "",
         travelStartDate: slots.travelStartDate || "",
         travelEndDate: slots.travelEndDate || "",
@@ -646,14 +674,11 @@ function diffTypeLabel(type?: string) {
     return type || "变化";
 }
 
-function traceEventKey(event: PlannerTraceEvent, index: number) {
-    return event.eventId || `${event.type}-${event.tool || "planner"}-${event.createdAt || index}`;
-}
-
 function buildInitialPrompt(slots: PlannerCoreSlots) {
     const dateRange = slots.travelEndDate ? `${slots.travelStartDate} 至 ${slots.travelEndDate}` : slots.travelStartDate;
     return [
         `请基于我的基础信息，先生成一版 ${slots.city} 行前智能规划。`,
+        slots.departureCity ? `出发城市：${slots.departureCity}` : "",
         `日期：${dateRange}`,
         `人数：${slots.peopleCount}`,
         slots.travelStyle ? `旅行偏好：${slots.travelStyle}` : "",
@@ -675,6 +700,10 @@ export default function AiPlanner() {
     const viewingSnapshotVersionRef = useRef<SnapshotView>("latest");
     const selectedPlaceIdsRef = useRef<string[]>([]);
     const activeDayIndexRef = useRef(1);
+    const plannerRunInFlightRef = useRef(false);
+    const lastPlannerRunCompletedRef = useRef(false);
+    const wsReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const wsReconnectAttemptsRef = useRef(0);
     const initialSessionRef = useRef<PlannerStoredSession | null | undefined>(undefined);
 
     if (initialSessionRef.current === undefined) {
@@ -694,6 +723,7 @@ export default function AiPlanner() {
         return configuredUserId;
     });
 
+    const [departureCity, setDepartureCity] = useState(initialForm.departureCity);
     const [city, setCity] = useState(initialForm.city);
     const [travelStartDate, setTravelStartDate] = useState<Dayjs | null>(dateValue(initialForm.travelStartDate));
     const [travelEndDate, setTravelEndDate] = useState<Dayjs | null>(dateValue(initialForm.travelEndDate));
@@ -709,18 +739,17 @@ export default function AiPlanner() {
 
     const [conversation, setConversation] = useState<PlannerConversationResponse | null>(initialSession?.conversation || null);
     const [socketStatus, setSocketStatus] = useState<SocketStatus>("idle");
+    const [wsReconnectNonce, setWsReconnectNonce] = useState(0);
     const [creating, setCreating] = useState(false);
     const [hydrating, setHydrating] = useState(Boolean(initialSession?.conversation));
     const [chatSending, setChatSending] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
-    const [chatInput, setChatInput] = useState(initialSession?.chatInput || "");
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>(initialSession?.chatMessages || []);
     const [liveData, setLiveData] = useState<PlannerViewData>(initialLiveData);
     const [displayData, setDisplayData] = useState<PlannerViewData>(initialDisplayData);
     const [snapshots, setSnapshots] = useState<PlannerSnapshot[]>(sortSnapshots(initialSession?.snapshots || []));
     const [plannerTraceEvents, setPlannerTraceEvents] = useState<PlannerTraceEvent[]>(initialSession?.plannerTraceEvents || []);
     const [viewingSnapshotVersion, setViewingSnapshotVersion] = useState<SnapshotView>(initialSession?.viewingSnapshotVersion || "latest");
-    const [workspaceTab, setWorkspaceTab] = useState<PlannerWorkspaceTab>(initialSession?.workspaceTab || "markdown");
     const [markdownMode, setMarkdownMode] = useState<PlannerMarkdownMode>(initialSession?.markdownMode || "preview");
     const [snapshotDiff, setSnapshotDiff] = useState<PlannerSnapshotDiffResponse | null>(null);
     const [snapshotDiffLoading, setSnapshotDiffLoading] = useState(false);
@@ -736,6 +765,7 @@ export default function AiPlanner() {
     );
 
     const formState = useMemo<PlannerFormState>(() => ({
+        departureCity,
         city,
         travelStartDate: formatPlannerDate(travelStartDate),
         travelEndDate: formatPlannerDate(travelEndDate),
@@ -749,6 +779,7 @@ export default function AiPlanner() {
         notes,
         modelVariant,
     }), [
+        departureCity,
         city,
         travelStartDate,
         travelEndDate,
@@ -764,6 +795,7 @@ export default function AiPlanner() {
     ]);
 
     const coreSlots = useMemo<PlannerCoreSlots>(() => ({
+        departureCity: departureCity.trim() || undefined,
         city: city.trim(),
         travelStartDate: formatPlannerDate(travelStartDate),
         travelEndDate: formatPlannerDate(travelEndDate) || undefined,
@@ -776,6 +808,7 @@ export default function AiPlanner() {
         mustVisitKeywords: splitKeywords(mustVisitKeywords),
         avoidKeywords: splitKeywords(avoidKeywords),
     }), [
+        departureCity,
         city,
         travelStartDate,
         travelEndDate,
@@ -800,7 +833,6 @@ export default function AiPlanner() {
         return activeEvent || progressEvents[progressEvents.length - 1] || null;
     }, [progressEvents]);
     const recentTraceEvents = useMemo(() => progressEvents.slice(-5), [progressEvents]);
-    const showPlannerProgress = chatSending || progressEvents.length > 0;
     const displayedDayPlans = displayData.dayPlans || [];
     const completedDaySet = useMemo(() => new Set(displayData.completedDayIndexes || []), [displayData.completedDayIndexes]);
     const tripDayCount = useMemo(() => {
@@ -848,6 +880,16 @@ export default function AiPlanner() {
     const activeDayIndex = dayOptions.includes(targetDayIndex) ? targetDayIndex : suggestedDayIndex;
     const nextDayIndex = Math.min(tripDayCount, activeDayIndex + 1);
     const canGenerateNextDay = nextDayIndex > activeDayIndex;
+    const activeDayPlan = displayedDayPlanByIndex.get(activeDayIndex);
+    const hasActiveDayPlan = Boolean(activeDayPlan);
+    const hasAllTripDayPlans = Array.from({length: tripDayCount}, (_, index) => index + 1)
+        .every(dayIndex => displayedDayPlanByIndex.has(dayIndex));
+    const activeDayDate = coreSlots.travelStartDate
+        ? dayjs(coreSlots.travelStartDate).add(activeDayIndex - 1, "day").format("YYYY-MM-DD")
+        : undefined;
+    const nextDayDate = coreSlots.travelStartDate
+        ? dayjs(coreSlots.travelStartDate).add(nextDayIndex - 1, "day").format("YYYY-MM-DD")
+        : undefined;
     const selectedDayVersion = useMemo(
         () => typeof viewingSnapshotVersion === "number"
             ? dayVersions.find(record => record.dayVersion === viewingSnapshotVersion)
@@ -894,35 +936,32 @@ export default function AiPlanner() {
             form: formState,
             conversation,
             chatMessages,
-        chatInput,
-        liveData,
-        displayData,
-        snapshots,
-        plannerTraceEvents,
-        viewingSnapshotVersion,
-        workspaceTab,
-        markdownMode,
-        targetDayIndex,
-    };
+            liveData,
+            displayData,
+            snapshots,
+            plannerTraceEvents,
+            viewingSnapshotVersion,
+            markdownMode,
+            targetDayIndex,
+        };
         localStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(session));
     }, [
         userId,
         formState,
         conversation,
         chatMessages,
-        chatInput,
         liveData,
         displayData,
         snapshots,
         plannerTraceEvents,
         viewingSnapshotVersion,
-        workspaceTab,
         markdownMode,
         targetDayIndex,
     ]);
 
     const applyCoreSlotsToForm = useCallback((slots: PlannerCoreSlots) => {
         const nextForm = formFromCoreSlots(slots);
+        setDepartureCity(nextForm.departureCity);
         setCity(nextForm.city);
         setTravelStartDate(dateValue(nextForm.travelStartDate));
         setTravelEndDate(dateValue(nextForm.travelEndDate));
@@ -1013,7 +1052,6 @@ export default function AiPlanner() {
                 setSnapshotView("latest");
                 setTargetDayIndex(1);
                 setChatMessages([]);
-                setChatInput("");
                 setErrorMessage("之前缓存的 AI 规划会话已随数据库重置清理，请重新开始规划。");
                 return;
             }
@@ -1121,7 +1159,13 @@ export default function AiPlanner() {
         socket.onopen = () => {
             if (closedByCleanup) return;
 
+            wsReconnectAttemptsRef.current = 0;
+            if (wsReconnectTimerRef.current) {
+                clearTimeout(wsReconnectTimerRef.current);
+                wsReconnectTimerRef.current = null;
+            }
             setSocketStatus("connected");
+            setErrorMessage(prevMessage => prevMessage === PLANNER_WS_RECONNECT_MESSAGE ? "" : prevMessage);
             const seed = pendingInitialPromptRef.current?.conversationId === conversationId
                 ? pendingInitialPromptRef.current
                 : null;
@@ -1137,12 +1181,13 @@ export default function AiPlanner() {
 
             if (seed) {
                 pendingInitialPromptRef.current = null;
+                plannerRunInFlightRef.current = true;
+                lastPlannerRunCompletedRef.current = false;
                 sendPlannerEnvelope(socket, conversationId, "PLANNER_CHAT_SEND", {
                     message: seed.prompt,
                     selectedPlaceIds: selectedPlaceIdsRef.current,
                     modelVariant,
                 });
-                setWorkspaceTab("chat");
                 setChatSending(true);
             }
         };
@@ -1159,7 +1204,12 @@ export default function AiPlanner() {
                 const payload = envelope.payload as PlannerTraceEvent;
                 setPlannerTraceEvents(prevEvents => [...prevEvents.slice(-11), payload]);
                 if (payload.type === "RUN_FAILED") {
+                    plannerRunInFlightRef.current = false;
+                    lastPlannerRunCompletedRef.current = false;
                     setChatSending(false);
+                }
+                if (payload.type === "RUN_FINISHED") {
+                    lastPlannerRunCompletedRef.current = true;
                 }
                 return;
             }
@@ -1167,15 +1217,28 @@ export default function AiPlanner() {
             if (envelope.type === "PLANNER_DATA_REFRESH") {
                 const payload = envelope.payload as PlannerDataRefreshPayload;
                 applyLiveData(viewDataFromRefresh(payload));
-                setWorkspaceTab("markdown");
+                plannerRunInFlightRef.current = false;
+                lastPlannerRunCompletedRef.current = true;
                 setChatSending(false);
+                setErrorMessage(prevMessage => prevMessage === PLANNER_WS_RECONNECT_MESSAGE ? "" : prevMessage);
                 void refreshSnapshotList(conversationId);
                 void loadDayVersions(conversationId, payload.currentDayIndex || activeDayIndexRef.current);
                 return;
             }
 
+            if (envelope.type === "PLANNER_SNAPSHOT_SAVED") {
+                plannerRunInFlightRef.current = false;
+                lastPlannerRunCompletedRef.current = true;
+                setChatSending(false);
+                setErrorMessage(prevMessage => prevMessage === PLANNER_WS_RECONNECT_MESSAGE ? "" : prevMessage);
+                void refreshConversationFromServer(conversationId);
+                return;
+            }
+
             if (envelope.type === "PLANNER_ERROR") {
                 const payload = envelope.payload as PlannerErrorPayload;
+                plannerRunInFlightRef.current = false;
+                lastPlannerRunCompletedRef.current = false;
                 setErrorMessage(formatPlannerError(payload));
                 setChatSending(false);
             }
@@ -1184,18 +1247,47 @@ export default function AiPlanner() {
         socket.onerror = () => {
             if (closedByCleanup) return;
             setSocketStatus("error");
-            setErrorMessage("WebSocket 连接失败，请确认 api-gateway 和 ai-arrange-service 已启动。");
+            if (plannerRunInFlightRef.current && !lastPlannerRunCompletedRef.current) {
+                setErrorMessage(PLANNER_WS_RECONNECT_MESSAGE);
+            }
             setChatSending(false);
         };
 
         socket.onclose = () => {
             if (closedByCleanup) return;
-            setSocketStatus(prevStatus => prevStatus === "error" ? "error" : "closed");
+            if (plannerWSRef.current === socket) {
+                plannerWSRef.current = null;
+            }
+            const completedNormally = lastPlannerRunCompletedRef.current;
+            const wasPlanning = plannerRunInFlightRef.current;
+            if (completedNormally) {
+                plannerRunInFlightRef.current = false;
+            }
+            setSocketStatus(prevStatus => prevStatus === "error" && wasPlanning && !completedNormally ? "error" : "closed");
             setChatSending(false);
+            if (completedNormally) {
+                setErrorMessage(prevMessage => prevMessage === PLANNER_WS_RECONNECT_MESSAGE ? "" : prevMessage);
+                window.setTimeout(() => refreshConversationFromServer(conversationId), 500);
+            } else if (wasPlanning) {
+                setErrorMessage(prevMessage => prevMessage || PLANNER_WS_RECONNECT_MESSAGE);
+            }
+
+            if (!wsReconnectTimerRef.current) {
+                const reconnectDelay = Math.min(10000, 1000 * Math.max(1, wsReconnectAttemptsRef.current + 1));
+                wsReconnectTimerRef.current = setTimeout(() => {
+                    wsReconnectTimerRef.current = null;
+                    wsReconnectAttemptsRef.current += 1;
+                    setWsReconnectNonce(value => value + 1);
+                }, reconnectDelay);
+            }
         };
 
         return () => {
             closedByCleanup = true;
+            if (wsReconnectTimerRef.current) {
+                clearTimeout(wsReconnectTimerRef.current);
+                wsReconnectTimerRef.current = null;
+            }
             socket.close();
             if (plannerWSRef.current === socket) {
                 plannerWSRef.current = null;
@@ -1207,9 +1299,11 @@ export default function AiPlanner() {
         conversation?.id,
         loadDayVersions,
         modelVariant,
+        refreshConversationFromServer,
         refreshSnapshotList,
         sendPlannerEnvelope,
         userId,
+        wsReconnectNonce,
     ]);
 
     const handleStartPlanning = async (event: FormEvent<HTMLFormElement>) => {
@@ -1243,11 +1337,9 @@ export default function AiPlanner() {
             setDayVersions([]);
             setPlannerTraceEvents([]);
             setSnapshotView("latest");
-            setWorkspaceTab("chat");
             setTargetDayIndex(1);
             setAssemblingTrip(false);
             setChatMessages([]);
-            setChatInput("");
         } catch (error) {
             console.error(error);
             setErrorMessage("创建 AI 规划会话失败，请确认网关 /ai-arrange/api/conversations 可访问。");
@@ -1300,7 +1392,8 @@ export default function AiPlanner() {
         ]);
         setErrorMessage("");
         setPlannerTraceEvents([]);
-        setWorkspaceTab("chat");
+        plannerRunInFlightRef.current = true;
+        lastPlannerRunCompletedRef.current = false;
         setChatSending(true);
 
         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -1323,7 +1416,7 @@ export default function AiPlanner() {
                 userId,
             });
             applySnapshotToPlannerState(response.data, payload.targetDayIndex);
-            setWorkspaceTab("markdown");
+            lastPlannerRunCompletedRef.current = true;
             setChatMessages(prevMessages => [
                 ...prevMessages,
                 {
@@ -1338,12 +1431,13 @@ export default function AiPlanner() {
             console.error(error);
             setErrorMessage("生成日计划失败，请确认 ai-arrange-service 与 Python Agent 可用后重试。");
         } finally {
+            plannerRunInFlightRef.current = false;
             setChatSending(false);
         }
     };
 
-    const handleSendChat = () => {
-        const trimmedInput = chatInput.trim();
+    const sendChatMessage = (message: string) => {
+        const trimmedInput = message.trim();
         if (!trimmedInput || !conversation) return;
 
         if (isSnapshotPreview) {
@@ -1361,10 +1455,10 @@ export default function AiPlanner() {
             ...prevMessages,
             {id: uuidv4(), role: "user", text: trimmedInput}
         ]);
-        setChatInput("");
         setErrorMessage("");
         setPlannerTraceEvents([]);
-        setWorkspaceTab("chat");
+        plannerRunInFlightRef.current = true;
+        lastPlannerRunCompletedRef.current = false;
         sendPlannerEnvelope(socket, conversation.id, "PLANNER_CHAT_SEND", {
             message: trimmedInput,
             selectedPlaceIds: liveData.selectedPlaceIds,
@@ -1408,7 +1502,6 @@ export default function AiPlanner() {
         if (value === "latest") {
             setSnapshotView("latest");
             setDisplayData(viewDataForDay(liveData, activeDayIndex));
-            setWorkspaceTab("markdown");
             return;
         }
 
@@ -1418,7 +1511,6 @@ export default function AiPlanner() {
 
         setSnapshotView(dayVersionValue);
         setDisplayData(viewDataFromDayVersion(dayVersion, liveData));
-        setWorkspaceTab("markdown");
     };
 
     const handleRestoreSnapshot = async () => {
@@ -1450,7 +1542,6 @@ export default function AiPlanner() {
             setDisplayData(viewDataForDay(restoredData, dayIndex));
             setSnapshotView("latest");
             setSnapshotDiff(null);
-            setWorkspaceTab("markdown");
             setTargetDayIndex(restoredSnapshot.currentDayIndex || restoredSnapshot.targetDayIndex || dayIndex);
             setChatMessages(prevMessages => [
                 ...prevMessages,
@@ -1480,7 +1571,6 @@ export default function AiPlanner() {
 
         setAssemblingTrip(true);
         setErrorMessage("");
-        setWorkspaceTab("markdown");
         try {
             const response = await ApiRequests.assemblePlannerTripSnapshot(conversation.id, userId);
             const assembledSnapshot = response.data;
@@ -1529,6 +1619,8 @@ export default function AiPlanner() {
     const resetPlanner = () => {
         plannerWSRef.current?.close();
         pendingInitialPromptRef.current = null;
+        plannerRunInFlightRef.current = false;
+        lastPlannerRunCompletedRef.current = false;
         localStorage.removeItem(PLANNER_STORAGE_KEY);
 
         const nextForm = defaultPlannerForm();
@@ -1540,14 +1632,12 @@ export default function AiPlanner() {
         setHydrating(false);
         setChatSending(false);
         setErrorMessage("");
-        setChatInput("");
         setChatMessages([]);
         setLiveData(nextData);
         setDisplayData(nextData);
         setSnapshots([]);
         setPlannerTraceEvents([]);
         setSnapshotView("latest");
-        setWorkspaceTab("markdown");
         setMarkdownMode("preview");
         setSnapshotDiff(null);
         setSnapshotDiffLoading(false);
@@ -1574,6 +1664,8 @@ export default function AiPlanner() {
     const loadMockPlannerData = () => {
         plannerWSRef.current?.close();
         pendingInitialPromptRef.current = null;
+        plannerRunInFlightRef.current = false;
+        lastPlannerRunCompletedRef.current = false;
 
         const nextData = {
             ...emptyPlannerView(),
@@ -1587,7 +1679,6 @@ export default function AiPlanner() {
         setHydrating(false);
         setChatSending(false);
         setErrorMessage("");
-        setChatInput("");
         setChatMessages([
             {
                 id: uuidv4(),
@@ -1600,7 +1691,6 @@ export default function AiPlanner() {
         setSnapshots([]);
         setPlannerTraceEvents([]);
         setSnapshotView("latest");
-        setWorkspaceTab("markdown");
         setMarkdownMode("preview");
         setSnapshotDiff(null);
         setSnapshotDiffLoading(false);
@@ -1628,6 +1718,64 @@ export default function AiPlanner() {
             <MenuItem value="FLASH">Flash 快速</MenuItem>
             <MenuItem value="PRO">Pro 高质量</MenuItem>
         </TextField>
+    );
+
+    const renderFreeSoloInput = (
+        label: string,
+        value: string,
+        onChange: (value: string) => void,
+        options: string[],
+        props?: {
+            required?: boolean,
+            placeholder?: string,
+        }
+    ) => (
+        <Autocomplete
+            freeSolo
+            forcePopupIcon
+            options={options}
+            value={value}
+            inputValue={value}
+            onChange={(_, nextValue) => onChange(nextValue || "")}
+            onInputChange={(_, nextInputValue) => onChange(nextInputValue)}
+            renderInput={params => (
+                <TextField
+                    {...params}
+                    label={label}
+                    required={props?.required}
+                    placeholder={props?.placeholder}
+                    fullWidth
+                />
+            )}
+        />
+    );
+
+    const renderPeopleCountInput = () => (
+        <Autocomplete
+            freeSolo
+            forcePopupIcon
+            options={PEOPLE_COUNT_QUICK_OPTIONS}
+            value={String(peopleCount)}
+            inputValue={String(peopleCount)}
+            onChange={(_, nextValue) => setPeopleCount(Math.max(1, Number(nextValue) || 1))}
+            onInputChange={(_, nextInputValue) => {
+                if (nextInputValue === "") {
+                    setPeopleCount(1);
+                    return;
+                }
+                setPeopleCount(Math.max(1, Number(nextInputValue) || 1));
+            }}
+            renderInput={params => (
+                <TextField
+                    {...params}
+                    label="人数"
+                    required
+                    fullWidth
+                    type="number"
+                    inputProps={{...params.inputProps, min: 1}}
+                />
+            )}
+        />
     );
 
     const renderSnapshotDiffPanel = () => {
@@ -1712,22 +1860,38 @@ export default function AiPlanner() {
         });
     };
 
+    const navigateToBookingLink = (link: PlannerBookingLink) => {
+        if (!link.url) return;
+        const normalizedUrl = normalizeBookingUrl(link.url);
+        if (normalizedUrl) {
+            navigate(normalizedUrl);
+            return;
+        }
+    };
+
+    const normalizeBookingUrl = (url: string) => {
+        const trimmed = url.trim();
+        const exampleMatch = trimmed.match(/^https?:\/\/example\.com(\/reservations\/(?:hotels(?:\/[^\s?#)]+)?|trains|flights)(?:[?#][^\s)]*)?)$/i);
+        if (exampleMatch) {
+            return exampleMatch[1];
+        }
+        if (/^\/reservations\/(?:hotels(?:\/[^\s?#)]+)?|trains|flights)(?:[?#].*)?$/i.test(trimmed)) {
+            return trimmed;
+        }
+        return null;
+    };
+
+    const bookingIcon = (type?: string) => {
+        if (type === "HOTEL") return <Hotel/>;
+        if (type === "TRAIN") return <Train/>;
+        if (type === "FLIGHT") return <Flight/>;
+        return <TravelExplore/>;
+    };
+
     const renderDayPlanBar = () => {
         if (!conversation) return null;
 
-        const canUseDayActions = !chatSending && !assemblingTrip && !isSnapshotPreview;
         const dayPlanByIndex = new Map(displayedDayPlans.map(dayPlan => [dayPlan.dayIndex || 0, dayPlan]));
-        const activeDayPlan = dayPlanByIndex.get(activeDayIndex);
-        const hasActiveDayPlan = Boolean(activeDayPlan);
-        const hasAllTripDayPlans = Array.from({length: tripDayCount}, (_, index) => index + 1)
-                .every(dayIndex => dayPlanByIndex.has(dayIndex));
-        const canUseAssembleAction = !chatSending && !assemblingTrip && !isSnapshotPreview && hasAllTripDayPlans;
-        const activeDayDate = coreSlots.travelStartDate
-            ? dayjs(coreSlots.travelStartDate).add(activeDayIndex - 1, "day").format("YYYY-MM-DD")
-            : undefined;
-        const nextDayDate = coreSlots.travelStartDate
-            ? dayjs(coreSlots.travelStartDate).add(nextDayIndex - 1, "day").format("YYYY-MM-DD")
-            : undefined;
         return (
             <section className="shrink-0 rounded-lg border border-gray-200 bg-white px-4 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1779,77 +1943,6 @@ export default function AiPlanner() {
                             );
                         })}
                     </ToggleButtonGroup>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<AutoFixHigh/>}
-                            disabled={!canUseDayActions}
-                            onClick={() => sendPlannerActionMessage(
-                                hasActiveDayPlan
-                                    ? `请基于当前选中的地点和偏好，优化第 ${activeDayIndex} 天的行程。`
-                                    : `请基于已确认天数和当前偏好，生成第 ${activeDayIndex} 天行程。`,
-                                {
-                                planningMode: hasActiveDayPlan ? "REFINE_WITH_SELECTION" : "ASK_MORE_OPTIONS",
-                                planningScope: hasActiveDayPlan ? "DAY_REFINE" : "DAY_PLAN",
-                                targetDayIndex: activeDayIndex,
-                                targetDate: activeDayDate,
-                                interaction: {
-                                    selectedPlaceIds: liveData.selectedPlaceIds,
-                                    freeText: hasActiveDayPlan ? `优化第 ${activeDayIndex} 天` : `生成第 ${activeDayIndex} 天`,
-                                },
-                            })}
-                        >
-                            {hasActiveDayPlan ? "优化当天" : "生成当天"}
-                        </Button>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<TaskAlt/>}
-                            disabled={!canUseDayActions || !hasActiveDayPlan}
-                            onClick={() => sendPlannerActionMessage(`确认第 ${activeDayIndex} 天行程，并保留当前选中的地点。`, {
-                                planningMode: "REFINE_WITH_SELECTION",
-                                planningScope: "DAY_REFINE",
-                                targetDayIndex: activeDayIndex,
-                                targetDate: activeDayDate,
-                                interaction: {
-                                    selectedPlaceIds: liveData.selectedPlaceIds,
-                                    freeText: `确认第 ${activeDayIndex} 天`,
-                                    confirmCurrentPlan: true,
-                                },
-                            })}
-                        >
-                            确认当天
-                        </Button>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<PlaylistAdd/>}
-                            disabled={!canUseDayActions || !hasActiveDayPlan || !canGenerateNextDay}
-                            onClick={() => sendPlannerActionMessage(`请基于已确认天数和当前偏好，生成第 ${nextDayIndex} 天行程。`, {
-                                planningMode: "ASK_MORE_OPTIONS",
-                                planningScope: "DAY_PLAN",
-                                targetDayIndex: nextDayIndex,
-                                targetDate: nextDayDate,
-                                interaction: {
-                                    selectedPlaceIds: liveData.selectedPlaceIds,
-                                    freeText: `生成第 ${nextDayIndex} 天`,
-                                },
-                            })}
-                        >
-                            生成下一天
-                        </Button>
-                        <Button
-                            size="small"
-                            variant="contained"
-                            startIcon={<TravelExplore/>}
-                            disabled={!canUseAssembleAction}
-                            onClick={handleAssembleTrip}
-                        >
-                            {assemblingTrip ? "汇总中" : hasAllTripDayPlans ? "汇总行程" : "先补齐日计划"}
-                        </Button>
-                    </div>
                 </div>
             </section>
         );
@@ -1859,7 +1952,7 @@ export default function AiPlanner() {
         <div className="grid shrink-0 gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 md:grid-cols-3">
             <div className="flex items-center gap-2 text-gray-700">
                 <LocationOn style={{fontSize: 20, color: "#556cd6"}}/>
-                <span>{coreSlots.city}</span>
+                <span>{coreSlots.departureCity ? `${coreSlots.departureCity} → ${coreSlots.city}` : coreSlots.city}</span>
             </div>
             <div className="flex items-center gap-2 text-gray-700">
                 <CalendarMonth style={{fontSize: 20, color: "#556cd6"}}/>
@@ -1883,13 +1976,10 @@ export default function AiPlanner() {
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <div className="grid gap-4">
-                    <TextField
-                        label="旅游城市"
-                        value={city}
-                        required
-                        fullWidth
-                        onChange={event => setCity(event.target.value)}
-                    />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        {renderFreeSoloInput("出发城市", departureCity, setDepartureCity, CITY_QUICK_OPTIONS, {placeholder: "例如：北京"})}
+                        {renderFreeSoloInput("旅游城市", city, setCity, CITY_QUICK_OPTIONS, {required: true})}
+                    </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <DatePicker
@@ -1907,66 +1997,23 @@ export default function AiPlanner() {
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <TextField
-                            label="人数"
-                            value={peopleCount}
-                            required
-                            fullWidth
-                            type="number"
-                            inputProps={{min: 1}}
-                            onChange={event => setPeopleCount(Math.max(1, Number(event.target.value) || 1))}
-                        />
+                        {renderPeopleCountInput()}
                         {renderModelVariantSelect(true)}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <TextField
-                            label="旅行偏好"
-                            value={travelStyle}
-                            fullWidth
-                            onChange={event => setTravelStyle(event.target.value)}
-                        />
-                        <TextField
-                            label="预算"
-                            value={budget}
-                            fullWidth
-                            placeholder="例如：人均 3000"
-                            onChange={event => setBudget(event.target.value)}
-                        />
+                        {renderFreeSoloInput("旅行偏好", travelStyle, setTravelStyle, TRAVEL_STYLE_QUICK_OPTIONS)}
+                        {renderFreeSoloInput("预算", budget, setBudget, BUDGET_QUICK_OPTIONS, {placeholder: "例如：人均 3000"})}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <TextField
-                            label="住宿偏好"
-                            value={accommodationPreference}
-                            fullWidth
-                            placeholder="例如：地铁附近、亲子酒店"
-                            onChange={event => setAccommodationPreference(event.target.value)}
-                        />
-                        <TextField
-                            label="交通偏好"
-                            value={transportPreference}
-                            fullWidth
-                            placeholder="例如：少打车、公共交通优先"
-                            onChange={event => setTransportPreference(event.target.value)}
-                        />
+                        {renderFreeSoloInput("住宿偏好", accommodationPreference, setAccommodationPreference, ACCOMMODATION_QUICK_OPTIONS, {placeholder: "例如：地铁附近、亲子酒店"})}
+                        {renderFreeSoloInput("交通偏好", transportPreference, setTransportPreference, TRANSPORT_QUICK_OPTIONS, {placeholder: "例如：少打车、公共交通优先"})}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <TextField
-                            label="想去的地点/关键词"
-                            value={mustVisitKeywords}
-                            fullWidth
-                            placeholder="外滩、博物馆、咖啡"
-                            onChange={event => setMustVisitKeywords(event.target.value)}
-                        />
-                        <TextField
-                            label="需要避开的内容"
-                            value={avoidKeywords}
-                            fullWidth
-                            placeholder="夜市、排队过久"
-                            onChange={event => setAvoidKeywords(event.target.value)}
-                        />
+                        {renderFreeSoloInput("想去的地点/关键词", mustVisitKeywords, setMustVisitKeywords, MUST_VISIT_QUICK_OPTIONS, {placeholder: "外滩、博物馆、咖啡"})}
+                        {renderFreeSoloInput("需要避开的内容", avoidKeywords, setAvoidKeywords, AVOID_QUICK_OPTIONS, {placeholder: "夜市、排队过久"})}
                     </div>
 
                     <TextField
@@ -2004,29 +2051,12 @@ export default function AiPlanner() {
         </form>
     );
 
-    const renderWorkspaceTabs = () => (
-        <Tabs
-            value={workspaceTab}
-            onChange={(_, value) => value && setWorkspaceTab(value)}
-            textColor="primary"
-            indicatorColor="primary"
-            variant="scrollable"
-            scrollButtons="auto"
-            sx={{
-                minHeight: 40,
-                "& .MuiTab-root": {minHeight: 40, px: 1.5},
-            }}
-        >
-            <Tab value="markdown" icon={<EditNote fontSize="small"/>} iconPosition="start" label="规划 Markdown"/>
-            <Tab value="chat" icon={<ChatBubbleOutline fontSize="small"/>} iconPosition="start" label="对话协作"/>
-        </Tabs>
-    );
-
     const renderMarkdownPanel = () => (
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-2">
-                <div className="min-w-0 flex-1">
-                    {renderWorkspaceTabs()}
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-gray-700">
+                    <EditNote fontSize="small"/>
+                    <Typography variant="subtitle1" className="truncate">规划 Markdown</Typography>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -2128,127 +2158,6 @@ export default function AiPlanner() {
         </section>
     );
 
-    const renderPlannerProgress = () => {
-        if (!showPlannerProgress) return null;
-
-        const activeStatus = currentTraceEvent?.status || (chatSending ? "RUNNING" : "SUCCESS");
-        const activeLabel = traceMessage(currentTraceEvent) || (chatSending ? "正在等待规划引擎响应..." : "规划任务已结束。");
-
-        return (
-            <div className="shrink-0 border-b border-gray-200 bg-[#fbfcff] px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2 text-gray-800">
-                        {activeStatus === "FAILED"
-                            ? <ErrorOutline style={{fontSize: 20, color: "#d32f2f"}}/>
-                            : activeStatus === "SUCCESS"
-                                ? <CheckCircle style={{fontSize: 20, color: "#2e7d32"}}/>
-                                : <HourglassTop style={{fontSize: 20, color: "#556cd6"}}/>
-                        }
-                        <Typography variant="body2" className="truncate">
-                            {activeLabel}
-                        </Typography>
-                    </div>
-                    <Chip
-                        size="small"
-                        color={traceStatusColor(activeStatus)}
-                        variant="outlined"
-                        label={traceStatusLabel(activeStatus)}
-                    />
-                </div>
-
-                {chatSending &&
-                    <Box sx={{mt: 1.25}}>
-                        <LinearProgress/>
-                    </Box>
-                }
-
-                {recentTraceEvents.length > 0 &&
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                        {recentTraceEvents.map((event, index) => (
-                            <Chip
-                                key={traceEventKey(event, index)}
-                                size="small"
-                                variant="outlined"
-                                color={traceStatusColor(event.status)}
-                                label={`${traceToolLabel(event.tool)} · ${traceStatusLabel(event.status)}`}
-                            />
-                        ))}
-                    </div>
-                }
-            </div>
-        );
-    };
-
-    const renderChatPanel = () => (
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-2">
-                <div className="min-w-0 flex-1">
-                    {renderWorkspaceTabs()}
-                </div>
-                <div className="flex items-center gap-2">
-                    {chatSending && <Chip size="small" label="AI 生成中" color="primary" variant="outlined"/>}
-                    <Tooltip title="重新填写槽位">
-                        <IconButton onClick={resetPlanner}>
-                            <RestartAlt/>
-                        </IconButton>
-                    </Tooltip>
-                </div>
-            </div>
-
-            {renderPlannerProgress()}
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-                {chatMessages.length === 0 &&
-                    <Typography variant="body2" color="text.secondary">开始规划后，AI 的追问、建议和流式回复会显示在这里。</Typography>
-                }
-
-                {chatMessages.map(message => (
-                    <div key={message.id} className={`mb-3 flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                        <div
-                            className={`max-w-[82%] rounded-lg px-4 py-3 text-sm leading-6 ${
-                                message.role === "user"
-                                    ? "bg-[#556cd6] text-white"
-                                    : message.role === "system"
-                                        ? "bg-gray-100 text-gray-600"
-                                        : "bg-[#f4f6fb] text-gray-800"
-                            }`}
-                        >
-                            <pre className="whitespace-pre-wrap font-sans">{message.text}{message.streaming ? "|" : ""}</pre>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <div className="shrink-0 border-t border-gray-200 p-3">
-                <div className="flex gap-2">
-                    <TextField
-                        value={chatInput}
-                        onChange={event => setChatInput(event.target.value)}
-                        onKeyDown={event => {
-                            if (event.key === "Enter" && !event.shiftKey) {
-                                event.preventDefault();
-                                handleSendChat();
-                            }
-                        }}
-                        fullWidth
-                        multiline
-                        maxRows={3}
-                        disabled={!conversation || isSnapshotPreview || assemblingTrip}
-                        placeholder={isSnapshotPreview ? "历史快照只读，请切回最新版本后继续对话。" : "继续告诉 AI：想加一个亲子景点、减少换乘、调整酒店区域..."}
-                    />
-                    <Button
-                        variant="contained"
-                        onClick={handleSendChat}
-                        disabled={!chatInput.trim() || socketStatus !== "connected" || isSnapshotPreview || assemblingTrip}
-                        startIcon={<Send/>}
-                    >
-                        发送
-                    </Button>
-                </div>
-            </div>
-        </section>
-    );
-
     const renderRecommendationsPanel = () => (
         <section className="flex min-h-0 flex-[1.35] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
@@ -2264,6 +2173,7 @@ export default function AiPlanner() {
                 <div className="flex flex-col gap-3">
                     {displayData.places.map((place, index) => {
                         const selected = displayData.selectedPlaceIds.includes(place.placeId);
+                        const bookingLinks = (place.bookingLinks || []).filter(link => Boolean(link.url && normalizeBookingUrl(link.url)));
                         return (
                             <Paper key={place.placeId} elevation={0} className="border border-gray-200 p-4">
                                 <div className="mb-2 flex items-start justify-between gap-3">
@@ -2297,7 +2207,7 @@ export default function AiPlanner() {
                                     >
                                         {selected ? "取消选择" : "加入计划"}
                                     </Button>
-                                    {place.internalOfferId &&
+                                    {place.internalOfferId && bookingLinks.length === 0 &&
                                         <Button
                                             size="small"
                                             variant="text"
@@ -2307,6 +2217,17 @@ export default function AiPlanner() {
                                             去预订
                                         </Button>
                                     }
+                                    {bookingLinks.map(link => (
+                                        <Button
+                                            key={`${place.placeId}-${link.type}-${link.url}`}
+                                            size="small"
+                                            variant="text"
+                                            startIcon={bookingIcon(link.type)}
+                                            onClick={() => navigateToBookingLink(link)}
+                                        >
+                                            {link.label || "去预订"}
+                                        </Button>
+                                    ))}
                                 </div>
                             </Paper>
                         );
@@ -2389,11 +2310,37 @@ export default function AiPlanner() {
                         <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
                             {renderTripBar()}
                             {renderDayPlanBar()}
-                            {workspaceTab === "markdown" ? renderMarkdownPanel() : renderChatPanel()}
+                            {renderMarkdownPanel()}
                         </div>
                     </div>
                 )}
             </div>
+            <FloatingAiAssistant
+                conversationActive={Boolean(conversation)}
+                socketStatus={socketStatus}
+                busy={chatSending || assemblingTrip}
+                busyLabel={assemblingTrip ? "正在汇总完整行程" : traceMessage(currentTraceEvent) || "AI 正在生成中"}
+                chatMessages={chatMessages}
+                progressEvents={recentTraceEvents}
+                currentProgressMessage={assemblingTrip ? "正在汇总完整行程" : traceMessage(currentTraceEvent) || (chatSending ? "正在等待规划引擎响应..." : "规划任务已结束。")}
+                currentProgressStatus={currentTraceEvent?.status || (chatSending || assemblingTrip ? "RUNNING" : "SUCCESS")}
+                isSnapshotPreview={isSnapshotPreview}
+                activeDayIndex={activeDayIndex}
+                activeDayDate={activeDayDate}
+                nextDayIndex={nextDayIndex}
+                nextDayDate={nextDayDate}
+                hasActiveDayPlan={hasActiveDayPlan}
+                canGenerateNextDay={canGenerateNextDay}
+                hasAllTripDayPlans={hasAllTripDayPlans}
+                hasDepartureCity={Boolean(coreSlots.departureCity)}
+                selectedPlaceIds={liveData.selectedPlaceIds}
+                traceToolLabel={traceToolLabel}
+                traceStatusLabel={traceStatusLabel}
+                traceStatusColor={traceStatusColor}
+                onPlannerAction={sendPlannerActionMessage}
+                onAssembleTrip={handleAssembleTrip}
+                onSendChat={sendChatMessage}
+            />
         </div>
     );
 }

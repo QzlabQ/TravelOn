@@ -257,7 +257,6 @@ const HotelBooking = () => {
         // instead of running a fresh one (handled by the restore effect below).
         if (isRestore && readSearchSnapshot()) return;
         loadDestinations().then(r => r);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Restore the saved filters + results when coming back from a hotel detail.
@@ -291,7 +290,6 @@ const HotelBooking = () => {
 
         const scrollTimer = window.setTimeout(() => window.scrollTo({top: snap.scrollY, behavior: 'auto'}), 150);
         return () => window.clearTimeout(scrollTimer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -305,7 +303,6 @@ const HotelBooking = () => {
         }
         searchHotels().then(r => r);
         setHasLoadedDestinations(true);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [destination]);
 
     const visibleOffers = offers;

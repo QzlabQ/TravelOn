@@ -21,6 +21,8 @@ public class TripCoreSlots {
     @NotBlank
     private String city;
 
+    private String departureCity;
+
     @NotNull
     private LocalDate travelStartDate;
 
