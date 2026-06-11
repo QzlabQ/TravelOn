@@ -21,6 +21,7 @@ import {
 import {Add, ArrowBack, Landscape, Search} from "@mui/icons-material";
 import axios from "axios";
 import {ApiRequests, AttractionResponse, CreateAttractionPayload} from "../../core/apiConfig";
+import CommunityImageUploader from "./CommunityImageUploader";
 
 type Props = {
     open: boolean,
@@ -36,7 +37,7 @@ type Props = {
     mode?: "pick" | "create",
 };
 
-const emptyCreate: CreateAttractionPayload = {name: "", cityId: "", description: "", coverImageUrl: ""};
+const emptyCreate: CreateAttractionPayload = {name: "", cityId: "", description: "", imageUrls: []};
 
 const AttractionPickerDialog = ({open, token, onPick, onClose, mode = "pick"}: Props) => {
     const createOnly = mode === "create";
@@ -111,7 +112,7 @@ const AttractionPickerDialog = ({open, token, onPick, onClose, mode = "pick"}: P
                 name: createPayload.name.trim(),
                 cityId: createPayload.cityId?.trim() || undefined,
                 description: createPayload.description?.trim() || undefined,
-                coverImageUrl: createPayload.coverImageUrl?.trim() || undefined,
+                imageUrls: createPayload.imageUrls ?? [],
             });
             onPick(res.data);
             handleClose();
@@ -250,12 +251,11 @@ const AttractionPickerDialog = ({open, token, onPick, onClose, mode = "pick"}: P
                                 multiline minRows={2} inputProps={{maxLength: 2000}}
                                 fullWidth size="small"
                             />
-                            <TextField
-                                label="封面图 URL（可选）"
-                                value={createPayload.coverImageUrl}
-                                onChange={e => setCreatePayload({...createPayload, coverImageUrl: e.target.value})}
-                                inputProps={{maxLength: 1000}}
-                                fullWidth size="small"
+                            <CommunityImageUploader
+                                token={token}
+                                value={createPayload.imageUrls ?? []}
+                                onChange={urls => setCreatePayload({...createPayload, imageUrls: urls})}
+                                disabled={creating}
                             />
                         </Box>
                     </Box>

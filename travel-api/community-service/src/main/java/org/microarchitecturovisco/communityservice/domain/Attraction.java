@@ -1,6 +1,8 @@
 package org.microarchitecturovisco.communityservice.domain;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
@@ -15,6 +17,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -40,6 +44,12 @@ public class Attraction {
 
     @Column(length = 1000)
     private String coverImageUrl;
+
+    @ElementCollection
+    @CollectionTable(name = "attraction_images", joinColumns = @JoinColumn(name = "attraction_id"))
+    @Column(name = "image_url", length = 1000)
+    @Builder.Default
+    private List<String> imageUrls = new ArrayList<>();
 
     @Column(nullable = false)
     private UUID createdByUserId;

@@ -19,10 +19,16 @@ public record PostResponse(
         String authorName,
         int likeCount,
         boolean likedByCurrentUser,
+        boolean favoritedByCurrentUser,
+        long commentCount,
         Instant createdAt,
         Instant updatedAt
 ) {
     public static PostResponse from(CommunityPost post, boolean likedByCurrentUser) {
+        return from(post, likedByCurrentUser, false, 0);
+    }
+
+    public static PostResponse from(CommunityPost post, boolean likedByCurrentUser, boolean favoritedByCurrentUser, long commentCount) {
         return new PostResponse(
                 post.getId(),
                 post.getTitle(),
@@ -35,6 +41,8 @@ public record PostResponse(
                 post.getAuthorName(),
                 post.getLikeCount(),
                 likedByCurrentUser,
+                favoritedByCurrentUser,
+                commentCount,
                 post.getCreatedAt(),
                 post.getUpdatedAt()
         );

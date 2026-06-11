@@ -6,6 +6,17 @@ const apiPort = process.env.REACT_APP_API_PORT || "58082";
 export const baseAPIURL = `http://${apiHostname}:${apiPort}/`;
 export const baseWSURL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${apiHostname}:${apiPort}/`;
 
+/**
+ * Resolves an image reference for display. Absolute URLs (seed data) and data URLs
+ * are returned untouched; relative paths from the local upload endpoint
+ * (e.g. /community/uploads/xyz.jpg) are prefixed with the API base URL.
+ */
+export const resolveCommunityImageUrl = (url?: string | null): string => {
+    if (!url) return "";
+    if (/^(https?:)?\/\//.test(url) || url.startsWith("data:")) return url;
+    return baseAPIURL.replace(/\/$/, "") + (url.startsWith("/") ? url : `/${url}`);
+};
+
 export const axiosInstance = axios.create({
     baseURL: baseAPIURL,
     timeout: 100000,
@@ -234,13 +245,27 @@ export class ApiRequests {
         });
     }
 
-    static listCommunityReviews = async (params: CommunityReviewsQuery) => {
-        return await axiosInstance.get<PageResponse<CommunityReviewResponse>>('community/reviews', {params});
+    static listCommunityReviews = async (params: CommunityReviewsQuery, token?: string) => {
+        return await axiosInstance.get<PageResponse<CommunityReviewResponse>>('community/reviews', {
+            params,
+            headers: token ? {'X-User-Token': token} : undefined,
+        });
     }
 
     static createCommunityReview = async (token: string, payload: CreateCommunityReviewPayload) => {
         return await axiosInstance.post<CommunityReviewResponse>('community/reviews', payload, {
             headers: {'X-User-Token': token}
+        });
+    }
+
+    static uploadCommunityImage = async (token: string, file: File) => {
+        const form = new FormData();
+        form.append('file', file);
+        // Override the global JSON default so axios treats the body as multipart.
+        // (With Content-Type: application/json, axios v1 serializes FormData to JSON.)
+        // The browser then replaces this with the real boundary when sending.
+        return await axiosInstance.post<UploadResponse>('community/uploads', form, {
+            headers: {'X-User-Token': token, 'Content-Type': 'multipart/form-data'}
         });
     }
 
@@ -258,12 +283,101 @@ export class ApiRequests {
         });
     }
 
-    static getAttraction = async (attractionId: string) => {
-        return await axiosInstance.get<AttractionDetailResponse>(`community/attractions/${attractionId}`);
+    static getAttraction = async (attractionId: string, token?: string) => {
+        return await axiosInstance.get<AttractionDetailResponse>(`community/attractions/${attractionId}`, {
+            headers: token ? {'X-User-Token': token} : undefined,
+        });
     }
 
     static createAttractionReview = async (token: string, attractionId: string, payload: CreateAttractionReviewPayload) => {
         return await axiosInstance.post<CommunityReviewResponse>(`community/attractions/${attractionId}/reviews`, payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static listTravelRoutes = async (params: TravelRoutesQuery) => {
+        return await axiosInstance.get<PageResponse<TravelRouteResponse>>('community/routes', {params});
+    }
+
+    static createTravelRoute = async (token: string, payload: CreateTravelRoutePayload) => {
+        return await axiosInstance.post<TravelRouteResponse>('community/routes', payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static getTravelRoute = async (routeId: string, token?: string) => {
+        return await axiosInstance.get<TravelRouteDetailResponse>(`community/routes/${routeId}`, {
+            headers: token ? {'X-User-Token': token} : undefined,
+        });
+    }
+
+    static createTravelRouteReview = async (token: string, routeId: string, payload: CreateAttractionReviewPayload) => {
+        return await axiosInstance.post<CommunityReviewResponse>(`community/routes/${routeId}/reviews`, payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static toggleFavorite = async (token: string, payload: ToggleFavoritePayload) => {
+        return await axiosInstance.post<FavoriteResponse>('community/favorites/toggle', payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static getFavoriteStatus = async (token: string | undefined, type: FavoriteTargetType, targetId: string) => {
+        return await axiosInstance.get<FavoriteResponse>('community/favorites/status', {
+            params: {type, targetId},
+            headers: token ? {'X-User-Token': token} : undefined,
+        });
+    }
+
+    static listPostComments = async (postId: string) => {
+        return await axiosInstance.get<CommentResponse[]>(`community/posts/${postId}/comments`);
+    }
+
+    static createPostComment = async (token: string, postId: string, payload: CreateCommentPayload) => {
+        return await axiosInstance.post<CommentResponse>(`community/posts/${postId}/comments`, payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static toggleReviewLike = async (token: string, reviewId: string | number) => {
+        return await axiosInstance.post<ReviewLikeResponse>(`community/reviews/${reviewId}/likes`, {}, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static listMyPosts = async (token: string) => {
+        return await axiosInstance.get<CommunityPostResponse[]>('community/me/posts', {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static listMyRoutes = async (token: string) => {
+        return await axiosInstance.get<TravelRouteResponse[]>('community/me/routes', {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static listMyReviews = async (token: string) => {
+        return await axiosInstance.get<CommunityReviewResponse[]>('community/me/reviews', {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static listMyFavoritePosts = async (token: string) => {
+        return await axiosInstance.get<CommunityPostResponse[]>('community/me/favorites/posts', {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static listMyFavoriteRoutes = async (token: string) => {
+        return await axiosInstance.get<TravelRouteResponse[]>('community/me/favorites/routes', {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static listMyFavoriteAttractions = async (token: string) => {
+        return await axiosInstance.get<AttractionResponse[]>('community/me/favorites/attractions', {
             headers: {'X-User-Token': token},
         });
     }
@@ -855,6 +969,8 @@ export type CommunityCategory = 'TRAVEL_NOTE' | 'SCENIC_SPOT' | 'ROUTE' | 'MERCH
 
 export type ReviewTargetType = 'SCENIC_SPOT' | 'ROUTE' | 'MERCHANT' | 'HOTEL';
 
+export type FavoriteTargetType = 'POST' | 'ROUTE' | 'ATTRACTION';
+
 export interface CommunityPostsQuery {
     category?: CommunityCategory,
     keyword?: string,
@@ -883,6 +999,8 @@ export interface CommunityPostResponse {
     authorName: string,
     likeCount: number,
     likedByCurrentUser: boolean,
+    favoritedByCurrentUser: boolean,
+    commentCount: number,
     createdAt: string,
     updatedAt: string,
 }
@@ -908,6 +1026,7 @@ export interface CreateCommunityReviewPayload {
     rating: number,
     content: string,
     category: CommunityCategory,
+    imageUrls?: string[],
 }
 
 export interface CommunityReviewResponse {
@@ -918,10 +1037,42 @@ export interface CommunityReviewResponse {
     rating: number,
     content: string,
     category: CommunityCategory,
+    imageUrls: string[],
     authorUserId: string,
     authorName: string,
+    likeCount: number,
+    likedByCurrentUser: boolean,
     createdAt: string,
     updatedAt: string,
+}
+
+export interface ToggleFavoritePayload {
+    type: FavoriteTargetType,
+    targetId: string,
+}
+
+export interface FavoriteResponse {
+    type: FavoriteTargetType,
+    targetId: string,
+    favorited: boolean,
+}
+
+export interface CreateCommentPayload {
+    content: string,
+}
+
+export interface CommentResponse {
+    id: string,
+    authorUserId: string,
+    authorName: string,
+    content: string,
+    createdAt: string,
+}
+
+export interface ReviewLikeResponse {
+    reviewId: number,
+    liked: boolean,
+    likeCount: number,
 }
 
 export interface CommunitySummaryQuery {
@@ -949,7 +1100,7 @@ export interface CreateAttractionPayload {
     name: string,
     cityId?: string,
     description?: string,
-    coverImageUrl?: string,
+    imageUrls?: string[],
 }
 
 export interface AttractionResponse {
@@ -959,6 +1110,7 @@ export interface AttractionResponse {
     cityId?: string | null,
     description?: string | null,
     coverImageUrl?: string | null,
+    imageUrls: string[],
     averageRating: number,
     reviewCount: number,
     createdByName: string,
@@ -966,12 +1118,97 @@ export interface AttractionResponse {
 }
 
 export interface AttractionDetailResponse extends AttractionResponse {
+    favoritedByCurrentUser: boolean,
     latestReviews: CommunityReviewResponse[],
 }
 
 export interface CreateAttractionReviewPayload {
     rating: number,
     content: string,
+    imageUrls?: string[],
+}
+
+export type TravelStyle = 'LEISURE' | 'CULTURE' | 'NATURE' | 'FOOD' | 'FAMILY' | 'ADVENTURE' | 'ROMANTIC' | 'OTHER';
+
+export interface TravelRoutesQuery {
+    style?: TravelStyle,
+    cityId?: string,
+    keyword?: string,
+    sort?: 'latest' | 'popular',
+    page?: number,
+    size?: number,
+}
+
+export interface RouteStopInput {
+    attractionId: string,
+    dayNumber: number,
+    sortOrder: number,
+    note?: string,
+}
+
+export interface CreateTravelRoutePayload {
+    title: string,
+    summary?: string,
+    days: number,
+    peopleCount: number,
+    budget: number,
+    style: TravelStyle,
+    cityId?: string,
+    imageUrls?: string[],
+    stops: RouteStopInput[],
+}
+
+export interface RouteStopResponse {
+    attractionId: string,
+    attractionName: string,
+    attractionCity?: string | null,
+    coverImageUrl?: string | null,
+    dayNumber: number,
+    sortOrder: number,
+    note?: string | null,
+}
+
+export interface TravelRouteResponse {
+    id: string,
+    title: string,
+    summary?: string | null,
+    days: number,
+    peopleCount: number,
+    budget: number,
+    style: TravelStyle,
+    city?: string | null,
+    cityId?: string | null,
+    coverImageUrl?: string | null,
+    stopCount: number,
+    averageRating: number,
+    reviewCount: number,
+    createdByName: string,
+    createdAt: string,
+}
+
+export interface TravelRouteDetailResponse {
+    id: string,
+    title: string,
+    summary?: string | null,
+    days: number,
+    peopleCount: number,
+    budget: number,
+    style: TravelStyle,
+    city?: string | null,
+    cityId?: string | null,
+    coverImageUrl?: string | null,
+    imageUrls: string[],
+    stops: RouteStopResponse[],
+    averageRating: number,
+    reviewCount: number,
+    favoritedByCurrentUser: boolean,
+    createdByName: string,
+    createdAt: string,
+    latestReviews: CommunityReviewResponse[],
+}
+
+export interface UploadResponse {
+    url: string,
 }
 
 export interface HotelDestination {

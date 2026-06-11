@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.communityservice.domain.Attraction;
 import org.microarchitecturovisco.communityservice.domain.City;
 import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
+import org.microarchitecturovisco.communityservice.domain.FavoriteTargetType;
 import org.microarchitecturovisco.communityservice.domain.Review;
 import org.microarchitecturovisco.communityservice.domain.ReviewTargetType;
 import org.microarchitecturovisco.communityservice.dto.AttractionDetailResponse;
@@ -16,6 +17,7 @@ import org.microarchitecturovisco.communityservice.repository.AttractionReposito
 import org.microarchitecturovisco.communityservice.repository.CityRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.microarchitecturovisco.communityservice.repository.TargetRatingAggregate;
+import org.microarchitecturovisco.communityservice.util.CommunityImages;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -37,6 +39,8 @@ public class AttractionService {
     private final ReviewRepository reviewRepository;
     private final CityRepository cityRepository;
     private final UserClient userClient;
+    private final FavoriteService favoriteService;
+    private final ReviewLikeService reviewLikeService;
 
     public Page<AttractionResponse> list(String cityId, String keyword, String sort, int page, int size) {
         int safePage = Math.max(0, page);
@@ -100,12 +104,14 @@ public class AttractionService {
                     return AttractionResponse.from(existing, avg, cnt);
                 })
                 .orElseGet(() -> {
+                    List<String> images = CommunityImages.normalize(request.imageUrls());
                     Attraction attraction = Attraction.builder()
                             .id(UUID.randomUUID())
                             .name(normalizedName)
                             .city(city)
                             .description(normalizeOptional(request.description()))
-                            .coverImageUrl(normalizeOptional(request.coverImageUrl()))
+                            .imageUrls(images)
+                            .coverImageUrl(images.isEmpty() ? null : images.get(0))
                             .createdByUserId(user.id())
                             .createdByName(user.displayName())
                             .build();
@@ -114,17 +120,17 @@ public class AttractionService {
                 });
     }
 
-    public AttractionDetailResponse getDetail(UUID id) {
+    public AttractionDetailResponse getDetail(UUID id, String token) {
         Attraction attraction = requireAttraction(id);
+        UUID currentUserId = userClient.tryResolveUserId(token);
         String targetId = attraction.getId().toString();
         double avg = reviewRepository.averageRating(ReviewTargetType.SCENIC_SPOT, targetId);
         long cnt = reviewRepository.countByTargetTypeAndTargetId(ReviewTargetType.SCENIC_SPOT, targetId);
-        List<ReviewResponse> latestReviews = reviewRepository
-                .findTop5ByTargetTypeAndTargetIdOrderByCreatedAtDesc(ReviewTargetType.SCENIC_SPOT, targetId)
-                .stream()
-                .map(ReviewResponse::from)
-                .toList();
-        return AttractionDetailResponse.from(attraction, avg, cnt, latestReviews);
+        List<ReviewResponse> latestReviews = reviewLikeService.toResponses(
+                reviewRepository.findTop5ByTargetTypeAndTargetIdOrderByCreatedAtDesc(ReviewTargetType.SCENIC_SPOT, targetId),
+                currentUserId);
+        boolean favorited = favoriteService.isFavorited(currentUserId, FavoriteTargetType.ATTRACTION, targetId);
+        return AttractionDetailResponse.from(attraction, avg, cnt, favorited, latestReviews);
     }
 
     public ReviewResponse createReview(String token, UUID attractionId, CreateAttractionReviewRequest request) {
@@ -139,6 +145,7 @@ public class AttractionService {
                 .rating(request.rating())
                 .content(request.content().trim())
                 .category(CommunityCategory.SCENIC_SPOT)
+                .imageUrls(CommunityImages.normalize(request.imageUrls()))
                 .authorUserId(user.id())
                 .authorName(user.displayName())
                 .build();

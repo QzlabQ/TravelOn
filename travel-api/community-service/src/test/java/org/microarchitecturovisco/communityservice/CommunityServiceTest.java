@@ -19,6 +19,9 @@ import org.microarchitecturovisco.communityservice.repository.CommunityPostRepos
 import org.microarchitecturovisco.communityservice.repository.PostLikeRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.microarchitecturovisco.communityservice.service.CommunityService;
+import org.microarchitecturovisco.communityservice.service.CommentService;
+import org.microarchitecturovisco.communityservice.service.FavoriteService;
+import org.microarchitecturovisco.communityservice.service.ReviewLikeService;
 import org.microarchitecturovisco.communityservice.service.UserClient;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +48,9 @@ class CommunityServiceTest {
     private ReviewRepository reviewRepository;
     private CityRepository cityRepository;
     private UserClient userClient;
+    private FavoriteService favoriteService;
+    private CommentService commentService;
+    private ReviewLikeService reviewLikeService;
     private CommunityService communityService;
     private UserProfileResponse user;
     private City shanghaiCity;
@@ -56,7 +62,10 @@ class CommunityServiceTest {
         reviewRepository = mock(ReviewRepository.class);
         cityRepository = mock(CityRepository.class);
         userClient = mock(UserClient.class);
-        communityService = new CommunityService(postRepository, likeRepository, reviewRepository, cityRepository, userClient);
+        favoriteService = mock(FavoriteService.class);
+        commentService = mock(CommentService.class);
+        reviewLikeService = mock(ReviewLikeService.class);
+        communityService = new CommunityService(postRepository, likeRepository, reviewRepository, cityRepository, userClient, favoriteService, commentService, reviewLikeService);
         user = new UserProfileResponse(UUID.randomUUID(), "ada@example.com", "Ada", "Lovelace", null, null, "Explorer", Instant.now(), Instant.now(), Instant.now());
         shanghaiCity = City.builder()
                 .id(UUID.randomUUID())
@@ -150,7 +159,8 @@ class CommunityServiceTest {
                 "West Lake",
                 5,
                 "Great view and clear signs.",
-                CommunityCategory.SCENIC_SPOT
+                CommunityCategory.SCENIC_SPOT,
+                List.of()
         ));
 
         assertThat(response.targetType()).isEqualTo(ReviewTargetType.SCENIC_SPOT);

@@ -20,6 +20,18 @@ public class UserClient {
 
     private final RestTemplate restTemplate;
 
+    /** Resolves the user id from a token, or returns null if missing/invalid (does not throw). */
+    public java.util.UUID tryResolveUserId(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        try {
+            return requireUser(token).id();
+        } catch (ResponseStatusException e) {
+            return null;
+        }
+    }
+
     public UserProfileResponse requireUser(String token) {
         if (token == null || token.isBlank()) {
             throw new ResponseStatusException(UNAUTHORIZED, "Missing session token");

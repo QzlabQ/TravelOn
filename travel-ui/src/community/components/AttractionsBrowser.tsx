@@ -14,20 +14,20 @@ import {
 } from "@mui/material";
 import {Add, Landscape, Place, Search, TrendingUp} from "@mui/icons-material";
 import {Link} from "react-router-dom";
-import {ApiRequests, AttractionResponse} from "../../core/apiConfig";
+import {ApiRequests, AttractionResponse, resolveCommunityImageUrl} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
 import AttractionPickerDialog from "./AttractionPickerDialog";
 
 type CityOption = {cityId: string, label: string};
 type SortOption = "popular" | "latest";
 
-/**
- * Self-contained attraction discovery: city filter, name/description search,
- * popularity sorting and a card grid that links straight to each attraction's
- * detail page. Used both on the standalone Attractions page and inline in the
- * community "景点评价" tab.
- */
-const AttractionsBrowser = () => {
+type Props = {
+    actionLabel?: string,
+    emptyActionLabel?: string,
+    onAction?: () => void,
+};
+
+const AttractionsBrowser = ({actionLabel, emptyActionLabel, onAction}: Props) => {
     const session = useAuthSession();
     const [keyword, setKeyword] = useState("");
     const [debouncedKeyword, setDebouncedKeyword] = useState("");
@@ -45,14 +45,17 @@ const AttractionsBrowser = () => {
         return () => clearTimeout(timer);
     }, [keyword]);
 
-    // 加载城市列表（与添加景点对话框一致，来源于 hotel-service 目的地）
     useEffect(() => {
         ApiRequests.getHotelDestinations()
             .then(res => {
                 const seen = new Set<string>();
                 const opts = res.data
                     .filter(d => d.cityId && d.region)
-                    .filter(d => { if (seen.has(d.cityId)) return false; seen.add(d.cityId); return true; })
+                    .filter(d => {
+                        if (seen.has(d.cityId)) return false;
+                        seen.add(d.cityId);
+                        return true;
+                    })
                     .map(d => ({cityId: d.cityId, label: d.region}))
                     .sort((a, b) => a.label.localeCompare(b.label, "zh"));
                 setCityOptions(opts);
@@ -71,22 +74,27 @@ const AttractionsBrowser = () => {
             size: 24,
         })
             .then(res => setAttractions(res.data.content))
-            .catch(() => setError("景点列表暂时不可用，请确认 community-service 已启动。"))
+            .catch(() => setError("景点列表暂时不可用，请确认 community-service 已启动"))
             .finally(() => setLoading(false));
     }, [selectedCity, debouncedKeyword, sort]);
 
     useEffect(() => { load(); }, [load]);
 
+    const openPicker = () => {
+        if (!session) {
+            setToast("请先登录后再添加景点");
+            return;
+        }
+        setPickerOpen(true);
+    };
+
     const handlePick = (attraction: AttractionResponse) => {
-        // After picker creates/selects an attraction, refresh list and show toast
-        setToast(`景点「${attraction.name}」已添加。`);
+        setToast(`景点「${attraction.name}」已添加`);
         load();
     };
 
-    const openPicker = () => {
-        if (!session) {setToast("请先登录后再添加景点。"); return;}
-        setPickerOpen(true);
-    };
+    const primaryAction = onAction ?? openPicker;
+    const primaryLabel = actionLabel ?? "添加景点";
 
     const listHeading = useMemo(() => {
         const scope = selectedCity ? selectedCity.label : "全部城市";
@@ -96,8 +104,8 @@ const AttractionsBrowser = () => {
     const emptyHint = debouncedKeyword
         ? "没有匹配的景点，换个关键词试试。"
         : selectedCity
-            ? "该城市还没有景点，成为第一个添加的人吧！"
-            : "成为第一个添加景点的用户吧！";
+            ? "该城市还没有景点。"
+            : "当前还没有景点。";
 
     return (
         <div>
@@ -109,7 +117,6 @@ const AttractionsBrowser = () => {
                 anchorOrigin={{vertical: "top", horizontal: "center"}}
             />
 
-            {/* 筛选栏：城市 + 搜索 + 排序 + 添加 */}
             <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                     <Autocomplete
@@ -162,8 +169,8 @@ const AttractionsBrowser = () => {
                         <MenuItem value="popular">最热门</MenuItem>
                         <MenuItem value="latest">最新</MenuItem>
                     </TextField>
-                    <Button variant="contained" startIcon={<Add/>} onClick={openPicker} sx={{whiteSpace: "nowrap"}}>
-                        添加景点
+                    <Button variant="contained" startIcon={<Add/>} onClick={primaryAction} sx={{whiteSpace: "nowrap"}}>
+                        {primaryLabel}
                     </Button>
                 </div>
             </section>
@@ -184,8 +191,8 @@ const AttractionsBrowser = () => {
                     <Landscape className="text-slate-300" fontSize="large"/>
                     <p className="mt-3 font-semibold text-slate-700">暂无景点</p>
                     <p className="mt-1 text-sm text-slate-500">{emptyHint}</p>
-                    <Button variant="contained" startIcon={<Add/>} onClick={openPicker} sx={{mt: 3}}>
-                        添加景点
+                    <Button variant="contained" startIcon={<Add/>} onClick={primaryAction} sx={{mt: 3}}>
+                        {emptyActionLabel ?? primaryLabel}
                     </Button>
                 </div>
             )}
@@ -201,7 +208,7 @@ const AttractionsBrowser = () => {
                             )}
                             <div className="h-44 overflow-hidden bg-slate-100">
                                 {attraction.coverImageUrl
-                                    ? <img src={attraction.coverImageUrl} alt={attraction.name} className="h-full w-full object-cover transition group-hover:scale-105"/>
+                                    ? <img src={resolveCommunityImageUrl(attraction.coverImageUrl)} alt={attraction.name} className="h-full w-full object-cover transition group-hover:scale-105"/>
                                     : <div className="flex h-full items-center justify-center text-slate-400"><Landscape fontSize="large"/></div>
                                 }
                             </div>
@@ -230,13 +237,15 @@ const AttractionsBrowser = () => {
                 ))}
             </div>
 
-            <AttractionPickerDialog
-                open={pickerOpen}
-                token={session?.token}
-                mode="create"
-                onPick={handlePick}
-                onClose={() => setPickerOpen(false)}
-            />
+            {!onAction && (
+                <AttractionPickerDialog
+                    open={pickerOpen}
+                    token={session?.token}
+                    mode="create"
+                    onPick={handlePick}
+                    onClose={() => setPickerOpen(false)}
+                />
+            )}
         </div>
     );
 };

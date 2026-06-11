@@ -59,6 +59,7 @@ const getRebookTarget = (reservation: ReservationResponse) => {
                     dateFrom: toDateInputValue(reservation.hotelTimeFrom),
                     dateTo: toDateInputValue(reservation.hotelTimeTo),
                     adults: Math.max(1, reservation.adultsQuantity || 1),
+                    back: {to: '/reservations', label: '返回我的预订'},
                 },
             };
         }

@@ -37,6 +37,8 @@ type HotelDetailsState = {
     dateTo?: string,
     adults?: number,
     roomType?: string,
+    /** Where the "返回" button should go; defaults to the hotel booking list. */
+    back?: {to: string, label: string, state?: unknown},
 };
 
 const HotelDetails = () => {
@@ -102,6 +104,12 @@ const HotelDetails = () => {
     };
 
     useEffect(() => clearAutoNavigate, []);
+
+    // Always open the detail page at the top, regardless of the caller's scroll
+    // position (React Router preserves scroll across navigations otherwise).
+    useEffect(() => {
+        window.scrollTo({top: 0, behavior: "auto"});
+    }, [hotelId]);
 
     useEffect(() => {
         if (!hotelId || Number.isNaN(numericHotelId) || stayDateError) return;
@@ -260,8 +268,16 @@ const HotelDetails = () => {
             </Snackbar>
 
             <div className="mb-5 flex items-center justify-between">
-                <Button component={Link} to="/reservations/hotels" startIcon={<ArrowBack/>} variant="outlined" sx={{borderRadius: 2}}>
-                    返回酒店列表
+                <Button
+                    onClick={() => navigate(
+                        state.back?.to ?? "/reservations/hotels",
+                        state.back?.state ? {state: state.back.state} : undefined,
+                    )}
+                    startIcon={<ArrowBack/>}
+                    variant="outlined"
+                    sx={{borderRadius: 2}}
+                >
+                    {state.back?.label ?? "返回酒店列表"}
                 </Button>
                 <Chip icon={<HotelIcon/>} label="酒店详情" sx={{backgroundColor: "#eff6ff", color: "#2563eb"}}/>
             </div>

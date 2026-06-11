@@ -42,6 +42,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     List<Review> findTop5ByTargetTypeAndTargetIdOrderByCreatedAtDesc(ReviewTargetType targetType, String targetId);
 
+    List<Review> findByAuthorUserIdOrderByCreatedAtDesc(java.util.UUID authorUserId);
+
     boolean existsByTargetType(ReviewTargetType targetType);
 
     long countByTargetTypeAndTargetId(ReviewTargetType targetType, String targetId);

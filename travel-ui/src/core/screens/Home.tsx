@@ -8,7 +8,7 @@ export default function Home () {
     const navigate = useNavigate();
 
     const onSearch = () => {
-        navigate('/offers');
+        navigate('/community?tab=ROUTE');
     }
 
     return(

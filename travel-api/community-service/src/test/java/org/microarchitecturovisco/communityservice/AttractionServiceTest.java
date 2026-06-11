@@ -15,6 +15,8 @@ import org.microarchitecturovisco.communityservice.repository.CityRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.microarchitecturovisco.communityservice.repository.TargetRatingAggregate;
 import org.microarchitecturovisco.communityservice.service.AttractionService;
+import org.microarchitecturovisco.communityservice.service.FavoriteService;
+import org.microarchitecturovisco.communityservice.service.ReviewLikeService;
 import org.microarchitecturovisco.communityservice.service.UserClient;
 
 import java.time.Instant;
@@ -38,6 +40,8 @@ class AttractionServiceTest {
     private ReviewRepository reviewRepository;
     private CityRepository cityRepository;
     private UserClient userClient;
+    private FavoriteService favoriteService;
+    private ReviewLikeService reviewLikeService;
     private AttractionService attractionService;
     private UserProfileResponse user;
     private City hangzhouCity;
@@ -48,7 +52,9 @@ class AttractionServiceTest {
         reviewRepository = mock(ReviewRepository.class);
         cityRepository = mock(CityRepository.class);
         userClient = mock(UserClient.class);
-        attractionService = new AttractionService(attractionRepository, reviewRepository, cityRepository, userClient);
+        favoriteService = mock(FavoriteService.class);
+        reviewLikeService = mock(ReviewLikeService.class);
+        attractionService = new AttractionService(attractionRepository, reviewRepository, cityRepository, userClient, favoriteService, reviewLikeService);
         user = new UserProfileResponse(UUID.randomUUID(), "lily@example.com", "Lily", "Chen", null, null, "Explorer",
                 Instant.now(), Instant.now(), Instant.now());
         hangzhouCity = City.builder()
@@ -133,7 +139,7 @@ class AttractionServiceTest {
         when(reviewRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ReviewResponse response = attractionService.createReview("token", a.getId(),
-                new CreateAttractionReviewRequest(5, "Absolutely beautiful!"));
+                new CreateAttractionReviewRequest(5, "Absolutely beautiful!", List.of()));
 
         assertThat(response.targetType()).isEqualTo(ReviewTargetType.SCENIC_SPOT);
         assertThat(response.targetId()).isEqualTo(a.getId().toString());
