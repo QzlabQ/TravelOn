@@ -296,7 +296,35 @@ export function FloatingAiAssistant({
             },
         ];
 
+        const scenicPayload: Partial<PlannerChatSendPayload> = hasActiveDayPlan
+            ? basePlanningPayload(
+                activeDayIndex,
+                activeDayDate,
+                selectedPlaceIds,
+                "推荐真实景点，优先使用 AMAP 景点数据，必须带图片，更新推荐卡和 Markdown，不生成预约链接。",
+            )
+            : {
+                planningMode: "ASK_MORE_OPTIONS",
+                planningScope: "DAY_PLAN",
+                targetDayIndex: activeDayIndex,
+                targetDate: activeDayDate,
+                interaction: {
+                    selectedPlaceIds,
+                    freeText: "推荐真实景点，优先使用 AMAP 景点数据，必须带图片，更新推荐卡和 Markdown，不生成预约链接。",
+                },
+            };
+
         const smartActions: AssistantAction[] = [
+            {
+                id: "scenic",
+                label: "推荐景点",
+                icon: <TravelExplore/>,
+                disabledReason: commonDisabledReason,
+                onClick: () => sendPlannerAction(
+                    "请推荐适合当前目的地和当天节奏的真实景点，优先使用 AMAP 景点数据，必须带图片，更新推荐卡和 Markdown，不生成预约链接。",
+                    scenicPayload,
+                ),
+            },
             {
                 id: "slower",
                 label: "放慢节奏",

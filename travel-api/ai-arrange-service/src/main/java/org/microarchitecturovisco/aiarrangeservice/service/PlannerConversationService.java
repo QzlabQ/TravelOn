@@ -254,7 +254,7 @@ public class PlannerConversationService {
                         webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
                                 Map.of("version", result.snapshot().getVersion(), "traceId", result.response().getTraceId()));
                     }
-                    sendAgentFallbackWarning(conversationId, result.response());
+                    sendAgentFallbackTrace(conversationId, result.response());
                 })
                 .exceptionally(error -> {
                     Throwable rootCause = unwrapFailure(error);
@@ -344,15 +344,26 @@ public class PlannerConversationService {
         return "你想先从酒店区域、核心景点，还是餐厅偏好开始？";
     }
 
-    private void sendAgentFallbackWarning(UUID conversationId, AgentRunResponse response) {
+    private void sendAgentFallbackTrace(UUID conversationId, AgentRunResponse response) {
         if (response == null || !isFallbackUsed(response)) {
             return;
         }
-        webSocketSessionRegistry.sendError(
+        webSocketSessionRegistry.send(
                 conversationId,
-                "PLANNER_AGENT_FALLBACK_USED",
-                "模型生成失败，已返回本地兜底规划。请检查 DeepSeek 网络/API 配置。",
-                agentFallbackDetail(response)
+                PlannerMessageType.PLANNER_TRACE_EVENT,
+                PlannerStreamEvent.builder()
+                        .traceId(response.getTraceId())
+                        .conversationId(conversationId)
+                        .type("FALLBACK_USED")
+                        .status("PARTIAL_SUCCESS")
+                        .message("模型不可用，已返回本地兜底规划。")
+                        .phase("fallback")
+                        .tool("fallback_plan_builder")
+                        .data(Map.of(
+                                "code", "PLANNER_AGENT_FALLBACK_USED",
+                                "detail", agentFallbackDetail(response)
+                        ))
+                        .build()
         );
     }
 

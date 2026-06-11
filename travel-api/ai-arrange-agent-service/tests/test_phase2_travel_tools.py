@@ -81,6 +81,32 @@ def hotel_client_factory():
     return lambda: httpx.AsyncClient(transport=transport)
 
 
+def amap_hotel_client_factory():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/place/text":
+            assert request.url.params["types"] == "100000"
+            return httpx.Response(
+                200,
+                json={
+                    "status": "1",
+                    "pois": [
+                        {
+                            "id": "amap-hotel-1",
+                            "name": "外滩真实酒店",
+                            "type": "住宿服务;宾馆酒店",
+                            "location": "121.490000,31.240000",
+                            "address": "中山东一路",
+                            "photos": [{"url": "https://img.example/amap-hotel.jpg"}],
+                        }
+                    ],
+                },
+            )
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(handler)
+    return lambda: httpx.AsyncClient(transport=transport)
+
+
 def transport_client_factory():
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/transports/tickets":
@@ -127,7 +153,8 @@ def transport_client_factory():
 async def test_hotel_search_returns_database_booking_link_candidates() -> None:
     result = await HotelSearchTool(load_settings(), client_factory=hotel_client_factory()).search_hotels(sample_request())
 
-    assert result.status == ToolStatus.SUCCESS
+    assert result.status == ToolStatus.PARTIAL_SUCCESS
+    assert any(warning.code == "HOTEL_AMAP_FALLBACK_DATABASE" for warning in result.warnings)
     assert result.data
     first = result.data[0]
     assert first.type == PlaceType.HOTEL
@@ -135,7 +162,24 @@ async def test_hotel_search_returns_database_booking_link_candidates() -> None:
     assert first.internalOfferId is None
     assert first.bookingLinks[0].type == "HOTEL"
     assert first.bookingLinks[0].hotelId == 42
-    assert first.bookingLinks[0].url.startswith("/reservations/hotels/42?")
+    assert first.bookingLinks[0].url.startswith("/reservations/hotels?")
+
+
+@pytest.mark.asyncio
+async def test_hotel_search_prefers_amap_hotels(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AMAP_API_KEY", "test-key")
+    monkeypatch.setenv("AMAP_BASE_URL", "https://amap.test")
+    result = await HotelSearchTool(load_settings(), client_factory=amap_hotel_client_factory()).search_hotels(sample_request())
+
+    assert result.status == ToolStatus.SUCCESS
+    assert result.data
+    first = result.data[0]
+    assert first.type == PlaceType.HOTEL
+    assert first.source == PlaceSource.AMAP
+    assert first.amapPoiId == "amap-hotel-1"
+    assert first.imageUrl == "https://img.example/amap-hotel.jpg"
+    assert first.bookingLinks[0].hotelId is None
+    assert first.bookingLinks[0].url.startswith("/reservations/hotels?")
 
 
 @pytest.mark.asyncio

@@ -31,23 +31,50 @@ class HotelSearchTool:
             return self._partial_result(
                 started=started,
                 code="HOTEL_DESTINATION_MISSING",
-                message="缺少目的地，已跳过酒店候选查询。",
+                message="Destination city is required before searching hotels.",
             )
 
         if request.coreSlots.travelStartDate is None:
             return self._partial_result(
                 started=started,
                 code="HOTEL_DATE_MISSING",
-                message="缺少入住日期，已跳过酒店候选查询。",
+                message="Travel start date is required before searching hotels.",
             )
 
-        base_url = self._settings.travel_gateway_base_url.rstrip("/")
         date_from = request.coreSlots.travelStartDate
         date_to = request.coreSlots.travelEndDate or (date_from + timedelta(days=1))
         if date_to <= date_from:
             date_to = date_from + timedelta(days=1)
         adults = max(request.coreSlots.peopleCount or 1, 1)
 
+        amap_hotels, amap_warnings = await self._search_amap_hotels(
+            city=request.coreSlots.city,
+            date_from=date_from.isoformat(),
+            date_to=date_to.isoformat(),
+            adults=adults,
+            preference=request.coreSlots.accommodationPreference,
+            limit=limit,
+        )
+        warnings.extend(amap_warnings)
+        if amap_hotels:
+            return ToolResult(
+                tool="search_hotels",
+                status=ToolStatus.SUCCESS,
+                data=amap_hotels,
+                latencyMs=self._latency_ms(started),
+                userMessage=f"Found {len(amap_hotels)} real hotel candidates from Amap.",
+                warnings=warnings,
+            )
+
+        warnings.append(
+            ToolWarning(
+                code="HOTEL_AMAP_FALLBACK_DATABASE",
+                message="Amap hotel search was unavailable or empty; using database hotels as fallback.",
+                source="search_hotels",
+            )
+        )
+
+        base_url = self._settings.travel_gateway_base_url.rstrip("/")
         try:
             async with self._client() as client:
                 destinations_response = await client.get(f"{base_url}/hotels/destinations")
@@ -58,7 +85,8 @@ class HotelSearchTool:
                     return self._partial_result(
                         started=started,
                         code="HOTEL_DESTINATION_NOT_FOUND",
-                        message=f"酒店库暂未找到目的地：{request.coreSlots.city}。",
+                        message=f"Hotel database has no destination matching {request.coreSlots.city}.",
+                        extra_warnings=warnings,
                     )
 
                 search_response = await client.get(
@@ -77,11 +105,18 @@ class HotelSearchTool:
             return self._partial_result(
                 started=started,
                 code="HOTEL_GATEWAY_ERROR",
-                message=f"酒店数据库接口查询失败：{error}",
+                message=f"Hotel database query failed: {error}",
+                extra_warnings=warnings,
             )
 
         hotels = [
-            self._to_place(item, date_from=date_from.isoformat(), date_to=date_to.isoformat(), adults=adults)
+            self._to_database_place(
+                item,
+                city=request.coreSlots.city,
+                date_from=date_from.isoformat(),
+                date_to=date_to.isoformat(),
+                adults=adults,
+            )
             for item in items[:limit]
             if isinstance(item, dict) and item.get("hotelId") and item.get("name")
         ]
@@ -96,17 +131,17 @@ class HotelSearchTool:
             warnings.append(
                 ToolWarning(
                     code="HOTEL_SEARCH_EMPTY",
-                    message="酒店数据库接口没有返回可推荐酒店。",
+                    message="Hotel database returned no bookable hotel candidates.",
                     source="search_hotels",
                 )
             )
 
         return ToolResult(
             tool="search_hotels",
-            status=ToolStatus.SUCCESS if hotels else ToolStatus.PARTIAL_SUCCESS,
+            status=ToolStatus.PARTIAL_SUCCESS,
             data=hotels,
             latencyMs=self._latency_ms(started),
-            userMessage=f"已从酒店数据库找到 {len(hotels)} 个酒店候选。",
+            userMessage=f"Found {len(hotels)} fallback hotel candidates from the database.",
             warnings=warnings,
         )
 
@@ -114,6 +149,115 @@ class HotelSearchTool:
         if self._client_factory is not None:
             return self._client_factory()
         return httpx.AsyncClient(timeout=self._settings.agent_tool_timeout_seconds)
+
+    async def _search_amap_hotels(
+        self,
+        *,
+        city: str,
+        date_from: str,
+        date_to: str,
+        adults: int,
+        preference: str | None,
+        limit: int,
+    ) -> tuple[list[PlannerPlaceSuggestion], list[ToolWarning]]:
+        if not self._settings.amap_enabled or not self._settings.amap_api_key:
+            return [], [
+                ToolWarning(
+                    code="HOTEL_AMAP_DISABLED",
+                    message="Amap is not configured; hotel search will use the database fallback.",
+                    source="search_hotels",
+                )
+            ]
+
+        url = f"{self._settings.amap_base_url.rstrip('/')}/place/text"
+        keywords = preference.strip() if preference and preference.strip() else "酒店"
+        params = {
+            "key": self._settings.amap_api_key,
+            "city": city,
+            "keywords": keywords,
+            "types": "100000",
+            "offset": min(max(limit, 1), 20),
+            "page": 1,
+            "extensions": "all",
+        }
+
+        try:
+            async with self._client() as client:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                payload = response.json()
+        except (httpx.TimeoutException, httpx.HTTPError, ValueError, TypeError) as error:
+            return [], [
+                ToolWarning(
+                    code="HOTEL_AMAP_ERROR",
+                    message=f"Amap hotel search failed: {error}",
+                    source="search_hotels",
+                )
+            ]
+
+        if not isinstance(payload, dict) or payload.get("status") != "1":
+            message = str(payload.get("info") or "Amap hotel search failed") if isinstance(payload, dict) else "Amap response was invalid"
+            return [], [ToolWarning(code="HOTEL_AMAP_ERROR", message=message, source="search_hotels")]
+
+        places: list[PlannerPlaceSuggestion] = []
+        for poi in payload.get("pois", []):
+            if len(places) >= limit:
+                break
+            if not isinstance(poi, dict) or not poi.get("name"):
+                continue
+            places.append(
+                self._to_amap_place(
+                    poi,
+                    city=city,
+                    date_from=date_from,
+                    date_to=date_to,
+                    adults=adults,
+                )
+            )
+        return places, []
+
+    def _to_amap_place(
+        self,
+        poi: dict[str, Any],
+        *,
+        city: str,
+        date_from: str,
+        date_to: str,
+        adults: int,
+    ) -> PlannerPlaceSuggestion:
+        name = str(poi.get("name") or "Hotel").strip()
+        longitude: float | None = None
+        latitude: float | None = None
+        location = poi.get("location")
+        if isinstance(location, str) and "," in location:
+            raw_lng, raw_lat = location.split(",", 1)
+            longitude = self._safe_float(raw_lng)
+            latitude = self._safe_float(raw_lat)
+
+        photos = self._photo_urls(poi.get("photos"))
+        booking_link = PlannerBookingLink(
+            type="HOTEL",
+            label="去预订酒店",
+            url=self._hotel_search_url(city=city, hotel_name=name, date_from=date_from, date_to=date_to, adults=adults),
+        )
+
+        address = poi.get("address") if isinstance(poi.get("address"), str) else None
+        return PlannerPlaceSuggestion(
+            placeId=uuid5(NAMESPACE_URL, f"amap-hotel:{poi.get('id') or name}"),
+            name=name,
+            type=PlaceType.HOTEL,
+            source=PlaceSource.AMAP,
+            amapPoiId=str(poi.get("id")) if poi.get("id") else None,
+            latitude=latitude,
+            longitude=longitude,
+            address=address,
+            imageUrl=photos[0] if photos else None,
+            imageUrls=photos,
+            description=str(poi.get("type") or "Amap hotel POI"),
+            selected=False,
+            tags=["hotel", "amap", "bookable"],
+            bookingLinks=[booking_link],
+        )
 
     def _match_destination(self, destinations: Any, city: str) -> dict[str, Any] | None:
         if not isinstance(destinations, list):
@@ -150,8 +294,17 @@ class HotelSearchTool:
     def _normalize(self, value: str) -> str:
         return "".join(value.strip().lower().split())
 
-    def _to_place(self, item: dict[str, Any], *, date_from: str, date_to: str, adults: int) -> PlannerPlaceSuggestion:
+    def _to_database_place(
+        self,
+        item: dict[str, Any],
+        *,
+        city: str,
+        date_from: str,
+        date_to: str,
+        adults: int,
+    ) -> PlannerPlaceSuggestion:
         hotel_id = int(item["hotelId"])
+        name = str(item["name"])
         location = item.get("location") if isinstance(item.get("location"), dict) else {}
         photos = self._string_list(item.get("photos"))
         price = item.get("pricePerAdult")
@@ -159,21 +312,21 @@ class HotelSearchTool:
         booking_link = PlannerBookingLink(
             type="HOTEL",
             label="去预订酒店",
-            url=self._hotel_booking_url(hotel_id, date_from=date_from, date_to=date_to, adults=adults),
+            url=self._hotel_search_url(city=city, hotel_name=name, date_from=date_from, date_to=date_to, adults=adults),
             hotelId=hotel_id,
-            price=price if isinstance(price, int | float) else None,
+            price=price if isinstance(price, (int, float)) else None,
         )
         description_parts = []
         if address:
-            description_parts.append(f"位于{address}")
-        if isinstance(price, int | float):
-            description_parts.append(f"约 CNY {int(price)}/人/晚")
+            description_parts.append(f"Located near {address}")
+        if isinstance(price, (int, float)):
+            description_parts.append(f"About CNY {int(price)} per adult/night")
         if item.get("description"):
             description_parts.append(str(item["description"])[:90])
 
         return PlannerPlaceSuggestion(
             placeId=uuid5(NAMESPACE_URL, f"hotel:{hotel_id}"),
-            name=str(item["name"]),
+            name=name,
             type=PlaceType.HOTEL,
             source=PlaceSource.INTERNAL_OFFER,
             latitude=None,
@@ -181,9 +334,9 @@ class HotelSearchTool:
             address=address,
             imageUrl=photos[0] if photos else None,
             imageUrls=photos,
-            description="，".join(description_parts) if description_parts else None,
+            description="; ".join(description_parts) if description_parts else None,
             selected=False,
-            tags=["酒店", "database", "bookable"],
+            tags=["hotel", "database", "bookable"],
             bookingLinks=[booking_link],
             hotelId=hotel_id,
             pricePerNight=price,
@@ -191,9 +344,17 @@ class HotelSearchTool:
             location=location,
         )
 
-    def _hotel_booking_url(self, hotel_id: int, *, date_from: str, date_to: str, adults: int) -> str:
-        query = urlencode({"dateFrom": date_from, "dateTo": date_to, "adults": adults})
-        return f"/reservations/hotels/{hotel_id}?{query}"
+    def _hotel_search_url(self, *, city: str, hotel_name: str, date_from: str, date_to: str, adults: int) -> str:
+        query = urlencode(
+            {
+                "city": city,
+                "dateFrom": date_from,
+                "dateTo": date_to,
+                "adults": adults,
+                "hotelName": hotel_name,
+            }
+        )
+        return f"/reservations/hotels?{query}"
 
     def _string_list(self, value: Any) -> list[str]:
         if not isinstance(value, list):
@@ -205,12 +366,45 @@ class HotelSearchTool:
                 result.append(text)
         return result[:3]
 
+    def _photo_urls(self, photos: Any) -> list[str]:
+        if not isinstance(photos, list):
+            return []
+
+        urls: list[str] = []
+        for photo in photos:
+            if len(urls) >= 3:
+                break
+            if not isinstance(photo, dict):
+                continue
+            url = photo.get("url")
+            if not isinstance(url, str):
+                continue
+            url = url.strip()
+            if url and url not in urls:
+                urls.append(url)
+        return urls
+
     def _address(self, location: dict[str, Any]) -> str | None:
         parts = [location.get("region"), location.get("province"), location.get("country")]
-        text = "，".join(str(part).strip() for part in parts if part)
+        text = ", ".join(str(part).strip() for part in parts if part)
         return text or None
 
-    def _partial_result(self, *, started: float, code: str, message: str) -> ToolResult:
+    def _safe_float(self, value: Any) -> float | None:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _partial_result(
+        self,
+        *,
+        started: float,
+        code: str,
+        message: str,
+        extra_warnings: list[ToolWarning] | None = None,
+    ) -> ToolResult:
+        warnings = list(extra_warnings or [])
+        warnings.append(ToolWarning(code=code, message=message, source="search_hotels"))
         return ToolResult(
             tool="search_hotels",
             status=ToolStatus.PARTIAL_SUCCESS,
@@ -219,7 +413,7 @@ class HotelSearchTool:
             errorMessage=message,
             latencyMs=self._latency_ms(started),
             userMessage=message,
-            warnings=[ToolWarning(code=code, message=message, source="search_hotels")],
+            warnings=warnings,
         )
 
     def _latency_ms(self, started: float) -> int:

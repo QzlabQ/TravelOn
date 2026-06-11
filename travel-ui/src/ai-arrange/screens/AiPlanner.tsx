@@ -681,6 +681,8 @@ export default function AiPlanner() {
     const viewingSnapshotVersionRef = useRef<SnapshotView>("latest");
     const selectedPlaceIdsRef = useRef<string[]>([]);
     const activeDayIndexRef = useRef(1);
+    const plannerRunInFlightRef = useRef(false);
+    const lastPlannerRunCompletedRef = useRef(false);
     const wsReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const wsReconnectAttemptsRef = useRef(0);
     const initialSessionRef = useRef<PlannerStoredSession | null | undefined>(undefined);
@@ -1144,6 +1146,8 @@ export default function AiPlanner() {
 
             if (seed) {
                 pendingInitialPromptRef.current = null;
+                plannerRunInFlightRef.current = true;
+                lastPlannerRunCompletedRef.current = false;
                 sendPlannerEnvelope(socket, conversationId, "PLANNER_CHAT_SEND", {
                     message: seed.prompt,
                     selectedPlaceIds: selectedPlaceIdsRef.current,
@@ -1165,7 +1169,12 @@ export default function AiPlanner() {
                 const payload = envelope.payload as PlannerTraceEvent;
                 setPlannerTraceEvents(prevEvents => [...prevEvents.slice(-11), payload]);
                 if (payload.type === "RUN_FAILED") {
+                    plannerRunInFlightRef.current = false;
+                    lastPlannerRunCompletedRef.current = false;
                     setChatSending(false);
+                }
+                if (payload.type === "RUN_FINISHED") {
+                    lastPlannerRunCompletedRef.current = true;
                 }
                 return;
             }
@@ -1173,14 +1182,28 @@ export default function AiPlanner() {
             if (envelope.type === "PLANNER_DATA_REFRESH") {
                 const payload = envelope.payload as PlannerDataRefreshPayload;
                 applyLiveData(viewDataFromRefresh(payload));
+                plannerRunInFlightRef.current = false;
+                lastPlannerRunCompletedRef.current = true;
                 setChatSending(false);
+                setErrorMessage(prevMessage => prevMessage === PLANNER_WS_RECONNECT_MESSAGE ? "" : prevMessage);
                 void refreshSnapshotList(conversationId);
                 void loadDayVersions(conversationId, payload.currentDayIndex || activeDayIndexRef.current);
                 return;
             }
 
+            if (envelope.type === "PLANNER_SNAPSHOT_SAVED") {
+                plannerRunInFlightRef.current = false;
+                lastPlannerRunCompletedRef.current = true;
+                setChatSending(false);
+                setErrorMessage(prevMessage => prevMessage === PLANNER_WS_RECONNECT_MESSAGE ? "" : prevMessage);
+                void refreshConversationFromServer(conversationId);
+                return;
+            }
+
             if (envelope.type === "PLANNER_ERROR") {
                 const payload = envelope.payload as PlannerErrorPayload;
+                plannerRunInFlightRef.current = false;
+                lastPlannerRunCompletedRef.current = false;
                 setErrorMessage(formatPlannerError(payload));
                 setChatSending(false);
             }
@@ -1189,7 +1212,9 @@ export default function AiPlanner() {
         socket.onerror = () => {
             if (closedByCleanup) return;
             setSocketStatus("error");
-            setErrorMessage(PLANNER_WS_RECONNECT_MESSAGE);
+            if (plannerRunInFlightRef.current && !lastPlannerRunCompletedRef.current) {
+                setErrorMessage(PLANNER_WS_RECONNECT_MESSAGE);
+            }
             setChatSending(false);
         };
 
@@ -1198,9 +1223,19 @@ export default function AiPlanner() {
             if (plannerWSRef.current === socket) {
                 plannerWSRef.current = null;
             }
-            setSocketStatus(prevStatus => prevStatus === "error" ? "error" : "closed");
+            const completedNormally = lastPlannerRunCompletedRef.current;
+            const wasPlanning = plannerRunInFlightRef.current;
+            if (completedNormally) {
+                plannerRunInFlightRef.current = false;
+            }
+            setSocketStatus(prevStatus => prevStatus === "error" && wasPlanning && !completedNormally ? "error" : "closed");
             setChatSending(false);
-            setErrorMessage(prevMessage => prevMessage || PLANNER_WS_RECONNECT_MESSAGE);
+            if (completedNormally) {
+                setErrorMessage(prevMessage => prevMessage === PLANNER_WS_RECONNECT_MESSAGE ? "" : prevMessage);
+                window.setTimeout(() => refreshConversationFromServer(conversationId), 500);
+            } else if (wasPlanning) {
+                setErrorMessage(prevMessage => prevMessage || PLANNER_WS_RECONNECT_MESSAGE);
+            }
 
             if (!wsReconnectTimerRef.current) {
                 const reconnectDelay = Math.min(10000, 1000 * Math.max(1, wsReconnectAttemptsRef.current + 1));
@@ -1229,6 +1264,7 @@ export default function AiPlanner() {
         conversation?.id,
         loadDayVersions,
         modelVariant,
+        refreshConversationFromServer,
         refreshSnapshotList,
         sendPlannerEnvelope,
         userId,
@@ -1321,6 +1357,8 @@ export default function AiPlanner() {
         ]);
         setErrorMessage("");
         setPlannerTraceEvents([]);
+        plannerRunInFlightRef.current = true;
+        lastPlannerRunCompletedRef.current = false;
         setChatSending(true);
 
         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -1343,6 +1381,7 @@ export default function AiPlanner() {
                 userId,
             });
             applySnapshotToPlannerState(response.data, payload.targetDayIndex);
+            lastPlannerRunCompletedRef.current = true;
             setChatMessages(prevMessages => [
                 ...prevMessages,
                 {
@@ -1357,6 +1396,7 @@ export default function AiPlanner() {
             console.error(error);
             setErrorMessage("生成日计划失败，请确认 ai-arrange-service 与 Python Agent 可用后重试。");
         } finally {
+            plannerRunInFlightRef.current = false;
             setChatSending(false);
         }
     };
@@ -1382,6 +1422,8 @@ export default function AiPlanner() {
         ]);
         setErrorMessage("");
         setPlannerTraceEvents([]);
+        plannerRunInFlightRef.current = true;
+        lastPlannerRunCompletedRef.current = false;
         sendPlannerEnvelope(socket, conversation.id, "PLANNER_CHAT_SEND", {
             message: trimmedInput,
             selectedPlaceIds: liveData.selectedPlaceIds,
@@ -1542,6 +1584,8 @@ export default function AiPlanner() {
     const resetPlanner = () => {
         plannerWSRef.current?.close();
         pendingInitialPromptRef.current = null;
+        plannerRunInFlightRef.current = false;
+        lastPlannerRunCompletedRef.current = false;
         localStorage.removeItem(PLANNER_STORAGE_KEY);
 
         const nextForm = defaultPlannerForm();
@@ -1585,6 +1629,8 @@ export default function AiPlanner() {
     const loadMockPlannerData = () => {
         plannerWSRef.current?.close();
         pendingInitialPromptRef.current = null;
+        plannerRunInFlightRef.current = false;
+        lastPlannerRunCompletedRef.current = false;
 
         const nextData = {
             ...emptyPlannerView(),
@@ -1723,11 +1769,23 @@ export default function AiPlanner() {
 
     const navigateToBookingLink = (link: PlannerBookingLink) => {
         if (!link.url) return;
-        if (/^https?:\/\//i.test(link.url)) {
-            window.open(link.url, "_blank", "noreferrer");
+        const normalizedUrl = normalizeBookingUrl(link.url);
+        if (normalizedUrl) {
+            navigate(normalizedUrl);
             return;
         }
-        navigate(link.url);
+    };
+
+    const normalizeBookingUrl = (url: string) => {
+        const trimmed = url.trim();
+        const exampleMatch = trimmed.match(/^https?:\/\/example\.com(\/reservations\/(?:hotels(?:\/[^\s?#)]+)?|trains|flights)(?:[?#][^\s)]*)?)$/i);
+        if (exampleMatch) {
+            return exampleMatch[1];
+        }
+        if (/^\/reservations\/(?:hotels(?:\/[^\s?#)]+)?|trains|flights)(?:[?#].*)?$/i.test(trimmed)) {
+            return trimmed;
+        }
+        return null;
     };
 
     const bookingIcon = (type?: string) => {
@@ -2077,7 +2135,7 @@ export default function AiPlanner() {
                 <div className="flex flex-col gap-3">
                     {displayData.places.map((place, index) => {
                         const selected = displayData.selectedPlaceIds.includes(place.placeId);
-                        const bookingLinks = place.bookingLinks || [];
+                        const bookingLinks = (place.bookingLinks || []).filter(link => Boolean(link.url && normalizeBookingUrl(link.url)));
                         return (
                             <Paper key={place.placeId} elevation={0} className="border border-gray-200 p-4">
                                 <div className="mb-2 flex items-start justify-between gap-3">

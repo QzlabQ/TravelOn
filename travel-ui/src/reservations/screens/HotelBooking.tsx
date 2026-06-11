@@ -14,7 +14,7 @@ import {
     ToggleButtonGroup
 } from "@mui/material";
 import {Bed, Hotel, LocalOffer, Search, Star} from "@mui/icons-material";
-import {Link, useLocation, useNavigate} from "react-router-dom";
+import {Link, useLocation, useNavigate, useSearchParams} from "react-router-dom";
 import {ApiRequests, GetOffersBySearchQueryOffer} from "../../core/apiConfig";
 import {BookingPersonPayload} from "../../core/apiConfig";
 import {Location} from "../../core/domain/DomainInterfaces";
@@ -54,6 +54,24 @@ const toDateInputValue = (value?: string | null, fallback = formatDate(today)) =
     return value.slice(0, 10);
 };
 
+const toPositiveInt = (value?: string | null) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
+};
+
+const normalizeCityText = (value?: string | null) => (value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s市省特别行政区自治区回族壮族维吾尔]+/g, '');
+
+const destinationMatchesCity = (destination: Location, city?: string | null) => {
+    const normalizedCity = normalizeCityText(city);
+    if (!normalizedCity) return false;
+    return [destination.region, destination.country]
+        .map(normalizeCityText)
+        .some(value => value === normalizedCity || value.includes(normalizedCity) || normalizedCity.includes(value));
+};
+
 const withCommunityHotelRatings = async (offers: GetOffersBySearchQueryOffer[]) => {
     const enriched = await Promise.all(offers.map(async offer => {
         try {
@@ -75,24 +93,30 @@ const withCommunityHotelRatings = async (offers: GetOffersBySearchQueryOffer[]) 
 const HotelBooking = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const [searchParams] = useSearchParams();
     const session = useAuthSession();
     const isAuthenticated = Boolean(session);
     const rebookState = (location.state ?? {}) as HotelRebookState;
     const bookingPreferences = useMemo(() => getBookingPreferences(), []);
+    const queryCity = searchParams.get('city');
+    const queryDateFrom = searchParams.get('dateFrom');
+    const queryDateTo = searchParams.get('dateTo');
+    const queryHotelName = searchParams.get('hotelName');
+    const queryAdults = toPositiveInt(searchParams.get('adults'));
     const navigateTimerRef = useRef<number | null>(null);
     const checkoutSectionRef = useRef<HTMLDivElement | null>(null);
     const checkoutSummaryRef = useRef<HTMLDivElement | null>(null);
     const [destinations, setDestinations] = useState<Location[]>([]);
     const [destination, setDestination] = useState<Location | undefined>();
-    const [dateFrom, setDateFrom] = useState(toDateInputValue(rebookState.dateFrom, formatDate(today)));
-    const [dateTo, setDateTo] = useState(toDateInputValue(rebookState.dateTo, formatDate(nextDay)));
+    const [dateFrom, setDateFrom] = useState(toDateInputValue(queryDateFrom ?? rebookState.dateFrom, formatDate(today)));
+    const [dateTo, setDateTo] = useState(toDateInputValue(queryDateTo ?? rebookState.dateTo, formatDate(nextDay)));
     const [priceFrom, setPriceFrom] = useState('');
     const [priceTo, setPriceTo] = useState(bookingPreferences.preferredHotelMaxPrice);
     const [stars, setStars] = useState(bookingPreferences.preferredHotelMinRating);
     const [hotelType, setHotelType] = useState('ALL');
     const [roomType, setRoomType] = useState('ALL');
     const [sortBy, setSortBy] = useState('price');
-    const [hotelNameQuery, setHotelNameQuery] = useState(rebookState.hotelName ?? '');
+    const [hotelNameQuery, setHotelNameQuery] = useState(queryHotelName ?? rebookState.hotelName ?? '');
     const [offers, setOffers] = useState<GetOffersBySearchQueryOffer[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
@@ -150,7 +174,7 @@ const HotelBooking = () => {
                 destinationId: destination.idLocation,
                 dateFrom,
                 dateTo,
-                adults: Math.max(1, selectedTravelers.filter(traveler => traveler.travelerType !== 'CHILD').length || 2),
+                adults: Math.max(1, selectedTravelers.filter(traveler => traveler.travelerType !== 'CHILD').length || queryAdults || 2),
                 hotelName: hotelNameQuery.trim() || undefined,
                 minPrice: priceFrom.trim() === '' ? undefined : normalizedPriceFrom,
                 maxPrice: priceTo.trim() === '' ? undefined : normalizedPriceTo,
@@ -195,6 +219,20 @@ const HotelBooking = () => {
     useEffect(() => {
         loadDestinations().then(r => r);
     }, []);
+
+    useEffect(() => {
+        if (!queryCity || destinations.length === 0) return;
+        const queryDestination = destinations.find(item => destinationMatchesCity(item, queryCity));
+        if (queryDestination && queryDestination.idLocation !== destination?.idLocation) {
+            setDestination(queryDestination);
+        }
+    }, [queryCity, destinations, destination?.idLocation]);
+
+    useEffect(() => {
+        setDateFrom(toDateInputValue(queryDateFrom ?? rebookState.dateFrom, formatDate(today)));
+        setDateTo(toDateInputValue(queryDateTo ?? rebookState.dateTo, formatDate(nextDay)));
+        setHotelNameQuery(queryHotelName ?? rebookState.hotelName ?? '');
+    }, [queryDateFrom, queryDateTo, queryHotelName, rebookState.dateFrom, rebookState.dateTo, rebookState.hotelName]);
 
     useEffect(() => {
         if (destinations.length > 0) {
@@ -252,7 +290,7 @@ const HotelBooking = () => {
         }, 350);
 
         return () => window.clearTimeout(timeoutId);
-    }, [hotelNameQuery, priceFrom, priceTo, stars, hotelType, roomType, sortBy, dateFrom, dateTo, selectedTravelers]);
+    }, [hotelNameQuery, priceFrom, priceTo, stars, hotelType, roomType, sortBy, dateFrom, dateTo, selectedTravelers, queryAdults]);
 
     const selectHotel = (offer: GetOffersBySearchQueryOffer) => {
         if (!isAuthenticated) {
