@@ -16,6 +16,7 @@ import HotelBooking from "./reservations/screens/HotelBooking";
 import HotelDetails from "./reservations/screens/HotelDetails";
 import Account from "./account/screens/Account";
 import ReservationDetails from "./reservations/screens/ReservationDetails";
+import TravelTimeline from "./reservations/screens/TravelTimeline";
 import Community from "./community/screens/Community";
 import CommunityPostDetails from "./community/screens/CommunityPostDetails";
 
@@ -34,6 +35,7 @@ function App() {
                     <Route path='/offerDetails' element={<OfferDetails/>}/>
                     <Route path='/buyOffer' element={<BuyOffer/>}/>
                     <Route path='/reservations' element={<Reservations/>}/>
+                    <Route path='/reservations/timeline' element={<TravelTimeline/>}/>
                     <Route path='/reservations/:reservationId' element={<ReservationDetails/>}/>
                     <Route path='/reservations/flights' element={<TicketBooking mode='flight'/>}/>
                     <Route path='/reservations/trains' element={<TicketBooking mode='train'/>}/>

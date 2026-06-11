@@ -13,7 +13,7 @@ import {
     TableHead,
     TableRow
 } from "@mui/material";
-import {Cancel, Refresh, Replay, Visibility} from "@mui/icons-material";
+import {Cancel, EventNote, Refresh, Replay, Visibility} from "@mui/icons-material";
 import {ApiRequests, ReservationResponse} from "../../core/apiConfig";
 import {getCurrentUserId, getCurrentUserMode} from "../../core/currentUser";
 import {Link} from "react-router-dom";
@@ -130,9 +130,14 @@ const Reservations = () => {
                         {userMode === 'GUEST' ? '当前使用游客身份保存预定，之后登录账号可以迁移绑定。' : '当前显示账号下的预定。'}
                     </p>
                 </div>
-                <Button variant='outlined' startIcon={<Refresh/>} onClick={loadReservations} disabled={loading}>
-                    刷新
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <Button component={Link} to="/reservations/timeline" variant="contained" startIcon={<EventNote/>}>
+                        我的行程
+                    </Button>
+                    <Button variant='outlined' startIcon={<Refresh/>} onClick={loadReservations} disabled={loading}>
+                        刷新
+                    </Button>
+                </div>
             </div>
 
             {loading && <Box sx={{height: 5}} className='mb-4'><LinearProgress/></Box>}

@@ -6,6 +6,7 @@ import {Link} from "react-router-dom";
 import {
     AutoAwesome,
     Bookmarks,
+    EventNote,
     Explore,
     Flight,
     Forum,
@@ -50,7 +51,8 @@ export default function Navbar() {
         {label: "机票预订", to: "/reservations/flights", icon: <Flight/>},
         {label: "火车票预订", to: "/reservations/trains", icon: <Train/>},
         {label: "酒店预订", to: "/reservations/hotels", icon: <Hotel/>},
-        {label: "我的预订", to: "/reservations", icon: <Bookmarks/>}
+        {label: "我的预订", to: "/reservations", icon: <Bookmarks/>},
+        {label: "我的行程", to: "/reservations/timeline", icon: <EventNote/>}
     ];
 
     return (
