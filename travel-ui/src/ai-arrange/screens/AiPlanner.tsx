@@ -2,6 +2,7 @@ import React, {FormEvent, useCallback, useEffect, useMemo, useRef, useState} fro
 import {useNavigate} from "react-router-dom";
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Chip,
@@ -122,6 +123,23 @@ interface PlannerStoredSession {
 const DEFAULT_DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 const PLANNER_STORAGE_KEY = "travel-ui.ai-planner.session.v1";
 const PLANNER_WS_RECONNECT_MESSAGE = "AI 连接已断开，正在自动重连。";
+const CITY_QUICK_OPTIONS = ["北京", "上海", "广州", "深圳", "杭州", "南京", "成都", "重庆", "西安", "苏州", "厦门", "青岛", "长沙", "武汉", "天津"];
+const PEOPLE_COUNT_QUICK_OPTIONS = ["1", "2", "3", "4", "5", "6"];
+const TRAVEL_STYLE_QUICK_OPTIONS = [
+    "轻松 citywalk + 经典地标",
+    "亲子友好",
+    "情侣慢旅行",
+    "美食优先",
+    "博物馆/展览",
+    "自然风景",
+    "夜景摄影",
+    "低强度少步行",
+];
+const BUDGET_QUICK_OPTIONS = ["人均 1000 以内", "人均 1000-2000", "人均 2000-3000", "人均 3000-5000", "不限制预算"];
+const ACCOMMODATION_QUICK_OPTIONS = ["地铁附近", "景区附近", "亲子酒店", "高性价比", "江景/海景", "安静舒适", "可步行到核心景点"];
+const TRANSPORT_QUICK_OPTIONS = ["公共交通优先", "少换乘", "少步行", "打车优先", "高铁优先", "飞机优先", "自驾友好"];
+const MUST_VISIT_QUICK_OPTIONS = ["地标建筑", "博物馆", "美食街", "咖啡店", "公园", "夜景", "历史街区", "亲子乐园", "购物中心"];
+const AVOID_QUICK_OPTIONS = ["排队过久", "人流密集", "夜市", "爬山", "长距离步行", "过度商业化", "早起行程"];
 
 function defaultPlannerForm(): PlannerFormState {
     return {
@@ -1685,6 +1703,64 @@ export default function AiPlanner() {
         </TextField>
     );
 
+    const renderFreeSoloInput = (
+        label: string,
+        value: string,
+        onChange: (value: string) => void,
+        options: string[],
+        props?: {
+            required?: boolean,
+            placeholder?: string,
+        }
+    ) => (
+        <Autocomplete
+            freeSolo
+            forcePopupIcon
+            options={options}
+            value={value}
+            inputValue={value}
+            onChange={(_, nextValue) => onChange(nextValue || "")}
+            onInputChange={(_, nextInputValue) => onChange(nextInputValue)}
+            renderInput={params => (
+                <TextField
+                    {...params}
+                    label={label}
+                    required={props?.required}
+                    placeholder={props?.placeholder}
+                    fullWidth
+                />
+            )}
+        />
+    );
+
+    const renderPeopleCountInput = () => (
+        <Autocomplete
+            freeSolo
+            forcePopupIcon
+            options={PEOPLE_COUNT_QUICK_OPTIONS}
+            value={String(peopleCount)}
+            inputValue={String(peopleCount)}
+            onChange={(_, nextValue) => setPeopleCount(Math.max(1, Number(nextValue) || 1))}
+            onInputChange={(_, nextInputValue) => {
+                if (nextInputValue === "") {
+                    setPeopleCount(1);
+                    return;
+                }
+                setPeopleCount(Math.max(1, Number(nextInputValue) || 1));
+            }}
+            renderInput={params => (
+                <TextField
+                    {...params}
+                    label="人数"
+                    required
+                    fullWidth
+                    type="number"
+                    inputProps={{...params.inputProps, min: 1}}
+                />
+            )}
+        />
+    );
+
     const renderSnapshotDiffPanel = () => {
         if (!isSnapshotPreview) return null;
 
@@ -1884,20 +1960,8 @@ export default function AiPlanner() {
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <div className="grid gap-4">
                     <div className="grid gap-4 md:grid-cols-2">
-                        <TextField
-                            label="出发城市"
-                            value={departureCity}
-                            fullWidth
-                            placeholder="例如：北京"
-                            onChange={event => setDepartureCity(event.target.value)}
-                        />
-                        <TextField
-                            label="旅游城市"
-                            value={city}
-                            required
-                            fullWidth
-                            onChange={event => setCity(event.target.value)}
-                        />
+                        {renderFreeSoloInput("出发城市", departureCity, setDepartureCity, CITY_QUICK_OPTIONS, {placeholder: "例如：北京"})}
+                        {renderFreeSoloInput("旅游城市", city, setCity, CITY_QUICK_OPTIONS, {required: true})}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
@@ -1916,66 +1980,23 @@ export default function AiPlanner() {
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <TextField
-                            label="人数"
-                            value={peopleCount}
-                            required
-                            fullWidth
-                            type="number"
-                            inputProps={{min: 1}}
-                            onChange={event => setPeopleCount(Math.max(1, Number(event.target.value) || 1))}
-                        />
+                        {renderPeopleCountInput()}
                         {renderModelVariantSelect(true)}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <TextField
-                            label="旅行偏好"
-                            value={travelStyle}
-                            fullWidth
-                            onChange={event => setTravelStyle(event.target.value)}
-                        />
-                        <TextField
-                            label="预算"
-                            value={budget}
-                            fullWidth
-                            placeholder="例如：人均 3000"
-                            onChange={event => setBudget(event.target.value)}
-                        />
+                        {renderFreeSoloInput("旅行偏好", travelStyle, setTravelStyle, TRAVEL_STYLE_QUICK_OPTIONS)}
+                        {renderFreeSoloInput("预算", budget, setBudget, BUDGET_QUICK_OPTIONS, {placeholder: "例如：人均 3000"})}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <TextField
-                            label="住宿偏好"
-                            value={accommodationPreference}
-                            fullWidth
-                            placeholder="例如：地铁附近、亲子酒店"
-                            onChange={event => setAccommodationPreference(event.target.value)}
-                        />
-                        <TextField
-                            label="交通偏好"
-                            value={transportPreference}
-                            fullWidth
-                            placeholder="例如：少打车、公共交通优先"
-                            onChange={event => setTransportPreference(event.target.value)}
-                        />
+                        {renderFreeSoloInput("住宿偏好", accommodationPreference, setAccommodationPreference, ACCOMMODATION_QUICK_OPTIONS, {placeholder: "例如：地铁附近、亲子酒店"})}
+                        {renderFreeSoloInput("交通偏好", transportPreference, setTransportPreference, TRANSPORT_QUICK_OPTIONS, {placeholder: "例如：少打车、公共交通优先"})}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <TextField
-                            label="想去的地点/关键词"
-                            value={mustVisitKeywords}
-                            fullWidth
-                            placeholder="外滩、博物馆、咖啡"
-                            onChange={event => setMustVisitKeywords(event.target.value)}
-                        />
-                        <TextField
-                            label="需要避开的内容"
-                            value={avoidKeywords}
-                            fullWidth
-                            placeholder="夜市、排队过久"
-                            onChange={event => setAvoidKeywords(event.target.value)}
-                        />
+                        {renderFreeSoloInput("想去的地点/关键词", mustVisitKeywords, setMustVisitKeywords, MUST_VISIT_QUICK_OPTIONS, {placeholder: "外滩、博物馆、咖啡"})}
+                        {renderFreeSoloInput("需要避开的内容", avoidKeywords, setAvoidKeywords, AVOID_QUICK_OPTIONS, {placeholder: "夜市、排队过久"})}
                     </div>
 
                     <TextField
