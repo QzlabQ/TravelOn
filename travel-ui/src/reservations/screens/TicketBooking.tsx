@@ -70,8 +70,19 @@ const modeConfig = {
   },
 };
 
-const today = new Date().toISOString().slice(0, 10);
+const toLocalDateInputValue = (value = new Date()) => {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const today = toLocalDateInputValue();
 const TICKET_PAGE_SIZE = 8;
+const ticketSaleCutoffMinutes: Record<TicketMode, number> = {
+  flight: 90,
+  train: 30,
+};
 const popularRoutes: Record<TicketMode, Array<{ from: string; to: string }>> = {
   flight: [
     { from: "北京", to: "上海" },
@@ -242,6 +253,58 @@ const formatTicketDate = (value: string) => {
 
 const formatTicketTimeRange = (offer: TicketSearchOffer) => {
   return `${formatTicketClock(offer.departureTime)} - ${formatTicketClock(offer.arrivalTime)}`;
+};
+
+const parseTicketDateTime = (value: string, fallbackDate?: string) => {
+  const trimmedValue = value?.trim() ?? "";
+  if (!trimmedValue) return null;
+
+  const date = new Date(trimmedValue);
+  if (!Number.isNaN(date.getTime())) {
+    return date;
+  }
+
+  const timeMatch = trimmedValue.match(/^(\d{1,2}):(\d{2})/);
+  if (timeMatch && fallbackDate) {
+    const [, hour, minute] = timeMatch;
+    const fallbackDateTime = new Date(
+      `${fallbackDate}T${hour.padStart(2, "0")}:${minute}:00`,
+    );
+    return Number.isNaN(fallbackDateTime.getTime()) ? null : fallbackDateTime;
+  }
+
+  return null;
+};
+
+const getTicketSaleDeadline = (
+  offer: TicketSearchOffer,
+  mode: TicketMode,
+  fallbackDate?: string,
+) => {
+  const departureDate = parseTicketDateTime(offer.departureTime, fallbackDate);
+  if (!departureDate) return null;
+
+  return new Date(
+    departureDate.getTime() - ticketSaleCutoffMinutes[mode] * 60 * 1000,
+  );
+};
+
+const isTicketOfferBookableByTime = (
+  offer: TicketSearchOffer,
+  mode: TicketMode,
+  now = new Date(),
+  fallbackDate?: string,
+) => {
+  const saleDeadline = getTicketSaleDeadline(offer, mode, fallbackDate);
+  if (!saleDeadline) return true;
+  return saleDeadline.getTime() > now.getTime();
+};
+
+const getTicketSaleClosedMessage = (mode: TicketMode) => {
+  const cutoffMinutes = ticketSaleCutoffMinutes[mode];
+  return mode === "flight"
+    ? `航班起飞前 ${cutoffMinutes} 分钟停止预订，请选择更晚的航班。`
+    : `列车发车前 ${cutoffMinutes} 分钟停止预订，请选择更晚的车次。`;
 };
 
 const TicketCard = ({
@@ -535,6 +598,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   const [selectedOffer, setSelectedOffer] = useState<TicketSearchOffer | null>(
     null,
   );
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const [hasLoadedOptions, setHasLoadedOptions] = useState(false);
   const [resultPage, setResultPage] = useState(1);
   const [selectedTrainTypes, setSelectedTrainTypes] = useState<
@@ -551,10 +615,22 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     Record<string, string>
   >({});
 
+  const currentDate = useMemo(
+    () => toLocalDateInputValue(currentTime),
+    [currentTime],
+  );
+  const timeAvailableOffers = useMemo(
+    () =>
+      ticketOffers.filter((offer) =>
+        isTicketOfferBookableByTime(offer, mode, currentTime, date),
+      ),
+    [currentTime, date, mode, ticketOffers],
+  );
+  const timeFilteredOfferCount = ticketOffers.length - timeAvailableOffers.length;
   const offers = useMemo(() => {
-    if (mode !== "train") return ticketOffers;
+    if (mode !== "train") return timeAvailableOffers;
     const normalizedTrainCodeQuery = trainCodeQuery.trim().toUpperCase();
-    return ticketOffers.filter((offer) => {
+    return timeAvailableOffers.filter((offer) => {
       const normalizedOfferCode = offer.code.toUpperCase();
       return (
         selectedTrainTypes.includes(getTrainTypeGroup(offer.code)) &&
@@ -562,7 +638,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
           normalizedOfferCode.includes(normalizedTrainCodeQuery))
       );
     });
-  }, [mode, selectedTrainTypes, ticketOffers, trainCodeQuery]);
+  }, [mode, selectedTrainTypes, timeAvailableOffers, trainCodeQuery]);
   const trainOfferGroups = useMemo(
     () => (mode === "train" ? buildTrainOfferGroups(offers) : []),
     [mode, offers],
@@ -667,6 +743,31 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   };
 
   useEffect(() => clearAutoNavigate, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (date && date < currentDate) {
+      setDate(currentDate);
+    }
+  }, [currentDate, date]);
+
+  useEffect(() => {
+    if (!selectedOffer) return;
+    const stillVisible = offers.some((offer) => offer.id === selectedOffer.id);
+    if (!stillVisible) {
+      setSelectedOffer(null);
+      setCheckoutConfirmOpen(false);
+      setBookingId("");
+      setBookingError(true);
+      setBookingMessage(getTicketSaleClosedMessage(mode));
+    }
+  }, [mode, offers, selectedOffer]);
 
   const searchTickets = async (
     departureCity = from,
@@ -785,6 +886,10 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     searchTickets(departureCity, arrivalCity).then((r) => r);
   };
 
+  const updateDepartureDate = (value: string) => {
+    setDate(value && value < currentDate ? currentDate : value);
+  };
+
   const toggleTrainType = (type: TrainTypeFilter) => {
     setSelectedTrainTypes((current) => {
       const nextTypes = current.includes(type)
@@ -850,6 +955,13 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       showToast("登录后才能选择和下单", true);
       return;
     }
+    if (!isTicketOfferBookableByTime(offer, mode, currentTime, date)) {
+      const closedMessage = getTicketSaleClosedMessage(mode);
+      setBookingError(true);
+      setBookingMessage(closedMessage);
+      showToast(closedMessage, true);
+      return;
+    }
 
     setSelectedOffer(offer);
     setBookingError(false);
@@ -868,6 +980,13 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       setBookingError(true);
       setBookingMessage("请先选择一个可预订方案。");
       showToast("请先选择一个可预订方案", true);
+      return;
+    }
+    if (!isTicketOfferBookableByTime(selectedOffer, mode, currentTime, date)) {
+      const closedMessage = getTicketSaleClosedMessage(mode);
+      setBookingError(true);
+      setBookingMessage(closedMessage);
+      showToast(closedMessage, true);
       return;
     }
     if (selectedTravelers.length === 0) {
@@ -904,6 +1023,14 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       setBookingError(true);
       setBookingMessage(travelerRuleError);
       showToast(travelerRuleError, true);
+      return;
+    }
+    if (!isTicketOfferBookableByTime(selectedOffer, mode, new Date(), date)) {
+      const closedMessage = getTicketSaleClosedMessage(mode);
+      setBookingError(true);
+      setBookingMessage(closedMessage);
+      showToast(closedMessage, true);
+      setCheckoutConfirmOpen(false);
       return;
     }
     setBookingId(selectedOffer.id);
@@ -1121,7 +1248,8 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
                 className="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900"
                 type="date"
                 value={date}
-                onChange={(event) => setDate(event.target.value)}
+                min={currentDate}
+                onChange={(event) => updateDepartureDate(event.target.value)}
               />
             </label>
             <Button
@@ -1260,6 +1388,12 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
             <Box sx={{ height: 5 }} className="mb-4">
               <LinearProgress />
             </Box>
+          )}
+          {timeFilteredOfferCount > 0 && (
+            <Alert severity="info" className="mb-4">
+              已隐藏 {timeFilteredOfferCount} 个已发车/起飞或距离出发时间过近的
+              {mode === "flight" ? "航班" : "车次"}，请预留足够办理时间。
+            </Alert>
           )}
           <section className="rounded-lg bg-white border border-slate-200 p-5 shadow-sm overflow-x-auto">
             <div className="mb-4 flex items-center justify-between">

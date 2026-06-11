@@ -147,6 +147,32 @@ const getTimelineEndDate = (reservation: ReservationResponse) => {
     return parseTripDate(reservation.hotelTimeTo);
 };
 
+const isTicketReservation = (reservation: ReservationResponse) => {
+    return reservation.bookingType === "FLIGHT" || reservation.bookingType === "TRAIN";
+};
+
+const isTimelineReservationActive = (
+    reservation: ReservationResponse,
+    now = new Date(),
+) => {
+    if (getEffectiveReservationStatus(reservation) !== "PAID") {
+        return false;
+    }
+
+    const startDate = getTimelineStartDate(reservation);
+    const endDate = getTimelineEndDate(reservation);
+
+    if (isTicketReservation(reservation)) {
+        return startDate.getTime() > now.getTime();
+    }
+
+    if (reservation.bookingType === "HOTEL") {
+        return (endDate ?? startDate).getTime() >= now.getTime();
+    }
+
+    return (endDate ?? startDate).getTime() >= now.getTime();
+};
+
 const getItemTitle = (reservation: ReservationResponse) => {
     if (reservation.bookingType === "HOTEL") {
         return reservation.title || reservation.provider || "酒店入住";
@@ -181,9 +207,12 @@ const getGroupSubtitle = (item: TravelTimelineItem) => {
     return "已确认行程";
 };
 
-const buildTimelineItems = (reservations: ReservationResponse[]): TravelTimelineItem[] => {
+const buildTimelineItems = (
+    reservations: ReservationResponse[],
+    now = new Date(),
+): TravelTimelineItem[] => {
     return reservations
-        .filter(reservation => getEffectiveReservationStatus(reservation) === "PAID")
+        .filter(reservation => isTimelineReservationActive(reservation, now))
         .map(reservation => {
             const startDate = getTimelineStartDate(reservation);
             return {
@@ -228,6 +257,7 @@ const TimelineCard = ({item}: { item: TravelTimelineItem }) => {
     const meta = kindMeta[item.kind];
     const isHotel = item.kind === "HOTEL";
     const travelerCount = getTravelerCount(reservation);
+    const isHotelCheckedIn = isHotel && item.startDate.getTime() <= Date.now();
 
     return (
         <Paper elevation={0} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -243,6 +273,7 @@ const TimelineCard = ({item}: { item: TravelTimelineItem }) => {
                         <Chip size="small" label={meta.label} sx={{backgroundColor: "#f8fafc"}}/>
                         {reservation.bookingCode && <Chip size="small" variant="outlined" label={reservation.bookingCode}/>}
                         <Chip size="small" color="success" label="已支付"/>
+                        {isHotel && <Chip size="small" color={isHotelCheckedIn ? "info" : "default"} label={isHotelCheckedIn ? "入住中" : "待入住"}/>}
                     </div>
 
                     <h3 className="mt-4 truncate text-xl font-bold text-slate-950">
@@ -323,6 +354,7 @@ const TravelTimeline = () => {
     const [reservations, setReservations] = useState<ReservationResponse[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
+    const [currentTime, setCurrentTime] = useState(() => new Date());
 
     const userId = getCurrentUserId();
     const userMode = getCurrentUserMode();
@@ -345,7 +377,14 @@ const TravelTimeline = () => {
         loadReservations().then(r => r);
     }, []);
 
-    const timelineItems = useMemo(() => buildTimelineItems(reservations), [reservations]);
+    useEffect(() => {
+        const timer = window.setInterval(() => {
+            setCurrentTime(new Date());
+        }, 60 * 1000);
+        return () => window.clearInterval(timer);
+    }, []);
+
+    const timelineItems = useMemo(() => buildTimelineItems(reservations, currentTime), [reservations, currentTime]);
     const timelineGroups = useMemo(() => buildTimelineGroups(timelineItems), [timelineItems]);
     const hiddenOrderCount = reservations.length - timelineItems.length;
 
@@ -359,7 +398,7 @@ const TravelTimeline = () => {
                         </p>
                         <h1 className="mt-4 text-4xl font-black">已确认行程时间线</h1>
                         <p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">
-                            自动整合已支付的火车票、机票和酒店订单，按时间从早到晚排列；订单退款或取消后，会从这里移除。
+                            自动整合已支付且尚未开始的火车票、机票，以及未离店的酒店订单；订单退款、取消或行程结束后，会从这里移除。
                         </p>
                     </div>
                     <div className="rounded-2xl bg-white/15 px-5 py-4 backdrop-blur">
@@ -374,8 +413,8 @@ const TravelTimeline = () => {
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-slate-500">
-                    仅显示已支付订单；待支付、已超时、已退款订单不会进入时间线。
-                    {hiddenOrderCount > 0 ? ` 已隐藏 ${hiddenOrderCount} 个未确认或已关闭订单。` : ""}
+                    仅显示接下来的有效行程；待支付、已超时、已退款、已取消、票务已出发或酒店已离店的订单不会进入时间线。
+                    {hiddenOrderCount > 0 ? ` 已隐藏 ${hiddenOrderCount} 个不在当前行程中的订单。` : ""}
                 </p>
                 <div className="flex flex-wrap gap-2">
                     <Button component={Link} to="/reservations" variant="outlined">
@@ -398,9 +437,9 @@ const TravelTimeline = () => {
             {!loading && !error && timelineGroups.length === 0 &&
                 <Paper elevation={0} className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white px-8 py-12 text-center">
                     <EventNote sx={{fontSize: 54, color: "#94a3b8"}}/>
-                    <h2 className="mt-4 text-2xl font-bold text-slate-900">暂无已确认行程</h2>
+                    <h2 className="mt-4 text-2xl font-bold text-slate-900">暂无接下来的行程</h2>
                     <p className="mt-2 text-slate-500">
-                        完成票务或酒店支付后，订单会自动出现在这里；退款完成后会自动移除。
+                        完成票务或酒店支付后，未开始的票务和未离店的酒店会出现在这里；出发、离店或退款完成后会自动移除。
                     </p>
                     <div className="mt-6 flex flex-wrap justify-center gap-3">
                         <Button component={Link} to="/reservations/trains" variant="contained">订火车票</Button>
