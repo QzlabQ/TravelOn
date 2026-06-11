@@ -1,8 +1,10 @@
 package org.microarchitecturovisco.communityservice.service;
 
 import lombok.RequiredArgsConstructor;
+import org.microarchitecturovisco.communityservice.domain.City;
 import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
 import org.microarchitecturovisco.communityservice.domain.CommunityPost;
+import org.microarchitecturovisco.communityservice.domain.FavoriteTargetType;
 import org.microarchitecturovisco.communityservice.domain.PostLike;
 import org.microarchitecturovisco.communityservice.domain.Review;
 import org.microarchitecturovisco.communityservice.domain.ReviewTargetType;
@@ -13,9 +15,11 @@ import org.microarchitecturovisco.communityservice.dto.LikeResponse;
 import org.microarchitecturovisco.communityservice.dto.PostResponse;
 import org.microarchitecturovisco.communityservice.dto.ReviewResponse;
 import org.microarchitecturovisco.communityservice.dto.UserProfileResponse;
+import org.microarchitecturovisco.communityservice.repository.CityRepository;
 import org.microarchitecturovisco.communityservice.repository.CommunityPostRepository;
 import org.microarchitecturovisco.communityservice.repository.PostLikeRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
+import org.microarchitecturovisco.communityservice.util.CommunityImages;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -36,7 +40,11 @@ public class CommunityService {
     private final CommunityPostRepository postRepository;
     private final PostLikeRepository likeRepository;
     private final ReviewRepository reviewRepository;
+    private final CityRepository cityRepository;
     private final UserClient userClient;
+    private final FavoriteService favoriteService;
+    private final CommentService commentService;
+    private final ReviewLikeService reviewLikeService;
 
     public Page<PostResponse> listPosts(CommunityCategory category, String keyword, int page, int size, String sort, String token) {
         Pageable pageable = PageRequest.of(
@@ -51,25 +59,34 @@ public class CommunityService {
         Page<CommunityPost> posts = normalizedKeyword == null
                 ? (category == null ? postRepository.findAll(pageable) : postRepository.findByCategory(category, pageable))
                 : postRepository.search(category, normalizedKeyword, pageable);
-        return posts
-                .map(post -> PostResponse.from(post, currentUserId != null && likeRepository.existsByPostIdAndUserId(post.getId(), currentUserId)));
+        return posts.map(post -> toPostResponse(post, currentUserId));
     }
 
     public PostResponse getPost(UUID postId, String token) {
         CommunityPost post = requirePost(postId);
-        UUID currentUserId = tryResolveUserId(token);
-        return PostResponse.from(post, currentUserId != null && likeRepository.existsByPostIdAndUserId(post.getId(), currentUserId));
+        return toPostResponse(post, tryResolveUserId(token));
+    }
+
+    private PostResponse toPostResponse(CommunityPost post, UUID currentUserId) {
+        boolean liked = currentUserId != null && likeRepository.existsByPostIdAndUserId(post.getId(), currentUserId);
+        boolean favorited = favoriteService.isFavorited(currentUserId, FavoriteTargetType.POST, post.getId().toString());
+        long commentCount = commentService.countPostComments(post.getId());
+        return PostResponse.from(post, liked, favorited, commentCount);
     }
 
     public PostResponse createPost(String token, CreatePostRequest request) {
         UserProfileResponse user = userClient.requireUser(token);
+        String normalizedCityId = normalizeOptional(request.destinationCityId());
+        City destinationCity = normalizedCityId != null
+                ? cityRepository.findByCityId(normalizedCityId).orElse(null)
+                : null;
         CommunityPost post = CommunityPost.builder()
                 .id(UUID.randomUUID())
                 .title(request.title().trim())
                 .content(request.content().trim())
                 .category(request.category())
-                .destination(normalizeOptional(request.destination()))
-                .imageUrls(normalizeImageUrls(request.imageUrls()))
+                .destinationCity(destinationCity)
+                .imageUrls(CommunityImages.normalize(request.imageUrls()))
                 .authorUserId(user.id())
                 .authorName(user.displayName())
                 .likeCount(0)
@@ -98,14 +115,19 @@ public class CommunityService {
                 });
     }
 
-    public Page<ReviewResponse> listReviews(ReviewTargetType targetType, String targetId, CommunityCategory category, int page, int size) {
+    public Page<ReviewResponse> listReviews(ReviewTargetType targetType, String targetId, CommunityCategory category, int page, int size, String token) {
         Pageable pageable = PageRequest.of(
                 Math.max(0, page),
                 Math.min(Math.max(size, 1), 50),
                 Sort.by(Sort.Direction.DESC, "createdAt")
         );
-        return reviewRepository.search(targetType, normalizeOptional(targetId), category, pageable)
-                .map(ReviewResponse::from);
+        UUID currentUserId = tryResolveUserId(token);
+        Page<Review> reviews = reviewRepository.search(targetType, normalizeOptional(targetId), category, pageable);
+        List<ReviewResponse> responses = reviewLikeService.toResponses(reviews.getContent(), currentUserId);
+        return reviews.map(review -> responses.stream()
+                .filter(response -> response.id().equals(review.getId()))
+                .findFirst()
+                .orElseGet(() -> ReviewResponse.from(review)));
     }
 
     public ReviewResponse createReview(String token, CreateReviewRequest request) {
@@ -118,6 +140,7 @@ public class CommunityService {
                 .rating(request.rating())
                 .content(request.content().trim())
                 .category(request.category())
+                .imageUrls(CommunityImages.normalize(request.imageUrls()))
                 .authorUserId(user.id())
                 .authorName(user.displayName())
                 .build();
@@ -165,16 +188,5 @@ public class CommunityService {
 
     private String normalizeOptional(String value) {
         return value == null || value.trim().isEmpty() ? null : value.trim();
-    }
-
-    private List<String> normalizeImageUrls(List<String> imageUrls) {
-        if (imageUrls == null) {
-            return List.of();
-        }
-        return imageUrls.stream()
-                .map(this::normalizeOptional)
-                .filter(url -> url != null && (url.startsWith("http://") || url.startsWith("https://")))
-                .limit(6)
-                .toList();
     }
 }

@@ -13,26 +13,36 @@ public record PostResponse(
         String content,
         CommunityCategory category,
         String destination,
+        String destinationCityId,
         List<String> imageUrls,
         UUID authorUserId,
         String authorName,
         int likeCount,
         boolean likedByCurrentUser,
+        boolean favoritedByCurrentUser,
+        long commentCount,
         Instant createdAt,
         Instant updatedAt
 ) {
     public static PostResponse from(CommunityPost post, boolean likedByCurrentUser) {
+        return from(post, likedByCurrentUser, false, 0);
+    }
+
+    public static PostResponse from(CommunityPost post, boolean likedByCurrentUser, boolean favoritedByCurrentUser, long commentCount) {
         return new PostResponse(
                 post.getId(),
                 post.getTitle(),
                 post.getContent(),
                 post.getCategory(),
-                post.getDestination(),
+                post.getDestinationCity() != null ? post.getDestinationCity().getRegion() : null,
+                post.getDestinationCity() != null ? post.getDestinationCity().getCityId() : null,
                 post.getImageUrls(),
                 post.getAuthorUserId(),
                 post.getAuthorName(),
                 post.getLikeCount(),
                 likedByCurrentUser,
+                favoritedByCurrentUser,
+                commentCount,
                 post.getCreatedAt(),
                 post.getUpdatedAt()
         );

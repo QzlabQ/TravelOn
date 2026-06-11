@@ -121,8 +121,6 @@ const trainTypeFilters: Array<{ label: string; value: TrainTypeFilter }> = [
 const defaultTrainTypeFilters = trainTypeFilters.map((item) => item.value);
 
 type TicketRebookState = {
-  routeFrom?: string | null;
-  routeTo?: string | null;
   departureDate?: string | null;
   bookingCode?: string | null;
 };
@@ -821,10 +819,6 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         const nextDepartures = response.data.departures ?? [];
         const nextArrivals = response.data.arrivals ?? [];
         const nextFrom =
-          (rebookState.routeFrom &&
-          nextDepartures.includes(rebookState.routeFrom)
-            ? rebookState.routeFrom
-            : undefined) ??
           findPreferredCity(
             nextDepartures,
             bookingPreferences.defaultDepartureCity,
@@ -836,10 +830,6 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
           (item) => item !== nextFrom,
         );
         const nextTo =
-          (rebookState.routeTo &&
-          nextArrivalCandidates.includes(rebookState.routeTo)
-            ? rebookState.routeTo
-            : undefined) ??
           findPreferredCity(
             nextArrivalCandidates,
             bookingPreferences.defaultArrivalCity,
@@ -1042,8 +1032,6 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       const response = await ApiRequests.createTicketReservation({
         userId: getCurrentUserId(),
         transportType: mode === "flight" ? "FLIGHT" : "TRAIN",
-        routeFrom: from || "出发地",
-        routeTo: to || "目的地",
         departureDate: date,
         departureTime: selectedOffer.departureTime,
         arrivalTime: selectedOffer.arrivalTime,

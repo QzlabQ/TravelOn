@@ -199,11 +199,13 @@ services:
     volumes:
       - ./logs/community:/logs
       - ./seed-data/hotel:/seed-data/hotel:ro
+      - ./data/community/uploads:/uploads
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${COMMUNITY_DB_NAME:-community_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       APP_SEED_DATA_HOTEL_REVIEWS_CSV: file:/seed-data/hotel/hotel_reviews.csv
+      APP_UPLOADS_DIR: /uploads
     depends_on:
       postgres:
         condition: service_healthy

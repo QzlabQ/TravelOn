@@ -22,6 +22,17 @@ SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
+CREATE TABLE public.city (
+    id uuid NOT NULL,
+    country character varying(255) NOT NULL,
+    region character varying(255),
+    city_id character varying(255),
+    normalized_name character varying(255),
+    province character varying(255),
+    CONSTRAINT city_pkey PRIMARY KEY (id),
+    CONSTRAINT uq_city_city_id UNIQUE (city_id)
+);
+
 --
 -- Name: community_post; Type: TABLE; Schema: public; Owner: -
 --
@@ -33,7 +44,7 @@ CREATE TABLE public.community_post (
     category character varying(255) NOT NULL,
     content character varying(4000) NOT NULL,
     created_at timestamp(6) with time zone NOT NULL,
-    destination character varying(255),
+    destination_city_id character varying(255),
     like_count integer NOT NULL,
     title character varying(120) NOT NULL,
     updated_at timestamp(6) with time zone NOT NULL,
@@ -85,6 +96,16 @@ CREATE TABLE public.review (
 
 
 --
+-- Name: review_images; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.review_images (
+    review_id bigint NOT NULL,
+    image_url character varying(1000)
+);
+
+
+--
 -- Name: community_post community_post_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -123,9 +144,16 @@ ALTER TABLE ONLY public.post_like
 ALTER TABLE ONLY public.community_post_images
     ADD CONSTRAINT fkk0qkynnekml4qotcayonr02he FOREIGN KEY (post_id) REFERENCES public.community_post(id);
 
+ALTER TABLE ONLY public.review_images
+    ADD CONSTRAINT fk_review_images_review FOREIGN KEY (review_id) REFERENCES public.review(id);
+CREATE INDEX idx_review_images_review ON public.review_images(review_id);
+
 CREATE INDEX idx_community_post_category_created ON public.community_post(category, created_at DESC);
 CREATE INDEX idx_community_post_popular ON public.community_post(like_count DESC, created_at DESC);
-CREATE INDEX idx_community_post_destination ON public.community_post(destination);
+CREATE INDEX idx_community_post_destination ON public.community_post(destination_city_id);
+
+ALTER TABLE ONLY public.community_post
+    ADD CONSTRAINT fk_community_post_destination_city FOREIGN KEY (destination_city_id) REFERENCES public.city(city_id);
 CREATE INDEX idx_post_like_post ON public.post_like(post_id);
 CREATE INDEX idx_post_like_user ON public.post_like(user_id);
 CREATE INDEX idx_review_target_created ON public.review(target_type, target_id, created_at DESC);
@@ -190,6 +218,178 @@ SELECT
 FROM public.review
 WHERE target_id IS NOT NULL
 GROUP BY target_type, target_id;
+
+
+--
+-- Name: attraction; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.attraction (
+    id uuid NOT NULL,
+    name character varying(120) NOT NULL,
+    city_id character varying(255),
+    description character varying(2000),
+    cover_image_url character varying(1000),
+    created_by_user_id uuid NOT NULL,
+    created_by_name character varying(255) NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    updated_at timestamp(6) with time zone NOT NULL,
+    CONSTRAINT attraction_pkey PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX uq_attraction_name_city
+    ON public.attraction (lower(name), lower(coalesce(city_id, '')));
+CREATE INDEX idx_attraction_name ON public.attraction (name);
+CREATE INDEX idx_attraction_city ON public.attraction (city_id);
+
+ALTER TABLE ONLY public.attraction
+    ADD CONSTRAINT fk_attraction_city FOREIGN KEY (city_id) REFERENCES public.city(city_id);
+
+--
+-- Name: attraction_images; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.attraction_images (
+    attraction_id uuid NOT NULL,
+    image_url character varying(1000)
+);
+
+ALTER TABLE ONLY public.attraction_images
+    ADD CONSTRAINT fk_attraction_images_attraction FOREIGN KEY (attraction_id) REFERENCES public.attraction(id);
+CREATE INDEX idx_attraction_images_attraction ON public.attraction_images(attraction_id);
+
+CREATE TRIGGER trg_attraction_set_updated_at
+BEFORE UPDATE ON public.attraction
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: travel_route; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.travel_route (
+    id uuid NOT NULL,
+    title character varying(120) NOT NULL,
+    summary character varying(4000),
+    days integer NOT NULL,
+    people_count integer NOT NULL,
+    budget integer NOT NULL,
+    style character varying(255) NOT NULL,
+    destination_city_id character varying(255),
+    cover_image_url character varying(1000),
+    author_user_id uuid NOT NULL,
+    author_name character varying(255) NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    updated_at timestamp(6) with time zone NOT NULL,
+    CONSTRAINT travel_route_pkey PRIMARY KEY (id),
+    CONSTRAINT travel_route_style_check CHECK (((style)::text = ANY ((ARRAY['LEISURE'::character varying, 'CULTURE'::character varying, 'NATURE'::character varying, 'FOOD'::character varying, 'FAMILY'::character varying, 'ADVENTURE'::character varying, 'ROMANTIC'::character varying, 'OTHER'::character varying])::text[])))
+);
+
+CREATE INDEX idx_travel_route_style_created ON public.travel_route(style, created_at DESC);
+CREATE INDEX idx_travel_route_city ON public.travel_route(destination_city_id);
+
+ALTER TABLE ONLY public.travel_route
+    ADD CONSTRAINT fk_travel_route_destination_city FOREIGN KEY (destination_city_id) REFERENCES public.city(city_id);
+
+CREATE TRIGGER trg_travel_route_set_updated_at
+BEFORE UPDATE ON public.travel_route
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+--
+-- Name: travel_route_images; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.travel_route_images (
+    route_id uuid NOT NULL,
+    image_url character varying(1000)
+);
+
+ALTER TABLE ONLY public.travel_route_images
+    ADD CONSTRAINT fk_travel_route_images_route FOREIGN KEY (route_id) REFERENCES public.travel_route(id);
+CREATE INDEX idx_travel_route_images_route ON public.travel_route_images(route_id);
+
+--
+-- Name: route_stop; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.route_stop (
+    id uuid NOT NULL,
+    route_id uuid NOT NULL,
+    attraction_id uuid NOT NULL,
+    attraction_name character varying(120) NOT NULL,
+    attraction_city character varying(255),
+    cover_image_url character varying(1000),
+    day_number integer NOT NULL,
+    sort_order integer NOT NULL,
+    note character varying(1000),
+    CONSTRAINT route_stop_pkey PRIMARY KEY (id)
+);
+
+ALTER TABLE ONLY public.route_stop
+    ADD CONSTRAINT fk_route_stop_route FOREIGN KEY (route_id) REFERENCES public.travel_route(id);
+CREATE INDEX idx_route_stop_route ON public.route_stop(route_id, day_number, sort_order);
+
+
+--
+-- Name: community_favorite; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.community_favorite (
+    id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    type character varying(255) NOT NULL,
+    target_id character varying(255) NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    CONSTRAINT community_favorite_pkey PRIMARY KEY (id),
+    CONSTRAINT community_favorite_type_check CHECK (((type)::text = ANY ((ARRAY['POST'::character varying, 'ROUTE'::character varying, 'ATTRACTION'::character varying])::text[]))),
+    CONSTRAINT uq_community_favorite_user_target UNIQUE (user_id, type, target_id)
+);
+
+CREATE INDEX idx_community_favorite_user_type_created
+    ON public.community_favorite(user_id, type, created_at DESC);
+CREATE INDEX idx_community_favorite_target
+    ON public.community_favorite(type, target_id);
+
+
+--
+-- Name: community_comment; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.community_comment (
+    id uuid NOT NULL,
+    target_type character varying(255) NOT NULL,
+    target_id character varying(255) NOT NULL,
+    author_user_id uuid NOT NULL,
+    author_name character varying(255) NOT NULL,
+    content character varying(2000) NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    CONSTRAINT community_comment_pkey PRIMARY KEY (id),
+    CONSTRAINT community_comment_target_type_check CHECK (((target_type)::text = ANY ((ARRAY['POST'::character varying, 'ROUTE'::character varying, 'ATTRACTION'::character varying])::text[])))
+);
+
+CREATE INDEX idx_community_comment_target_created
+    ON public.community_comment(target_type, target_id, created_at DESC);
+CREATE INDEX idx_community_comment_author_created
+    ON public.community_comment(author_user_id, created_at DESC);
+
+
+--
+-- Name: review_like; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.review_like (
+    id uuid NOT NULL,
+    review_id bigint NOT NULL,
+    user_id uuid NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    CONSTRAINT review_like_pkey PRIMARY KEY (id),
+    CONSTRAINT uq_review_like_review_user UNIQUE (review_id, user_id)
+);
+
+ALTER TABLE ONLY public.review_like
+    ADD CONSTRAINT fk_review_like_review FOREIGN KEY (review_id) REFERENCES public.review(id);
+CREATE INDEX idx_review_like_review ON public.review_like(review_id);
+CREATE INDEX idx_review_like_user_review ON public.review_like(user_id, review_id);
 
 
 --

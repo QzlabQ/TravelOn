@@ -2,7 +2,7 @@ import React from "react";
 import {Avatar, Button, Chip, Tooltip} from "@mui/material";
 import {ArrowForward, Favorite, FavoriteBorder, ImageOutlined, LocationOn} from "@mui/icons-material";
 import {Link} from "react-router-dom";
-import {CommunityPostResponse} from "../../core/apiConfig";
+import {CommunityPostResponse, resolveCommunityImageUrl} from "../../core/apiConfig";
 import {categoryLabels, formatCommunityTime} from "./communityLabels";
 
 type Props = {
@@ -48,7 +48,7 @@ const CommunityPostCard = ({post, onLike, canLike}: Props) => {
 
                 <Link to={`/community/posts/${post.id}`} className="block h-36 overflow-hidden rounded-lg bg-slate-100 md:h-full">
                     {coverImage ?
-                        <img src={coverImage} alt={post.title} className="h-full w-full object-cover transition duration-300 hover:scale-105"/>
+                        <img src={resolveCommunityImageUrl(coverImage)} alt={post.title} className="h-full w-full object-cover transition duration-300 hover:scale-105"/>
                         :
                         <div className="flex h-full min-h-36 items-center justify-center text-slate-400">
                             <ImageOutlined fontSize="large"/>

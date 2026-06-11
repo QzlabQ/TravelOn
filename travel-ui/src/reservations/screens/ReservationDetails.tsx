@@ -540,8 +540,7 @@ export default function ReservationDetails() {
                             <div className="grid gap-5 sm:grid-cols-2">
                                 <div><p className="text-sm text-slate-500">出发 / 入住</p><p className="mt-1 text-lg font-semibold text-slate-900">{formatTripDate(reservation.hotelTimeFrom)}</p></div>
                                 <div><p className="text-sm text-slate-500">到达 / 离店</p><p className="mt-1 text-lg font-semibold text-slate-900">{formatTripDate(reservation.hotelTimeTo)}</p></div>
-                                {reservation.routeFrom && <div><p className="text-sm text-slate-500">路线</p><p className="mt-1 text-lg font-semibold text-slate-900">{reservation.routeFrom} → {reservation.routeTo}</p></div>}
-                                {reservation.provider && <div><p className="text-sm text-slate-500">服务方 / 房型</p><p className="mt-1 text-lg font-semibold text-slate-900">{reservation.provider}</p></div>}
+                                {reservation.provider &&<div><p className="text-sm text-slate-500">服务方 / 房型</p><p className="mt-1 text-lg font-semibold text-slate-900">{reservation.provider}</p></div>}
                                 {reservation.bookingCode && <div><p className="text-sm text-slate-500">确认编号</p><p className="mt-1 text-lg font-semibold text-slate-900">{reservation.bookingCode}</p></div>}
                             </div>
                         </Paper>

@@ -6,8 +6,10 @@ import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import lombok.AllArgsConstructor;
@@ -42,7 +44,9 @@ public class CommunityPost {
     @Column(nullable = false)
     private CommunityCategory category;
 
-    private String destination;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "destination_city_id", referencedColumnName = "city_id")
+    private City destinationCity;
 
     @ElementCollection
     @CollectionTable(name = "community_post_images", joinColumns = @JoinColumn(name = "post_id"))

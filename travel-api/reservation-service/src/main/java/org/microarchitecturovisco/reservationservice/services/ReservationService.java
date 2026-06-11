@@ -177,7 +177,7 @@ public class ReservationService {
         UUID transportReservationId = request.ticketOfferId() != null
                 ? request.ticketOfferId()
                 : UUID.nameUUIDFromBytes(
-                        (bookingType + request.bookingCode() + request.routeFrom() + request.routeTo() + departureAt)
+                        (bookingType + request.bookingCode() + departureAt)
                                 .getBytes(StandardCharsets.UTF_8));
 
         int adultsCount = countTravelers(travelers, "ADULT", "STUDENT");
@@ -198,8 +198,6 @@ public class ReservationService {
                 .transportReservationsIds(List.of(transportReservationId))
                 .userId(request.userId())
                 .title((bookingType.equals("FLIGHT") ? "机票预订 " : "火车票预订 ") + request.bookingCode())
-                .routeFrom(request.routeFrom())
-                .routeTo(request.routeTo())
                 .provider(request.provider())
                 .bookingCode(request.bookingCode())
                 .travelers(travelers)

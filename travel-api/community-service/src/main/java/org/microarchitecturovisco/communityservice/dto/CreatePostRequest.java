@@ -11,7 +11,7 @@ public record CreatePostRequest(
         @NotBlank @Size(max = 120) String title,
         @NotBlank @Size(max = 4000) String content,
         @NotNull CommunityCategory category,
-        @Size(max = 80) String destination,
+        @Size(max = 255) String destinationCityId,
         List<@Size(max = 1000) String> imageUrls
 ) {
 }

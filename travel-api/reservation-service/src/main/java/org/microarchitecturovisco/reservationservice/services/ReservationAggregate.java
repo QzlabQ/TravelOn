@@ -42,8 +42,6 @@ public class ReservationAggregate {
                 .transportReservationsIds(command.getTransportReservationsIds())
                 .userId(command.getUserId())
                 .title(command.getTitle())
-                .routeFrom(command.getRouteFrom())
-                .routeTo(command.getRouteTo())
                 .provider(command.getProvider())
                 .bookingCode(command.getBookingCode())
                 .travelers(command.getTravelers())

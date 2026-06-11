@@ -30,8 +30,6 @@ const getRebookTarget = (reservation: ReservationResponse) => {
         return {
             pathname: '/reservations/flights',
             state: {
-                routeFrom: reservation.routeFrom,
-                routeTo: reservation.routeTo,
                 departureDate: toDateInputValue(reservation.hotelTimeFrom),
                 bookingCode: reservation.bookingCode,
             },
@@ -42,8 +40,6 @@ const getRebookTarget = (reservation: ReservationResponse) => {
         return {
             pathname: '/reservations/trains',
             state: {
-                routeFrom: reservation.routeFrom,
-                routeTo: reservation.routeTo,
                 departureDate: toDateInputValue(reservation.hotelTimeFrom),
                 bookingCode: reservation.bookingCode,
             },
@@ -63,6 +59,7 @@ const getRebookTarget = (reservation: ReservationResponse) => {
                     dateFrom: toDateInputValue(reservation.hotelTimeFrom),
                     dateTo: toDateInputValue(reservation.hotelTimeTo),
                     adults: Math.max(1, reservation.adultsQuantity || 1),
+                    back: {to: '/reservations', label: '返回我的预订'},
                 },
             };
         }
@@ -175,9 +172,7 @@ const Reservations = () => {
                                                 {reservation.title || reservation.bookingType || '旅行预订'}
                                             </p>
                                             <p className='text-xs text-gray-500 mt-1'>
-                                                {reservation.routeFrom && reservation.routeTo
-                                                    ? `${reservation.routeFrom} → ${reservation.routeTo}`
-                                                    : reservation.hotelId ? `酒店 ${reservation.hotelId}` : reservation.provider || '订单详情'}
+                                                {reservation.hotelId ? `酒店 ${reservation.hotelId}` : reservation.provider || '订单详情'}
                                             </p>
                                         </TableCell>
                                         <TableCell>{formatTripDate(reservation.hotelTimeFrom)}</TableCell>

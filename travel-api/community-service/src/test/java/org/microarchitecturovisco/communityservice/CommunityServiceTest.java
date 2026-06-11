@@ -2,6 +2,7 @@ package org.microarchitecturovisco.communityservice;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.microarchitecturovisco.communityservice.domain.City;
 import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
 import org.microarchitecturovisco.communityservice.domain.CommunityPost;
 import org.microarchitecturovisco.communityservice.domain.PostLike;
@@ -13,10 +14,14 @@ import org.microarchitecturovisco.communityservice.dto.LikeResponse;
 import org.microarchitecturovisco.communityservice.dto.PostResponse;
 import org.microarchitecturovisco.communityservice.dto.ReviewResponse;
 import org.microarchitecturovisco.communityservice.dto.UserProfileResponse;
+import org.microarchitecturovisco.communityservice.repository.CityRepository;
 import org.microarchitecturovisco.communityservice.repository.CommunityPostRepository;
 import org.microarchitecturovisco.communityservice.repository.PostLikeRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.microarchitecturovisco.communityservice.service.CommunityService;
+import org.microarchitecturovisco.communityservice.service.CommentService;
+import org.microarchitecturovisco.communityservice.service.FavoriteService;
+import org.microarchitecturovisco.communityservice.service.ReviewLikeService;
 import org.microarchitecturovisco.communityservice.service.UserClient;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -41,34 +46,52 @@ class CommunityServiceTest {
     private CommunityPostRepository postRepository;
     private PostLikeRepository likeRepository;
     private ReviewRepository reviewRepository;
+    private CityRepository cityRepository;
     private UserClient userClient;
+    private FavoriteService favoriteService;
+    private CommentService commentService;
+    private ReviewLikeService reviewLikeService;
     private CommunityService communityService;
     private UserProfileResponse user;
+    private City shanghaiCity;
 
     @BeforeEach
     void setUp() {
         postRepository = mock(CommunityPostRepository.class);
         likeRepository = mock(PostLikeRepository.class);
         reviewRepository = mock(ReviewRepository.class);
+        cityRepository = mock(CityRepository.class);
         userClient = mock(UserClient.class);
-        communityService = new CommunityService(postRepository, likeRepository, reviewRepository, userClient);
+        favoriteService = mock(FavoriteService.class);
+        commentService = mock(CommentService.class);
+        reviewLikeService = mock(ReviewLikeService.class);
+        communityService = new CommunityService(postRepository, likeRepository, reviewRepository, cityRepository, userClient, favoriteService, commentService, reviewLikeService);
         user = new UserProfileResponse(UUID.randomUUID(), "ada@example.com", "Ada", "Lovelace", null, null, "Explorer", Instant.now(), Instant.now(), Instant.now());
+        shanghaiCity = City.builder()
+                .id(UUID.randomUUID())
+                .cityId("SHA")
+                .region("Shanghai")
+                .country("中国")
+                .build();
     }
 
     @Test
     void createsPostForAuthenticatedUser() {
         when(userClient.requireUser("token")).thenReturn(user);
+        when(cityRepository.findByCityId("SHA")).thenReturn(Optional.of(shanghaiCity));
         when(postRepository.save(any(CommunityPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         PostResponse response = communityService.createPost("token", new CreatePostRequest(
                 "Shanghai weekend",
                 "A compact route with museums and food.",
                 CommunityCategory.TRAVEL_NOTE,
-                "Shanghai",
+                "SHA",
                 List.of("https://example.com/photo.jpg", "ftp://ignored.example.com/photo.jpg")
         ));
 
         assertThat(response.title()).isEqualTo("Shanghai weekend");
+        assertThat(response.destination()).isEqualTo("Shanghai");
+        assertThat(response.destinationCityId()).isEqualTo("SHA");
         assertThat(response.authorUserId()).isEqualTo(user.id());
         assertThat(response.authorName()).isEqualTo("Ada Lovelace");
         assertThat(response.imageUrls()).containsExactly("https://example.com/photo.jpg");
@@ -107,6 +130,8 @@ class CommunityServiceTest {
         when(postRepository.findById(post.getId())).thenReturn(Optional.of(post));
         when(postRepository.save(any(CommunityPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(likeRepository.findByPostIdAndUserId(post.getId(), user.id())).thenReturn(Optional.empty());
+        // toggleLike derives the count from the repository: 1 after liking, 0 after unliking
+        when(likeRepository.countByPostId(post.getId())).thenReturn(1L, 0L);
 
         LikeResponse liked = communityService.toggleLike("token", post.getId());
 
@@ -134,7 +159,8 @@ class CommunityServiceTest {
                 "West Lake",
                 5,
                 "Great view and clear signs.",
-                CommunityCategory.SCENIC_SPOT
+                CommunityCategory.SCENIC_SPOT,
+                List.of()
         ));
 
         assertThat(response.targetType()).isEqualTo(ReviewTargetType.SCENIC_SPOT);
@@ -149,7 +175,7 @@ class CommunityServiceTest {
                 .title(title)
                 .content("Content")
                 .category(CommunityCategory.TRAVEL_NOTE)
-                .destination("Suzhou")
+                .destinationCity(shanghaiCity)
                 .imageUrls(List.of())
                 .authorUserId(user.id())
                 .authorName("Ada Lovelace")

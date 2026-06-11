@@ -6,7 +6,9 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -17,6 +19,18 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 public class UserClient {
 
     private final RestTemplate restTemplate;
+
+    /** Resolves the user id from a token, or returns null if missing/invalid (does not throw). */
+    public java.util.UUID tryResolveUserId(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        try {
+            return requireUser(token).id();
+        } catch (ResponseStatusException e) {
+            return null;
+        }
+    }
 
     public UserProfileResponse requireUser(String token) {
         if (token == null || token.isBlank()) {
@@ -39,6 +53,10 @@ public class UserClient {
             return user;
         } catch (HttpClientErrorException.Unauthorized e) {
             throw new ResponseStatusException(UNAUTHORIZED, "Invalid session token");
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(UNAUTHORIZED, "Invalid session token");
+        } catch (RestClientException e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "User service unavailable");
         }
     }
 }

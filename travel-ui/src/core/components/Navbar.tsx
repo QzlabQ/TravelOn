@@ -7,7 +7,6 @@ import {
     AutoAwesome,
     Bookmarks,
     EventNote,
-    Explore,
     Flight,
     Forum,
     Hotel,
@@ -65,17 +64,6 @@ export default function Navbar() {
 
             <ClickAwayListener onClickAway={closeNavPoppers}>
                 <ul className="flex w-full flex-wrap items-center justify-center gap-2 md:gap-4 xl:w-auto xl:gap-8">
-                    <li className="flex flex-row items-center">
-                        <Link to="/offers">
-                            <Button
-                                variant="text"
-                                startIcon={<Explore style={{color: "#333"}}/>}
-                                style={{color: "#333"}}
-                            >
-                                旅游产品
-                            </Button>
-                        </Link>
-                    </li>
                     <li className="flex flex-row items-center">
                         <Link to="/ai-planner">
                             <Button

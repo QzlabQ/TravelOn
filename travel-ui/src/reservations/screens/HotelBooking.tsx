@@ -47,6 +47,43 @@ type HotelRebookState = {
     dateFrom?: string | null;
     dateTo?: string | null;
     hotelName?: string | null;
+    /** Set when returning from a hotel detail page so we restore the prior search. */
+    restore?: boolean;
+};
+
+const HOTEL_SEARCH_SNAPSHOT_KEY = 'hotelBooking:searchSnapshot';
+
+type HotelSearchSnapshot = {
+    destinationId?: string;
+    dateFrom: string;
+    dateTo: string;
+    priceFrom: string;
+    priceTo: string;
+    stars: number;
+    hotelType: string;
+    roomType: string;
+    sortBy: string;
+    hotelNameQuery: string;
+    offers: GetOffersBySearchQueryOffer[];
+    resultPage: number;
+    scrollY: number;
+};
+
+const readSearchSnapshot = (): HotelSearchSnapshot | null => {
+    try {
+        const raw = sessionStorage.getItem(HOTEL_SEARCH_SNAPSHOT_KEY);
+        return raw ? (JSON.parse(raw) as HotelSearchSnapshot) : null;
+    } catch {
+        return null;
+    }
+};
+
+const writeSearchSnapshot = (snapshot: HotelSearchSnapshot) => {
+    try {
+        sessionStorage.setItem(HOTEL_SEARCH_SNAPSHOT_KEY, JSON.stringify(snapshot));
+    } catch {
+        /* ignore quota/serialization errors */
+    }
 };
 
 const toDateInputValue = (value?: string | null, fallback = formatDate(today)) => {
@@ -78,6 +115,10 @@ const HotelBooking = () => {
     const session = useAuthSession();
     const isAuthenticated = Boolean(session);
     const rebookState = (location.state ?? {}) as HotelRebookState;
+    const isRestore = Boolean(rebookState.restore);
+    // While restoring a prior search, suppress the auto-search effects so the
+    // saved results are shown instead of being overwritten by a fresh query.
+    const restoreActiveRef = useRef(isRestore);
     const bookingPreferences = useMemo(() => getBookingPreferences(), []);
     const navigateTimerRef = useRef<number | null>(null);
     const checkoutSectionRef = useRef<HTMLDivElement | null>(null);
@@ -134,7 +175,26 @@ const HotelBooking = () => {
         }
     };
 
+    const persistSnapshot = () => {
+        writeSearchSnapshot({
+            destinationId: destination?.idLocation,
+            dateFrom,
+            dateTo,
+            priceFrom,
+            priceTo,
+            stars,
+            hotelType,
+            roomType,
+            sortBy,
+            hotelNameQuery,
+            offers,
+            resultPage,
+            scrollY: window.scrollY,
+        });
+    };
+
     const searchHotels = async (showValidation = false) => {
+        if (restoreActiveRef.current) return;
         if (!destination) return;
         if (stayDateError) {
             if (showValidation) {
@@ -193,14 +253,59 @@ const HotelBooking = () => {
     };
 
     useEffect(() => {
+        // When returning from a hotel detail page, restore the prior search
+        // instead of running a fresh one (handled by the restore effect below).
+        if (isRestore && readSearchSnapshot()) return;
         loadDestinations().then(r => r);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Restore the saved filters + results when coming back from a hotel detail.
+    useEffect(() => {
+        if (!isRestore) return;
+        const snap = readSearchSnapshot();
+        if (!snap) { restoreActiveRef.current = false; return; }
+
+        setDateFrom(snap.dateFrom);
+        setDateTo(snap.dateTo);
+        setPriceFrom(snap.priceFrom);
+        setPriceTo(snap.priceTo);
+        setStars(snap.stars);
+        setHotelType(snap.hotelType);
+        setRoomType(snap.roomType);
+        setSortBy(snap.sortBy);
+        setHotelNameQuery(snap.hotelNameQuery);
+        setOffers(snap.offers);
+        setResultPage(snap.resultPage);
+
+        // Load destination options for the dropdown, then select the saved one.
+        // Setting `destination` triggers the effect below, which clears the
+        // suppression flag (so subsequent user-driven searches work again).
+        ApiRequests.getHotelDestinations()
+            .then(res => {
+                const arrivals = (res.data ?? []) as Location[];
+                setDestinations(arrivals);
+                setDestination(arrivals.find(item => item.idLocation === snap.destinationId));
+            })
+            .catch(() => { restoreActiveRef.current = false; });
+
+        const scrollTimer = window.setTimeout(() => window.scrollTo({top: snap.scrollY, behavior: 'auto'}), 150);
+        return () => window.clearTimeout(scrollTimer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
-        if (destinations.length > 0) {
-            searchHotels().then(r => r);
+        if (destinations.length === 0) return;
+        if (restoreActiveRef.current) {
+            // Final restore step: destination just set from the snapshot — skip
+            // the search and re-enable searching for later user interactions.
+            restoreActiveRef.current = false;
             setHasLoadedDestinations(true);
+            return;
         }
+        searchHotels().then(r => r);
+        setHasLoadedDestinations(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [destination]);
 
     const visibleOffers = offers;
@@ -245,6 +350,7 @@ const HotelBooking = () => {
     useEffect(() => clearAutoNavigate, []);
 
     useEffect(() => {
+        if (restoreActiveRef.current) return;
         if (!hasLoadedDestinations || !destination || hasInvalidPriceRange || stayDateError) return;
 
         const timeoutId = window.setTimeout(() => {
@@ -532,6 +638,7 @@ const HotelBooking = () => {
                                     dateTo={dateTo}
                                     adults={Math.max(1, selectedTravelers.filter(traveler => traveler.travelerType !== 'CHILD').length || 2)}
                                     onBook={selectHotel}
+                                    onView={persistSnapshot}
                                     reserving={bookingHotelId === offer.idHotel}
                                     canBook={isAuthenticated}
                                     selected={selectedOffer?.idHotel === offer.idHotel}
@@ -687,6 +794,7 @@ const HotelResultCard = ({
     dateTo,
     adults,
     onBook,
+    onView,
     reserving,
     canBook,
     selected = false
@@ -697,6 +805,7 @@ const HotelResultCard = ({
     dateTo: string,
     adults: number,
     onBook: (offer: GetOffersBySearchQueryOffer) => void,
+    onView: () => void,
     reserving: boolean
     canBook: boolean
     selected?: boolean
@@ -735,7 +844,8 @@ const HotelResultCard = ({
                     </Button>
                     <Link
                         to={`/reservations/hotels/${offer.idHotel}?dateFrom=${dateFrom}&dateTo=${dateTo}&adults=${adults}`}
-                        state={{offer, dateFrom, dateTo, adults, roomType}}
+                        state={{offer, dateFrom, dateTo, adults, roomType, back: {to: '/reservations/hotels', label: '返回酒店列表', state: {restore: true}}}}
+                        onClick={onView}
                     >
                         <Button fullWidth variant='outlined' sx={{borderRadius: 2}}>查看酒店</Button>
                     </Link>

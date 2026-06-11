@@ -32,7 +32,7 @@ CREATE TEMP TABLE seed_hotel_photos (
 \copy seed_hotel_rooms FROM '/seed-data/hotel/hotel_rooms.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
 \copy seed_hotel_photos FROM '/seed-data/hotel/hotel_photos.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
 
-INSERT INTO public.location (id, city_id, country, province, region, normalized_name)
+INSERT INTO public.city (id, city_id, country, province, region, normalized_name)
 SELECT DISTINCT
        (substr(md5(city_id), 1, 8) || '-' || substr(md5(city_id), 9, 4) || '-' ||
         substr(md5(city_id), 13, 4) || '-' || substr(md5(city_id), 17, 4) || '-' ||
@@ -46,7 +46,7 @@ FROM seed_cities
 WHERE city_id IN (SELECT DISTINCT city_id FROM seed_hotels WHERE city_id IS NOT NULL AND city_id <> '')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.hotel (id, name, rating, description, location_id)
+INSERT INTO public.hotel (id, name, rating, description, city_id)
 SELECT h.source_id,
        h.name,
        0,

@@ -13,8 +13,6 @@ import java.util.UUID;
 public record CreateTicketReservationRequest(
         @NotNull UUID userId,
         @NotBlank String transportType,
-        @NotBlank String routeFrom,
-        @NotBlank String routeTo,
         @NotNull LocalDate departureDate,
         @NotBlank String departureTime,
         @NotBlank String arrivalTime,
