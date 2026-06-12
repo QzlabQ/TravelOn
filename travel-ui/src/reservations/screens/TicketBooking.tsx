@@ -305,6 +305,38 @@ const getTicketSaleClosedMessage = (mode: TicketMode) => {
     : `列车发车前 ${cutoffMinutes} 分钟停止预订，请选择更晚的车次。`;
 };
 
+const airportNameMap: Record<string, string> = {
+  PEK: "首都",
+  PKX: "大兴",
+  SHA: "虹桥",
+  PVG: "浦东",
+  CAN: "白云",
+  SZX: "宝安",
+  CTU: "双流",
+  TFU: "天府",
+  HGH: "萧山",
+  XIY: "咸阳",
+  CKG: "江北",
+  NKG: "禄口",
+};
+
+const formatAirportNameWithTerminal = (
+  airportCode?: string | null,
+  terminalName?: string | null,
+) => {
+  const normalizedCode = airportCode?.trim().toUpperCase() ?? "";
+  const airportName = airportNameMap[normalizedCode] ?? normalizedCode;
+  return [airportName, terminalName?.trim()].filter(Boolean).join(" ");
+};
+
+const formatAirportFilterOption = (airportCode: string) => {
+  const normalizedCode = airportCode.trim().toUpperCase();
+  const airportName = airportNameMap[normalizedCode] ?? normalizedCode;
+  return airportName === normalizedCode
+    ? normalizedCode
+    : `${airportName}（${normalizedCode}）`;
+};
+
 const TicketCard = ({
   offer,
   mode,
@@ -325,15 +357,29 @@ const TicketCard = ({
   selected?: boolean;
 }) => {
   const config = modeConfig[mode];
-  const departureStation = [
+  const departureTerminal = [
     offer.departureStationCode,
     offer.departureTerminalName,
   ]
     .filter(Boolean)
     .join(" ");
-  const arrivalStation = [offer.arrivalStationCode, offer.arrivalTerminalName]
+  const arrivalTerminal = [offer.arrivalStationCode, offer.arrivalTerminalName]
     .filter(Boolean)
     .join(" ");
+  const departurePlace =
+    mode === "flight"
+      ? formatAirportNameWithTerminal(
+          offer.departureStationCode,
+          offer.departureTerminalName,
+        )
+      : departureTerminal;
+  const arrivalPlace =
+    mode === "flight"
+      ? formatAirportNameWithTerminal(
+          offer.arrivalStationCode,
+          offer.arrivalTerminalName,
+        )
+      : arrivalTerminal;
   const departureDateLabel = formatTicketDate(offer.departureTime);
   const arrivalDateLabel = formatTicketDate(offer.arrivalTime);
 
@@ -360,7 +406,7 @@ const TicketCard = ({
             <p className="mt-1 text-xs text-slate-400">{departureDateLabel}</p>
           )}
           <p className="mt-1 text-sm font-semibold text-slate-800">
-            {departureStation}
+            {departurePlace}
           </p>
         </div>
         <div className="flex-1 flex flex-col items-center text-slate-500">
@@ -382,7 +428,7 @@ const TicketCard = ({
             <p className="mt-1 text-xs text-slate-400">{arrivalDateLabel}</p>
           )}
           <p className="mt-1 text-sm font-semibold text-slate-800">
-            {arrivalStation}
+            {arrivalPlace}
           </p>
         </div>
         <div className="w-32 text-right">
@@ -575,7 +621,6 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     config.lowPrice,
     config.highPrice,
   ]);
-  const [studentOnly, setStudentOnly] = useState(false);
   const [onlyAvailable, setOnlyAvailable] = useState(
     bookingPreferences.onlyAvailableTickets,
   );
@@ -612,6 +657,10 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   const [trainSeatSelections, setTrainSeatSelections] = useState<
     Record<string, string>
   >({});
+  const [departureAirportFilter, setDepartureAirportFilter] = useState("");
+  const [arrivalAirportFilter, setArrivalAirportFilter] = useState("");
+  const [departureStationFilter, setDepartureStationFilter] = useState("");
+  const [arrivalStationFilter, setArrivalStationFilter] = useState("");
 
   const currentDate = useMemo(
     () => toLocalDateInputValue(currentTime),
@@ -624,19 +673,85 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       ),
     [currentTime, date, mode, ticketOffers],
   );
+  const departureAirportOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          timeAvailableOffers
+            .map((offer) => offer.departureStationCode)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [timeAvailableOffers],
+  );
+  const arrivalAirportOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          timeAvailableOffers
+            .map((offer) => offer.arrivalStationCode)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [timeAvailableOffers],
+  );
+  const departureStationOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          timeAvailableOffers
+            .map((offer) => offer.departureStationCode)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [timeAvailableOffers],
+  );
+  const arrivalStationOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          timeAvailableOffers
+            .map((offer) => offer.arrivalStationCode)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [timeAvailableOffers],
+  );
   const timeFilteredOfferCount = ticketOffers.length - timeAvailableOffers.length;
   const offers = useMemo(() => {
-    if (mode !== "train") return timeAvailableOffers;
+    if (mode !== "train") {
+      return timeAvailableOffers.filter((offer) => {
+        return (
+          (!departureAirportFilter ||
+            offer.departureStationCode === departureAirportFilter) &&
+          (!arrivalAirportFilter ||
+            offer.arrivalStationCode === arrivalAirportFilter)
+        );
+      });
+    }
     const normalizedTrainCodeQuery = trainCodeQuery.trim().toUpperCase();
     return timeAvailableOffers.filter((offer) => {
       const normalizedOfferCode = offer.code.toUpperCase();
       return (
         selectedTrainTypes.includes(getTrainTypeGroup(offer.code)) &&
+        (!departureStationFilter ||
+          offer.departureStationCode === departureStationFilter) &&
+        (!arrivalStationFilter ||
+          offer.arrivalStationCode === arrivalStationFilter) &&
         (!normalizedTrainCodeQuery ||
           normalizedOfferCode.includes(normalizedTrainCodeQuery))
       );
     });
-  }, [mode, selectedTrainTypes, timeAvailableOffers, trainCodeQuery]);
+  }, [
+    arrivalAirportFilter,
+    arrivalStationFilter,
+    departureAirportFilter,
+    departureStationFilter,
+    mode,
+    selectedTrainTypes,
+    timeAvailableOffers,
+    trainCodeQuery,
+  ]);
   const trainOfferGroups = useMemo(
     () => (mode === "train" ? buildTrainOfferGroups(offers) : []),
     [mode, offers],
@@ -690,7 +805,6 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     ? selectedOffer.price * selectedPassengerCount
     : 0;
   const travelerRuleError = validateTicketTravelerRules(selectedTravelers, {
-    studentOnly,
     transportType: mode === "flight" ? "FLIGHT" : "TRAIN",
     departureDate: date,
   });
@@ -784,7 +898,6 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         departureDate,
         minPrice: priceRange[0],
         maxPrice: priceRange[1],
-        studentOnly,
         onlyAvailable,
         sortBy,
       });
@@ -806,6 +919,10 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
 
   useEffect(() => {
     setHasLoadedOptions(false);
+    setDepartureAirportFilter("");
+    setArrivalAirportFilter("");
+    setDepartureStationFilter("");
+    setArrivalStationFilter("");
     setSelectedTrainTypes(
       mode === "train" && preferredTrainTypeFilters.length > 0
         ? preferredTrainTypeFilters
@@ -862,7 +979,44 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     }, 350);
 
     return () => window.clearTimeout(timeoutId);
-  }, [priceRange, studentOnly, onlyAvailable, sortBy, date]);
+  }, [priceRange, onlyAvailable, sortBy, date]);
+
+  useEffect(() => {
+    setDepartureAirportFilter("");
+    setArrivalAirportFilter("");
+    setDepartureStationFilter("");
+    setArrivalStationFilter("");
+  }, [from, to, date, mode]);
+
+  useEffect(() => {
+    if (
+      departureAirportFilter &&
+      !departureAirportOptions.includes(departureAirportFilter)
+    ) {
+      setDepartureAirportFilter("");
+    }
+  }, [departureAirportFilter, departureAirportOptions]);
+
+  useEffect(() => {
+    if (arrivalAirportFilter && !arrivalAirportOptions.includes(arrivalAirportFilter)) {
+      setArrivalAirportFilter("");
+    }
+  }, [arrivalAirportFilter, arrivalAirportOptions]);
+
+  useEffect(() => {
+    if (
+      departureStationFilter &&
+      !departureStationOptions.includes(departureStationFilter)
+    ) {
+      setDepartureStationFilter("");
+    }
+  }, [departureStationFilter, departureStationOptions]);
+
+  useEffect(() => {
+    if (arrivalStationFilter && !arrivalStationOptions.includes(arrivalStationFilter)) {
+      setArrivalStationFilter("");
+    }
+  }, [arrivalStationFilter, arrivalStationOptions]);
 
   const swapLocations = () => {
     const oldFrom = from;
@@ -1139,6 +1293,18 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
                 }
               />
             )}
+            {mode === "train" &&
+              (departureStationFilter || arrivalStationFilter) && (
+                <Chip
+                  label={`${departureStationFilter || "全部出发站"} → ${arrivalStationFilter || "全部到达站"}`}
+                />
+              )}
+            {mode === "flight" &&
+              (departureAirportFilter || arrivalAirportFilter) && (
+                <Chip
+                  label={`${departureAirportFilter ? formatAirportFilterOption(departureAirportFilter) : "全部出发机场"} → ${arrivalAirportFilter ? formatAirportFilterOption(arrivalAirportFilter) : "全部到达机场"}`}
+                />
+              )}
           </div>
         </div>
       </div>
@@ -1255,13 +1421,6 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
 
           <section className="rounded-lg bg-white border border-slate-200 p-5 shadow-sm">
             <h2 className="text-lg font-bold text-slate-900 mb-4">高级筛选</h2>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-slate-700">学生票</span>
-              <Switch
-                checked={studentOnly}
-                onChange={(event) => setStudentOnly(event.target.checked)}
-              />
-            </div>
             <div className="flex items-center justify-between mb-5">
               <span className="text-sm text-slate-700">只看有票</span>
               <Switch
@@ -1269,51 +1428,141 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
                 onChange={(event) => setOnlyAvailable(event.target.checked)}
               />
             </div>
-            {mode === "train" && (
+            {mode === "flight" && (
               <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-slate-800">
-                    车次类型
-                  </p>
-                  <label className="flex cursor-pointer items-center gap-1 text-sm text-slate-700">
-                    <Checkbox
+                <p className="mb-3 text-sm font-semibold text-slate-800">
+                  机场筛选
+                </p>
+                <div className="grid gap-3">
+                  <Autocomplete
+                    size="small"
+                    options={departureAirportOptions}
+                    value={departureAirportFilter || null}
+                    noOptionsText="暂无可选机场"
+                    getOptionLabel={(option) => formatAirportFilterOption(option)}
+                    onChange={(_, value) =>
+                      setDepartureAirportFilter(value ?? "")
+                    }
+                    renderInput={(params) => (
+                      <TextField {...params} label="出发机场" />
+                    )}
+                  />
+                  <Autocomplete
+                    size="small"
+                    options={arrivalAirportOptions}
+                    value={arrivalAirportFilter || null}
+                    noOptionsText="暂无可选机场"
+                    getOptionLabel={(option) => formatAirportFilterOption(option)}
+                    onChange={(_, value) => setArrivalAirportFilter(value ?? "")}
+                    renderInput={(params) => (
+                      <TextField {...params} label="到达机场" />
+                    )}
+                  />
+                  {(departureAirportFilter || arrivalAirportFilter) && (
+                    <Button
                       size="small"
-                      checked={allTrainTypesSelected}
-                      indeterminate={
-                        selectedTrainTypes.length > 0 && !allTrainTypesSelected
-                      }
-                      onChange={toggleAllTrainTypes}
-                    />
-                    全选
-                  </label>
-                </div>
-                <div className="mt-2 grid grid-cols-3 gap-1">
-                  {trainTypeFilters.map((option) => (
-                    <label
-                      key={option.value}
-                      className="flex cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-sm text-slate-700 hover:bg-white"
+                      variant="text"
+                      onClick={() => {
+                        setDepartureAirportFilter("");
+                        setArrivalAirportFilter("");
+                      }}
                     >
+                      清空机场筛选
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+            {mode === "train" && (
+              <>
+                <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                  <p className="mb-3 text-sm font-semibold text-slate-800">
+                    车站筛选
+                  </p>
+                  <div className="grid gap-3">
+                    <Autocomplete
+                      size="small"
+                      options={departureStationOptions}
+                      value={departureStationFilter || null}
+                      noOptionsText="暂无可选车站"
+                      onChange={(_, value) =>
+                        setDepartureStationFilter(value ?? "")
+                      }
+                      renderInput={(params) => (
+                        <TextField {...params} label="出发车站" />
+                      )}
+                    />
+                    <Autocomplete
+                      size="small"
+                      options={arrivalStationOptions}
+                      value={arrivalStationFilter || null}
+                      noOptionsText="暂无可选车站"
+                      onChange={(_, value) =>
+                        setArrivalStationFilter(value ?? "")
+                      }
+                      renderInput={(params) => (
+                        <TextField {...params} label="到达车站" />
+                      )}
+                    />
+                    {(departureStationFilter || arrivalStationFilter) && (
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => {
+                          setDepartureStationFilter("");
+                          setArrivalStationFilter("");
+                        }}
+                      >
+                        清空车站筛选
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-slate-800">
+                      车次类型
+                    </p>
+                    <label className="flex cursor-pointer items-center gap-1 text-sm text-slate-700">
                       <Checkbox
                         size="small"
-                        checked={selectedTrainTypes.includes(option.value)}
-                        onChange={() => toggleTrainType(option.value)}
+                        checked={allTrainTypesSelected}
+                        indeterminate={
+                          selectedTrainTypes.length > 0 && !allTrainTypesSelected
+                        }
+                        onChange={toggleAllTrainTypes}
                       />
-                      {option.label}
+                      全选
                     </label>
-                  ))}
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-1">
+                    {trainTypeFilters.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-sm text-slate-700 hover:bg-white"
+                      >
+                        <Checkbox
+                          size="small"
+                          checked={selectedTrainTypes.includes(option.value)}
+                          onChange={() => toggleTrainType(option.value)}
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="按车次筛选"
+                    value={trainCodeQuery}
+                    onChange={(event) =>
+                      updateTrainCodeQuery(event.target.value.toUpperCase())
+                    }
+                    placeholder="例如 G101 / D / K"
+                    sx={{ mt: 2, backgroundColor: "#fff" }}
+                  />
                 </div>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="按车次筛选"
-                  value={trainCodeQuery}
-                  onChange={(event) =>
-                    updateTrainCodeQuery(event.target.value.toUpperCase())
-                  }
-                  placeholder="例如 G101 / D / K"
-                  sx={{ mt: 2, backgroundColor: "#fff" }}
-                />
-              </div>
+              </>
             )}
             <p className="mb-2 text-sm font-semibold text-slate-700">
               价格区间
@@ -1651,7 +1900,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
               <div className="rounded-lg bg-orange-50 p-4">
                 <p className="font-semibold text-orange-700">优惠获取</p>
                 <p className="mt-2 text-sm text-slate-600">
-                  铁路线路支持学生票筛选，后续可继续接入会员价与平台优惠。
+                  可按车次、车站、价格和余票快速筛选，后续可继续接入会员价与平台优惠。
                 </p>
               </div>
               <div className="rounded-lg bg-emerald-50 p-4">
