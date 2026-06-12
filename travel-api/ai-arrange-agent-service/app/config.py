@@ -62,6 +62,7 @@ class AgentSettings:
     agent_model_timeout_seconds: float
     agent_tool_timeout_seconds: float
     agent_trace_enabled: bool
+    travel_gateway_base_url: str = "http://gateway:8082"
 
 
 def load_settings() -> AgentSettings:
@@ -100,4 +101,5 @@ def load_settings() -> AgentSettings:
         agent_model_timeout_seconds=_as_float(os.getenv("AGENT_MODEL_TIMEOUT_SECONDS"), deepseek_timeout_seconds),
         agent_tool_timeout_seconds=_as_float(os.getenv("AGENT_TOOL_TIMEOUT_SECONDS"), 10.0),
         agent_trace_enabled=_as_bool(os.getenv("AGENT_TRACE_ENABLED"), True),
+        travel_gateway_base_url=os.getenv("TRAVEL_GATEWAY_BASE_URL", "http://gateway:8082"),
     )

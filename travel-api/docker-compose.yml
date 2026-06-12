@@ -235,6 +235,7 @@ services:
       AGENT_MAX_RUNTIME_SECONDS: "240"
       DEEPSEEK_MAX_TOKENS: "12000"
       DEEPSEEK_SLOW_RESPONSE_WARNING_MS: "60000"
+      TRAVEL_GATEWAY_BASE_URL: "http://gateway:8082"
       NO_PROXY: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
       no_proxy: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
     ports:

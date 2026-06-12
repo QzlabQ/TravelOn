@@ -328,6 +328,7 @@ class DeepSeekClient:
                 "but do not make the itinerary overly short."
             ),
             "places": "Reuse candidatePlaces when possible. Return enough useful places up to responseBudget.maxPlaces.",
+            "bookingLinks": "If a reused candidate place has bookingLinks, preserve those links and include useful booking markdown links. Do not invent booking URLs.",
             "routes": "Return useful route segments up to responseBudget.maxRoutes, or [] when route data is unavailable.",
             "userSelections": "Keep selected places and style choices unless impossible; do not use rejected places as main recommendations.",
             "snapshot": "When latestSnapshot is provided, treat it as the previous saved plan and describe only useful changes in Chinese.",

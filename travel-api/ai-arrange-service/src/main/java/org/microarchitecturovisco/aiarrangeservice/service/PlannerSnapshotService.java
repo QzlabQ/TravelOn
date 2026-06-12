@@ -8,6 +8,7 @@ import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerDayRev
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerMessage;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapshot;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerDayPlanRef;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerBookingLink;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerPlaceSuggestion;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerRouteSegment;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerSnapshotDraft;
@@ -23,6 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -36,11 +39,18 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PlannerSnapshotService {
+
+    private static final Pattern EXAMPLE_RESERVATION_URL = Pattern.compile(
+            "https?://example\\.com(?<path>/reservations/(?:hotels(?:/[^\\s)]*)?|trains[^\\s)]*|flights[^\\s)]*))",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final PlannerAiClient plannerAiClient;
     private final PlannerPromptFactory promptFactory;
@@ -101,7 +111,7 @@ public class PlannerSnapshotService {
                 .createdAt(Instant.now())
                 .build();
 
-        return snapshotRepository.save(snapshot);
+        return saveSnapshot(snapshot);
     }
 
     public PlannerSnapshot updateSelectionSnapshot(PlannerConversation conversation, List<UUID> selectedPlaceIds) {
@@ -142,7 +152,7 @@ public class PlannerSnapshotService {
                 .createdAt(Instant.now())
                 .build();
 
-        return snapshotRepository.save(snapshot);
+        return saveSnapshot(snapshot);
     }
 
     public PlannerSnapshot createSnapshotFromAgentResponse(PlannerConversation conversation, AgentRunResponse response) {
@@ -219,7 +229,7 @@ public class PlannerSnapshotService {
                 .createdAt(Instant.now())
                 .build();
 
-        PlannerSnapshot savedSnapshot = snapshotRepository.save(snapshot);
+        PlannerSnapshot savedSnapshot = saveSnapshot(snapshot);
         return recordDayRevisionsForSnapshot(conversation, savedSnapshot);
     }
 
@@ -293,7 +303,7 @@ public class PlannerSnapshotService {
                 .createdAt(Instant.now())
                 .build();
 
-        return snapshotRepository.save(snapshot);
+        return saveSnapshot(snapshot);
     }
 
     public PlannerSnapshot rollbackSnapshot(PlannerConversation conversation, Integer version) {
@@ -335,7 +345,7 @@ public class PlannerSnapshotService {
                 .createdAt(Instant.now())
                 .build();
 
-        return snapshotRepository.save(restoredSnapshot);
+        return saveSnapshot(restoredSnapshot);
     }
 
     public PlannerSnapshot restoreDaySnapshot(PlannerConversation conversation, Integer dayIndex, Integer version) {
@@ -389,7 +399,7 @@ public class PlannerSnapshotService {
                 .createdAt(Instant.now())
                 .build();
 
-        return snapshotRepository.save(snapshot);
+        return saveSnapshot(snapshot);
     }
 
     public PlannerSnapshot assembleTripSnapshot(PlannerConversation conversation) {
@@ -446,7 +456,7 @@ public class PlannerSnapshotService {
                 .createdAt(Instant.now())
                 .build();
 
-        return snapshotRepository.save(snapshot);
+        return saveSnapshot(snapshot);
     }
 
     public PlannerSnapshotDiffResponse diffSnapshots(UUID conversationId, Integer fromVersion, Integer toVersion) {
@@ -725,7 +735,7 @@ public class PlannerSnapshotService {
                     .findFirst()
                     .orElse(snapshot.getCurrentDayPlan());
             snapshot.setCurrentDayPlan(currentDayPlan);
-            snapshot = snapshotRepository.save(snapshot);
+            snapshot = saveSnapshot(snapshot);
         }
         return snapshot;
     }
@@ -1090,6 +1100,9 @@ public class PlannerSnapshotService {
             if (place.getInternalOfferId() == null) {
                 place.setInternalOfferId(previous.getInternalOfferId());
             }
+            if (safeList(place.getBookingLinks()).isEmpty() && !safeList(previous.getBookingLinks()).isEmpty()) {
+                place.setBookingLinks(safeList(previous.getBookingLinks()));
+            }
             if (previous.getSource() != null) {
                 place.setSource(previous.getSource());
             }
@@ -1288,6 +1301,124 @@ public class PlannerSnapshotService {
                 .changeSummary(dayPlan.getChangeSummary())
                 .checksum(dayPlan.getChecksum())
                 .build();
+    }
+
+    private PlannerSnapshot saveSnapshot(PlannerSnapshot snapshot) {
+        sanitizeSnapshot(snapshot);
+        return snapshotRepository.save(snapshot);
+    }
+
+    private void sanitizeSnapshot(PlannerSnapshot snapshot) {
+        if (snapshot == null) {
+            return;
+        }
+        snapshot.setMarkdown(sanitizeMarkdownBookingLinks(snapshot.getMarkdown()));
+        snapshot.setAssistantText(sanitizeMarkdownBookingLinks(snapshot.getAssistantText()));
+        snapshot.setPlaces(sanitizePlaces(snapshot.getPlaces()));
+        snapshot.setCurrentDayPlan(sanitizeDayPlan(snapshot.getCurrentDayPlan()));
+        snapshot.setDayPlans(safeList(snapshot.getDayPlans()).stream()
+                .map(this::sanitizeDayPlan)
+                .filter(Objects::nonNull)
+                .toList());
+    }
+
+    private PlannerDayPlanRef sanitizeDayPlan(PlannerDayPlanRef dayPlan) {
+        if (dayPlan == null) {
+            return null;
+        }
+        return dayPlanWithPlaces(
+                dayPlan,
+                sanitizePlaces(dayPlan.getPlaces()),
+                sanitizeMarkdownBookingLinks(nonBlankOrDefault(dayPlan.getMarkdown(), ""))
+        );
+    }
+
+    private List<PlannerPlaceSuggestion> sanitizePlaces(List<PlannerPlaceSuggestion> places) {
+        return safeList(places).stream()
+                .map(this::sanitizePlace)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private PlannerPlaceSuggestion sanitizePlace(PlannerPlaceSuggestion place) {
+        if (place == null) {
+            return null;
+        }
+        place.setBookingLinks(sanitizeBookingLinks(place.getBookingLinks()));
+        return place;
+    }
+
+    private List<PlannerBookingLink> sanitizeBookingLinks(List<PlannerBookingLink> bookingLinks) {
+        List<PlannerBookingLink> sanitized = new ArrayList<>();
+        LinkedHashSet<String> seenUrls = new LinkedHashSet<>();
+        for (PlannerBookingLink link : safeList(bookingLinks)) {
+            if (link == null) {
+                continue;
+            }
+            String sanitizedUrl = sanitizeBookingUrl(link.getUrl());
+            if (!hasText(sanitizedUrl) || !seenUrls.add(sanitizedUrl)) {
+                continue;
+            }
+            link.setUrl(sanitizedUrl);
+            sanitized.add(link);
+        }
+        return sanitized;
+    }
+
+    private String sanitizeBookingUrl(String url) {
+        if (!hasText(url)) {
+            return null;
+        }
+        String trimmed = url.trim();
+        if (trimmed.startsWith("/")) {
+            String path = trimmed.split("[?#]", 2)[0];
+            return isAllowedBookingPath(path) ? trimmed : null;
+        }
+
+        try {
+            URI uri = new URI(trimmed);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+            if (("http".equals(scheme) || "https".equals(scheme))
+                    && "example.com".equals(host)
+                    && isAllowedBookingPath(uri.getRawPath())) {
+                return relativeUri(uri);
+            }
+        } catch (URISyntaxException ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private boolean isAllowedBookingPath(String path) {
+        return "/reservations/hotels".equals(path)
+                || (path != null && path.startsWith("/reservations/hotels/"))
+                || "/reservations/trains".equals(path)
+                || "/reservations/flights".equals(path);
+    }
+
+    private String relativeUri(URI uri) {
+        StringBuilder builder = new StringBuilder(uri.getRawPath());
+        if (hasText(uri.getRawQuery())) {
+            builder.append('?').append(uri.getRawQuery());
+        }
+        if (hasText(uri.getRawFragment())) {
+            builder.append('#').append(uri.getRawFragment());
+        }
+        return builder.toString();
+    }
+
+    private String sanitizeMarkdownBookingLinks(String markdown) {
+        if (!hasText(markdown)) {
+            return markdown;
+        }
+        Matcher matcher = EXAMPLE_RESERVATION_URL.matcher(markdown);
+        StringBuffer result = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(result, Matcher.quoteReplacement(matcher.group("path")));
+        }
+        matcher.appendTail(result);
+        return result.toString();
     }
 
     private <T> List<T> safeList(List<T> values) {

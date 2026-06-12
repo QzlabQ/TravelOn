@@ -222,8 +222,7 @@ class PlannerConversationServiceTest {
         executorService.shutdownNow();
     }
 
-    @Test
-    void handleChatMessageReportsAgentFallbackWarning() {
+    void handleChatMessageReportsAgentFallbackAsTraceEvent() {
         UUID conversationId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         PlannerConversation conversation = conversation(conversationId, userId);
@@ -282,6 +281,63 @@ class PlannerConversationServiceTest {
         assertThat(detailCaptor.getValue()).contains("deepseek_chat_completion 失败");
         assertThat(detailCaptor.getValue()).contains("All connection attempts failed");
         assertThat(detailCaptor.getValue()).contains("fallback_plan_builder");
+        executorService.shutdownNow();
+    }
+
+    @Test
+    void handleChatMessageSendsFallbackAsTraceEvent() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = conversation(conversationId, userId);
+        AgentRunResponse response = agentResponse(null, 1, "fallback-trace-checksum");
+        response.setStatus("PARTIAL_SUCCESS");
+        response.setToolCalls(List.of(
+                PlannerAgentToolCall.builder()
+                        .tool("deepseek_chat_completion")
+                        .status("FAILED")
+                        .detail("All connection attempts failed")
+                        .build(),
+                PlannerAgentToolCall.builder()
+                        .tool("fallback_plan_builder")
+                        .status("SUCCESS")
+                        .build()
+        ));
+        PlannerSnapshot savedSnapshot = agentSnapshot(conversationId, userId, 1, null, "fallback-trace-checksum");
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.of(conversation));
+        when(conversationRepository.save(any(PlannerConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).thenReturn(List.of());
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.empty());
+        when(snapshotService.createSnapshotFromAgentResponse(any(PlannerConversation.class), eq(response))).thenReturn(savedSnapshot);
+        when(plannerAgentClient.streamPlanner(any(AgentRunRequest.class), any())).thenReturn(CompletableFuture.completedFuture(response));
+
+        PlannerConversationService service = new PlannerConversationService(
+                conversationRepository,
+                messageRepository,
+                snapshotRepository,
+                promptFactory,
+                plannerAiClient,
+                plannerAgentClient,
+                snapshotService,
+                webSocketSessionRegistry,
+                executorService
+        );
+
+        service.handleChatMessage(conversationId, userId, PlannerChatSendPayload.builder().message("generate fallback trace").build());
+
+        ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(webSocketSessionRegistry, timeout(1000)).send(
+                eq(conversationId),
+                eq(PlannerMessageType.PLANNER_TRACE_EVENT),
+                payloadCaptor.capture()
+        );
+        PlannerStreamEvent event = (PlannerStreamEvent) payloadCaptor.getValue();
+        assertThat(event.getType()).isEqualTo("FALLBACK_USED");
+        assertThat(event.getStatus()).isEqualTo("PARTIAL_SUCCESS");
+        assertThat(event.getTool()).isEqualTo("fallback_plan_builder");
+        assertThat(String.valueOf(event.getData().get("code"))).isEqualTo("PLANNER_AGENT_FALLBACK_USED");
+        assertThat(String.valueOf(event.getData().get("detail"))).contains("All connection attempts failed");
         executorService.shutdownNow();
     }
 

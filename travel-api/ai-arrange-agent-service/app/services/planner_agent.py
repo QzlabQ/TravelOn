@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import asyncio
 import json
+import re
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -240,6 +241,7 @@ class PlannerAgent:
         data = fallback_result.data if isinstance(fallback_result.data, dict) else {}
         places = self._places_from_unknown(data.get("places"))
         markdown = str(data.get("markdown") or "# 行前规划")
+        markdown = self._append_booking_links_if_missing(markdown, places)
         routes = evidence.routes
         response = AgentRunResponse(
             traceId=trace_id,
@@ -439,7 +441,16 @@ class PlannerAgent:
         step_index: int,
     ) -> list[str]:
         if step_index == 0:
-            return [] if evidence.places else ["search_hotels"]
+            tools: list[str] = []
+            if (
+                self._needs_scenic(request)
+                and self._amap_tool.is_configured()
+                and not any(place.type == PlaceType.SCENIC for place in evidence.places)
+            ):
+                tools.append("amap_poi_search")
+            if self._needs_hotel(request) and not evidence.hotels:
+                tools.append("search_hotels")
+            return tools
         if step_index == 1:
             return [] if evidence.weather else ["get_weather"]
         if step_index == 2:
@@ -487,6 +498,7 @@ class PlannerAgent:
                 context,
                 city=request.coreSlots.city or "",
                 keywords=self._extract_keywords(request),
+                types="110000" if self._needs_scenic(request) else None,
             )
         if tool_name == "internal_hotel_match":
             return await self._tool_registry.execute(
@@ -519,7 +531,22 @@ class PlannerAgent:
             evidence.weather = result.data
             return
         if tool_name == "search_flights" and isinstance(result.data, list):
-            evidence.transport_options = [item for item in result.data if isinstance(item, dict)]
+            transport_options: list[dict[str, Any]] = []
+            transport_places: list[PlannerPlaceSuggestion] = []
+            for item in result.data:
+                if not isinstance(item, dict):
+                    continue
+                transport_options.append(item)
+                place_value = item.get("plannerPlace")
+                if isinstance(place_value, PlannerPlaceSuggestion):
+                    transport_places.append(place_value)
+                elif isinstance(place_value, dict):
+                    try:
+                        transport_places.append(PlannerPlaceSuggestion.model_validate(place_value))
+                    except ValueError:
+                        pass
+            evidence.transport_options = transport_options
+            evidence.places = self._merge_places(evidence.places, transport_places)
             return
         if tool_name == "estimate_budget" and isinstance(result.data, dict):
             evidence.budget = result.data
@@ -537,11 +564,56 @@ class PlannerAgent:
         }
 
     def _has_enough_evidence(self, request: AgentRunRequest, evidence: AgentEvidence) -> bool:
-        has_places = bool(evidence.places)
+        has_scenic = any(place.type == PlaceType.SCENIC for place in evidence.places)
+        has_places = bool(evidence.places) and (has_scenic or not self._needs_scenic(request))
         has_weather = evidence.weather is not None
         has_budget = evidence.budget is not None or not self._needs_budget(request)
         has_transport = bool(evidence.transport_options) or not self._needs_transport(request)
         return has_places and has_weather and has_budget and has_transport
+
+    def _needs_scenic(self, request: AgentRunRequest) -> bool:
+        text = self._request_intent_text(request)
+        scenic_keywords = ["scenic", "attraction", "sight", "景点", "景区", "游玩", "观光"]
+        hotel_keywords = ["hotel", "酒店", "住宿"]
+        ticket_keywords = ["train", "flight", "ticket", "火车", "机票", "航班", "票"]
+        general_plan_keywords = ["plan", "itinerary", "route", "day", "规划", "行程", "路线", "当天"]
+
+        if any(keyword in text for keyword in scenic_keywords):
+            return True
+        if any(keyword in text for keyword in hotel_keywords + ticket_keywords) and not any(
+            keyword in text for keyword in general_plan_keywords
+        ):
+            return False
+        return request.planningScope != PlanningScope.TRIP_ASSEMBLE
+
+    def _needs_hotel(self, request: AgentRunRequest) -> bool:
+        text = self._request_intent_text(request)
+        hotel_keywords = ["hotel", "酒店", "住宿"]
+        scenic_keywords = ["scenic", "attraction", "sight", "景点", "景区", "游玩", "观光"]
+        ticket_keywords = ["train", "flight", "ticket", "火车", "机票", "航班", "票"]
+        general_plan_keywords = ["plan", "itinerary", "route", "day", "规划", "行程", "路线", "当天"]
+
+        if any(keyword in text for keyword in hotel_keywords):
+            return True
+        if any(keyword in text for keyword in scenic_keywords + ticket_keywords) and not any(
+            keyword in text for keyword in general_plan_keywords
+        ):
+            return False
+        return request.planningScope != PlanningScope.TRIP_ASSEMBLE
+
+    def _request_intent_text(self, request: AgentRunRequest) -> str:
+        parts = [request.userMessage or ""]
+        if request.interaction and request.interaction.freeText:
+            parts.append(request.interaction.freeText)
+        for value in [
+            request.coreSlots.travelStyle,
+            request.coreSlots.accommodationPreference,
+            request.coreSlots.transportPreference,
+            request.coreSlots.notes,
+        ]:
+            if value:
+                parts.append(value)
+        return " ".join(parts).lower()
 
     def _needs_transport(self, request: AgentRunRequest) -> bool:
         return True
@@ -562,10 +634,46 @@ class PlannerAgent:
         for place in incoming:
             key = str(place.placeId) if place.placeId else place.name.lower()
             if key in seen:
+                existing = next(
+                    (
+                        candidate
+                        for candidate in merged
+                        if (str(candidate.placeId) if candidate.placeId else candidate.name.lower()) == key
+                    ),
+                    None,
+                )
+                if existing is not None:
+                    self._merge_place_details(existing, place)
                 continue
             merged.append(place)
             seen.add(key)
         return merged
+
+    def _merge_place_details(self, existing: PlannerPlaceSuggestion, incoming: PlannerPlaceSuggestion) -> None:
+        if not existing.bookingLinks and incoming.bookingLinks:
+            existing.bookingLinks = list(incoming.bookingLinks)
+        if not existing.imageUrl and incoming.imageUrl:
+            existing.imageUrl = incoming.imageUrl
+        if incoming.imageUrls:
+            urls = list(existing.imageUrls or [])
+            for url in incoming.imageUrls:
+                if url and url not in urls:
+                    urls.append(url)
+            existing.imageUrls = urls[:3]
+            if not existing.imageUrl and existing.imageUrls:
+                existing.imageUrl = existing.imageUrls[0]
+        if existing.latitude is None and incoming.latitude is not None:
+            existing.latitude = incoming.latitude
+        if existing.longitude is None and incoming.longitude is not None:
+            existing.longitude = incoming.longitude
+        if not existing.address and incoming.address:
+            existing.address = incoming.address
+        if not existing.amapPoiId and incoming.amapPoiId:
+            existing.amapPoiId = incoming.amapPoiId
+        if existing.internalOfferId is None and incoming.internalOfferId is not None:
+            existing.internalOfferId = incoming.internalOfferId
+        if not existing.tags and incoming.tags:
+            existing.tags = list(incoming.tags)
 
     def _build_tool_registry(self, policy: RuntimePolicy) -> ToolRegistry:
         registry = ToolRegistry(policy)
@@ -604,7 +712,7 @@ class PlannerAgent:
         registry.register(
             ToolSpec(
                 name="search_hotels",
-                description="Search hotel candidates from offer-provider or mock data.",
+                description="Search hotel candidates from the hotel database through the API gateway.",
                 input_schema=AgentRunRequest,
                 output_schema="list[PlannerPlaceSuggestion]",
                 timeout_seconds=policy.default_tool_timeout_seconds,
@@ -636,7 +744,7 @@ class PlannerAgent:
         registry.register(
             ToolSpec(
                 name="search_flights",
-                description="Search flight or intercity transport candidates.",
+                description="Search train or flight ticket candidates from the transport database through the API gateway.",
                 input_schema=AgentRunRequest,
                 output_schema="list[transport option]",
                 timeout_seconds=policy.default_tool_timeout_seconds,
@@ -838,6 +946,7 @@ class PlannerAgent:
         places = self._aggregate_day_places(confirmed_day_plans)
         routes = self._aggregate_day_routes(confirmed_day_plans)
         markdown = self._build_final_trip_markdown(request, confirmed_day_plans, places, routes)
+        markdown = self._append_booking_links_if_missing(markdown, places)
         title = f"{request.coreSlots.city or '目的地'}最终完整行程"
         summary = f"已将 {day_count} 个已确认日计划汇总为最终行程。"
         recorder.emit(
@@ -1045,6 +1154,8 @@ class PlannerAgent:
                     source="agent",
                 )
             )
+
+        markdown = self._append_booking_links_if_missing(markdown, places)
 
         return AgentRunResponse(
             traceId=trace_id,
@@ -1779,7 +1890,88 @@ class PlannerAgent:
                 or normalized_name in turn_state.selected_place_names
             )
             parsed.append(place.model_copy(update={"selected": selected}))
-        return parsed
+        return self._restore_booking_links(parsed, fallback)
+
+    def _restore_booking_links(
+        self,
+        places: list[PlannerPlaceSuggestion],
+        fallback: list[PlannerPlaceSuggestion],
+    ) -> list[PlannerPlaceSuggestion]:
+        fallback_by_key: dict[str, PlannerPlaceSuggestion] = {}
+        for candidate in fallback:
+            for key in self._booking_link_lookup_keys(candidate):
+                fallback_by_key.setdefault(key, candidate)
+
+        restored: list[PlannerPlaceSuggestion] = []
+        for place in places:
+            if place.bookingLinks:
+                restored.append(place)
+                continue
+
+            matched = next(
+                (
+                    fallback_by_key[key]
+                    for key in self._booking_link_lookup_keys(place)
+                    if key in fallback_by_key and fallback_by_key[key].bookingLinks
+                ),
+                None,
+            )
+            if matched is None:
+                restored.append(place)
+            else:
+                update: dict[str, Any] = {"bookingLinks": list(matched.bookingLinks)}
+                if not place.imageUrl and matched.imageUrl:
+                    update["imageUrl"] = matched.imageUrl
+                if not place.imageUrls and matched.imageUrls:
+                    update["imageUrls"] = list(matched.imageUrls)
+                if place.latitude is None and matched.latitude is not None:
+                    update["latitude"] = matched.latitude
+                if place.longitude is None and matched.longitude is not None:
+                    update["longitude"] = matched.longitude
+                if not place.address and matched.address:
+                    update["address"] = matched.address
+                if not place.amapPoiId and matched.amapPoiId:
+                    update["amapPoiId"] = matched.amapPoiId
+                restored.append(place.model_copy(update=update))
+        return restored
+
+    def _booking_link_lookup_keys(self, place: PlannerPlaceSuggestion) -> list[str]:
+        normalized_name = self._normalize_place_name(place.name)
+        return [
+            self._place_identity(place),
+            f"name:{normalized_name}|type:{place.type.value}",
+            f"name:{normalized_name}",
+        ]
+
+    def _append_booking_links_if_missing(
+        self,
+        markdown: str,
+        places: list[PlannerPlaceSuggestion],
+    ) -> str:
+        markdown = self._sanitize_markdown_booking_links(markdown)
+        lines: list[str] = []
+        seen_urls: set[str] = set()
+        for place in places:
+            for link in place.bookingLinks:
+                if not link.url or link.url in markdown or link.url in seen_urls:
+                    continue
+                seen_urls.add(link.url)
+                label = link.label or "去预订"
+                lines.append(f"- [{label}：{place.name}]({link.url})")
+
+        if not lines:
+            return markdown
+
+        suffix = "\n".join(["", "## 预订入口", "", *lines])
+        return f"{markdown.rstrip()}\n{suffix}"
+
+    def _sanitize_markdown_booking_links(self, markdown: str) -> str:
+        return re.sub(
+            r"https?://example\.com(?P<path>/reservations/(?:hotels(?:/[^\s)]*)?|trains[^\s)]*|flights[^\s)]*))",
+            lambda match: match.group("path"),
+            markdown or "",
+            flags=re.IGNORECASE,
+        )
 
     def _parse_routes(
         self,
