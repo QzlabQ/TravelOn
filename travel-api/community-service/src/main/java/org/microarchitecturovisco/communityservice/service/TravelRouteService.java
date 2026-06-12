@@ -19,6 +19,7 @@ import org.microarchitecturovisco.communityservice.dto.TravelRouteResponse;
 import org.microarchitecturovisco.communityservice.dto.UserProfileResponse;
 import org.microarchitecturovisco.communityservice.repository.AttractionRepository;
 import org.microarchitecturovisco.communityservice.repository.CityRepository;
+import org.microarchitecturovisco.communityservice.repository.FavoriteRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.microarchitecturovisco.communityservice.repository.TargetRatingAggregate;
 import org.microarchitecturovisco.communityservice.repository.TravelRouteRepository;
@@ -28,6 +29,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
@@ -50,6 +52,7 @@ public class TravelRouteService {
     private final UserClient userClient;
     private final FavoriteService favoriteService;
     private final ReviewLikeService reviewLikeService;
+    private final FavoriteRepository favoriteRepository;
 
     public Page<TravelRouteResponse> list(String style, String cityId, String keyword, String sort, int page, int size) {
         int safePage = Math.max(0, page);
@@ -158,6 +161,51 @@ public class TravelRouteService {
         return TravelRouteDetailResponse.from(route, avg, cnt, favorited, latestReviews);
     }
 
+    @Transactional
+    public TravelRouteResponse update(String token, UUID id, CreateTravelRouteRequest request) {
+        userClient.requireAdmin(token);
+        TravelRoute route = requireRoute(id);
+        String normalizedCityId = normalizeOptional(request.cityId());
+        City city = normalizedCityId != null ? cityRepository.findByCityId(normalizedCityId).orElse(null) : null;
+
+        List<RouteStop> stops = buildStops(request.stops());
+        List<String> images = CommunityImages.normalize(request.imageUrls());
+        String cover = images.isEmpty()
+                ? stops.stream().map(RouteStop::getCoverImageUrl).filter(c -> c != null).findFirst().orElse(null)
+                : images.get(0);
+
+        route.setTitle(request.title().trim());
+        route.setSummary(normalizeOptional(request.summary()));
+        route.setDays(request.days());
+        route.setPeopleCount(request.peopleCount());
+        route.setBudget(request.budget());
+        route.setStyle(request.style());
+        route.setDestinationCity(city);
+        route.setImageUrls(images);
+        route.setCoverImageUrl(cover);
+        route.getStops().clear();
+        stops.forEach(stop -> {
+            stop.setRoute(route);
+            route.getStops().add(stop);
+        });
+
+        TravelRoute saved = routeRepository.save(route);
+        String targetId = saved.getId().toString();
+        double avg = reviewRepository.averageRating(TARGET, targetId);
+        long cnt = reviewRepository.countByTargetTypeAndTargetId(TARGET, targetId);
+        return TravelRouteResponse.from(saved, avg, cnt);
+    }
+
+    @Transactional
+    public void delete(String token, UUID id) {
+        userClient.requireAdmin(token);
+        TravelRoute route = requireRoute(id);
+        String targetId = route.getId().toString();
+        reviewRepository.deleteByTargetTypeAndTargetId(TARGET, targetId);
+        favoriteRepository.deleteByTypeAndTargetId(FavoriteTargetType.ROUTE, targetId);
+        routeRepository.delete(route);
+    }
+
     public ReviewResponse createReview(String token, UUID routeId, CreateAttractionReviewRequest request) {
         UserProfileResponse user = userClient.requireUser(token);
         TravelRoute route = requireRoute(routeId);
@@ -181,6 +229,26 @@ public class TravelRouteService {
     private TravelRoute requireRoute(UUID id) {
         return routeRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Travel route not found"));
+    }
+
+    private List<RouteStop> buildStops(List<CreateRouteStopRequest> stopRequests) {
+        List<RouteStop> stops = new ArrayList<>();
+        for (CreateRouteStopRequest stopRequest : stopRequests) {
+            Attraction attraction = attractionRepository.findById(stopRequest.attractionId())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST, "Referenced attraction not found: " + stopRequest.attractionId()));
+            stops.add(RouteStop.builder()
+                    .id(UUID.randomUUID())
+                    .attractionId(attraction.getId())
+                    .attractionName(attraction.getName())
+                    .attractionCity(attraction.getCity() != null ? attraction.getCity().getRegion() : null)
+                    .coverImageUrl(attraction.getCoverImageUrl())
+                    .dayNumber(stopRequest.dayNumber())
+                    .sortOrder(stopRequest.sortOrder())
+                    .note(normalizeOptional(stopRequest.note()))
+                    .build());
+        }
+        return stops;
     }
 
     private TravelStyle parseStyle(String value) {

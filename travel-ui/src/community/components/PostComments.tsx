@@ -1,8 +1,9 @@
 import React, {useCallback, useEffect, useState} from "react";
-import {Alert, Avatar, Button, LinearProgress, TextField} from "@mui/material";
-import {ChatBubbleOutline} from "@mui/icons-material";
-import {ApiRequests, CommentResponse} from "../../core/apiConfig";
+import {Alert, Avatar, Button, LinearProgress, Snackbar, TextField, ToggleButton, ToggleButtonGroup} from "@mui/material";
+import {ChatBubbleOutline, Delete, ThumbUp, ThumbUpOutlined} from "@mui/icons-material";
+import {ApiRequests, CommentResponse, CommentSort} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
+import {isCurrentUserAdmin} from "../../core/currentUser";
 import {formatCommunityTime} from "./communityLabels";
 
 type Props = {
@@ -12,27 +13,41 @@ type Props = {
 
 const PostComments = ({postId, onCountChange}: Props) => {
     const session = useAuthSession();
+    const isAdmin = isCurrentUserAdmin();
     const [comments, setComments] = useState<CommentResponse[]>([]);
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
+    const [toast, setToast] = useState("");
+    const [sort, setSort] = useState<CommentSort>("likes");
+    const [likingIds, setLikingIds] = useState<Set<string>>(new Set());
 
     const load = useCallback(() => {
         setLoading(true);
         setError("");
-        ApiRequests.listPostComments(postId)
+        ApiRequests.listPostComments(postId, sort, session?.token)
             .then(response => {
                 setComments(response.data);
                 onCountChange?.(response.data.length);
             })
             .catch(() => setError("评论暂时无法加载"))
             .finally(() => setLoading(false));
-    }, [onCountChange, postId]);
+    }, [onCountChange, postId, session?.token, sort]);
 
     useEffect(() => {
         load();
     }, [load]);
+
+    const sortComments = useCallback((items: CommentResponse[]) => {
+        return [...items].sort((a, b) => {
+            if (sort === "likes") {
+                const likeDelta = b.likeCount - a.likeCount;
+                if (likeDelta !== 0) return likeDelta;
+            }
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+    }, [sort]);
 
     const submit = async () => {
         if (!session) {
@@ -50,7 +65,7 @@ const PostComments = ({postId, onCountChange}: Props) => {
         try {
             const response = await ApiRequests.createPostComment(session.token, postId, {content: trimmed});
             setComments(current => {
-                const next = [response.data, ...current];
+                const next = sortComments([response.data, ...current]);
                 onCountChange?.(next.length);
                 return next;
             });
@@ -62,8 +77,68 @@ const PostComments = ({postId, onCountChange}: Props) => {
         }
     };
 
+    const toggleCommentLike = async (comment: CommentResponse) => {
+        if (likingIds.has(comment.id)) {
+            return;
+        }
+        if (!session) {
+            setToast("请先登录后再点赞");
+            return;
+        }
+
+        const previousComments = comments;
+        const nextLiked = !comment.likedByCurrentUser;
+        setLikingIds(current => new Set(current).add(comment.id));
+        setComments(current => sortComments(current.map(item => item.id === comment.id ? {
+            ...item,
+            likedByCurrentUser: nextLiked,
+            likeCount: Math.max(0, item.likeCount + (nextLiked ? 1 : -1)),
+        } : item)));
+
+        try {
+            const response = await ApiRequests.togglePostCommentLike(session.token, postId, comment.id);
+            setComments(current => sortComments(current.map(item => item.id === comment.id ? {
+                ...item,
+                likedByCurrentUser: response.data.liked,
+                likeCount: response.data.likeCount,
+            } : item)));
+        } catch {
+            setComments(previousComments);
+            setToast("点赞失败，请稍后重试");
+        } finally {
+            setLikingIds(current => {
+                const next = new Set(current);
+                next.delete(comment.id);
+                return next;
+            });
+        }
+    };
+
+    const deleteComment = async (comment: CommentResponse) => {
+        if (!session) return;
+        if (!window.confirm("确定删除这条评论？")) return;
+        try {
+            await ApiRequests.deletePostComment(session.token, postId, comment.id);
+            setComments(current => {
+                const next = current.filter(item => item.id !== comment.id);
+                onCountChange?.(next.length);
+                return next;
+            });
+        } catch {
+            setToast("删除失败，请确认当前账号是管理员");
+        }
+    };
+
     return (
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <Snackbar
+                open={Boolean(toast)}
+                autoHideDuration={2200}
+                onClose={() => setToast("")}
+                message={toast}
+                anchorOrigin={{vertical: "top", horizontal: "center"}}
+            />
+
             <div className="flex items-center justify-between gap-3">
                 <h2 className="flex items-center gap-2 text-lg font-bold text-slate-950">
                     <ChatBubbleOutline fontSize="small"/>
@@ -85,7 +160,16 @@ const PostComments = ({postId, onCountChange}: Props) => {
                     size="small"
                     fullWidth
                 />
-                <div className="flex justify-end">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <ToggleButtonGroup
+                        size="small"
+                        exclusive
+                        value={sort}
+                        onChange={(_, value: CommentSort | null) => value && setSort(value)}
+                    >
+                        <ToggleButton value="latest">按时间</ToggleButton>
+                        <ToggleButton value="likes">按点赞数</ToggleButton>
+                    </ToggleButtonGroup>
                     <Button variant="contained" onClick={submit} disabled={submitting || !content.trim()}>
                         {submitting ? "发布中" : "发布评论"}
                     </Button>
@@ -106,6 +190,29 @@ const PostComments = ({postId, onCountChange}: Props) => {
                                 <span className="text-xs text-slate-400">{formatCommunityTime(comment.createdAt)}</span>
                             </div>
                             <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">{comment.content}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                <Button
+                                    size="small"
+                                    variant={comment.likedByCurrentUser ? "contained" : "outlined"}
+                                    color={comment.likedByCurrentUser ? "primary" : "inherit"}
+                                    startIcon={comment.likedByCurrentUser ? <ThumbUp/> : <ThumbUpOutlined/>}
+                                    onClick={() => toggleCommentLike(comment)}
+                                    disabled={likingIds.has(comment.id)}
+                                >
+                                    {comment.likeCount}
+                                </Button>
+                                {isAdmin && (
+                                    <Button
+                                        size="small"
+                                        color="error"
+                                        variant="outlined"
+                                        startIcon={<Delete/>}
+                                        onClick={() => deleteComment(comment)}
+                                    >
+                                        删除
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </article>
                 ))}

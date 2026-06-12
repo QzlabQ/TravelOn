@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useState} from "react";
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Chip,
@@ -10,7 +11,7 @@ import {
     Snackbar,
     TextField,
 } from "@mui/material";
-import {Add, Route as RouteIcon, Search} from "@mui/icons-material";
+import {Add, Place, Route as RouteIcon, Search} from "@mui/icons-material";
 import {ApiRequests, TravelRouteResponse, TravelStyle} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
 import {travelStyleLabels} from "./communityLabels";
@@ -18,6 +19,7 @@ import RouteCard from "./RouteCard";
 import RoutePublishDialog from "./RoutePublishDialog";
 
 type SortOption = "latest" | "popular";
+type CityOption = {cityId: string, label: string};
 
 const styleFilters: Array<{value: TravelStyle | "ALL", label: string}> = [
     {value: "ALL", label: "全部风格"},
@@ -32,6 +34,8 @@ const RoutesBrowser = () => {
     const session = useAuthSession();
     const [keyword, setKeyword] = useState("");
     const [debouncedKeyword, setDebouncedKeyword] = useState("");
+    const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
+    const [selectedCity, setSelectedCity] = useState<CityOption | null>(null);
     const [style, setStyle] = useState<TravelStyle | "ALL">("ALL");
     const [sort, setSort] = useState<SortOption>("latest");
     const [routes, setRoutes] = useState<TravelRouteResponse[]>([]);
@@ -45,11 +49,30 @@ const RoutesBrowser = () => {
         return () => clearTimeout(timer);
     }, [keyword]);
 
+    useEffect(() => {
+        ApiRequests.getHotelDestinations()
+            .then(res => {
+                const seen = new Set<string>();
+                const options = res.data
+                    .filter(destination => destination.cityId && destination.region)
+                    .filter(destination => {
+                        if (seen.has(destination.cityId)) return false;
+                        seen.add(destination.cityId);
+                        return true;
+                    })
+                    .map(destination => ({cityId: destination.cityId, label: destination.region}))
+                    .sort((a, b) => a.label.localeCompare(b.label, "zh"));
+                setCityOptions(options);
+            })
+            .catch(() => {});
+    }, []);
+
     const load = useCallback(() => {
         setLoading(true);
         setError("");
         ApiRequests.listTravelRoutes({
             style: style === "ALL" ? undefined : style,
+            cityId: selectedCity?.cityId || undefined,
             keyword: debouncedKeyword || undefined,
             sort,
             page: 0,
@@ -58,7 +81,7 @@ const RoutesBrowser = () => {
             .then(res => setRoutes(res.data.content))
             .catch(() => setError("线路列表暂时不可用，请确认 community-service 已启动。"))
             .finally(() => setLoading(false));
-    }, [style, debouncedKeyword, sort]);
+    }, [style, selectedCity, debouncedKeyword, sort]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -83,13 +106,38 @@ const RoutesBrowser = () => {
 
             <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                    <Autocomplete
+                        options={cityOptions}
+                        getOptionLabel={option => option.label}
+                        isOptionEqualToValue={(option, value) => option.cityId === value.cityId}
+                        value={selectedCity}
+                        onChange={(_, value) => setSelectedCity(value)}
+                        renderInput={params => (
+                            <TextField
+                                {...params}
+                                size="small"
+                                label="城市"
+                                placeholder="全部城市"
+                                InputProps={{
+                                    ...params.InputProps,
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Place fontSize="small"/>
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        )}
+                        noOptionsText="无匹配城市"
+                        sx={{minWidth: {xs: "100%", lg: 220}}}
+                    />
                     <TextField
                         size="small"
                         select
                         label="风格"
                         value={style}
                         onChange={e => setStyle(e.target.value as TravelStyle | "ALL")}
-                        sx={{minWidth: {xs: "100%", lg: 160}}}
+                        sx={{minWidth: {xs: "100%", lg: 112}, width: {xs: "100%", lg: 128}}}
                     >
                         {styleFilters.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
                     </TextField>
@@ -118,7 +166,14 @@ const RoutesBrowser = () => {
                         <MenuItem value="latest">最新</MenuItem>
                         <MenuItem value="popular">最热门</MenuItem>
                     </TextField>
-                    <Button variant="contained" startIcon={<Add/>} onClick={openPublish} sx={{whiteSpace: "nowrap"}}>
+                    <Button
+                        variant="contained"
+                        startIcon={<Add/>}
+                        onClick={openPublish}
+                        sx={{
+                            whiteSpace: "nowrap",
+                        }}
+                    >
                         创建线路
                     </Button>
                 </div>
@@ -144,7 +199,7 @@ const RoutesBrowser = () => {
                 </div>
             )}
 
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-5">
                 {routes.map(route => <RouteCard key={route.id} route={route}/>)}
             </div>
 

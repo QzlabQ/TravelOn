@@ -15,7 +15,10 @@ import org.microarchitecturovisco.communityservice.dto.PostResponse;
 import org.microarchitecturovisco.communityservice.dto.ReviewResponse;
 import org.microarchitecturovisco.communityservice.dto.UserProfileResponse;
 import org.microarchitecturovisco.communityservice.repository.CityRepository;
+import org.microarchitecturovisco.communityservice.repository.CommentLikeRepository;
+import org.microarchitecturovisco.communityservice.repository.CommunityCommentRepository;
 import org.microarchitecturovisco.communityservice.repository.CommunityPostRepository;
+import org.microarchitecturovisco.communityservice.repository.FavoriteRepository;
 import org.microarchitecturovisco.communityservice.repository.PostLikeRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.microarchitecturovisco.communityservice.service.CommunityService;
@@ -36,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,6 +55,9 @@ class CommunityServiceTest {
     private FavoriteService favoriteService;
     private CommentService commentService;
     private ReviewLikeService reviewLikeService;
+    private FavoriteRepository favoriteRepository;
+    private CommunityCommentRepository commentRepository;
+    private CommentLikeRepository commentLikeRepository;
     private CommunityService communityService;
     private UserProfileResponse user;
     private City shanghaiCity;
@@ -65,8 +72,11 @@ class CommunityServiceTest {
         favoriteService = mock(FavoriteService.class);
         commentService = mock(CommentService.class);
         reviewLikeService = mock(ReviewLikeService.class);
-        communityService = new CommunityService(postRepository, likeRepository, reviewRepository, cityRepository, userClient, favoriteService, commentService, reviewLikeService);
-        user = new UserProfileResponse(UUID.randomUUID(), "ada@example.com", "Ada", "Lovelace", null, null, "Explorer", Instant.now(), Instant.now(), Instant.now());
+        favoriteRepository = mock(FavoriteRepository.class);
+        commentRepository = mock(CommunityCommentRepository.class);
+        commentLikeRepository = mock(CommentLikeRepository.class);
+        communityService = new CommunityService(postRepository, likeRepository, reviewRepository, cityRepository, userClient, favoriteService, commentService, reviewLikeService, favoriteRepository, commentRepository, commentLikeRepository);
+        user = new UserProfileResponse(UUID.randomUUID(), "ada@example.com", "Ada", "Lovelace", null, null, "Explorer", "USER", Instant.now(), Instant.now(), Instant.now());
         shanghaiCity = City.builder()
                 .id(UUID.randomUUID())
                 .cityId("SHA")
@@ -86,12 +96,18 @@ class CommunityServiceTest {
                 "A compact route with museums and food.",
                 CommunityCategory.TRAVEL_NOTE,
                 "SHA",
+                ReviewTargetType.ROUTE,
+                "route-1",
+                "Shanghai two-day route",
                 List.of("https://example.com/photo.jpg", "ftp://ignored.example.com/photo.jpg")
         ));
 
         assertThat(response.title()).isEqualTo("Shanghai weekend");
         assertThat(response.destination()).isEqualTo("Shanghai");
         assertThat(response.destinationCityId()).isEqualTo("SHA");
+        assertThat(response.associatedTargetType()).isEqualTo(ReviewTargetType.ROUTE);
+        assertThat(response.associatedTargetId()).isEqualTo("route-1");
+        assertThat(response.associatedTargetName()).isEqualTo("Shanghai two-day route");
         assertThat(response.authorUserId()).isEqualTo(user.id());
         assertThat(response.authorName()).isEqualTo("Ada Lovelace");
         assertThat(response.imageUrls()).containsExactly("https://example.com/photo.jpg");
@@ -106,6 +122,9 @@ class CommunityServiceTest {
                 "Content",
                 CommunityCategory.TRAVEL_NOTE,
                 null,
+                null,
+                null,
+                null,
                 List.of()
         ))).isInstanceOf(ResponseStatusException.class);
     }
@@ -113,14 +132,27 @@ class CommunityServiceTest {
     @Test
     void searchesPostsByCategoryAndKeyword() {
         CommunityPost post = post("Suzhou gardens");
-        when(postRepository.search(eq(CommunityCategory.TRAVEL_NOTE), eq("Suzhou"), any(Pageable.class)))
+        when(postRepository.findFiltered(eq(CommunityCategory.TRAVEL_NOTE), isNull(), eq("Suzhou"), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(post)));
 
-        List<PostResponse> posts = communityService.listPosts(CommunityCategory.TRAVEL_NOTE, " Suzhou ", 0, 12, "latest", null)
+        List<PostResponse> posts = communityService.listPosts(CommunityCategory.TRAVEL_NOTE, null, " Suzhou ", 0, 12, "latest", null)
                 .getContent();
 
         assertThat(posts).hasSize(1);
         assertThat(posts.get(0).title()).isEqualTo("Suzhou gardens");
+    }
+
+    @Test
+    void filtersPostsByDestinationCity() {
+        CommunityPost post = post("Shanghai weekend");
+        when(postRepository.findFiltered(eq(CommunityCategory.TRAVEL_NOTE), eq("SHA"), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(post)));
+
+        List<PostResponse> posts = communityService.listPosts(CommunityCategory.TRAVEL_NOTE, " SHA ", null, 0, 12, "latest", null)
+                .getContent();
+
+        assertThat(posts).hasSize(1);
+        assertThat(posts.get(0).title()).isEqualTo("Shanghai weekend");
     }
 
     @Test

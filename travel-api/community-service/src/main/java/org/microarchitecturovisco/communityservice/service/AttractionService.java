@@ -15,6 +15,7 @@ import org.microarchitecturovisco.communityservice.dto.ReviewResponse;
 import org.microarchitecturovisco.communityservice.dto.UserProfileResponse;
 import org.microarchitecturovisco.communityservice.repository.AttractionRepository;
 import org.microarchitecturovisco.communityservice.repository.CityRepository;
+import org.microarchitecturovisco.communityservice.repository.FavoriteRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.microarchitecturovisco.communityservice.repository.TargetRatingAggregate;
 import org.microarchitecturovisco.communityservice.util.CommunityImages;
@@ -23,6 +24,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Comparator;
@@ -41,6 +43,7 @@ public class AttractionService {
     private final UserClient userClient;
     private final FavoriteService favoriteService;
     private final ReviewLikeService reviewLikeService;
+    private final FavoriteRepository favoriteRepository;
 
     public Page<AttractionResponse> list(String cityId, String keyword, String sort, int page, int size) {
         int safePage = Math.max(0, page);
@@ -75,12 +78,20 @@ public class AttractionService {
     }
 
     /**
-     * "popular" (default) ranks by most reviews, then highest rating, newest first;
+     * "reviewCount" (default) ranks by most reviews, then highest rating, newest first;
+     * "rating" ranks by highest rating, then most reviews, newest first;
      * "latest" ranks purely by creation time, newest first.
      */
     private Comparator<AttractionResponse> comparatorFor(String sort) {
         if ("latest".equalsIgnoreCase(sort)) {
             return Comparator.comparing(AttractionResponse::createdAt, Comparator.reverseOrder());
+        }
+        if ("rating".equalsIgnoreCase(sort)) {
+            return Comparator
+                    .comparingDouble(AttractionResponse::averageRating)
+                    .thenComparingLong(AttractionResponse::reviewCount)
+                    .reversed()
+                    .thenComparing(AttractionResponse::createdAt, Comparator.reverseOrder());
         }
         return Comparator
                 .comparingLong(AttractionResponse::reviewCount)
@@ -131,6 +142,37 @@ public class AttractionService {
                 currentUserId);
         boolean favorited = favoriteService.isFavorited(currentUserId, FavoriteTargetType.ATTRACTION, targetId);
         return AttractionDetailResponse.from(attraction, avg, cnt, favorited, latestReviews);
+    }
+
+    @Transactional
+    public AttractionResponse update(String token, UUID id, CreateAttractionRequest request) {
+        userClient.requireAdmin(token);
+        Attraction attraction = requireAttraction(id);
+        String normalizedCityId = normalizeOptional(request.cityId());
+        City city = normalizedCityId != null ? cityRepository.findByCityId(normalizedCityId).orElse(null) : null;
+        List<String> images = CommunityImages.normalize(request.imageUrls());
+
+        attraction.setName(request.name().trim());
+        attraction.setCity(city);
+        attraction.setDescription(normalizeOptional(request.description()));
+        attraction.setImageUrls(images);
+        attraction.setCoverImageUrl(images.isEmpty() ? null : images.get(0));
+
+        Attraction saved = attractionRepository.save(attraction);
+        String targetId = saved.getId().toString();
+        long cnt = reviewRepository.countByTargetTypeAndTargetId(ReviewTargetType.SCENIC_SPOT, targetId);
+        double avg = reviewRepository.averageRating(ReviewTargetType.SCENIC_SPOT, targetId);
+        return AttractionResponse.from(saved, avg, cnt);
+    }
+
+    @Transactional
+    public void delete(String token, UUID id) {
+        userClient.requireAdmin(token);
+        Attraction attraction = requireAttraction(id);
+        String targetId = attraction.getId().toString();
+        reviewRepository.deleteByTargetTypeAndTargetId(ReviewTargetType.SCENIC_SPOT, targetId);
+        favoriteRepository.deleteByTypeAndTargetId(FavoriteTargetType.ATTRACTION, targetId);
+        attractionRepository.delete(attraction);
     }
 
     public ReviewResponse createReview(String token, UUID attractionId, CreateAttractionReviewRequest request) {

@@ -1,35 +1,32 @@
-import React, {useEffect, useState} from "react";
+import React, {useCallback, useEffect, useState} from "react";
 import {Alert, Box, Button, Chip, LinearProgress, Snackbar} from "@mui/material";
-import {ArrowBack, Favorite, FavoriteBorder, LocationOn} from "@mui/icons-material";
-import {Link, useParams} from "react-router-dom";
-import {ApiRequests, CommunityPostResponse, CommunityReviewResponse} from "../../core/apiConfig";
+import {ArrowBack, Delete, Favorite, FavoriteBorder, Landscape, LocationOn, Route as RouteIcon} from "@mui/icons-material";
+import {Link, useNavigate, useParams} from "react-router-dom";
+import {ApiRequests, CommunityPostResponse} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
-import {categoryLabels, formatCommunityTime} from "../components/communityLabels";
-import CommunityReviewCard from "../components/CommunityReviewCard";
+import {isCurrentUserAdmin} from "../../core/currentUser";
+import {formatCommunityTime} from "../components/communityLabels";
 import FavoriteButton from "../components/FavoriteButton";
 import ImageCarousel from "../components/ImageCarousel";
 import PostComments from "../components/PostComments";
 
 const CommunityPostDetails = () => {
     const {postId = ""} = useParams();
+    const navigate = useNavigate();
     const session = useAuthSession();
+    const isAdmin = isCurrentUserAdmin();
     const [post, setPost] = useState<CommunityPostResponse | null>(null);
-    const [reviews, setReviews] = useState<CommunityReviewResponse[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [toast, setToast] = useState("");
+    const [adminBusy, setAdminBusy] = useState(false);
 
     useEffect(() => {
         if (!postId) return;
         setLoading(true);
         setError("");
         ApiRequests.getCommunityPost(postId, session?.token)
-            .then(response => {
-                setPost(response.data);
-                const targetId = response.data.destination || response.data.title;
-                return ApiRequests.listCommunityReviews({targetId, page: 0, size: 6}, session?.token);
-            })
-            .then(response => setReviews(response.data.content))
+            .then(response => setPost(response.data))
             .catch(() => setError("帖子详情暂时不可用"))
             .finally(() => setLoading(false));
     }, [postId, session?.token]);
@@ -46,6 +43,35 @@ const CommunityPostDetails = () => {
             setToast("点赞失败，请稍后重试");
         }
     };
+
+    const handleCommentCountChange = useCallback((count: number) => {
+        setPost(current => {
+            if (!current || current.commentCount === count) return current;
+            return {...current, commentCount: count};
+        });
+    }, []);
+
+    const deletePost = async () => {
+        if (!session || !post) return;
+        if (!window.confirm("确定删除这篇帖子？")) return;
+        setAdminBusy(true);
+        try {
+            await ApiRequests.deleteCommunityPost(session.token, post.id);
+            navigate("/community");
+        } catch {
+            setToast("删除失败，请确认当前账号是管理员");
+        } finally {
+            setAdminBusy(false);
+        }
+    };
+
+    const associatedPath = post?.associatedTargetType === "ROUTE"
+        ? `/community/routes/${post.associatedTargetId}`
+        : post?.associatedTargetType === "SCENIC_SPOT"
+            ? `/community/attractions/${post.associatedTargetId}`
+            : "";
+    const associatedLabel = post?.associatedTargetType === "ROUTE" ? "关联线路" : "关联景点";
+    const associatedIcon = post?.associatedTargetType === "ROUTE" ? <RouteIcon/> : <Landscape/>;
 
     return (
         <div className="min-h-screen bg-[#f6f7fb]">
@@ -75,24 +101,52 @@ const CommunityPostDetails = () => {
 
                                 <div className="p-7">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <Chip size="small" label={categoryLabels[post.category]} color="primary" variant="outlined"/>
                                         {post.destination && <Chip size="small" icon={<LocationOn/>} label={post.destination}/>}
                                     </div>
                                     <h1 className="mt-4 text-4xl font-bold leading-tight text-slate-950">{post.title}</h1>
                                     <p className="mt-3 text-sm text-slate-500">
                                         {post.authorName} · {formatCommunityTime(post.createdAt)}
                                     </p>
+                                    {associatedPath && post.associatedTargetName && (
+                                        <Button
+                                            component={Link}
+                                            to={associatedPath}
+                                            state={{returnTo: `/community/posts/${post.id}`, returnLabel: "返回帖子"}}
+                                            startIcon={associatedIcon}
+                                            variant="outlined"
+                                            sx={{mt: 4}}
+                                        >
+                                            {associatedLabel}：{post.associatedTargetName}
+                                        </Button>
+                                    )}
                                     <div className="mt-6 whitespace-pre-wrap text-base leading-8 text-slate-700">{post.content}</div>
                                 </div>
                             </article>
 
                             <PostComments
                                 postId={post.id}
-                                onCountChange={count => setPost(current => current ? {...current, commentCount: count} : current)}
+                                onCountChange={handleCommentCountChange}
                             />
                         </div>
 
                         <aside className="space-y-5 lg:sticky lg:top-24">
+                            {isAdmin && (
+                                <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                                    <h2 className="text-lg font-bold text-slate-950">管理员操作</h2>
+                                    <Button
+                                        fullWidth
+                                        color="error"
+                                        variant="outlined"
+                                        startIcon={<Delete/>}
+                                        disabled={adminBusy}
+                                        onClick={deletePost}
+                                        sx={{mt: 2}}
+                                    >
+                                        删除帖子
+                                    </Button>
+                                </section>
+                            )}
+
                             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                                 <h2 className="text-lg font-bold text-slate-950">互动</h2>
                                 <div className="mt-3 grid gap-3">
@@ -114,19 +168,6 @@ const CommunityPostDetails = () => {
                                     </Button>
                                 </div>
                                 <p className="mt-3 text-center text-sm text-slate-500">{post.commentCount} 条评论</p>
-                            </section>
-
-                            <section className="space-y-3">
-                                <div className="flex items-center justify-between gap-3">
-                                    <h2 className="text-lg font-bold text-slate-950">相关评价</h2>
-                                    <Chip size="small" label={`${reviews.length} 条`} variant="outlined"/>
-                                </div>
-                                {reviews.map(review => <CommunityReviewCard key={review.id} review={review}/>)}
-                                {reviews.length === 0 &&
-                                    <p className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-8 text-center text-sm text-slate-500">
-                                        暂无相关评价
-                                    </p>
-                                }
                             </section>
                         </aside>
                     </div>

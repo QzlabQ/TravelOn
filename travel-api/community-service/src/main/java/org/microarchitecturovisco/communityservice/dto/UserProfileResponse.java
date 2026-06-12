@@ -11,6 +11,7 @@ public record UserProfileResponse(
         String phone,
         String avatarUrl,
         String loyaltyTier,
+        String role,
         Instant createdAt,
         Instant updatedAt,
         Instant lastLoginAt
@@ -18,5 +19,9 @@ public record UserProfileResponse(
     public String displayName() {
         String fullName = ((name == null ? "" : name) + " " + (surname == null ? "" : surname)).trim();
         return fullName.isBlank() ? email : fullName;
+    }
+
+    public boolean admin() {
+        return "ADMIN".equalsIgnoreCase(role);
     }
 }

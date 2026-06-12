@@ -1,9 +1,9 @@
 import React, {useEffect, useState} from "react";
-import {Avatar, Button, Chip, Rating, Snackbar} from "@mui/material";
-import {RateReview, ThumbUp, ThumbUpOutlined} from "@mui/icons-material";
+import {Avatar, Button, Rating, Snackbar} from "@mui/material";
+import {ThumbUp, ThumbUpOutlined} from "@mui/icons-material";
 import {ApiRequests, CommunityReviewResponse, resolveCommunityImageUrl} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
-import {categoryLabels, formatCommunityTime, targetTypeLabels} from "./communityLabels";
+import {formatCommunityTime} from "./communityLabels";
 import ImageLightbox, {useLightbox} from "./ImageLightbox";
 
 type Props = {
@@ -18,6 +18,8 @@ const CommunityReviewCard = ({review}: Props) => {
     const [liked, setLiked] = useState(review.likedByCurrentUser);
     const [likeCount, setLikeCount] = useState(review.likeCount);
     const [toast, setToast] = useState("");
+    const [expanded, setExpanded] = useState(false);
+    const canExpand = review.content.length > 120;
 
     useEffect(() => {
         setLiked(review.likedByCurrentUser);
@@ -49,18 +51,8 @@ const CommunityReviewCard = ({review}: Props) => {
         <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-amber-200 hover:shadow-md">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Chip
-                            size="small"
-                            icon={<RateReview fontSize="small"/>}
-                            label={`${targetTypeLabels[review.targetType]} · ${review.targetName}`}
-                            color="secondary"
-                            variant="outlined"
-                            sx={{maxWidth: 260, "& .MuiChip-label": {overflow: "hidden", textOverflow: "ellipsis"}}}
-                        />
-                        <Chip size="small" label={categoryLabels[review.category]}/>
-                    </div>
-                    <h3 className="mt-3 line-clamp-1 text-lg font-bold text-slate-950">{review.targetName}</h3>
+                    <Rating value={review.rating} readOnly size="small"/>
+                    <h3 className="mt-2 line-clamp-1 text-lg font-bold text-slate-950">{review.targetName}</h3>
                 </div>
 
                 <div className="rounded-lg bg-amber-50 px-3 py-2 text-center">
@@ -69,11 +61,19 @@ const CommunityReviewCard = ({review}: Props) => {
                 </div>
             </div>
 
-            <div className="mt-3 flex items-center gap-3">
-                <Rating value={review.rating} readOnly size="small"/>
-            </div>
-
-            <p className="mt-3 line-clamp-4 text-sm leading-6 text-slate-600">{review.content}</p>
+            <p className={`mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600 ${expanded ? "" : "line-clamp-4"}`}>
+                {review.content}
+            </p>
+            {canExpand && (
+                <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => setExpanded(value => !value)}
+                    sx={{mt: 0.5, minWidth: 0, px: 0}}
+                >
+                    {expanded ? "收起" : "展开"}
+                </Button>
+            )}
 
             {images.length > 0 &&
                 <div className="mt-3 flex flex-wrap gap-2">

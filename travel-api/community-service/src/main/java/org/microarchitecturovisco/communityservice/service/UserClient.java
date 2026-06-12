@@ -59,4 +59,12 @@ public class UserClient {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "User service unavailable");
         }
     }
+
+    public UserProfileResponse requireAdmin(String token) {
+        UserProfileResponse user = requireUser(token);
+        if (!user.admin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin account required");
+        }
+        return user;
+    }
 }

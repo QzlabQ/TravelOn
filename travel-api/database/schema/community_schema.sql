@@ -41,6 +41,9 @@ CREATE TABLE public.community_post (
     id uuid NOT NULL,
     author_name character varying(255) NOT NULL,
     author_user_id uuid NOT NULL,
+    associated_target_id character varying(120),
+    associated_target_name character varying(255),
+    associated_target_type character varying(255),
     category character varying(255) NOT NULL,
     content character varying(4000) NOT NULL,
     created_at timestamp(6) with time zone NOT NULL,
@@ -48,6 +51,7 @@ CREATE TABLE public.community_post (
     like_count integer NOT NULL,
     title character varying(120) NOT NULL,
     updated_at timestamp(6) with time zone NOT NULL,
+    CONSTRAINT community_post_associated_target_type_check CHECK (((associated_target_type)::text = ANY ((ARRAY['SCENIC_SPOT'::character varying, 'ROUTE'::character varying, 'MERCHANT'::character varying, 'HOTEL'::character varying])::text[]))),
     CONSTRAINT community_post_category_check CHECK (((category)::text = ANY ((ARRAY['TRAVEL_NOTE'::character varying, 'SCENIC_SPOT'::character varying, 'ROUTE'::character varying, 'MERCHANT'::character varying, 'HOTEL'::character varying, 'FOOD'::character varying, 'TRANSPORT'::character varying, 'OTHER'::character varying])::text[])))
 );
 
@@ -371,6 +375,25 @@ CREATE INDEX idx_community_comment_target_created
     ON public.community_comment(target_type, target_id, created_at DESC);
 CREATE INDEX idx_community_comment_author_created
     ON public.community_comment(author_user_id, created_at DESC);
+
+
+--
+-- Name: community_comment_like; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.community_comment_like (
+    id uuid NOT NULL,
+    comment_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    CONSTRAINT community_comment_like_pkey PRIMARY KEY (id),
+    CONSTRAINT uq_community_comment_like_comment_user UNIQUE (comment_id, user_id)
+);
+
+ALTER TABLE ONLY public.community_comment_like
+    ADD CONSTRAINT fk_community_comment_like_comment FOREIGN KEY (comment_id) REFERENCES public.community_comment(id);
+CREATE INDEX idx_community_comment_like_comment ON public.community_comment_like(comment_id);
+CREATE INDEX idx_community_comment_like_user_comment ON public.community_comment_like(user_id, comment_id);
 
 
 --

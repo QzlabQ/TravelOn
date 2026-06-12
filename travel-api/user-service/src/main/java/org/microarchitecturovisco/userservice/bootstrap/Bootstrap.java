@@ -2,6 +2,7 @@ package org.microarchitecturovisco.userservice.bootstrap;
 
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.userservice.domain.User;
+import org.microarchitecturovisco.userservice.domain.UserRole;
 import org.microarchitecturovisco.userservice.repositories.UserRepository;
 import org.microarchitecturovisco.userservice.services.UserService;
 import org.springframework.boot.CommandLineRunner;
@@ -87,6 +88,7 @@ public class Bootstrap implements CommandLineRunner {
                         .name(firstName)
                         .surname(lastName)
                         .loyaltyTier("Explorer")
+                        .role(UserRole.USER)
                         .build();
                 users.add(user);
             }

@@ -2,6 +2,8 @@ package org.microarchitecturovisco.userservice.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -53,6 +55,10 @@ public class User {
     @Size(max = 32)
     private String loyaltyTier;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private UserRole role;
+
     @Column(unique = true)
     private String sessionToken;
 
@@ -69,6 +75,9 @@ public class User {
         updatedAt = now;
         if (loyaltyTier == null || loyaltyTier.isBlank()) {
             loyaltyTier = "Explorer";
+        }
+        if (role == null) {
+            role = UserRole.USER;
         }
     }
 

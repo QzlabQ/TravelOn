@@ -13,24 +13,34 @@ import {
     ArrowBack,
     AttachMoney,
     CalendarMonth,
+    Delete,
+    Edit,
     Groups,
     Landscape,
     Place,
     RateReview,
     Route as RouteIcon,
 } from "@mui/icons-material";
-import {Link, useParams} from "react-router-dom";
+import {Link, useLocation, useNavigate, useParams} from "react-router-dom";
 import {ApiRequests, resolveCommunityImageUrl, RouteStopResponse, TravelRouteDetailResponse} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
+import {isCurrentUserAdmin} from "../../core/currentUser";
 import CommunityReviewCard from "../components/CommunityReviewCard";
 import CommunityImageUploader from "../components/CommunityImageUploader";
 import FavoriteButton from "../components/FavoriteButton";
 import ImageLightbox, {useLightbox} from "../components/ImageLightbox";
 import {formatCommunityTime, travelStyleLabels} from "../components/communityLabels";
+import RoutePublishDialog from "../components/RoutePublishDialog";
 
 const RouteDetails = () => {
     const {routeId} = useParams<{routeId: string}>();
+    const location = useLocation();
+    const navigate = useNavigate();
     const session = useAuthSession();
+    const isAdmin = isCurrentUserAdmin();
+    const returnState = location.state as {returnTo?: string, returnLabel?: string} | null;
+    const returnTo = returnState?.returnTo ?? "/community?tab=ROUTE";
+    const returnLabel = returnState?.returnLabel ?? "返回线路列表";
 
     const [detail, setDetail] = useState<TravelRouteDetailResponse | null>(null);
     const [loading, setLoading] = useState(true);
@@ -42,6 +52,8 @@ const RouteDetails = () => {
     const [submitting, setSubmitting] = useState(false);
     const [reviewError, setReviewError] = useState("");
     const [toast, setToast] = useState("");
+    const [editOpen, setEditOpen] = useState(false);
+    const [adminBusy, setAdminBusy] = useState(false);
     const lightbox = useLightbox();
 
     const load = useCallback(() => {
@@ -89,12 +101,26 @@ const RouteDetails = () => {
         }
     };
 
+    const deleteRoute = async () => {
+        if (!session || !detail) return;
+        if (!window.confirm("确定删除这条线路？")) return;
+        setAdminBusy(true);
+        try {
+            await ApiRequests.deleteTravelRoute(session.token, detail.id);
+            navigate(returnTo);
+        } catch {
+            setToast("删除失败，请确认当前账号是管理员");
+        } finally {
+            setAdminBusy(false);
+        }
+    };
+
     if (loading) return <Box className="p-8"><LinearProgress/></Box>;
     if (error || !detail) return (
         <div className="mx-auto max-w-3xl px-6 py-10">
             <Alert severity="error">{error || "线路不存在。"}</Alert>
-            <Link to="/community?tab=ROUTE" className="mt-4 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
-                <ArrowBack fontSize="small"/>返回线路列表
+            <Link to={returnTo} className="mt-4 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                <ArrowBack fontSize="small"/>{returnLabel}
             </Link>
         </div>
     );
@@ -123,12 +149,6 @@ const RouteDetails = () => {
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"/>
                 <div className="pointer-events-none absolute inset-x-0 bottom-0">
                     <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10">
-                        <Link
-                            to="/community?tab=ROUTE"
-                            className="pointer-events-auto mb-4 inline-flex items-center gap-1 text-sm text-white/80 hover:text-white"
-                        >
-                            <ArrowBack fontSize="small"/>返回线路列表
-                        </Link>
                         <div className="flex flex-wrap items-center gap-2">
                             <Chip size="small" label={travelStyleLabels[detail.style]} sx={{bgcolor: "rgba(255,255,255,0.85)", fontWeight: 600}}/>
                             {detail.city && (
@@ -149,6 +169,9 @@ const RouteDetails = () => {
             </div>
 
             <main className="mx-auto max-w-7xl px-6 py-10 lg:px-10">
+                <Button component={Link} to={returnTo} startIcon={<ArrowBack/>} variant="outlined" sx={{mb: 3}}>
+                    {returnLabel}
+                </Button>
                 <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:gap-12">
                     {/* Left: attributes, itinerary, gallery, reviews */}
                     <div className="space-y-8">
@@ -198,6 +221,7 @@ const RouteDetails = () => {
                                                     </div>
                                                     <Link
                                                         to={`/community/attractions/${stop.attractionId}`}
+                                                        state={{returnTo: `/community/routes/${detail.id}`, returnLabel: "返回线路"}}
                                                         className="group flex flex-1 gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-blue-200 hover:bg-slate-50"
                                                     >
                                                         <div className="h-20 w-28 shrink-0 overflow-hidden rounded-lg bg-slate-100">
@@ -265,6 +289,20 @@ const RouteDetails = () => {
 
                     {/* Right: rating summary + write review */}
                     <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+                        {isAdmin && (
+                            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <h2 className="font-bold text-slate-950">管理员操作</h2>
+                                <div className="mt-3 grid gap-3">
+                                    <Button variant="outlined" startIcon={<Edit/>} onClick={() => setEditOpen(true)}>
+                                        编辑线路
+                                    </Button>
+                                    <Button color="error" variant="outlined" startIcon={<Delete/>} disabled={adminBusy} onClick={deleteRoute}>
+                                        删除线路
+                                    </Button>
+                                </div>
+                            </section>
+                        )}
+
                         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                             <FavoriteButton
                                 type="ROUTE"
@@ -343,6 +381,16 @@ const RouteDetails = () => {
                 open={lightbox.open}
                 onClose={lightbox.close}
                 onIndexChange={lightbox.setIndex}
+            />
+            <RoutePublishDialog
+                open={editOpen}
+                token={session?.token}
+                route={detail}
+                onClose={() => setEditOpen(false)}
+                onPublished={() => {
+                    setToast("线路已保存");
+                    load();
+                }}
             />
         </div>
     );

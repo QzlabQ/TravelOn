@@ -55,6 +55,7 @@ CREATE TABLE public.users (
     name character varying(50) NOT NULL,
     password_hash character varying(255) NOT NULL,
     phone character varying(32),
+    role character varying(16) DEFAULT 'USER'::character varying NOT NULL,
     session_token character varying(255),
     surname character varying(50) NOT NULL,
     updated_at timestamp(6) with time zone
@@ -129,6 +130,7 @@ SELECT
     u.phone,
     u.avatar_url,
     u.loyalty_tier,
+    u.role,
     u.last_login_at,
     count(t.id) AS traveler_count
 FROM public.users u

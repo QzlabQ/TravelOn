@@ -16,7 +16,10 @@ import org.microarchitecturovisco.communityservice.dto.PostResponse;
 import org.microarchitecturovisco.communityservice.dto.ReviewResponse;
 import org.microarchitecturovisco.communityservice.dto.UserProfileResponse;
 import org.microarchitecturovisco.communityservice.repository.CityRepository;
+import org.microarchitecturovisco.communityservice.repository.CommentLikeRepository;
+import org.microarchitecturovisco.communityservice.repository.CommunityCommentRepository;
 import org.microarchitecturovisco.communityservice.repository.CommunityPostRepository;
+import org.microarchitecturovisco.communityservice.repository.FavoriteRepository;
 import org.microarchitecturovisco.communityservice.repository.PostLikeRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.microarchitecturovisco.communityservice.util.CommunityImages;
@@ -45,8 +48,11 @@ public class CommunityService {
     private final FavoriteService favoriteService;
     private final CommentService commentService;
     private final ReviewLikeService reviewLikeService;
+    private final FavoriteRepository favoriteRepository;
+    private final CommunityCommentRepository commentRepository;
+    private final CommentLikeRepository commentLikeRepository;
 
-    public Page<PostResponse> listPosts(CommunityCategory category, String keyword, int page, int size, String sort, String token) {
+    public Page<PostResponse> listPosts(CommunityCategory category, String cityId, String keyword, int page, int size, String sort, String token) {
         Pageable pageable = PageRequest.of(
                 Math.max(0, page),
                 Math.min(Math.max(size, 1), 50),
@@ -55,10 +61,9 @@ public class CommunityService {
                         : Sort.by(Sort.Direction.DESC, "createdAt")
         );
         UUID currentUserId = tryResolveUserId(token);
+        String normalizedCityId = normalizeOptional(cityId);
         String normalizedKeyword = normalizeKeyword(keyword);
-        Page<CommunityPost> posts = normalizedKeyword == null
-                ? (category == null ? postRepository.findAll(pageable) : postRepository.findByCategory(category, pageable))
-                : postRepository.search(category, normalizedKeyword, pageable);
+        Page<CommunityPost> posts = postRepository.findFiltered(category, normalizedCityId, normalizedKeyword, pageable);
         return posts.map(post -> toPostResponse(post, currentUserId));
     }
 
@@ -86,6 +91,9 @@ public class CommunityService {
                 .content(request.content().trim())
                 .category(request.category())
                 .destinationCity(destinationCity)
+                .associatedTargetType(request.associatedTargetType())
+                .associatedTargetId(normalizeOptional(request.associatedTargetId()))
+                .associatedTargetName(normalizeOptional(request.associatedTargetName()))
                 .imageUrls(CommunityImages.normalize(request.imageUrls()))
                 .authorUserId(user.id())
                 .authorName(user.displayName())
@@ -146,6 +154,24 @@ public class CommunityService {
                 .build();
 
         return ReviewResponse.from(reviewRepository.save(review));
+    }
+
+    @Transactional
+    public void deletePost(String token, UUID postId) {
+        userClient.requireAdmin(token);
+        CommunityPost post = requirePost(postId);
+        List<UUID> commentIds = commentRepository.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(
+                        FavoriteTargetType.POST, postId.toString())
+                .stream()
+                .map(comment -> comment.getId())
+                .toList();
+        if (!commentIds.isEmpty()) {
+            commentLikeRepository.deleteByCommentIdIn(commentIds);
+        }
+        commentRepository.deleteByTargetTypeAndTargetId(FavoriteTargetType.POST, postId.toString());
+        likeRepository.deleteByPostId(postId);
+        favoriteRepository.deleteByTypeAndTargetId(FavoriteTargetType.POST, postId.toString());
+        postRepository.delete(post);
     }
 
     public CommunitySummaryResponse getSummary(ReviewTargetType targetType, String targetId) {

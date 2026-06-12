@@ -1,6 +1,7 @@
 package org.microarchitecturovisco.userservice.services;
 
 import org.microarchitecturovisco.userservice.domain.User;
+import org.microarchitecturovisco.userservice.domain.UserRole;
 import org.microarchitecturovisco.userservice.dto.AuthResponse;
 import org.microarchitecturovisco.userservice.dto.LoginRequest;
 import org.microarchitecturovisco.userservice.dto.RegisterRequest;
@@ -61,6 +62,7 @@ public class UserService {
                 .surname(normalizeOptional(request.surname()) == null ? "" : request.surname().trim())
                 .phone(normalizeOptional(request.phone()))
                 .loyaltyTier("Explorer")
+                .role(UserRole.USER)
                 .sessionToken(generateSessionToken())
                 .lastLoginAt(Instant.now())
                 .build();

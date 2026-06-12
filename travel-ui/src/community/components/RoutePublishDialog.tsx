@@ -21,6 +21,7 @@ import {
     CreateTravelRoutePayload,
     resolveCommunityImageUrl,
     RouteStopInput,
+    TravelRouteDetailResponse,
     TravelStyle,
 } from "../../core/apiConfig";
 import CommunityImageUploader from "./CommunityImageUploader";
@@ -30,6 +31,7 @@ import {travelStyleLabels} from "./communityLabels";
 type Props = {
     open: boolean,
     token?: string,
+    route?: TravelRouteDetailResponse | null,
     onClose: () => void,
     onPublished: () => void,
 };
@@ -67,7 +69,7 @@ const defaultMeta: Meta = {
 
 const styleOptions = (Object.keys(travelStyleLabels) as TravelStyle[]).map(value => ({value, label: travelStyleLabels[value]}));
 
-const RoutePublishDialog = ({open, token, onClose, onPublished}: Props) => {
+const RoutePublishDialog = ({open, token, route, onClose, onPublished}: Props) => {
     const [meta, setMeta] = useState<Meta>(defaultMeta);
     const [stops, setStops] = useState<DraftStop[]>([]);
     const [submitting, setSubmitting] = useState(false);
@@ -77,10 +79,26 @@ const RoutePublishDialog = ({open, token, onClose, onPublished}: Props) => {
 
     useEffect(() => {
         if (!open) return;
-        setMeta(defaultMeta);
-        setStops([]);
+        setMeta(route ? {
+            title: route.title,
+            summary: route.summary ?? "",
+            style: route.style,
+            cityId: route.cityId ?? "",
+            days: route.days,
+            peopleCount: route.peopleCount,
+            budget: route.budget,
+            imageUrls: route.imageUrls,
+        } : defaultMeta);
+        setStops(route ? route.stops.map(stop => ({
+            attractionId: stop.attractionId,
+            attractionName: stop.attractionName,
+            attractionCity: stop.attractionCity,
+            coverImageUrl: stop.coverImageUrl,
+            dayNumber: stop.dayNumber,
+            note: stop.note ?? "",
+        })) : []);
         setError("");
-    }, [open]);
+    }, [open, route]);
 
     useEffect(() => {
         if (!open || cityOptions.length > 0) return;
@@ -152,7 +170,11 @@ const RoutePublishDialog = ({open, token, onClose, onPublished}: Props) => {
         setSubmitting(true);
         setError("");
         try {
-            await ApiRequests.createTravelRoute(token, payload);
+            if (route) {
+                await ApiRequests.updateTravelRoute(token, route.id, payload);
+            } else {
+                await ApiRequests.createTravelRoute(token, payload);
+            }
             onPublished();
             onClose();
         } catch {

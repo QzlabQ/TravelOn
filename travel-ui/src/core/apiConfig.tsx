@@ -239,6 +239,12 @@ export class ApiRequests {
         });
     }
 
+    static deleteCommunityPost = async (token: string, postId: string) => {
+        return await axiosInstance.delete(`community/posts/${postId}`, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
     static toggleCommunityPostLike = async (token: string, postId: string) => {
         return await axiosInstance.post<CommunityLikeResponse>(`community/posts/${postId}/likes`, {}, {
             headers: {'X-User-Token': token}
@@ -283,6 +289,18 @@ export class ApiRequests {
         });
     }
 
+    static updateAttraction = async (token: string, attractionId: string, payload: CreateAttractionPayload) => {
+        return await axiosInstance.put<AttractionResponse>(`community/attractions/${attractionId}`, payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static deleteAttraction = async (token: string, attractionId: string) => {
+        return await axiosInstance.delete(`community/attractions/${attractionId}`, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
     static getAttraction = async (attractionId: string, token?: string) => {
         return await axiosInstance.get<AttractionDetailResponse>(`community/attractions/${attractionId}`, {
             headers: token ? {'X-User-Token': token} : undefined,
@@ -301,6 +319,18 @@ export class ApiRequests {
 
     static createTravelRoute = async (token: string, payload: CreateTravelRoutePayload) => {
         return await axiosInstance.post<TravelRouteResponse>('community/routes', payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static updateTravelRoute = async (token: string, routeId: string, payload: CreateTravelRoutePayload) => {
+        return await axiosInstance.put<TravelRouteResponse>(`community/routes/${routeId}`, payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static deleteTravelRoute = async (token: string, routeId: string) => {
+        return await axiosInstance.delete(`community/routes/${routeId}`, {
             headers: {'X-User-Token': token},
         });
     }
@@ -330,12 +360,27 @@ export class ApiRequests {
         });
     }
 
-    static listPostComments = async (postId: string) => {
-        return await axiosInstance.get<CommentResponse[]>(`community/posts/${postId}/comments`);
+    static listPostComments = async (postId: string, sort: CommentSort = "likes", token?: string) => {
+        return await axiosInstance.get<CommentResponse[]>(`community/posts/${postId}/comments`, {
+            params: {sort},
+            headers: token ? {'X-User-Token': token} : undefined,
+        });
     }
 
     static createPostComment = async (token: string, postId: string, payload: CreateCommentPayload) => {
         return await axiosInstance.post<CommentResponse>(`community/posts/${postId}/comments`, payload, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static togglePostCommentLike = async (token: string, postId: string, commentId: string) => {
+        return await axiosInstance.post<CommentLikeResponse>(`community/posts/${postId}/comments/${commentId}/likes`, {}, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
+    static deletePostComment = async (token: string, postId: string, commentId: string) => {
+        return await axiosInstance.delete(`community/posts/${postId}/comments/${commentId}`, {
             headers: {'X-User-Token': token},
         });
     }
@@ -718,6 +763,7 @@ export interface UserProfileResponse {
     phone?: string | null,
     avatarUrl?: string | null,
     loyaltyTier?: string | null,
+    role?: 'USER' | 'ADMIN' | string | null,
     createdAt?: string,
     updatedAt?: string,
     lastLoginAt?: string | null,
@@ -977,6 +1023,7 @@ export type FavoriteTargetType = 'POST' | 'ROUTE' | 'ATTRACTION';
 
 export interface CommunityPostsQuery {
     category?: CommunityCategory,
+    cityId?: string,
     keyword?: string,
     page?: number,
     size?: number,
@@ -988,6 +1035,9 @@ export interface CreateCommunityPostPayload {
     content: string,
     category: CommunityCategory,
     destinationCityId?: string,
+    associatedTargetType?: ReviewTargetType,
+    associatedTargetId?: string,
+    associatedTargetName?: string,
     imageUrls?: string[],
 }
 
@@ -998,6 +1048,9 @@ export interface CommunityPostResponse {
     category: CommunityCategory,
     destination?: string | null,
     destinationCityId?: string | null,
+    associatedTargetType?: ReviewTargetType | null,
+    associatedTargetId?: string | null,
+    associatedTargetName?: string | null,
     imageUrls: string[],
     authorUserId: string,
     authorName: string,
@@ -1065,12 +1118,22 @@ export interface CreateCommentPayload {
     content: string,
 }
 
+export type CommentSort = "latest" | "likes";
+
 export interface CommentResponse {
     id: string,
     authorUserId: string,
     authorName: string,
     content: string,
     createdAt: string,
+    likeCount: number,
+    likedByCurrentUser: boolean,
+}
+
+export interface CommentLikeResponse {
+    commentId: string,
+    liked: boolean,
+    likeCount: number,
 }
 
 export interface ReviewLikeResponse {
@@ -1095,7 +1158,7 @@ export interface CommunitySummaryResponse {
 export interface AttractionsQuery {
     cityId?: string,
     keyword?: string,
-    sort?: "popular" | "latest",
+    sort?: "reviewCount" | "rating" | "popular" | "latest",
     page?: number,
     size?: number,
 }

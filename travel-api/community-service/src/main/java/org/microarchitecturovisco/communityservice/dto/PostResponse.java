@@ -2,6 +2,7 @@ package org.microarchitecturovisco.communityservice.dto;
 
 import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
 import org.microarchitecturovisco.communityservice.domain.CommunityPost;
+import org.microarchitecturovisco.communityservice.domain.ReviewTargetType;
 
 import java.time.Instant;
 import java.util.List;
@@ -14,6 +15,9 @@ public record PostResponse(
         CommunityCategory category,
         String destination,
         String destinationCityId,
+        ReviewTargetType associatedTargetType,
+        String associatedTargetId,
+        String associatedTargetName,
         List<String> imageUrls,
         UUID authorUserId,
         String authorName,
@@ -36,6 +40,9 @@ public record PostResponse(
                 post.getCategory(),
                 post.getDestinationCity() != null ? post.getDestinationCity().getRegion() : null,
                 post.getDestinationCity() != null ? post.getDestinationCity().getCityId() : null,
+                post.getAssociatedTargetType(),
+                post.getAssociatedTargetId(),
+                post.getAssociatedTargetName(),
                 post.getImageUrls(),
                 post.getAuthorUserId(),
                 post.getAuthorName(),

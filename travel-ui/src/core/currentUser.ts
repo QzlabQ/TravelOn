@@ -8,6 +8,7 @@ export type UserProfile = {
     phone?: string | null;
     avatarUrl?: string | null;
     loyaltyTier?: string | null;
+    role?: 'USER' | 'ADMIN' | string | null;
     createdAt?: string;
     updatedAt?: string;
     lastLoginAt?: string | null;
@@ -222,6 +223,10 @@ export const getCurrentUserId = () => {
 
 export const getCurrentUserMode = () => {
     return getCurrentUserSession() ? 'ACCOUNT' : 'GUEST';
+};
+
+export const isCurrentUserAdmin = () => {
+    return getCurrentUserSession()?.user.role === 'ADMIN';
 };
 
 export const getBookingPreferences = (): BookingPreferences => {

@@ -9,10 +9,11 @@ import {
     Snackbar,
     TextField,
 } from "@mui/material";
-import {ArrowBack, Landscape, PhotoLibrary, Place, RateReview} from "@mui/icons-material";
-import {Link, useParams} from "react-router-dom";
+import {ArrowBack, Delete, Edit, Landscape, PhotoLibrary, Place, RateReview, Save} from "@mui/icons-material";
+import {Link, useLocation, useNavigate, useParams} from "react-router-dom";
 import {ApiRequests, AttractionDetailResponse, resolveCommunityImageUrl} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
+import {isCurrentUserAdmin} from "../../core/currentUser";
 import CommunityReviewCard from "../components/CommunityReviewCard";
 import CommunityImageUploader from "../components/CommunityImageUploader";
 import FavoriteButton from "../components/FavoriteButton";
@@ -21,7 +22,13 @@ import {formatCommunityTime} from "../components/communityLabels";
 
 const AttractionDetails = () => {
     const {attractionId} = useParams<{attractionId: string}>();
+    const location = useLocation();
+    const navigate = useNavigate();
     const session = useAuthSession();
+    const isAdmin = isCurrentUserAdmin();
+    const returnState = location.state as {returnTo?: string, returnLabel?: string} | null;
+    const returnTo = returnState?.returnTo ?? "/community?tab=SCENIC_SPOT";
+    const returnLabel = returnState?.returnLabel ?? "返回景点列表";
 
     const [detail, setDetail] = useState<AttractionDetailResponse | null>(null);
     const [loading, setLoading] = useState(true);
@@ -33,6 +40,12 @@ const AttractionDetails = () => {
     const [submitting, setSubmitting] = useState(false);
     const [reviewError, setReviewError] = useState("");
     const [toast, setToast] = useState("");
+    const [editing, setEditing] = useState(false);
+    const [editName, setEditName] = useState("");
+    const [editCityId, setEditCityId] = useState("");
+    const [editDescription, setEditDescription] = useState("");
+    const [editImageUrls, setEditImageUrls] = useState<string[]>([]);
+    const [adminBusy, setAdminBusy] = useState(false);
     const lightbox = useLightbox();
 
     const load = useCallback(() => {
@@ -46,6 +59,49 @@ const AttractionDetails = () => {
     }, [attractionId, session?.token]);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (!detail) return;
+        setEditName(detail.name);
+        setEditCityId(detail.cityId ?? "");
+        setEditDescription(detail.description ?? "");
+        setEditImageUrls(detail.imageUrls);
+    }, [detail]);
+
+    const saveAttraction = async () => {
+        if (!session || !detail) return;
+        if (!editName.trim()) {setToast("景点名称不能为空"); return;}
+        setAdminBusy(true);
+        try {
+            await ApiRequests.updateAttraction(session.token, detail.id, {
+                name: editName.trim(),
+                cityId: editCityId.trim() || undefined,
+                description: editDescription.trim() || undefined,
+                imageUrls: editImageUrls,
+            });
+            setToast("景点已保存");
+            setEditing(false);
+            load();
+        } catch {
+            setToast("保存失败，请确认当前账号是管理员");
+        } finally {
+            setAdminBusy(false);
+        }
+    };
+
+    const deleteAttraction = async () => {
+        if (!session || !detail) return;
+        if (!window.confirm("确定删除这个景点？")) return;
+        setAdminBusy(true);
+        try {
+            await ApiRequests.deleteAttraction(session.token, detail.id);
+            navigate(returnTo);
+        } catch {
+            setToast("删除失败，请确认当前账号是管理员");
+        } finally {
+            setAdminBusy(false);
+        }
+    };
 
     const submitReview = async () => {
         if (!session) {setReviewError("请先登录后再评价。"); return;}
@@ -71,8 +127,8 @@ const AttractionDetails = () => {
     if (error || !detail) return (
         <div className="mx-auto max-w-3xl px-6 py-10">
             <Alert severity="error">{error || "景点不存在。"}</Alert>
-            <Link to="/community?tab=SCENIC_SPOT" className="mt-4 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
-                <ArrowBack fontSize="small"/>返回景点列表
+            <Link to={returnTo} className="mt-4 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                <ArrowBack fontSize="small"/>{returnLabel}
             </Link>
         </div>
     );
@@ -101,12 +157,6 @@ const AttractionDetails = () => {
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"/>
                 <div className="pointer-events-none absolute inset-x-0 bottom-0">
                     <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10">
-                        <Link
-                            to="/community?tab=SCENIC_SPOT"
-                            className="pointer-events-auto mb-4 inline-flex items-center gap-1 text-sm text-white/80 hover:text-white"
-                        >
-                            <ArrowBack fontSize="small"/>返回景点列表
-                        </Link>
                         <h1 className="text-4xl font-bold text-white drop-shadow-md md:text-5xl">{detail.name}</h1>
                         <div className="mt-3 flex flex-wrap items-center gap-4 text-white/90">
                             {detail.city && (
@@ -126,6 +176,9 @@ const AttractionDetails = () => {
             </div>
 
             <main className="mx-auto max-w-7xl px-6 py-10 lg:px-10">
+                <Button component={Link} to={returnTo} startIcon={<ArrowBack/>} variant="outlined" sx={{mb: 3}}>
+                    {returnLabel}
+                </Button>
                 <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:gap-12">
                     {/* Left: about, gallery, reviews */}
                     <div className="space-y-8">
@@ -185,6 +238,29 @@ const AttractionDetails = () => {
 
                     {/* Right: rating summary + write review */}
                     <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+                        {isAdmin && (
+                            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h2 className="font-bold text-slate-950">管理员操作</h2>
+                                    <Button size="small" startIcon={<Edit/>} onClick={() => setEditing(value => !value)}>
+                                        {editing ? "收起" : "编辑"}
+                                    </Button>
+                                </div>
+                                {editing && (
+                                    <div className="mt-4 grid gap-3">
+                                        <TextField label="景点名称" size="small" value={editName} onChange={e => setEditName(e.target.value)} fullWidth/>
+                                        <TextField label="城市 ID" size="small" value={editCityId} onChange={e => setEditCityId(e.target.value)} fullWidth/>
+                                        <TextField label="景点介绍" size="small" value={editDescription} onChange={e => setEditDescription(e.target.value)} multiline minRows={4} fullWidth/>
+                                        <CommunityImageUploader token={session?.token} value={editImageUrls} onChange={setEditImageUrls} disabled={adminBusy}/>
+                                        <Button variant="contained" startIcon={<Save/>} disabled={adminBusy} onClick={saveAttraction}>保存景点</Button>
+                                    </div>
+                                )}
+                                <Button color="error" variant="outlined" startIcon={<Delete/>} disabled={adminBusy} onClick={deleteAttraction} fullWidth sx={{mt: 2}}>
+                                    删除景点
+                                </Button>
+                            </section>
+                        )}
+
                         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                             <FavoriteButton
                                 type="ATTRACTION"

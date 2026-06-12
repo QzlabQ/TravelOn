@@ -6,6 +6,7 @@ import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
 import org.microarchitecturovisco.communityservice.domain.ReviewTargetType;
 import org.microarchitecturovisco.communityservice.dto.AttractionDetailResponse;
 import org.microarchitecturovisco.communityservice.dto.AttractionResponse;
+import org.microarchitecturovisco.communityservice.dto.CommentLikeResponse;
 import org.microarchitecturovisco.communityservice.dto.CommentResponse;
 import org.microarchitecturovisco.communityservice.dto.CommunitySummaryResponse;
 import org.microarchitecturovisco.communityservice.dto.CreateAttractionRequest;
@@ -36,9 +37,11 @@ import org.microarchitecturovisco.communityservice.service.TravelRouteService;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -67,13 +70,14 @@ public class CommunityController {
     @GetMapping("/posts")
     public Page<PostResponse> listPosts(
             @RequestParam(required = false) CommunityCategory category,
+            @RequestParam(required = false) String cityId,
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(defaultValue = "latest") String sort,
             @RequestHeader(value = "X-User-Token", required = false) String token
     ) {
-        return communityService.listPosts(category, keyword, page, size, sort, token);
+        return communityService.listPosts(category, cityId, keyword, page, size, sort, token);
     }
 
     @PostMapping("/posts")
@@ -91,6 +95,15 @@ public class CommunityController {
             @RequestHeader(value = "X-User-Token", required = false) String token
     ) {
         return communityService.getPost(postId, token);
+    }
+
+    @DeleteMapping("/posts/{postId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePost(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable UUID postId
+    ) {
+        communityService.deletePost(token, postId);
     }
 
     @PostMapping("/posts/{postId}/likes")
@@ -169,6 +182,24 @@ public class CommunityController {
         return attractionService.getDetail(attractionId, token);
     }
 
+    @PutMapping("/attractions/{attractionId}")
+    public AttractionResponse updateAttraction(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable UUID attractionId,
+            @Valid @RequestBody CreateAttractionRequest request
+    ) {
+        return attractionService.update(token, attractionId, request);
+    }
+
+    @DeleteMapping("/attractions/{attractionId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAttraction(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable UUID attractionId
+    ) {
+        attractionService.delete(token, attractionId);
+    }
+
     @PostMapping("/attractions/{attractionId}/reviews")
     @ResponseStatus(HttpStatus.CREATED)
     public ReviewResponse createAttractionReview(
@@ -210,6 +241,24 @@ public class CommunityController {
         return travelRouteService.getDetail(routeId, token);
     }
 
+    @PutMapping("/routes/{routeId}")
+    public TravelRouteResponse updateRoute(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable UUID routeId,
+            @Valid @RequestBody CreateTravelRouteRequest request
+    ) {
+        return travelRouteService.update(token, routeId, request);
+    }
+
+    @DeleteMapping("/routes/{routeId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRoute(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable UUID routeId
+    ) {
+        travelRouteService.delete(token, routeId);
+    }
+
     @PostMapping("/routes/{routeId}/reviews")
     @ResponseStatus(HttpStatus.CREATED)
     public ReviewResponse createRouteReview(
@@ -242,8 +291,12 @@ public class CommunityController {
     // ── Post comments ───────────────────────────────────────────────────────────
 
     @GetMapping("/posts/{postId}/comments")
-    public List<CommentResponse> listPostComments(@PathVariable UUID postId) {
-        return commentService.listPostComments(postId);
+    public List<CommentResponse> listPostComments(
+            @PathVariable UUID postId,
+            @RequestParam(defaultValue = "likes") String sort,
+            @RequestHeader(value = "X-User-Token", required = false) String token
+    ) {
+        return commentService.listPostComments(postId, sort, token);
     }
 
     @PostMapping("/posts/{postId}/comments")
@@ -254,6 +307,25 @@ public class CommunityController {
             @Valid @RequestBody CreateCommentRequest request
     ) {
         return commentService.addPostComment(token, postId, request);
+    }
+
+    @PostMapping("/posts/{postId}/comments/{commentId}/likes")
+    public CommentLikeResponse togglePostCommentLike(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable UUID postId,
+            @PathVariable UUID commentId
+    ) {
+        return commentService.togglePostCommentLike(token, postId, commentId);
+    }
+
+    @DeleteMapping("/posts/{postId}/comments/{commentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePostComment(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable UUID postId,
+            @PathVariable UUID commentId
+    ) {
+        commentService.deletePostComment(token, postId, commentId);
     }
 
     // ── Review likes ──────────────────────────────────────────────────────────

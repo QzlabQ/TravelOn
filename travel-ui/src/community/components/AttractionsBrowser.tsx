@@ -12,28 +12,29 @@ import {
     Snackbar,
     TextField,
 } from "@mui/material";
-import {Add, Landscape, Place, Search, TrendingUp} from "@mui/icons-material";
+import {Add, Landscape, Place, Search} from "@mui/icons-material";
 import {Link} from "react-router-dom";
 import {ApiRequests, AttractionResponse, resolveCommunityImageUrl} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
 import AttractionPickerDialog from "./AttractionPickerDialog";
 
 type CityOption = {cityId: string, label: string};
-type SortOption = "popular" | "latest";
+type SortOption = "reviewCount" | "rating";
 
 type Props = {
     actionLabel?: string,
     emptyActionLabel?: string,
     onAction?: () => void,
+    refreshKey?: number,
 };
 
-const AttractionsBrowser = ({actionLabel, emptyActionLabel, onAction}: Props) => {
+const AttractionsBrowser = ({actionLabel, emptyActionLabel, onAction, refreshKey = 0}: Props) => {
     const session = useAuthSession();
     const [keyword, setKeyword] = useState("");
     const [debouncedKeyword, setDebouncedKeyword] = useState("");
     const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
     const [selectedCity, setSelectedCity] = useState<CityOption | null>(null);
-    const [sort, setSort] = useState<SortOption>("popular");
+    const [sort, setSort] = useState<SortOption>("reviewCount");
     const [attractions, setAttractions] = useState<AttractionResponse[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -76,7 +77,7 @@ const AttractionsBrowser = ({actionLabel, emptyActionLabel, onAction}: Props) =>
             .then(res => setAttractions(res.data.content))
             .catch(() => setError("景点列表暂时不可用，请确认 community-service 已启动"))
             .finally(() => setLoading(false));
-    }, [selectedCity, debouncedKeyword, sort]);
+    }, [selectedCity, debouncedKeyword, sort, refreshKey]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -97,9 +98,8 @@ const AttractionsBrowser = ({actionLabel, emptyActionLabel, onAction}: Props) =>
     const primaryLabel = actionLabel ?? "添加景点";
 
     const listHeading = useMemo(() => {
-        const scope = selectedCity ? selectedCity.label : "全部城市";
-        return sort === "popular" ? `${scope} · 热门景点` : `${scope} · 最新景点`;
-    }, [selectedCity, sort]);
+        return selectedCity ? selectedCity.label : "全部城市";
+    }, [selectedCity]);
 
     const emptyHint = debouncedKeyword
         ? "没有匹配的景点，换个关键词试试。"
@@ -166,8 +166,8 @@ const AttractionsBrowser = ({actionLabel, emptyActionLabel, onAction}: Props) =>
                         onChange={e => setSort(e.target.value as SortOption)}
                         sx={{width: {xs: "100%", lg: 132}}}
                     >
-                        <MenuItem value="popular">最热门</MenuItem>
-                        <MenuItem value="latest">最新</MenuItem>
+                        <MenuItem value="reviewCount">按评价数</MenuItem>
+                        <MenuItem value="rating">按评分</MenuItem>
                     </TextField>
                     <Button variant="contained" startIcon={<Add/>} onClick={primaryAction} sx={{whiteSpace: "nowrap"}}>
                         {primaryLabel}
@@ -176,7 +176,6 @@ const AttractionsBrowser = ({actionLabel, emptyActionLabel, onAction}: Props) =>
             </section>
 
             <div className="mb-4 mt-5 flex items-center gap-2">
-                {sort === "popular" && <TrendingUp className="text-blue-600" fontSize="small"/>}
                 <h2 className="text-xl font-bold text-slate-950">{listHeading}</h2>
                 {!loading && !error && (
                     <Chip size="small" label={`${attractions.length} 个`} variant="outlined"/>
@@ -198,14 +197,9 @@ const AttractionsBrowser = ({actionLabel, emptyActionLabel, onAction}: Props) =>
             )}
 
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {attractions.map((attraction, index) => (
+                {attractions.map(attraction => (
                     <Link key={attraction.id} to={`/community/attractions/${attraction.id}`} className="group block">
                         <article className="relative h-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition group-hover:border-blue-300 group-hover:shadow-md">
-                            {sort === "popular" && index < 3 && attraction.reviewCount > 0 && (
-                                <span className="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-amber-500/95 px-2 py-0.5 text-xs font-bold text-white shadow">
-                                    <TrendingUp fontSize="inherit"/>热门 #{index + 1}
-                                </span>
-                            )}
                             <div className="h-44 overflow-hidden bg-slate-100">
                                 {attraction.coverImageUrl
                                     ? <img src={resolveCommunityImageUrl(attraction.coverImageUrl)} alt={attraction.name} className="h-full w-full object-cover transition group-hover:scale-105"/>

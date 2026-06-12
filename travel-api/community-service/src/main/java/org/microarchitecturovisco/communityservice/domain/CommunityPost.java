@@ -48,6 +48,15 @@ public class CommunityPost {
     @JoinColumn(name = "destination_city_id", referencedColumnName = "city_id")
     private City destinationCity;
 
+    @Enumerated(EnumType.STRING)
+    private ReviewTargetType associatedTargetType;
+
+    @Column(length = 120)
+    private String associatedTargetId;
+
+    @Column(length = 255)
+    private String associatedTargetName;
+
     @ElementCollection
     @CollectionTable(name = "community_post_images", joinColumns = @JoinColumn(name = "post_id"))
     @Column(name = "image_url", length = 1000)

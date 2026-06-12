@@ -18,12 +18,15 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, UU
     @Query("""
             select post from CommunityPost post left join post.destinationCity c
             where (:category is null or post.category = :category)
-              and (lower(post.title) like lower(concat('%', :keyword, '%'))
-                or lower(post.content) like lower(concat('%', :keyword, '%'))
-                or lower(coalesce(c.region, '')) like lower(concat('%', :keyword, '%')))
+              and (cast(:cityId as string) is null or c.cityId = :cityId)
+              and (cast(:keyword as string) is null
+                or lower(post.title) like concat('%', lower(cast(:keyword as string)), '%')
+                or lower(post.content) like concat('%', lower(cast(:keyword as string)), '%')
+                or lower(coalesce(c.region, '')) like concat('%', lower(cast(:keyword as string)), '%'))
             """)
-    Page<CommunityPost> search(
+    Page<CommunityPost> findFiltered(
             @Param("category") CommunityCategory category,
+            @Param("cityId") String cityId,
             @Param("keyword") String keyword,
             Pageable pageable
     );

@@ -50,4 +50,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     @Query("select coalesce(avg(review.rating), 0) from Review review where review.targetType = :targetType and review.targetId = :targetId")
     double averageRating(@Param("targetType") ReviewTargetType targetType, @Param("targetId") String targetId);
+
+    void deleteByTargetTypeAndTargetId(ReviewTargetType targetType, String targetId);
 }

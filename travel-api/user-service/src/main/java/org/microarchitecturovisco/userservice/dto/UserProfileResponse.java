@@ -13,6 +13,7 @@ public record UserProfileResponse(
         String phone,
         String avatarUrl,
         String loyaltyTier,
+        String role,
         Instant createdAt,
         Instant updatedAt,
         Instant lastLoginAt
@@ -26,6 +27,7 @@ public record UserProfileResponse(
                 user.getPhone(),
                 user.getAvatarUrl(),
                 user.getLoyaltyTier(),
+                user.getRole() == null ? "USER" : user.getRole().name(),
                 user.getCreatedAt(),
                 user.getUpdatedAt(),
                 user.getLastLoginAt()

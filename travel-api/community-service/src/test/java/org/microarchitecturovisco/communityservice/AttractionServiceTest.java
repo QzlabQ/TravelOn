@@ -12,6 +12,7 @@ import org.microarchitecturovisco.communityservice.dto.ReviewResponse;
 import org.microarchitecturovisco.communityservice.dto.UserProfileResponse;
 import org.microarchitecturovisco.communityservice.repository.AttractionRepository;
 import org.microarchitecturovisco.communityservice.repository.CityRepository;
+import org.microarchitecturovisco.communityservice.repository.FavoriteRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.microarchitecturovisco.communityservice.repository.TargetRatingAggregate;
 import org.microarchitecturovisco.communityservice.service.AttractionService;
@@ -42,6 +43,7 @@ class AttractionServiceTest {
     private UserClient userClient;
     private FavoriteService favoriteService;
     private ReviewLikeService reviewLikeService;
+    private FavoriteRepository favoriteRepository;
     private AttractionService attractionService;
     private UserProfileResponse user;
     private City hangzhouCity;
@@ -54,8 +56,9 @@ class AttractionServiceTest {
         userClient = mock(UserClient.class);
         favoriteService = mock(FavoriteService.class);
         reviewLikeService = mock(ReviewLikeService.class);
-        attractionService = new AttractionService(attractionRepository, reviewRepository, cityRepository, userClient, favoriteService, reviewLikeService);
-        user = new UserProfileResponse(UUID.randomUUID(), "lily@example.com", "Lily", "Chen", null, null, "Explorer",
+        favoriteRepository = mock(FavoriteRepository.class);
+        attractionService = new AttractionService(attractionRepository, reviewRepository, cityRepository, userClient, favoriteService, reviewLikeService, favoriteRepository);
+        user = new UserProfileResponse(UUID.randomUUID(), "lily@example.com", "Lily", "Chen", null, null, "Explorer", "USER",
                 Instant.now(), Instant.now(), Instant.now());
         hangzhouCity = City.builder()
                 .id(UUID.randomUUID())
