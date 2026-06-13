@@ -302,6 +302,8 @@ export default function Account() {
         try {
             const response = await ApiRequests.updateCurrentUser(session.token, {
                 ...profileForm,
+                name: profileForm.name.trim(),
+                surname: "",
                 phone: normalizeChinaMainlandPhone(profileForm.phone) || ""
             });
             const nextSession = {...session, user: response.data};
@@ -640,15 +642,14 @@ export default function Account() {
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <TextField
-                                label="名"
+                                label="真实姓名"
                                 value={profileForm.name}
-                                onChange={event => setProfileForm({...profileForm, name: event.target.value})}
-                                fullWidth
-                            />
-                            <TextField
-                                label="姓"
-                                value={profileForm.surname}
-                                onChange={event => setProfileForm({...profileForm, surname: event.target.value})}
+                                onChange={event => setProfileForm({
+                                    ...profileForm,
+                                    name: event.target.value,
+                                    surname: ""
+                                })}
+                                helperText="请填写与证件一致的姓名"
                                 fullWidth
                             />
                             <TextField
