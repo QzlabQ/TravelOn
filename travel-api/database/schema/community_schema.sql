@@ -45,14 +45,16 @@ CREATE TABLE public.community_post (
     associated_target_name character varying(255),
     associated_target_type character varying(255),
     category character varying(255) NOT NULL,
-    content character varying(4000) NOT NULL,
+    content text NOT NULL,
+    content_format character varying(255) NOT NULL DEFAULT 'PLAIN_TEXT',
     created_at timestamp(6) with time zone NOT NULL,
     destination_city_id character varying(255),
     like_count integer NOT NULL,
     title character varying(120) NOT NULL,
     updated_at timestamp(6) with time zone NOT NULL,
     CONSTRAINT community_post_associated_target_type_check CHECK (((associated_target_type)::text = ANY ((ARRAY['SCENIC_SPOT'::character varying, 'ROUTE'::character varying, 'MERCHANT'::character varying, 'HOTEL'::character varying])::text[]))),
-    CONSTRAINT community_post_category_check CHECK (((category)::text = ANY ((ARRAY['TRAVEL_NOTE'::character varying, 'SCENIC_SPOT'::character varying, 'ROUTE'::character varying, 'MERCHANT'::character varying, 'HOTEL'::character varying, 'FOOD'::character varying, 'TRANSPORT'::character varying, 'OTHER'::character varying])::text[])))
+    CONSTRAINT community_post_category_check CHECK (((category)::text = ANY ((ARRAY['TRAVEL_NOTE'::character varying, 'SCENIC_SPOT'::character varying, 'ROUTE'::character varying, 'MERCHANT'::character varying, 'HOTEL'::character varying, 'FOOD'::character varying, 'TRANSPORT'::character varying, 'OTHER'::character varying])::text[]))),
+    CONSTRAINT community_post_content_format_check CHECK (((content_format)::text = ANY ((ARRAY['PLAIN_TEXT'::character varying, 'MARKDOWN'::character varying])::text[])))
 );
 
 

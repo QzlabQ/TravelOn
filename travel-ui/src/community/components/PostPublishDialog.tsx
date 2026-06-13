@@ -15,6 +15,7 @@ import {
     List,
     ListItemButton,
     ListItemText,
+    MenuItem,
     TextField
 } from "@mui/material";
 import {Landscape, Link as LinkIcon, Route as RouteIcon, Search} from "@mui/icons-material";
@@ -30,8 +31,10 @@ import CommunityImageUploader from "./CommunityImageUploader";
 type Props = {
     open: boolean,
     token?: string,
+    initialPayload?: Partial<CreateCommunityPostPayload>,
+    initialDestinationName?: string,
     onClose: () => void,
-    onPublished: () => void,
+    onPublished: (postId?: string) => void,
 };
 
 type CityOption = {cityId: string, label: string};
@@ -41,20 +44,55 @@ type AssociationOption = {id: string, label: string, meta?: string};
 const defaultPayload: CreateCommunityPostPayload = {
     title: "",
     content: "",
+    contentFormat: "PLAIN_TEXT",
     category: "TRAVEL_NOTE",
     destinationCityId: "",
     imageUrls: [],
 };
 
-const PostPublishDialog = ({open, token, onClose, onPublished}: Props) => {
+const buildInitialPayload = (initialPayload?: Partial<CreateCommunityPostPayload>): CreateCommunityPostPayload => ({
+    ...defaultPayload,
+    ...initialPayload,
+    title: initialPayload?.title ?? defaultPayload.title,
+    content: initialPayload?.content ?? defaultPayload.content,
+    contentFormat: initialPayload?.contentFormat ?? defaultPayload.contentFormat,
+    category: initialPayload?.category ?? defaultPayload.category,
+    destinationCityId: initialPayload?.destinationCityId ?? defaultPayload.destinationCityId,
+    imageUrls: initialPayload?.imageUrls ?? defaultPayload.imageUrls,
+});
+
+const normalizeCityName = (value?: string | null) => (value || "").trim().replace(/市$/, "").toLowerCase();
+
+const PostPublishDialog = ({open, token, initialPayload, initialDestinationName, onClose, onPublished}: Props) => {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
-    const [payload, setPayload] = useState<CreateCommunityPostPayload>(defaultPayload);
+    const [payload, setPayload] = useState<CreateCommunityPostPayload>(() => buildInitialPayload(initialPayload));
     const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
     const [pickerType, setPickerType] = useState<AssociationType | null>(null);
 
     const associatedType = payload.associatedTargetType;
     const associatedName = payload.associatedTargetName;
+
+    useEffect(() => {
+        if (open) {
+            setPayload(buildInitialPayload(initialPayload));
+            setError("");
+        }
+    }, [initialPayload, open]);
+
+    useEffect(() => {
+        if (!open || payload.destinationCityId || !initialDestinationName || cityOptions.length === 0) return;
+        const normalizedName = normalizeCityName(initialDestinationName);
+        const matchedCity = cityOptions.find(option => {
+            const normalizedLabel = normalizeCityName(option.label);
+            return normalizedLabel === normalizedName
+                || normalizedLabel.includes(normalizedName)
+                || normalizedName.includes(normalizedLabel);
+        });
+        if (matchedCity) {
+            setPayload(current => ({...current, destinationCityId: matchedCity.cityId}));
+        }
+    }, [cityOptions, initialDestinationName, open, payload.destinationCityId]);
 
     useEffect(() => {
         if (!open || cityOptions.length > 0) return;
@@ -114,9 +152,10 @@ const PostPublishDialog = ({open, token, onClose, onPublished}: Props) => {
         setSubmitting(true);
         setError("");
         try {
-            await ApiRequests.createCommunityPost(token, {
+            const response = await ApiRequests.createCommunityPost(token, {
                 title: payload.title.trim(),
                 content: payload.content.trim(),
+                contentFormat: payload.contentFormat ?? "PLAIN_TEXT",
                 category: "TRAVEL_NOTE",
                 destinationCityId: payload.destinationCityId?.trim() || undefined,
                 associatedTargetType: payload.associatedTargetType,
@@ -124,8 +163,8 @@ const PostPublishDialog = ({open, token, onClose, onPublished}: Props) => {
                 associatedTargetName: payload.associatedTargetName,
                 imageUrls: payload.imageUrls ?? [],
             });
-            setPayload(defaultPayload);
-            onPublished();
+            setPayload(buildInitialPayload(initialPayload));
+            onPublished(response.data.id);
             onClose();
         } catch (e) {
             if (axios.isAxiosError(e)) {
@@ -210,10 +249,20 @@ const PostPublishDialog = ({open, token, onClose, onPublished}: Props) => {
                             onChange={event => setPayload({...payload, content: event.target.value})}
                             multiline
                             minRows={6}
-                            inputProps={{maxLength: 4000}}
+                            inputProps={{maxLength: 20000}}
                             fullWidth
                             required
                         />
+                        <TextField
+                            label="发布格式"
+                            select
+                            value={payload.contentFormat ?? "PLAIN_TEXT"}
+                            onChange={event => setPayload({...payload, contentFormat: event.target.value as CreateCommunityPostPayload["contentFormat"]})}
+                            fullWidth
+                        >
+                            <MenuItem value="PLAIN_TEXT">纯文本</MenuItem>
+                            <MenuItem value="MARKDOWN">Markdown 富文本</MenuItem>
+                        </TextField>
                         <CommunityImageUploader
                             token={token}
                             value={payload.imageUrls ?? []}

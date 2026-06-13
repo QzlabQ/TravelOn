@@ -1037,6 +1037,8 @@ export type ReviewTargetType = 'SCENIC_SPOT' | 'ROUTE' | 'MERCHANT' | 'HOTEL';
 
 export type FavoriteTargetType = 'POST' | 'ROUTE' | 'ATTRACTION';
 
+export type PostContentFormat = 'PLAIN_TEXT' | 'MARKDOWN';
+
 export interface CommunityPostsQuery {
     category?: CommunityCategory,
     cityId?: string,
@@ -1049,6 +1051,7 @@ export interface CommunityPostsQuery {
 export interface CreateCommunityPostPayload {
     title: string,
     content: string,
+    contentFormat?: PostContentFormat,
     category: CommunityCategory,
     destinationCityId?: string,
     associatedTargetType?: ReviewTargetType,
@@ -1061,6 +1064,7 @@ export interface CommunityPostResponse {
     id: string,
     title: string,
     content: string,
+    contentFormat: PostContentFormat,
     category: CommunityCategory,
     destination?: string | null,
     destinationCityId?: string | null,

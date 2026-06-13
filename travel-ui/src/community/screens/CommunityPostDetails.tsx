@@ -9,6 +9,7 @@ import {formatCommunityTime} from "../components/communityLabels";
 import FavoriteButton from "../components/FavoriteButton";
 import ImageCarousel from "../components/ImageCarousel";
 import PostComments from "../components/PostComments";
+import MarkdownPreview from "../../core/components/MarkdownPreview";
 
 const CommunityPostDetails = () => {
     const {postId = ""} = useParams();
@@ -119,7 +120,13 @@ const CommunityPostDetails = () => {
                                             {associatedLabel}：{post.associatedTargetName}
                                         </Button>
                                     )}
-                                    <div className="mt-6 whitespace-pre-wrap text-base leading-8 text-slate-700">{post.content}</div>
+                                    {post.contentFormat === "MARKDOWN" ? (
+                                        <div className="mt-6 text-base leading-8 text-slate-700">
+                                            <MarkdownPreview markdown={post.content}/>
+                                        </div>
+                                    ) : (
+                                        <div className="mt-6 whitespace-pre-wrap text-base leading-8 text-slate-700">{post.content}</div>
+                                    )}
                                 </div>
                             </article>
 

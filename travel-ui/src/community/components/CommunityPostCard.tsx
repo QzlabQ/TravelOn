@@ -4,6 +4,7 @@ import {ArrowForward, Favorite, FavoriteBorder, ImageOutlined, LocationOn} from 
 import {useNavigate} from "react-router-dom";
 import {CommunityPostResponse, resolveCommunityImageUrl} from "../../core/apiConfig";
 import {formatCommunityTime} from "./communityLabels";
+import {stripMarkdown} from "../../core/components/MarkdownPreview";
 
 type Props = {
     post: CommunityPostResponse,
@@ -16,6 +17,7 @@ const CommunityPostCard = ({post, onLike, canLike}: Props) => {
     const coverImage = post.imageUrls?.[0];
     const authorInitial = post.authorName?.trim()?.slice(0, 1) || "旅";
     const detailPath = `/community/posts/${post.id}`;
+    const summary = post.contentFormat === "MARKDOWN" ? stripMarkdown(post.content) : post.content;
 
     const openPost = () => {
         navigate(detailPath);
@@ -56,7 +58,7 @@ const CommunityPostCard = ({post, onLike, canLike}: Props) => {
                         {post.title}
                     </h2>
 
-                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{post.content}</p>
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{summary}</p>
 
                     <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-500">
                         <Avatar sx={{width: 28, height: 28, fontSize: 14}}>{authorInitial}</Avatar>

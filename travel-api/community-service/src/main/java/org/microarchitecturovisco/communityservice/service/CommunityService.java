@@ -6,6 +6,7 @@ import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
 import org.microarchitecturovisco.communityservice.domain.CommunityPost;
 import org.microarchitecturovisco.communityservice.domain.FavoriteTargetType;
 import org.microarchitecturovisco.communityservice.domain.PostLike;
+import org.microarchitecturovisco.communityservice.domain.PostContentFormat;
 import org.microarchitecturovisco.communityservice.domain.Review;
 import org.microarchitecturovisco.communityservice.domain.ReviewTargetType;
 import org.microarchitecturovisco.communityservice.dto.CommunitySummaryResponse;
@@ -89,6 +90,7 @@ public class CommunityService {
                 .id(UUID.randomUUID())
                 .title(request.title().trim())
                 .content(request.content().trim())
+                .contentFormat(request.contentFormat() == null ? PostContentFormat.PLAIN_TEXT : request.contentFormat())
                 .category(request.category())
                 .destinationCity(destinationCity)
                 .associatedTargetType(request.associatedTargetType())

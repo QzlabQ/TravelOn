@@ -37,8 +37,13 @@ public class CommunityPost {
     @Column(nullable = false, length = 120)
     private String title;
 
-    @Column(nullable = false, length = 4000)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private PostContentFormat contentFormat = PostContentFormat.PLAIN_TEXT;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

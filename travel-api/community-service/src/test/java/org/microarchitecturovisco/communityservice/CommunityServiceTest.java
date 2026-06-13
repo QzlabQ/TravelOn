@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.microarchitecturovisco.communityservice.domain.City;
 import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
 import org.microarchitecturovisco.communityservice.domain.CommunityPost;
+import org.microarchitecturovisco.communityservice.domain.PostContentFormat;
 import org.microarchitecturovisco.communityservice.domain.PostLike;
 import org.microarchitecturovisco.communityservice.domain.Review;
 import org.microarchitecturovisco.communityservice.domain.ReviewTargetType;
@@ -94,6 +95,7 @@ class CommunityServiceTest {
         PostResponse response = communityService.createPost("token", new CreatePostRequest(
                 "Shanghai weekend",
                 "A compact route with museums and food.",
+                null,
                 CommunityCategory.TRAVEL_NOTE,
                 "SHA",
                 ReviewTargetType.ROUTE,
@@ -103,6 +105,7 @@ class CommunityServiceTest {
         ));
 
         assertThat(response.title()).isEqualTo("Shanghai weekend");
+        assertThat(response.contentFormat()).isEqualTo(PostContentFormat.PLAIN_TEXT);
         assertThat(response.destination()).isEqualTo("Shanghai");
         assertThat(response.destinationCityId()).isEqualTo("SHA");
         assertThat(response.associatedTargetType()).isEqualTo(ReviewTargetType.ROUTE);
@@ -114,12 +117,35 @@ class CommunityServiceTest {
     }
 
     @Test
+    void createsMarkdownPostWithLongContent() {
+        when(userClient.requireUser("token")).thenReturn(user);
+        when(postRepository.save(any(CommunityPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        String markdown = "# Shanghai plan\n\n" + "- Museum\n".repeat(1200);
+
+        PostResponse response = communityService.createPost("token", new CreatePostRequest(
+                "AI plan",
+                markdown,
+                PostContentFormat.MARKDOWN,
+                CommunityCategory.TRAVEL_NOTE,
+                null,
+                null,
+                null,
+                null,
+                List.of()
+        ));
+
+        assertThat(response.content()).isEqualTo(markdown.trim());
+        assertThat(response.contentFormat()).isEqualTo(PostContentFormat.MARKDOWN);
+    }
+
+    @Test
     void rejectsPostCreationWithoutAuthenticatedUser() {
         when(userClient.requireUser("bad-token")).thenThrow(new ResponseStatusException(UNAUTHORIZED, "Invalid session token"));
 
         assertThatThrownBy(() -> communityService.createPost("bad-token", new CreatePostRequest(
                 "Title",
                 "Content",
+                null,
                 CommunityCategory.TRAVEL_NOTE,
                 null,
                 null,

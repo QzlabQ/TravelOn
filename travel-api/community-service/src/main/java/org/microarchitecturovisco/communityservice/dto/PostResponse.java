@@ -2,6 +2,7 @@ package org.microarchitecturovisco.communityservice.dto;
 
 import org.microarchitecturovisco.communityservice.domain.CommunityCategory;
 import org.microarchitecturovisco.communityservice.domain.CommunityPost;
+import org.microarchitecturovisco.communityservice.domain.PostContentFormat;
 import org.microarchitecturovisco.communityservice.domain.ReviewTargetType;
 
 import java.time.Instant;
@@ -12,6 +13,7 @@ public record PostResponse(
         UUID id,
         String title,
         String content,
+        PostContentFormat contentFormat,
         CommunityCategory category,
         String destination,
         String destinationCityId,
@@ -37,6 +39,7 @@ public record PostResponse(
                 post.getId(),
                 post.getTitle(),
                 post.getContent(),
+                post.getContentFormat(),
                 post.getCategory(),
                 post.getDestinationCity() != null ? post.getDestinationCity().getRegion() : null,
                 post.getDestinationCity() != null ? post.getDestinationCity().getCityId() : null,
