@@ -45,6 +45,17 @@ public class AttractionService {
     private final ReviewLikeService reviewLikeService;
     private final FavoriteRepository favoriteRepository;
 
+    /**
+     * Official built-in attractions seeded into the database. These are read-only:
+     * they cannot be edited or deleted, even by an administrator.
+     */
+    private static final java.util.Set<UUID> PROTECTED_ATTRACTION_IDS = java.util.Set.of(
+            UUID.fromString("f0000000-0000-4000-a000-000000000001"),
+            UUID.fromString("f0000000-0000-4000-a000-000000000002"),
+            UUID.fromString("f0000000-0000-4000-a000-000000000003"),
+            UUID.fromString("f0000000-0000-4000-a000-000000000004")
+    );
+
     public Page<AttractionResponse> list(String cityId, String keyword, String sort, int page, int size) {
         int safePage = Math.max(0, page);
         int safeSize = Math.min(Math.max(size, 1), 50);
@@ -147,6 +158,7 @@ public class AttractionService {
     @Transactional
     public AttractionResponse update(String token, UUID id, CreateAttractionRequest request) {
         userClient.requireAdmin(token);
+        requireEditable(id);
         Attraction attraction = requireAttraction(id);
         String normalizedCityId = normalizeOptional(request.cityId());
         City city = normalizedCityId != null ? cityRepository.findByCityId(normalizedCityId).orElse(null) : null;
@@ -170,6 +182,7 @@ public class AttractionService {
     @Transactional
     public void delete(String token, UUID id) {
         userClient.requireAdmin(token);
+        requireEditable(id);
         Attraction attraction = requireAttraction(id);
         String targetId = attraction.getId().toString();
         reviewRepository.deleteByTargetTypeAndTargetId(ReviewTargetType.SCENIC_SPOT, targetId);
@@ -195,6 +208,13 @@ public class AttractionService {
                 .build();
 
         return ReviewResponse.from(reviewRepository.save(review));
+    }
+
+    private void requireEditable(UUID id) {
+        if (PROTECTED_ATTRACTION_IDS.contains(id)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "该景点为官方精选景点，不可修改或删除");
+        }
     }
 
     private Attraction requireAttraction(UUID id) {

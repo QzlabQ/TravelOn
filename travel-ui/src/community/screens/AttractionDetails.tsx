@@ -15,6 +15,7 @@ import {Link, useLocation, useNavigate, useParams} from "react-router-dom";
 import {ApiRequests, AttractionDetailResponse, resolveCommunityImageUrl} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
 import {isCurrentUserAdmin} from "../../core/currentUser";
+import {isFeaturedAttraction} from "../featuredAttractions";
 import CommunityReviewCard from "../components/CommunityReviewCard";
 import CommunityImageUploader from "../components/CommunityImageUploader";
 import FavoriteButton from "../components/FavoriteButton";
@@ -255,7 +256,13 @@ const AttractionDetails = () => {
 
                     {/* Right: rating summary + write review */}
                     <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-                        {isAdmin && (
+                        {isAdmin && isFeaturedAttraction(detail.id) && (
+                            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <h2 className="font-bold text-slate-950">管理员操作</h2>
+                                <p className="mt-2 text-sm text-slate-500">该景点为官方精选景点，不可编辑或删除。</p>
+                            </section>
+                        )}
+                        {isAdmin && !isFeaturedAttraction(detail.id) && (
                             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                                 <div className="flex items-center justify-between gap-3">
                                     <h2 className="font-bold text-slate-950">管理员操作</h2>
