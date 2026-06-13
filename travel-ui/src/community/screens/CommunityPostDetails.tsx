@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useState} from "react";
 import {Alert, Box, Button, Chip, LinearProgress, Snackbar} from "@mui/material";
 import {ArrowBack, Delete, Favorite, FavoriteBorder, Landscape, LocationOn, Route as RouteIcon} from "@mui/icons-material";
-import {Link, useNavigate, useParams} from "react-router-dom";
+import {Link, useLocation, useNavigate, useParams} from "react-router-dom";
 import {ApiRequests, CommunityPostResponse} from "../../core/apiConfig";
 import {useAuthSession} from "../../core/useAuthSession";
 import {isCurrentUserAdmin} from "../../core/currentUser";
@@ -12,9 +12,13 @@ import PostComments from "../components/PostComments";
 
 const CommunityPostDetails = () => {
     const {postId = ""} = useParams();
+    const location = useLocation();
     const navigate = useNavigate();
     const session = useAuthSession();
     const isAdmin = isCurrentUserAdmin();
+    const returnState = location.state as {returnTo?: string, returnLabel?: string} | null;
+    const returnTo = returnState?.returnTo ?? "/community";
+    const returnLabel = returnState?.returnLabel ?? "返回社区";
     const [post, setPost] = useState<CommunityPostResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -57,13 +61,15 @@ const CommunityPostDetails = () => {
         setAdminBusy(true);
         try {
             await ApiRequests.deleteCommunityPost(session.token, post.id);
-            navigate("/community");
+            navigate(returnTo);
         } catch {
-            setToast("删除失败，请确认当前账号是管理员");
+            setToast("删除失败，请稍后重试");
         } finally {
             setAdminBusy(false);
         }
     };
+
+    const canManagePost = Boolean(session && post && (isAdmin || session.user.id === post.authorUserId));
 
     const associatedPath = post?.associatedTargetType === "ROUTE"
         ? `/community/routes/${post.associatedTargetId}`
@@ -84,8 +90,8 @@ const CommunityPostDetails = () => {
             />
 
             <main className="mx-auto max-w-7xl px-6 py-8">
-                <Button component={Link} to="/community" startIcon={<ArrowBack/>} variant="outlined">
-                    返回社区
+                <Button component={Link} to={returnTo} startIcon={<ArrowBack/>} variant="outlined">
+                    {returnLabel}
                 </Button>
 
                 {loading && <Box sx={{height: 5}} className="mt-5"><LinearProgress/></Box>}
@@ -130,9 +136,9 @@ const CommunityPostDetails = () => {
                         </div>
 
                         <aside className="space-y-5 lg:sticky lg:top-24">
-                            {isAdmin && (
+                            {canManagePost && (
                                 <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                                    <h2 className="text-lg font-bold text-slate-950">管理员操作</h2>
+                                    <h2 className="text-lg font-bold text-slate-950">{isAdmin && post.authorUserId !== session?.user.id ? "管理员操作" : "管理我的帖子"}</h2>
                                     <Button
                                         fullWidth
                                         color="error"

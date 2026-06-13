@@ -103,25 +103,11 @@ public class TravelRouteService {
     public TravelRouteResponse create(String token, CreateTravelRouteRequest request) {
         UserProfileResponse user = userClient.requireUser(token);
         String normalizedCityId = normalizeOptional(request.cityId());
-        City city = normalizedCityId != null ? cityRepository.findByCityId(normalizedCityId).orElse(null) : null;
+        City city = requireCity(normalizedCityId);
 
-        // Build snapshot stops; every attraction must already exist in the community.
-        List<RouteStop> stops = new ArrayList<>();
-        for (CreateRouteStopRequest stopRequest : request.stops()) {
-            Attraction attraction = attractionRepository.findById(stopRequest.attractionId())
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST, "Referenced attraction not found: " + stopRequest.attractionId()));
-            stops.add(RouteStop.builder()
-                    .id(UUID.randomUUID())
-                    .attractionId(attraction.getId())
-                    .attractionName(attraction.getName())
-                    .attractionCity(attraction.getCity() != null ? attraction.getCity().getRegion() : null)
-                    .coverImageUrl(attraction.getCoverImageUrl())
-                    .dayNumber(stopRequest.dayNumber())
-                    .sortOrder(stopRequest.sortOrder())
-                    .note(normalizeOptional(stopRequest.note()))
-                    .build());
-        }
+        // Build snapshot stops; every attraction must already exist in the community
+        // and belong to the route's city.
+        List<RouteStop> stops = buildStops(request.stops(), normalizedCityId);
 
         List<String> images = CommunityImages.normalize(request.imageUrls());
         String cover = images.isEmpty()
@@ -162,44 +148,9 @@ public class TravelRouteService {
     }
 
     @Transactional
-    public TravelRouteResponse update(String token, UUID id, CreateTravelRouteRequest request) {
-        userClient.requireAdmin(token);
-        TravelRoute route = requireRoute(id);
-        String normalizedCityId = normalizeOptional(request.cityId());
-        City city = normalizedCityId != null ? cityRepository.findByCityId(normalizedCityId).orElse(null) : null;
-
-        List<RouteStop> stops = buildStops(request.stops());
-        List<String> images = CommunityImages.normalize(request.imageUrls());
-        String cover = images.isEmpty()
-                ? stops.stream().map(RouteStop::getCoverImageUrl).filter(c -> c != null).findFirst().orElse(null)
-                : images.get(0);
-
-        route.setTitle(request.title().trim());
-        route.setSummary(normalizeOptional(request.summary()));
-        route.setDays(request.days());
-        route.setPeopleCount(request.peopleCount());
-        route.setBudget(request.budget());
-        route.setStyle(request.style());
-        route.setDestinationCity(city);
-        route.setImageUrls(images);
-        route.setCoverImageUrl(cover);
-        route.getStops().clear();
-        stops.forEach(stop -> {
-            stop.setRoute(route);
-            route.getStops().add(stop);
-        });
-
-        TravelRoute saved = routeRepository.save(route);
-        String targetId = saved.getId().toString();
-        double avg = reviewRepository.averageRating(TARGET, targetId);
-        long cnt = reviewRepository.countByTargetTypeAndTargetId(TARGET, targetId);
-        return TravelRouteResponse.from(saved, avg, cnt);
-    }
-
-    @Transactional
     public void delete(String token, UUID id) {
-        userClient.requireAdmin(token);
         TravelRoute route = requireRoute(id);
+        userClient.requireOwnerOrAdmin(token, route.getAuthorUserId());
         String targetId = route.getId().toString();
         reviewRepository.deleteByTargetTypeAndTargetId(TARGET, targetId);
         favoriteRepository.deleteByTypeAndTargetId(FavoriteTargetType.ROUTE, targetId);
@@ -231,12 +182,25 @@ public class TravelRouteService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Travel route not found"));
     }
 
-    private List<RouteStop> buildStops(List<CreateRouteStopRequest> stopRequests) {
+    private City requireCity(String normalizedCityId) {
+        if (normalizedCityId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Travel route must specify a city");
+        }
+        return cityRepository.findByCityId(normalizedCityId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown city: " + normalizedCityId));
+    }
+
+    private List<RouteStop> buildStops(List<CreateRouteStopRequest> stopRequests, String requiredCityId) {
         List<RouteStop> stops = new ArrayList<>();
         for (CreateRouteStopRequest stopRequest : stopRequests) {
             Attraction attraction = attractionRepository.findById(stopRequest.attractionId())
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.BAD_REQUEST, "Referenced attraction not found: " + stopRequest.attractionId()));
+            String attractionCityId = attraction.getCity() != null ? attraction.getCity().getCityId() : null;
+            if (!requiredCityId.equals(attractionCityId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Attraction \"" + attraction.getName() + "\" does not belong to the route city");
+            }
             stops.add(RouteStop.builder()
                     .id(UUID.randomUUID())
                     .attractionId(attraction.getId())

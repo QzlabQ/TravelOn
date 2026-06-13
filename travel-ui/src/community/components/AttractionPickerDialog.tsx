@@ -35,11 +35,17 @@ type Props = {
      * used by the "添加景点" action.
      */
     mode?: "pick" | "create",
+    /**
+     * When set, restricts both search and creation to this city. Used by route
+     * publishing so every stop belongs to the route's city (issue #7).
+     */
+    lockedCityId?: string | null,
+    lockedCityLabel?: string | null,
 };
 
 const emptyCreate: CreateAttractionPayload = {name: "", cityId: "", description: "", imageUrls: []};
 
-const AttractionPickerDialog = ({open, token, onPick, onClose, mode = "pick"}: Props) => {
+const AttractionPickerDialog = ({open, token, onPick, onClose, mode = "pick", lockedCityId, lockedCityLabel}: Props) => {
     const createOnly = mode === "create";
     const [keyword, setKeyword] = useState("");
     const [results, setResults] = useState<AttractionResponse[]>([]);
@@ -59,10 +65,10 @@ const AttractionPickerDialog = ({open, token, onPick, onClose, mode = "pick"}: P
         setShowCreate(createOnly);
         setError("");
         if (createOnly) {
-            setCreatePayload(emptyCreate);
+            setCreatePayload({...emptyCreate, cityId: lockedCityId ?? ""});
             setKeyword("");
         }
-    }, [open, createOnly]);
+    }, [open, createOnly, lockedCityId]);
 
     // 打开时加载城市列表
     useEffect(() => {
@@ -85,18 +91,18 @@ const AttractionPickerDialog = ({open, token, onPick, onClose, mode = "pick"}: P
         if (!open || showCreate) return;
         const timer = setTimeout(() => {
             setSearching(true);
-            ApiRequests.listAttractions({keyword: keyword.trim() || undefined, page: 0, size: 10})
+            ApiRequests.listAttractions({keyword: keyword.trim() || undefined, cityId: lockedCityId || undefined, page: 0, size: 10})
                 .then(res => setResults(res.data.content))
                 .catch(() => setResults([]))
                 .finally(() => setSearching(false));
         }, 300);
         return () => clearTimeout(timer);
-    }, [keyword, open, showCreate]);
+    }, [keyword, open, showCreate, lockedCityId]);
 
     const handleClose = () => {
         setKeyword("");
         setShowCreate(createOnly);
-        setCreatePayload(emptyCreate);
+        setCreatePayload({...emptyCreate, cityId: lockedCityId ?? ""});
         setError("");
         onClose();
     };
@@ -226,24 +232,35 @@ const AttractionPickerDialog = ({open, token, onPick, onClose, mode = "pick"}: P
                                 fullWidth required size="small"
                                 autoFocus
                             />
-                            <Autocomplete
-                                options={cityOptions}
-                                getOptionLabel={o => o.label}
-                                isOptionEqualToValue={(o, v) => o.cityId === v.cityId}
-                                value={cityOptions.find(o => o.cityId === createPayload.cityId) ?? null}
-                                onChange={(_, value) => setCreatePayload({...createPayload, cityId: value?.cityId ?? ""})}
-                                renderInput={params => (
-                                    <TextField
-                                        {...params}
-                                        label="城市"
-                                        size="small"
-                                        fullWidth
-                                        placeholder="请选择城市"
-                                    />
-                                )}
-                                noOptionsText="无匹配城市"
-                                size="small"
-                            />
+                            {lockedCityId ? (
+                                <TextField
+                                    label="城市"
+                                    size="small"
+                                    fullWidth
+                                    disabled
+                                    value={lockedCityLabel ?? (cityOptions.find(o => o.cityId === lockedCityId)?.label ?? lockedCityId)}
+                                    helperText="景点城市需与线路城市一致"
+                                />
+                            ) : (
+                                <Autocomplete
+                                    options={cityOptions}
+                                    getOptionLabel={o => o.label}
+                                    isOptionEqualToValue={(o, v) => o.cityId === v.cityId}
+                                    value={cityOptions.find(o => o.cityId === createPayload.cityId) ?? null}
+                                    onChange={(_, value) => setCreatePayload({...createPayload, cityId: value?.cityId ?? ""})}
+                                    renderInput={params => (
+                                        <TextField
+                                            {...params}
+                                            label="城市"
+                                            size="small"
+                                            fullWidth
+                                            placeholder="请选择城市"
+                                        />
+                                    )}
+                                    noOptionsText="无匹配城市"
+                                    size="small"
+                                />
+                            )}
                             <TextField
                                 label="简介（可选）"
                                 value={createPayload.description}

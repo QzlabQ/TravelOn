@@ -14,7 +14,6 @@ import {
     AttachMoney,
     CalendarMonth,
     Delete,
-    Edit,
     Groups,
     Landscape,
     Place,
@@ -30,7 +29,6 @@ import CommunityImageUploader from "../components/CommunityImageUploader";
 import FavoriteButton from "../components/FavoriteButton";
 import ImageLightbox, {useLightbox} from "../components/ImageLightbox";
 import {formatCommunityTime, travelStyleLabels} from "../components/communityLabels";
-import RoutePublishDialog from "../components/RoutePublishDialog";
 
 const RouteDetails = () => {
     const {routeId} = useParams<{routeId: string}>();
@@ -52,7 +50,6 @@ const RouteDetails = () => {
     const [submitting, setSubmitting] = useState(false);
     const [reviewError, setReviewError] = useState("");
     const [toast, setToast] = useState("");
-    const [editOpen, setEditOpen] = useState(false);
     const [adminBusy, setAdminBusy] = useState(false);
     const lightbox = useLightbox();
 
@@ -101,6 +98,8 @@ const RouteDetails = () => {
         }
     };
 
+    const isOwner = Boolean(session && detail && session.user.id === detail.authorUserId);
+
     const deleteRoute = async () => {
         if (!session || !detail) return;
         if (!window.confirm("确定删除这条线路？")) return;
@@ -109,7 +108,7 @@ const RouteDetails = () => {
             await ApiRequests.deleteTravelRoute(session.token, detail.id);
             navigate(returnTo);
         } catch {
-            setToast("删除失败，请确认当前账号是管理员");
+            setToast("删除失败，请稍后重试");
         } finally {
             setAdminBusy(false);
         }
@@ -280,7 +279,7 @@ const RouteDetails = () => {
                             ) : (
                                 <div className="grid gap-4 xl:grid-cols-2">
                                     {detail.latestReviews.map(review => (
-                                        <CommunityReviewCard key={review.id} review={review}/>
+                                        <CommunityReviewCard key={review.id} review={review} onDeleted={() => { setToast("评价已删除"); load(); }}/>
                                     ))}
                                 </div>
                             )}
@@ -289,13 +288,11 @@ const RouteDetails = () => {
 
                     {/* Right: rating summary + write review */}
                     <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-                        {isAdmin && (
+                        {(isOwner || isAdmin) && (
                             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                                <h2 className="font-bold text-slate-950">管理员操作</h2>
+                                <h2 className="font-bold text-slate-950">{isOwner ? "管理我的线路" : "管理员操作"}</h2>
+                                {/* Published routes cannot be edited by anyone — only deleted. */}
                                 <div className="mt-3 grid gap-3">
-                                    <Button variant="outlined" startIcon={<Edit/>} onClick={() => setEditOpen(true)}>
-                                        编辑线路
-                                    </Button>
                                     <Button color="error" variant="outlined" startIcon={<Delete/>} disabled={adminBusy} onClick={deleteRoute}>
                                         删除线路
                                     </Button>
@@ -381,16 +378,6 @@ const RouteDetails = () => {
                 open={lightbox.open}
                 onClose={lightbox.close}
                 onIndexChange={lightbox.setIndex}
-            />
-            <RoutePublishDialog
-                open={editOpen}
-                token={session?.token}
-                route={detail}
-                onClose={() => setEditOpen(false)}
-                onPublished={() => {
-                    setToast("线路已保存");
-                    load();
-                }}
             />
         </div>
     );

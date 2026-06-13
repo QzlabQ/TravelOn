@@ -6,8 +6,8 @@
 ## 1. 停止并移除所有容器
 `docker compose down`
 
-## 2. 删除三类持久化数据
-`Remove-Item -Recurse -Force .\data\postgres, .\data\mongo, .\data\rabbitmq`
+## 2. 删除持久化数据
+`Remove-Item -Recurse -Force .\data\postgres`
 
 ## 3. 重建镜像并后台启动
 `docker compose up -d --build`

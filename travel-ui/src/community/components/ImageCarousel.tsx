@@ -34,7 +34,7 @@ const ImageCarousel = ({images, alt}: Props) => {
                 src={resolveCommunityImageUrl(images[safeIndex])}
                 alt={alt}
                 onClick={() => lightbox.openAt(safeIndex)}
-                className="h-[420px] w-full cursor-zoom-in object-cover md:h-[520px]"
+                className="h-[420px] w-full cursor-zoom-in object-contain md:h-[520px]"
             />
 
             {hasMultiple && (

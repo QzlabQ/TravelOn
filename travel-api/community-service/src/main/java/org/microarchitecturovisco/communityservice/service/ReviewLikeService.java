@@ -51,6 +51,16 @@ public class ReviewLikeService {
                 });
     }
 
+    /** Deletes a review (and its likes). Allowed for the review author or an admin. */
+    @Transactional
+    public void delete(String token, Long reviewId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found"));
+        userClient.requireOwnerOrAdmin(token, review.getAuthorUserId());
+        reviewLikeRepository.deleteByReviewId(reviewId);
+        reviewRepository.delete(review);
+    }
+
     /** Maps reviews to responses, filling like count and whether {@code currentUserId} liked each. */
     public List<ReviewResponse> toResponses(List<Review> reviews, UUID currentUserId) {
         if (reviews.isEmpty()) {

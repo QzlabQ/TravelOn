@@ -40,6 +40,7 @@ type DraftStop = {
     attractionId: string,
     attractionName: string,
     attractionCity?: string | null,
+    attractionCityId?: string | null,
     coverImageUrl?: string | null,
     dayNumber: number,
     note: string,
@@ -93,6 +94,7 @@ const RoutePublishDialog = ({open, token, route, onClose, onPublished}: Props) =
             attractionId: stop.attractionId,
             attractionName: stop.attractionName,
             attractionCity: stop.attractionCity,
+            attractionCityId: route.cityId,
             coverImageUrl: stop.coverImageUrl,
             dayNumber: stop.dayNumber,
             note: stop.note ?? "",
@@ -118,17 +120,27 @@ const RoutePublishDialog = ({open, token, route, onClose, onPublished}: Props) =
     const dayList = useMemo(() => Array.from({length: Math.max(1, meta.days)}, (_, i) => i + 1), [meta.days]);
 
     const handlePick = (attraction: AttractionResponse) => {
+        // Defensive: the picker is already constrained to the route city, but guard anyway.
+        if (meta.cityId && attraction.cityId && attraction.cityId !== meta.cityId) {
+            setError("所选景点必须与线路城市一致。");
+            setPickerDay(null);
+            return;
+        }
         const day = pickerDay ?? 1;
         setStops(current => [...current, {
             attractionId: attraction.id,
             attractionName: attraction.name,
             attractionCity: attraction.city,
+            attractionCityId: attraction.cityId,
             coverImageUrl: attraction.coverImageUrl,
             dayNumber: day,
             note: "",
         }]);
+        setError("");
         setPickerDay(null);
     };
+
+    const cityLabel = cityOptions.find(o => o.cityId === meta.cityId)?.label ?? null;
 
     const removeStop = (index: number) => setStops(current => current.filter((_, i) => i !== index));
 
@@ -140,7 +152,11 @@ const RoutePublishDialog = ({open, token, route, onClose, onPublished}: Props) =
     const submit = async () => {
         if (!token) {setError("请先登录后再创建线路。"); return;}
         if (!meta.title.trim()) {setError("线路标题不能为空。"); return;}
+        if (!meta.cityId.trim()) {setError("请先选择线路城市。"); return;}
         if (stops.length === 0) {setError("请至少添加一个景点。"); return;}
+        if (stops.some(stop => stop.attractionCityId && stop.attractionCityId !== meta.cityId)) {
+            setError("所有景点都必须与线路城市一致。"); return;
+        }
 
         // Build ordered stops; sortOrder is the position within each day.
         const dayCounters: Record<number, number> = {};
@@ -214,9 +230,16 @@ const RoutePublishDialog = ({open, token, route, onClose, onPublished}: Props) =
                             getOptionLabel={o => o.label}
                             isOptionEqualToValue={(o, v) => o.cityId === v.cityId}
                             value={cityOptions.find(o => o.cityId === meta.cityId) ?? null}
-                            onChange={(_, value) => setMeta({...meta, cityId: value?.cityId ?? ""})}
+                            onChange={(_, value) => {
+                                const nextCityId = value?.cityId ?? "";
+                                // Switching cities invalidates already-added stops, which must match the city.
+                                if (nextCityId !== meta.cityId && stops.length > 0) {
+                                    setStops([]);
+                                }
+                                setMeta(current => ({...current, cityId: nextCityId}));
+                            }}
                             renderInput={params => (
-                                <TextField {...params} label="目的地城市" placeholder="请选择（可选）" fullWidth/>
+                                <TextField {...params} label="目的地城市" placeholder="请选择城市" required fullWidth/>
                             )}
                             noOptionsText="无匹配城市"
                         />
@@ -269,7 +292,10 @@ const RoutePublishDialog = ({open, token, route, onClose, onPublished}: Props) =
 
                     <Divider textAlign="left" sx={{mt: 1}}>每日行程</Divider>
                     <p className="-mt-2 text-xs text-slate-500">
-                        逐天添加景点，景点只能引用社区内已存在的条目（也可在选择框内即时新建）。
+                        逐天添加景点，只能引用社区内已存在的景点。
+                        {meta.cityId
+                            ? ` 所有景点须位于「${cityLabel ?? ""}」。`
+                            : " 请先在上方选择线路城市，景点必须与线路城市一致。"}
                     </p>
 
                     {dayList.map(day => {
@@ -280,7 +306,7 @@ const RoutePublishDialog = ({open, token, route, onClose, onPublished}: Props) =
                             <section key={day} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                                 <div className="mb-3 flex items-center justify-between">
                                     <h4 className="text-sm font-bold text-slate-800">第 {day} 天</h4>
-                                    <Button size="small" startIcon={<Add/>} onClick={() => setPickerDay(day)}>
+                                    <Button size="small" startIcon={<Add/>} onClick={() => setPickerDay(day)} disabled={!meta.cityId}>
                                         添加景点
                                     </Button>
                                 </div>
@@ -341,6 +367,8 @@ const RoutePublishDialog = ({open, token, route, onClose, onPublished}: Props) =
                 open={pickerDay !== null}
                 token={token}
                 mode="pick"
+                lockedCityId={meta.cityId || undefined}
+                lockedCityLabel={cityLabel}
                 onPick={handlePick}
                 onClose={() => setPickerDay(null)}
             />

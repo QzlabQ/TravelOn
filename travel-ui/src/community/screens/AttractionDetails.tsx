@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useState} from "react";
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Chip,
@@ -46,7 +47,23 @@ const AttractionDetails = () => {
     const [editDescription, setEditDescription] = useState("");
     const [editImageUrls, setEditImageUrls] = useState<string[]>([]);
     const [adminBusy, setAdminBusy] = useState(false);
+    const [cityOptions, setCityOptions] = useState<{cityId: string, label: string}[]>([]);
     const lightbox = useLightbox();
+
+    useEffect(() => {
+        if (!isAdmin || cityOptions.length > 0) return;
+        ApiRequests.getHotelDestinations()
+            .then(res => {
+                const seen = new Set<string>();
+                const opts = res.data
+                    .filter(d => d.cityId && d.region)
+                    .filter(d => { if (seen.has(d.cityId)) return false; seen.add(d.cityId); return true; })
+                    .map(d => ({cityId: d.cityId, label: d.region}))
+                    .sort((a, b) => a.label.localeCompare(b.label, "zh"));
+                setCityOptions(opts);
+            })
+            .catch(() => {});
+    }, [isAdmin, cityOptions.length]);
 
     const load = useCallback(() => {
         if (!attractionId) return;
@@ -229,7 +246,7 @@ const AttractionDetails = () => {
                             ) : (
                                 <div className="grid gap-4 xl:grid-cols-2">
                                     {detail.latestReviews.map(review => (
-                                        <CommunityReviewCard key={review.id} review={review}/>
+                                        <CommunityReviewCard key={review.id} review={review} onDeleted={() => { setToast("评价已删除"); load(); }}/>
                                     ))}
                                 </div>
                             )}
@@ -249,7 +266,16 @@ const AttractionDetails = () => {
                                 {editing && (
                                     <div className="mt-4 grid gap-3">
                                         <TextField label="景点名称" size="small" value={editName} onChange={e => setEditName(e.target.value)} fullWidth/>
-                                        <TextField label="城市 ID" size="small" value={editCityId} onChange={e => setEditCityId(e.target.value)} fullWidth/>
+                                        <Autocomplete
+                                            options={cityOptions}
+                                            size="small"
+                                            getOptionLabel={o => o.label}
+                                            isOptionEqualToValue={(o, v) => o.cityId === v.cityId}
+                                            value={cityOptions.find(o => o.cityId === editCityId) ?? null}
+                                            onChange={(_, value) => setEditCityId(value?.cityId ?? "")}
+                                            renderInput={params => <TextField {...params} label="城市" placeholder="请选择城市"/>}
+                                            noOptionsText="无匹配城市"
+                                        />
                                         <TextField label="景点介绍" size="small" value={editDescription} onChange={e => setEditDescription(e.target.value)} multiline minRows={4} fullWidth/>
                                         <CommunityImageUploader token={session?.token} value={editImageUrls} onChange={setEditImageUrls} disabled={adminBusy}/>
                                         <Button variant="contained" startIcon={<Save/>} disabled={adminBusy} onClick={saveAttraction}>保存景点</Button>

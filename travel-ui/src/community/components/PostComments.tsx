@@ -125,9 +125,12 @@ const PostComments = ({postId, onCountChange}: Props) => {
                 return next;
             });
         } catch {
-            setToast("删除失败，请确认当前账号是管理员");
+            setToast("删除失败，请稍后重试");
         }
     };
+
+    const canDeleteComment = (comment: CommentResponse) =>
+        Boolean(session && (isAdmin || session.user.id === comment.authorUserId));
 
     return (
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -201,7 +204,7 @@ const PostComments = ({postId, onCountChange}: Props) => {
                                 >
                                     {comment.likeCount}
                                 </Button>
-                                {isAdmin && (
+                                {canDeleteComment(comment) && (
                                     <Button
                                         size="small"
                                         color="error"

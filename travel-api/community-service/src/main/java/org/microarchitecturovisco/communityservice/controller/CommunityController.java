@@ -241,14 +241,8 @@ public class CommunityController {
         return travelRouteService.getDetail(routeId, token);
     }
 
-    @PutMapping("/routes/{routeId}")
-    public TravelRouteResponse updateRoute(
-            @RequestHeader(value = "X-User-Token", required = false) String token,
-            @PathVariable UUID routeId,
-            @Valid @RequestBody CreateTravelRouteRequest request
-    ) {
-        return travelRouteService.update(token, routeId, request);
-    }
+    // Published routes are immutable: there is intentionally no update endpoint —
+    // a route can only be created or deleted, never edited (by anyone, including admins).
 
     @DeleteMapping("/routes/{routeId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -336,6 +330,15 @@ public class CommunityController {
             @PathVariable Long reviewId
     ) {
         return reviewLikeService.toggle(token, reviewId);
+    }
+
+    @DeleteMapping("/reviews/{reviewId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteReview(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable Long reviewId
+    ) {
+        reviewLikeService.delete(token, reviewId);
     }
 
     // ── "我的" (current user's content & favorites) ──────────────────────────────

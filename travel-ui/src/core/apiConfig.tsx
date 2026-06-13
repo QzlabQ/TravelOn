@@ -391,6 +391,12 @@ export class ApiRequests {
         });
     }
 
+    static deleteCommunityReview = async (token: string, reviewId: string | number) => {
+        return await axiosInstance.delete(`community/reviews/${reviewId}`, {
+            headers: {'X-User-Token': token},
+        });
+    }
+
     static listMyPosts = async (token: string) => {
         return await axiosInstance.get<CommunityPostResponse[]>('community/me/posts', {
             headers: {'X-User-Token': token},
@@ -1265,6 +1271,7 @@ export interface TravelRouteResponse {
     stopCount: number,
     averageRating: number,
     reviewCount: number,
+    authorUserId: string,
     createdByName: string,
     createdAt: string,
 }
@@ -1285,6 +1292,7 @@ export interface TravelRouteDetailResponse {
     averageRating: number,
     reviewCount: number,
     favoritedByCurrentUser: boolean,
+    authorUserId: string,
     createdByName: string,
     createdAt: string,
     latestReviews: CommunityReviewResponse[],
