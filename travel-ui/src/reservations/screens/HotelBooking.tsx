@@ -47,6 +47,8 @@ type HotelRebookState = {
     dateFrom?: string | null;
     dateTo?: string | null;
     hotelName?: string | null;
+    /** Pre-selected destination when arriving from the home-page quick search. */
+    destinationId?: string | null;
     /** Set when returning from a hotel detail page so we restore the prior search. */
     restore?: boolean;
 };
@@ -166,7 +168,11 @@ const HotelBooking = () => {
             const response = await ApiRequests.getHotelDestinations();
             const arrivals = response.data ?? [];
             setDestinations(arrivals);
-            setDestination(arrivals.find((item: Location) => item.region === '北京市') ?? arrivals[0]);
+            // Honor a destination passed from the home-page quick search, else default to 北京.
+            const requested = rebookState.destinationId
+                ? arrivals.find((item: Location) => item.idLocation === rebookState.destinationId)
+                : undefined;
+            setDestination(requested ?? arrivals.find((item: Location) => item.region === '北京市') ?? arrivals[0]);
         } catch (e) {
             console.log(e);
             setError(true);

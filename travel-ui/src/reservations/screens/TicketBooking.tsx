@@ -123,6 +123,9 @@ const defaultTrainTypeFilters = trainTypeFilters.map((item) => item.value);
 type TicketRebookState = {
   departureDate?: string | null;
   bookingCode?: string | null;
+  // Pre-filled origin/destination when arriving from the home-page quick search.
+  from?: string | null;
+  to?: string | null;
 };
 
 const findPreferredCity = (cities: string[], keyword: string) => {
@@ -935,7 +938,17 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       .then((response) => {
         const nextDepartures = response.data.departures ?? [];
         const nextArrivals = response.data.arrivals ?? [];
+        // Honor an origin/destination passed from the home-page quick search.
+        const requestedFrom =
+          rebookState.from && nextDepartures.includes(rebookState.from)
+            ? rebookState.from
+            : null;
+        const requestedTo =
+          rebookState.to && nextArrivals.includes(rebookState.to)
+            ? rebookState.to
+            : null;
         const nextFrom =
+          requestedFrom ??
           findPreferredCity(
             nextDepartures,
             bookingPreferences.defaultDepartureCity,
@@ -947,6 +960,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
           (item) => item !== nextFrom,
         );
         const nextTo =
+          (requestedTo && requestedTo !== nextFrom ? requestedTo : null) ??
           findPreferredCity(
             nextArrivalCandidates,
             bookingPreferences.defaultArrivalCity,
