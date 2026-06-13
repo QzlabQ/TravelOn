@@ -160,8 +160,8 @@ public class CommunityService {
 
     @Transactional
     public void deletePost(String token, UUID postId) {
-        userClient.requireAdmin(token);
         CommunityPost post = requirePost(postId);
+        userClient.requireOwnerOrAdmin(token, post.getAuthorUserId());
         List<UUID> commentIds = commentRepository.findByTargetTypeAndTargetIdOrderByCreatedAtDesc(
                         FavoriteTargetType.POST, postId.toString())
                 .stream()

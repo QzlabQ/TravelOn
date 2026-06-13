@@ -21,6 +21,7 @@ public record TravelRouteResponse(
         int stopCount,
         double averageRating,
         long reviewCount,
+        UUID authorUserId,
         String createdByName,
         Instant createdAt
 ) {
@@ -39,6 +40,7 @@ public record TravelRouteResponse(
                 route.getStops().size(),
                 Math.round(averageRating * 10.0) / 10.0,
                 reviewCount,
+                route.getAuthorUserId(),
                 route.getAuthorName(),
                 route.getCreatedAt()
         );

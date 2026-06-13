@@ -155,7 +155,9 @@ public class AttractionService {
         attraction.setName(request.name().trim());
         attraction.setCity(city);
         attraction.setDescription(normalizeOptional(request.description()));
-        attraction.setImageUrls(images);
+        // Use a mutable copy: Hibernate clears/repopulates the managed @ElementCollection on flush,
+        // which fails with UnsupportedOperationException for the immutable list from List.toList().
+        attraction.setImageUrls(new java.util.ArrayList<>(images));
         attraction.setCoverImageUrl(images.isEmpty() ? null : images.get(0));
 
         Attraction saved = attractionRepository.save(attraction);

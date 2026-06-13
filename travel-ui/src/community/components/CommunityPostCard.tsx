@@ -10,9 +10,11 @@ type Props = {
     post: CommunityPostResponse,
     onLike: (post: CommunityPostResponse) => void,
     canLike: boolean,
+    /** Optional router state so the detail page can navigate back to where this card was shown. */
+    navState?: {returnTo?: string, returnLabel?: string},
 };
 
-const CommunityPostCard = ({post, onLike, canLike}: Props) => {
+const CommunityPostCard = ({post, onLike, canLike, navState}: Props) => {
     const navigate = useNavigate();
     const coverImage = post.imageUrls?.[0];
     const authorInitial = post.authorName?.trim()?.slice(0, 1) || "旅";
@@ -20,7 +22,7 @@ const CommunityPostCard = ({post, onLike, canLike}: Props) => {
     const summary = post.contentFormat === "MARKDOWN" ? stripMarkdown(post.content) : post.content;
 
     const openPost = () => {
-        navigate(detailPath);
+        navigate(detailPath, navState ? {state: navState} : undefined);
     };
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {

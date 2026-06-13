@@ -89,10 +89,10 @@ public class CommentService {
 
     @Transactional
     public void deletePostComment(String token, UUID postId, UUID commentId) {
-        userClient.requireAdmin(token);
         CommunityComment comment = commentRepository.findById(commentId)
                 .filter(item -> item.getTargetType() == FavoriteTargetType.POST && item.getTargetId().equals(postId.toString()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found"));
+        userClient.requireOwnerOrAdmin(token, comment.getAuthorUserId());
         commentLikeRepository.deleteByCommentId(comment.getId());
         commentRepository.delete(comment);
     }

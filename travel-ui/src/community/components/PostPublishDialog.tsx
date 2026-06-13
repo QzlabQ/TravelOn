@@ -39,7 +39,7 @@ type Props = {
 
 type CityOption = {cityId: string, label: string};
 type AssociationType = "SCENIC_SPOT" | "ROUTE";
-type AssociationOption = {id: string, label: string, meta?: string};
+type AssociationOption = {id: string, label: string, meta?: string, cityId?: string | null, cityLabel?: string | null};
 
 const defaultPayload: CreateCommunityPostPayload = {
     title: "",
@@ -69,6 +69,8 @@ const PostPublishDialog = ({open, token, initialPayload, initialDestinationName,
     const [payload, setPayload] = useState<CreateCommunityPostPayload>(() => buildInitialPayload(initialPayload));
     const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
     const [pickerType, setPickerType] = useState<AssociationType | null>(null);
+    // When a route/attraction is associated, its city fixes the post's city (issue #9).
+    const [lockedCityLabel, setLockedCityLabel] = useState<string | null>(null);
 
     const associatedType = payload.associatedTargetType;
     const associatedName = payload.associatedTargetName;
@@ -126,7 +128,10 @@ const PostPublishDialog = ({open, token, initialPayload, initialDestinationName,
             associatedTargetType: type,
             associatedTargetId: option.id,
             associatedTargetName: option.label,
+            // The associated route/attraction's city becomes the post's city.
+            destinationCityId: option.cityId ?? current.destinationCityId,
         }));
+        setLockedCityLabel(option.cityId ? (option.cityLabel ?? null) : null);
         setPickerType(null);
     };
 
@@ -137,6 +142,7 @@ const PostPublishDialog = ({open, token, initialPayload, initialDestinationName,
             associatedTargetId: undefined,
             associatedTargetName: undefined,
         }));
+        setLockedCityLabel(null);
     };
 
     const submit = async () => {
@@ -164,6 +170,7 @@ const PostPublishDialog = ({open, token, initialPayload, initialDestinationName,
                 imageUrls: payload.imageUrls ?? [],
             });
             setPayload(buildInitialPayload(initialPayload));
+            setLockedCityLabel(null);
             onPublished(response.data.id);
             onClose();
         } catch (e) {
@@ -199,22 +206,32 @@ const PostPublishDialog = ({open, token, initialPayload, initialDestinationName,
                             fullWidth
                             required
                         />
-                        <Autocomplete
-                            options={cityOptions}
-                            getOptionLabel={option => option.label}
-                            isOptionEqualToValue={(option, value) => option.cityId === value.cityId}
-                            value={cityOptions.find(option => option.cityId === payload.destinationCityId) ?? null}
-                            onChange={(_, value) => setPayload({...payload, destinationCityId: value?.cityId ?? ""})}
-                            renderInput={params => (
-                                <TextField
-                                    {...params}
-                                    label="目的地城市（可选）"
-                                    placeholder="选择帖子相关城市"
-                                    fullWidth
-                                />
-                            )}
-                            noOptionsText="无匹配城市"
-                        />
+                        {lockedCityLabel ? (
+                            <TextField
+                                label="城市"
+                                value={lockedCityLabel}
+                                disabled
+                                fullWidth
+                                helperText="已根据关联的线路 / 景点自动设置城市"
+                            />
+                        ) : (
+                            <Autocomplete
+                                options={cityOptions}
+                                getOptionLabel={option => option.label}
+                                isOptionEqualToValue={(option, value) => option.cityId === value.cityId}
+                                value={cityOptions.find(option => option.cityId === payload.destinationCityId) ?? null}
+                                onChange={(_, value) => setPayload({...payload, destinationCityId: value?.cityId ?? ""})}
+                                renderInput={params => (
+                                    <TextField
+                                        {...params}
+                                        label="城市（可选）"
+                                        placeholder="选择帖子相关城市"
+                                        fullWidth
+                                    />
+                                )}
+                                noOptionsText="无匹配城市"
+                            />
+                        )}
 
                         <section className="rounded-lg border border-slate-200 p-4">
                             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -318,6 +335,8 @@ const AssociationPickerDialog = ({open, type, onPick, onClose}: AssociationPicke
                         setOptions((response.data.content as TravelRouteResponse[]).map(route => ({
                             id: route.id,
                             label: route.title,
+                            cityId: route.cityId,
+                            cityLabel: route.city,
                             meta: [
                                 route.city,
                                 `${route.days} 天`,
@@ -328,6 +347,8 @@ const AssociationPickerDialog = ({open, type, onPick, onClose}: AssociationPicke
                         setOptions((response.data.content as AttractionResponse[]).map(attraction => ({
                             id: attraction.id,
                             label: attraction.name,
+                            cityId: attraction.cityId,
+                            cityLabel: attraction.city,
                             meta: [
                                 attraction.city,
                                 attraction.reviewCount > 0 ? `${attraction.averageRating.toFixed(1)} 分` : "暂无评价",

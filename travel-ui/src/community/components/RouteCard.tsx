@@ -7,11 +7,14 @@ import {formatCommunityTime, travelStyleLabels} from "./communityLabels";
 
 type Props = {
     route: TravelRouteResponse,
+    /** Optional router state so the detail page can navigate back to where this card was shown. */
+    state?: {returnTo?: string, returnLabel?: string},
 };
 
-const RouteCard = ({route}: Props) => (
+const RouteCard = ({route, state}: Props) => (
     <Link
         to={`/community/routes/${route.id}`}
+        state={state}
         className="group grid overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:border-blue-200 hover:shadow-md md:h-56 md:grid-cols-[280px_minmax(0,1fr)]"
     >
         <div className="relative h-48 overflow-hidden bg-slate-100 md:h-full">

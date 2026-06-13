@@ -24,6 +24,7 @@ public record TravelRouteDetailResponse(
         double averageRating,
         long reviewCount,
         boolean favoritedByCurrentUser,
+        UUID authorUserId,
         String createdByName,
         Instant createdAt,
         List<ReviewResponse> latestReviews
@@ -45,6 +46,7 @@ public record TravelRouteDetailResponse(
                 Math.round(averageRating * 10.0) / 10.0,
                 reviewCount,
                 favoritedByCurrentUser,
+                route.getAuthorUserId(),
                 route.getAuthorName(),
                 route.getCreatedAt(),
                 latestReviews
