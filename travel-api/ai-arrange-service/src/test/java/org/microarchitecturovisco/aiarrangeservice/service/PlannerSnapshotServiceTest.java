@@ -19,12 +19,14 @@ import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentToolCall;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentWarning;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.request.CreatePlannerMarkdownSnapshotRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerSnapshotDiffResponse;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerDayRevisionRepository;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerMessageRepository;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerSnapshotRepository;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -37,6 +39,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -1069,5 +1072,127 @@ class PlannerSnapshotServiceTest {
         assertThat(assembledSnapshot.getMarkdown()).contains("Day 1 markdown", "Day 2 markdown");
         assertThat(assembledSnapshot.getDayPlans()).extracting(PlannerDayPlanRef::getTitle)
                 .containsExactly("Day 1", "Day 2");
+    }
+
+    @Test
+    void createMarkdownSnapshotSavesDayEditAsSnapshotAndDayRevision() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = PlannerConversation.builder()
+                .id(conversationId)
+                .userId(userId)
+                .status(PlannerConversationStatus.ACTIVE_CHAT)
+                .coreSlots(TripCoreSlots.builder()
+                        .city("Shanghai")
+                        .travelStartDate(LocalDate.of(2026, 6, 1))
+                        .peopleCount(2)
+                        .build())
+                .title("Shanghai plan")
+                .selectedPlaceIds(List.of())
+                .build();
+        PlannerDayPlanRef dayOne = PlannerDayPlanRef.builder()
+                .dayIndex(1)
+                .status("DRAFT")
+                .title("Day 1")
+                .markdown("old markdown")
+                .build();
+        PlannerSnapshot latestSnapshot = PlannerSnapshot.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversationId)
+                .userId(userId)
+                .version(4)
+                .scope("DAY_PLAN")
+                .currentDayIndex(1)
+                .title("Shanghai plan")
+                .markdown("old markdown")
+                .currentDayPlan(dayOne)
+                .dayPlans(List.of(dayOne))
+                .selectedPlaceIds(List.of())
+                .createdAt(Instant.now())
+                .build();
+
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.of(latestSnapshot));
+        when(dayRevisionRepository.findByConversationId(conversationId)).thenReturn(List.of());
+        when(snapshotRepository.findByConversationIdOrderByVersionDesc(conversationId)).thenReturn(List.of(latestSnapshot));
+        when(dayRevisionRepository.findFirstByConversationIdAndDayIndexAndContentHashOrderByDayVersionDesc(eq(conversationId), eq(1), any()))
+                .thenReturn(Optional.empty());
+        when(dayRevisionRepository.findFirstByConversationIdAndDayIndexOrderByDayVersionDesc(conversationId, 1))
+                .thenReturn(Optional.empty());
+        when(snapshotRepository.save(any(PlannerSnapshot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PlannerSnapshotService service = new PlannerSnapshotService(
+                plannerAiClient,
+                promptFactory,
+                new PlannerMarkdownBuilder(),
+                new PlaceEnrichmentService(amapPoiClient, internalOfferHotelMatcher),
+                messageRepository,
+                snapshotRepository,
+                dayRevisionRepository
+        );
+
+        PlannerSnapshot snapshot = service.createMarkdownSnapshot(conversation, CreatePlannerMarkdownSnapshotRequest.builder()
+                .userId(userId)
+                .mode(CreatePlannerMarkdownSnapshotRequest.Mode.DAY)
+                .dayIndex(1)
+                .baseVersion(4)
+                .markdown("manual markdown")
+                .build());
+
+        assertThat(snapshot.getVersion()).isEqualTo(5);
+        assertThat(snapshot.getBaseVersion()).isEqualTo(4);
+        assertThat(snapshot.getScope()).isEqualTo("DAY_MARKDOWN_EDIT");
+        assertThat(snapshot.getMarkdown()).isEqualTo("manual markdown");
+        assertThat(snapshot.getCurrentDayPlan().getMarkdown()).isEqualTo("manual markdown");
+        assertThat(snapshot.getDayPlans()).extracting(PlannerDayPlanRef::getMarkdown).containsExactly("manual markdown");
+        assertThat(dayRevisionStore.values()).extracting(PlannerDayRevision::getMarkdown).contains("manual markdown");
+    }
+
+    @Test
+    void createMarkdownSnapshotRejectsStaleBaseVersion() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = PlannerConversation.builder()
+                .id(conversationId)
+                .userId(userId)
+                .status(PlannerConversationStatus.ACTIVE_CHAT)
+                .coreSlots(TripCoreSlots.builder()
+                        .city("Shanghai")
+                        .travelStartDate(LocalDate.of(2026, 6, 1))
+                        .peopleCount(2)
+                        .build())
+                .title("Shanghai plan")
+                .selectedPlaceIds(List.of())
+                .build();
+        PlannerSnapshot latestSnapshot = PlannerSnapshot.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversationId)
+                .userId(userId)
+                .version(7)
+                .title("Shanghai plan")
+                .markdown("latest")
+                .createdAt(Instant.now())
+                .build();
+
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.of(latestSnapshot));
+
+        PlannerSnapshotService service = new PlannerSnapshotService(
+                plannerAiClient,
+                promptFactory,
+                new PlannerMarkdownBuilder(),
+                new PlaceEnrichmentService(amapPoiClient, internalOfferHotelMatcher),
+                messageRepository,
+                snapshotRepository,
+                dayRevisionRepository
+        );
+
+        assertThatThrownBy(() -> service.createMarkdownSnapshot(conversation, CreatePlannerMarkdownSnapshotRequest.builder()
+                .userId(userId)
+                .mode(CreatePlannerMarkdownSnapshotRequest.Mode.TRIP)
+                .baseVersion(6)
+                .markdown("manual markdown")
+                .build()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409 CONFLICT");
+        verify(snapshotRepository, never()).save(any(PlannerSnapshot.class));
     }
 }

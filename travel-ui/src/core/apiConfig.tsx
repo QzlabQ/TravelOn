@@ -210,6 +210,10 @@ export class ApiRequests {
         });
     }
 
+    static createPlannerMarkdownSnapshot = async (conversationId: string, payload: CreatePlannerMarkdownSnapshotPayload) => {
+        return await axiosInstance.post<PlannerSnapshot>(`ai-arrange/api/conversations/${conversationId}/markdown-snapshots`, payload);
+    }
+
     static diffPlannerSnapshots = async (conversationId: string, userId: string, fromVersion: number, toVersion: number) => {
         return await axiosInstance.get<PlannerSnapshotDiffResponse>(`ai-arrange/api/conversations/${conversationId}/snapshots/${fromVersion}/diff/${toVersion}`, {
             params: {userId}
@@ -910,6 +914,14 @@ export interface PlannerDataRefreshPayload {
     places: PlannerPlaceSuggestion[],
     routes: PlannerRouteSegment[],
     selectedPlaceIds: string[],
+}
+
+export interface CreatePlannerMarkdownSnapshotPayload {
+    userId: string,
+    markdown: string,
+    mode: 'DAY' | 'TRIP',
+    dayIndex?: number,
+    baseVersion: number,
 }
 
 export interface PlannerPlaceSuggestion {

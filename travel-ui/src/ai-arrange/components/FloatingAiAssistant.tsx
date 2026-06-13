@@ -60,6 +60,8 @@ interface FloatingAiAssistantProps {
     hasActiveDayPlan: boolean,
     canGenerateNextDay: boolean,
     hasAllTripDayPlans: boolean,
+    generatedDayCount: number,
+    tripDayCount: number,
     hasDepartureCity: boolean,
     selectedPlaceIds: string[],
     traceToolLabel: (tool?: string) => string,
@@ -155,6 +157,8 @@ export function FloatingAiAssistant({
     hasActiveDayPlan,
     canGenerateNextDay,
     hasAllTripDayPlans,
+    generatedDayCount,
+    tripDayCount,
     hasDepartureCity,
     selectedPlaceIds,
     traceToolLabel,
@@ -166,6 +170,7 @@ export function FloatingAiAssistant({
 }: FloatingAiAssistantProps) {
     const [open, setOpen] = useState(false);
     const [input, setInput] = useState("");
+    const [showProgressDetails, setShowProgressDetails] = useState(false);
     const chatHistoryRef = useRef<HTMLDivElement | null>(null);
     const compact = useMediaQuery("(max-width: 640px)");
     const commonDisabledReason = disabledByCommonState({
@@ -177,6 +182,14 @@ export function FloatingAiAssistant({
     const displayedMessages = chatMessages;
     const visibleProgressEvents = progressEvents.slice(-5);
     const showProgress = busy || progressEvents.length > 0;
+    const safeTripDayCount = Math.max(1, tripDayCount || 1);
+    const safeGeneratedDayCount = Math.min(safeTripDayCount, Math.max(0, generatedDayCount || 0));
+    const progressPercent = Math.round((safeGeneratedDayCount / safeTripDayCount) * 100);
+    const thinkingTitle = busy
+        ? `AI 正在思考第 ${activeDayIndex} 天行程`
+        : hasAllTripDayPlans
+            ? "全部天数计划已生成"
+            : "继续补齐每日计划";
     const chatDisabledReason = commonDisabledReason;
     const assembleDisabledReason = !conversationActive
         ? "请先填写基础信息并开始规划"
@@ -498,7 +511,60 @@ export function FloatingAiAssistant({
 
                     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
                         {showProgress &&
-                            <div className="mb-4 rounded-md border border-gray-200 bg-[#fbfcff] px-3 py-3">
+                            <div className="mb-4 rounded-md border border-teal-100 bg-teal-50/60 px-3 py-3">
+                                <div className="mb-3 flex items-start gap-3">
+                                    <Box
+                                        sx={{
+                                            width: 44,
+                                            height: 44,
+                                            borderRadius: "50%",
+                                            bgcolor: "#19857b",
+                                            color: "#fff",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            flexShrink: 0,
+                                            position: "relative",
+                                            boxShadow: "0 10px 24px rgba(25, 133, 123, 0.24)",
+                                            "@keyframes aiThinkingPulse": {
+                                                "0%": {transform: "scale(1)", opacity: 0.42},
+                                                "70%": {transform: "scale(1.75)", opacity: 0},
+                                                "100%": {transform: "scale(1.75)", opacity: 0},
+                                            },
+                                            "&::after": busy ? {
+                                                content: '""',
+                                                position: "absolute",
+                                                inset: 0,
+                                                borderRadius: "50%",
+                                                bgcolor: "#19857b",
+                                                zIndex: -1,
+                                                animation: "aiThinkingPulse 1.6s ease-out infinite",
+                                            } : undefined,
+                                        }}
+                                    >
+                                        <AutoAwesome fontSize="small"/>
+                                    </Box>
+                                    <div className="min-w-0 flex-1">
+                                        <Typography variant="subtitle2" className="truncate text-gray-900">
+                                            {thinkingTitle}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary" className="mt-1">
+                                            已生成 {safeGeneratedDayCount} / {safeTripDayCount} 天，完成全部 {safeTripDayCount} 天后可汇总完整行程。
+                                        </Typography>
+                                        <Box sx={{mt: 1.25}}>
+                                            <LinearProgress
+                                                variant={busy ? "indeterminate" : "determinate"}
+                                                value={progressPercent}
+                                                sx={{
+                                                    height: 6,
+                                                    borderRadius: 999,
+                                                    bgcolor: "rgba(25, 133, 123, 0.14)",
+                                                    "& .MuiLinearProgress-bar": {bgcolor: "#19857b"},
+                                                }}
+                                            />
+                                        </Box>
+                                    </div>
+                                </div>
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
                                         <Typography variant="caption" color="text.secondary" className="mb-1 block font-semibold">
@@ -515,12 +581,17 @@ export function FloatingAiAssistant({
                                         label={traceStatusLabel(currentProgressStatus)}
                                     />
                                 </div>
-                                {busy &&
-                                    <Box sx={{mt: 1.25}}>
-                                        <LinearProgress/>
-                                    </Box>
-                                }
                                 {visibleProgressEvents.length > 0 &&
+                                    <>
+                                        <Button
+                                            size="small"
+                                            variant="text"
+                                            onClick={() => setShowProgressDetails(value => !value)}
+                                            sx={{mt: 0.5, minHeight: 28, px: 0}}
+                                        >
+                                            {showProgressDetails ? "收起详情" : "查看详情"}
+                                        </Button>
+                                        {showProgressDetails &&
                                     <div className="mt-2 flex flex-wrap gap-1.5">
                                         {visibleProgressEvents.map((event, index) => (
                                             <Chip
@@ -532,6 +603,8 @@ export function FloatingAiAssistant({
                                             />
                                         ))}
                                     </div>
+                                        }
+                                    </>
                                 }
                             </div>
                         }

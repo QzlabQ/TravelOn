@@ -36,6 +36,7 @@ import {
     RestartAlt,
     Restore,
     Send,
+    Save,
     Train,
     TravelExplore,
     Visibility
@@ -333,9 +334,13 @@ function viewDataFromDayVersion(record: PlannerDayVersion, fallbackData: Planner
     };
 }
 
+function isTripMarkdownScope(scope?: string) {
+    return scope === "TRIP_ASSEMBLE" || scope === "TRIP_MARKDOWN_EDIT";
+}
+
 function viewDataForDay(data: PlannerViewData, dayIndex: number): PlannerViewData {
     const normalizedData = normalizePlannerViewData(data);
-    if (normalizedData.scope === "TRIP_ASSEMBLE") {
+    if (isTripMarkdownScope(normalizedData.scope)) {
         return normalizedData;
     }
 
@@ -546,6 +551,10 @@ export default function AiPlanner() {
     const [plannerTraceEvents, setPlannerTraceEvents] = useState<PlannerTraceEvent[]>(initialSession?.plannerTraceEvents || []);
     const [viewingSnapshotVersion, setViewingSnapshotVersion] = useState<SnapshotView>(initialSession?.viewingSnapshotVersion || "latest");
     const [markdownMode, setMarkdownMode] = useState<PlannerMarkdownMode>(initialSession?.markdownMode || "preview");
+    const [markdownDraft, setMarkdownDraft] = useState(initialDisplayData.markdown || "");
+    const [markdownDraftBaseVersion, setMarkdownDraftBaseVersion] = useState<number | null>(initialDisplayData.snapshotVersion);
+    const [markdownDirty, setMarkdownDirty] = useState(false);
+    const [markdownSaving, setMarkdownSaving] = useState(false);
     const [snapshotDiff, setSnapshotDiff] = useState<PlannerSnapshotDiffResponse | null>(null);
     const [snapshotDiffLoading, setSnapshotDiffLoading] = useState(false);
     const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
@@ -710,6 +719,16 @@ export default function AiPlanner() {
         imageUrls: [] as string[],
     }), [coreSlots.city, displayData.markdown, displayData.title]);
     const canPublishCommunityPost = Boolean(session && displayData.markdown.trim());
+    const canEditMarkdown = Boolean(conversation && !isSnapshotPreview && !chatSending && !assemblingTrip && displayData.snapshotVersion);
+    const markdownEditDisabledReason = !conversation
+        ? "Create a planner session first."
+        : isSnapshotPreview
+            ? "Historical versions are read-only. Return to latest before editing."
+            : chatSending || assemblingTrip
+                ? "Wait for the current AI generation to finish."
+                : !displayData.snapshotVersion
+                    ? "No saved planner version is available yet."
+                    : "";
 
     useEffect(() => {
         viewingSnapshotVersionRef.current = viewingSnapshotVersion;
@@ -734,6 +753,13 @@ export default function AiPlanner() {
             setDisplayData(viewDataForDay(liveData, activeDayIndex));
         }
     }, [activeDayIndex, liveData]);
+
+    useEffect(() => {
+        if (!markdownDirty) {
+            setMarkdownDraft(displayData.markdown || "");
+            setMarkdownDraftBaseVersion(displayData.snapshotVersion);
+        }
+    }, [displayData.markdown, displayData.snapshotVersion, markdownDirty]);
 
     useEffect(() => {
         const session: PlannerStoredSession = {
@@ -1142,6 +1168,10 @@ export default function AiPlanner() {
             setDayVersions([]);
             setPlannerTraceEvents([]);
             setSnapshotView("latest");
+            setMarkdownDraft(nextData.markdown || "");
+            setMarkdownDraftBaseVersion(nextData.snapshotVersion);
+            setMarkdownDirty(false);
+            setMarkdownSaving(false);
             setTargetDayIndex(1);
             setAssemblingTrip(false);
             setChatMessages([]);
@@ -1172,6 +1202,10 @@ export default function AiPlanner() {
         setDisplayData(nextData);
         setSnapshotView("latest");
         setSnapshotDiff(null);
+        setMarkdownDraft(nextData.markdown || "");
+        setMarkdownDraftBaseVersion(nextData.snapshotVersion);
+        setMarkdownDirty(false);
+        setMarkdownSaving(false);
         setTargetDayIndex(snapshot.currentDayIndex || snapshot.targetDayIndex || preferredDayIndex || 1);
     }, [setSnapshotView]);
 
@@ -1305,8 +1339,12 @@ export default function AiPlanner() {
 
     const handleSnapshotChange = (value: string) => {
         if (value === "latest") {
+            const nextData = viewDataForDay(liveData, activeDayIndex);
             setSnapshotView("latest");
-            setDisplayData(viewDataForDay(liveData, activeDayIndex));
+            setDisplayData(nextData);
+            setMarkdownDraft(nextData.markdown || "");
+            setMarkdownDraftBaseVersion(nextData.snapshotVersion);
+            setMarkdownDirty(false);
             return;
         }
 
@@ -1314,8 +1352,12 @@ export default function AiPlanner() {
         const dayVersion = dayVersions.find(record => record.dayVersion === dayVersionValue);
         if (!dayVersion) return;
 
+        const nextData = viewDataFromDayVersion(dayVersion, liveData);
         setSnapshotView(dayVersionValue);
-        setDisplayData(viewDataFromDayVersion(dayVersion, liveData));
+        setDisplayData(nextData);
+        setMarkdownDraft(nextData.markdown || "");
+        setMarkdownDraftBaseVersion(nextData.snapshotVersion);
+        setMarkdownDirty(false);
     };
 
     const handleRestoreSnapshot = async () => {
@@ -1417,8 +1459,78 @@ export default function AiPlanner() {
 
     const handleMarkdownChange = (nextMarkdown: string) => {
         if (isSnapshotPreview) return;
-        const nextData = {...liveData, markdown: nextMarkdown};
-        applyLiveData(nextData);
+        setMarkdownDraft(nextMarkdown);
+        setMarkdownDirty(nextMarkdown !== (displayData.markdown || ""));
+    };
+
+    const discardMarkdownDraft = () => {
+        setMarkdownDraft(displayData.markdown || "");
+        setMarkdownDraftBaseVersion(displayData.snapshotVersion);
+        setMarkdownDirty(false);
+    };
+
+    const saveMarkdownDraft = async () => {
+        if (!conversation || !displayData.snapshotVersion || !markdownDraftBaseVersion || isSnapshotPreview || chatSending || assemblingTrip) return;
+
+        const trimmedMarkdown = markdownDraft.trim();
+        if (!trimmedMarkdown) {
+            setErrorMessage("Markdown content cannot be empty.");
+            return;
+        }
+
+        const mode = isTripMarkdownScope(displayData.scope) ? "TRIP" : "DAY";
+        setMarkdownSaving(true);
+        setErrorMessage("");
+        try {
+            const response = await ApiRequests.createPlannerMarkdownSnapshot(conversation.id, {
+                userId,
+                markdown: markdownDraft,
+                mode,
+                dayIndex: mode === "DAY" ? activeDayIndex : undefined,
+                baseVersion: markdownDraftBaseVersion,
+            });
+            const savedSnapshot = response.data;
+            const savedData = viewDataFromSnapshot(savedSnapshot);
+            const nextDayIndex = savedSnapshot.currentDayIndex || savedSnapshot.targetDayIndex || activeDayIndex;
+
+            setConversation(prevConversation => prevConversation ? {
+                ...prevConversation,
+                title: savedSnapshot.title || prevConversation.title,
+                currentMarkdown: savedSnapshot.markdown || "",
+                latestSnapshotVersion: savedSnapshot.version,
+                selectedPlaceIds: savedSnapshot.selectedPlaceIds || [],
+                updatedAt: savedSnapshot.createdAt || prevConversation.updatedAt,
+            } : prevConversation);
+            setSnapshots(prevSnapshots => sortSnapshots([
+                savedSnapshot,
+                ...prevSnapshots.filter(snapshot => snapshot.id !== savedSnapshot.id),
+            ]));
+            setLiveData(savedData);
+            setDisplayData(mode === "DAY" ? viewDataForDay(savedData, nextDayIndex) : savedData);
+            setSnapshotView("latest");
+            setSnapshotDiff(null);
+            setMarkdownDirty(false);
+            setMarkdownDraftBaseVersion(savedSnapshot.version);
+            setMarkdownMode("preview");
+            setTargetDayIndex(nextDayIndex);
+            setChatMessages(prevMessages => [
+                ...prevMessages,
+                {
+                    id: uuidv4(),
+                    role: "system",
+                    text: `Manual Markdown edit saved as v${savedSnapshot.version}.`,
+                }
+            ]);
+            void refreshSnapshotList(conversation.id);
+            if (mode === "DAY") {
+                void loadDayVersions(conversation.id, nextDayIndex);
+            }
+        } catch (error) {
+            console.error(error);
+            setErrorMessage("Markdown save failed. The plan may have a newer version; please review the latest version and save again.");
+        } finally {
+            setMarkdownSaving(false);
+        }
     };
 
     const resetPlanner = () => {
@@ -1444,6 +1556,10 @@ export default function AiPlanner() {
         setPlannerTraceEvents([]);
         setSnapshotView("latest");
         setMarkdownMode("preview");
+        setMarkdownDraft(nextData.markdown || "");
+        setMarkdownDraftBaseVersion(nextData.snapshotVersion);
+        setMarkdownDirty(false);
+        setMarkdownSaving(false);
         setSnapshotDiff(null);
         setSnapshotDiffLoading(false);
         setRestoringVersion(null);
@@ -1497,6 +1613,10 @@ export default function AiPlanner() {
         setPlannerTraceEvents([]);
         setSnapshotView("latest");
         setMarkdownMode("preview");
+        setMarkdownDraft(nextData.markdown || "");
+        setMarkdownDraftBaseVersion(nextData.snapshotVersion);
+        setMarkdownDirty(false);
+        setMarkdownSaving(false);
         setSnapshotDiff(null);
         setSnapshotDiffLoading(false);
         setRestoringVersion(null);
@@ -1901,17 +2021,45 @@ export default function AiPlanner() {
                         size="small"
                         exclusive
                         value={markdownMode}
-                        onChange={(_, value) => value && setMarkdownMode(value)}
+                        onChange={(_, value) => {
+                            if (!value) return;
+                            if (value === "edit" && !canEditMarkdown) {
+                                setErrorMessage(markdownEditDisabledReason);
+                                return;
+                            }
+                            setMarkdownMode(value);
+                        }}
                     >
                         <ToggleButton value="preview">
                             <Visibility fontSize="small" className="mr-1"/>
                             预览
                         </ToggleButton>
-                        <ToggleButton value="edit">
+                        <ToggleButton value="edit" disabled={!canEditMarkdown}>
                             <Code fontSize="small" className="mr-1"/>
                             编辑
                         </ToggleButton>
                     </ToggleButtonGroup>
+                    {markdownMode === "edit" &&
+                        <>
+                            <Button
+                                size="small"
+                                variant="contained"
+                                startIcon={<Save fontSize="small"/>}
+                                disabled={!markdownDirty || !canEditMarkdown || !markdownDraftBaseVersion || markdownSaving}
+                                onClick={saveMarkdownDraft}
+                            >
+                                保存为新版本
+                            </Button>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                disabled={!markdownDirty || markdownSaving}
+                                onClick={discardMarkdownDraft}
+                            >
+                                取消修改
+                            </Button>
+                        </>
+                    }
                     <Chip size="small" variant="outlined" icon={<History/>} label={snapshotCountLabel}/>
                     <TextField
                         select
@@ -1948,6 +2096,12 @@ export default function AiPlanner() {
                 </Alert>
             }
 
+            {markdownMode === "edit" && markdownDirty &&
+                <Alert severity="warning" className="mx-4 mt-3">
+                    当前修改仅保存在本地草稿中，点击“保存为新版本”后才会上传并进入版本历史。
+                </Alert>
+            }
+
             {renderSnapshotDiffPanel()}
 
             <div className="min-h-0 flex-1 overflow-hidden px-4 py-3">
@@ -1965,12 +2119,12 @@ export default function AiPlanner() {
                 ) : (
                     <div className="h-full min-h-0">
                         <TextField
-                            value={displayData.markdown}
+                            value={markdownDraft}
                             onChange={event => handleMarkdownChange(event.target.value)}
                             placeholder="AI 生成的 Markdown 规划会显示在这里。"
                             multiline
                             fullWidth
-                            InputProps={{readOnly: isSnapshotPreview}}
+                            InputProps={{readOnly: !canEditMarkdown || markdownSaving}}
                             sx={{
                                 height: "100%",
                                 "& .MuiInputBase-root": {
@@ -2169,6 +2323,8 @@ export default function AiPlanner() {
                 hasActiveDayPlan={hasActiveDayPlan}
                 canGenerateNextDay={canGenerateNextDay}
                 hasAllTripDayPlans={hasAllTripDayPlans}
+                generatedDayCount={displayedDayPlans.length}
+                tripDayCount={tripDayCount}
                 hasDepartureCity={Boolean(coreSlots.departureCity)}
                 selectedPlaceIds={liveData.selectedPlaceIds}
                 traceToolLabel={traceToolLabel}

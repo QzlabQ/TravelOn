@@ -12,6 +12,7 @@ import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerBookingLi
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerPlaceSuggestion;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerRouteSegment;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerSnapshotDraft;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.request.CreatePlannerMarkdownSnapshotRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerDayVersionResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerSnapshotDiffItem;
@@ -457,6 +458,79 @@ public class PlannerSnapshotService {
                 .build();
 
         return saveSnapshot(snapshot);
+    }
+
+    public PlannerSnapshot createMarkdownSnapshot(PlannerConversation conversation, CreatePlannerMarkdownSnapshotRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Markdown snapshot request is required");
+        }
+        if (request.getMode() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Markdown snapshot mode is required");
+        }
+
+        PlannerSnapshot latestSnapshot = snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversation.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Cannot save markdown before a planner snapshot exists"));
+        if (!Objects.equals(latestSnapshot.getVersion(), request.getBaseVersion())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Planner snapshot has changed, please refresh before saving");
+        }
+
+        String markdown = sanitizeMarkdownBookingLinks(request.getMarkdown());
+        if (!hasText(markdown)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Markdown content is required");
+        }
+
+        Integer dayIndex = request.getMode() == CreatePlannerMarkdownSnapshotRequest.Mode.DAY ? request.getDayIndex() : null;
+        if (request.getMode() == CreatePlannerMarkdownSnapshotRequest.Mode.DAY) {
+            validateDayIndex(dayIndex);
+        }
+        PlannerDayPlanRef editedDayPlan = dayIndex == null ? null : manualMarkdownDayPlan(latestSnapshot, dayIndex, markdown);
+        List<PlannerDayPlanRef> dayPlans = editedDayPlan == null
+                ? safeList(latestSnapshot.getDayPlans())
+                : replaceDayPlan(safeList(latestSnapshot.getDayPlans()), editedDayPlan);
+        PlannerDayPlanRef currentDayPlan = editedDayPlan == null ? latestSnapshot.getCurrentDayPlan() : editedDayPlan;
+
+        Integer nextVersion = (latestSnapshot.getVersion() == null ? 0 : latestSnapshot.getVersion()) + 1;
+        PlannerSnapshot snapshot = PlannerSnapshot.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversation.getId())
+                .userId(conversation.getUserId())
+                .version(nextVersion)
+                .baseVersion(latestSnapshot.getVersion())
+                .scope(request.getMode() == CreatePlannerMarkdownSnapshotRequest.Mode.TRIP ? "TRIP_MARKDOWN_EDIT" : "DAY_MARKDOWN_EDIT")
+                .targetDayIndex(dayIndex == null ? latestSnapshot.getTargetDayIndex() : dayIndex)
+                .currentDayIndex(dayIndex == null ? latestSnapshot.getCurrentDayIndex() : dayIndex)
+                .completedDayIndexes(safeList(latestSnapshot.getCompletedDayIndexes()))
+                .title(latestSnapshot.getTitle())
+                .summary(latestSnapshot.getSummary())
+                .markdown(markdown)
+                .nextQuestion(latestSnapshot.getNextQuestion())
+                .assistantText(latestSnapshot.getAssistantText())
+                .places(safeList(latestSnapshot.getPlaces()))
+                .routes(safeList(latestSnapshot.getRoutes()))
+                .currentDayPlan(currentDayPlan)
+                .dayPlans(dayPlans)
+                .selectedPlaceIds(safeList(latestSnapshot.getSelectedPlaceIds()))
+                .rejectedPlaceIds(safeList(latestSnapshot.getRejectedPlaceIds()))
+                .changeSummary("Manual markdown edit")
+                .patchOps(List.of(Map.of(
+                        "op", "manual-markdown-edit",
+                        "mode", request.getMode().name(),
+                        "dayIndex", dayIndex == null ? "" : dayIndex,
+                        "baseVersion", latestSnapshot.getVersion(),
+                        "toVersion", nextVersion
+                )))
+                .checksum(latestSnapshot.getChecksum())
+                .traceId(latestSnapshot.getTraceId())
+                .agentToolCalls(safeList(latestSnapshot.getAgentToolCalls()))
+                .agentWarnings(safeList(latestSnapshot.getAgentWarnings()))
+                .createdAt(Instant.now())
+                .build();
+
+        PlannerSnapshot savedSnapshot = saveSnapshot(snapshot);
+        if (editedDayPlan != null) {
+            recordManualDayMarkdownRevision(conversation, editedDayPlan, savedSnapshot);
+        }
+        return savedSnapshot;
     }
 
     public PlannerSnapshotDiffResponse diffSnapshots(UUID conversationId, Integer fromVersion, Integer toVersion) {
@@ -1283,6 +1357,27 @@ public class PlannerSnapshotService {
         );
     }
 
+    private PlannerDayPlanRef manualMarkdownDayPlan(PlannerSnapshot latestSnapshot, Integer dayIndex, String markdown) {
+        PlannerDayPlanRef currentDayPlan = findDayPlan(latestSnapshot, dayIndex)
+                .orElseGet(() -> PlannerDayPlanRef.builder()
+                        .dayIndex(dayIndex)
+                        .status(safeList(latestSnapshot.getCompletedDayIndexes()).contains(dayIndex) ? "CONFIRMED" : "DRAFT")
+                        .build());
+        return PlannerDayPlanRef.builder()
+                .dayIndex(dayIndex)
+                .date(currentDayPlan.getDate())
+                .status(currentDayPlan.getStatus())
+                .title(currentDayPlan.getTitle())
+                .markdown(markdown)
+                .places(safeList(currentDayPlan.getPlaces()))
+                .routes(safeList(currentDayPlan.getRoutes()))
+                .selectedPlaceIds(safeList(currentDayPlan.getSelectedPlaceIds()))
+                .rejectedPlaceIds(safeList(currentDayPlan.getRejectedPlaceIds()))
+                .changeSummary("Manual markdown edit")
+                .checksum(currentDayPlan.getChecksum())
+                .build();
+    }
+
     private PlannerDayPlanRef dayPlanWithPlaces(PlannerDayPlanRef dayPlan, List<PlannerPlaceSuggestion> places) {
         return dayPlanWithPlaces(dayPlan, places, nonBlankOrDefault(dayPlan.getMarkdown(), ""));
     }
@@ -1301,6 +1396,12 @@ public class PlannerSnapshotService {
                 .changeSummary(dayPlan.getChangeSummary())
                 .checksum(dayPlan.getChecksum())
                 .build();
+    }
+
+    private void recordManualDayMarkdownRevision(PlannerConversation conversation, PlannerDayPlanRef dayPlan, PlannerSnapshot snapshot) {
+        ensureDayRevisions(conversation);
+        PlannerDayRevision revision = recordDayRevision(conversation, dayPlan, snapshot);
+        currentDayRevisionIds(conversation).put(dayKey(dayPlan.getDayIndex()), revision.getId());
     }
 
     private PlannerSnapshot saveSnapshot(PlannerSnapshot snapshot) {

@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapshot;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.CreatePlannerConversationRequest;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.request.CreatePlannerMarkdownSnapshotRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.RunPlannerAgentRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.UpdatePlannerCoreSlotsRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.UpdatePlannerSelectionRequest;
@@ -102,6 +103,14 @@ public class PlannerConversationController {
     @PostMapping("/{conversationId}/day-plans/assemble")
     public PlannerSnapshot assembleTripSnapshot(@PathVariable UUID conversationId, @RequestParam UUID userId) {
         return plannerConversationService.assembleTripSnapshot(conversationId, userId);
+    }
+
+    @PostMapping("/{conversationId}/markdown-snapshots")
+    public PlannerSnapshot createMarkdownSnapshot(
+            @PathVariable UUID conversationId,
+            @Valid @RequestBody CreatePlannerMarkdownSnapshotRequest request
+    ) {
+        return plannerConversationService.createMarkdownSnapshot(conversationId, request);
     }
 
     @GetMapping("/{conversationId}/snapshots/{fromVersion}/diff/{toVersion}")

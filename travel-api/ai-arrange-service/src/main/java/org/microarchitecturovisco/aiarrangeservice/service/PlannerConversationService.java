@@ -20,6 +20,7 @@ import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAge
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerInteractionInput;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerStreamEvent;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.request.CreatePlannerMarkdownSnapshotRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.PlannerChatSendPayload;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerChatStreamPayload;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerConversationResponse;
@@ -187,6 +188,22 @@ public class PlannerConversationService {
                 PlannerDataRefreshPayload.from(conversation.getStatus(), snapshot));
         webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
                 Map.of("version", snapshot.getVersion(), "scope", "TRIP_ASSEMBLE"));
+        return snapshot;
+    }
+
+    public PlannerSnapshot createMarkdownSnapshot(UUID conversationId, CreatePlannerMarkdownSnapshotRequest request) {
+        if (request == null || request.getUserId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Markdown snapshot request requires userId");
+        }
+        PlannerConversation conversation = getOwnedConversation(conversationId, request.getUserId());
+        PlannerSnapshot snapshot = snapshotService.createMarkdownSnapshot(conversation, request);
+        conversation.setSelectedPlaceIds(snapshot.getSelectedPlaceIds() == null ? new ArrayList<>() : new ArrayList<>(snapshot.getSelectedPlaceIds()));
+        refreshConversationFromSnapshot(conversation, snapshot);
+        conversationRepository.save(conversation);
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_DATA_REFRESH,
+                PlannerDataRefreshPayload.from(conversation.getStatus(), snapshot));
+        webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
+                Map.of("version", snapshot.getVersion(), "scope", snapshot.getScope()));
         return snapshot;
     }
 
