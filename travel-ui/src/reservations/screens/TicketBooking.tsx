@@ -17,7 +17,6 @@ import {
 } from "@mui/material";
 import {
   ArrowForward,
-  CheckCircle,
   Flight,
   Search,
   SwapHoriz,
@@ -323,15 +322,6 @@ const airportNameMap: Record<string, string> = {
   NKG: "禄口",
 };
 
-const formatAirportNameWithTerminal = (
-  airportCode?: string | null,
-  terminalName?: string | null,
-) => {
-  const normalizedCode = airportCode?.trim().toUpperCase() ?? "";
-  const airportName = airportNameMap[normalizedCode] ?? normalizedCode;
-  return [airportName, terminalName?.trim()].filter(Boolean).join(" ");
-};
-
 const formatAirportFilterOption = (airportCode: string) => {
   const normalizedCode = airportCode.trim().toUpperCase();
   const airportName = airportNameMap[normalizedCode] ?? normalizedCode;
@@ -360,29 +350,15 @@ const TicketCard = ({
   selected?: boolean;
 }) => {
   const config = modeConfig[mode];
-  const departureTerminal = [
-    offer.departureStationCode,
+  const departurePlace = [
+    offer.departureStationName,
     offer.departureTerminalName,
   ]
     .filter(Boolean)
     .join(" ");
-  const arrivalTerminal = [offer.arrivalStationCode, offer.arrivalTerminalName]
+  const arrivalPlace = [offer.arrivalStationName, offer.arrivalTerminalName]
     .filter(Boolean)
     .join(" ");
-  const departurePlace =
-    mode === "flight"
-      ? formatAirportNameWithTerminal(
-          offer.departureStationCode,
-          offer.departureTerminalName,
-        )
-      : departureTerminal;
-  const arrivalPlace =
-    mode === "flight"
-      ? formatAirportNameWithTerminal(
-          offer.arrivalStationCode,
-          offer.arrivalTerminalName,
-        )
-      : arrivalTerminal;
   const departureDateLabel = formatTicketDate(offer.departureTime);
   const arrivalDateLabel = formatTicketDate(offer.arrivalTime);
 
@@ -390,17 +366,7 @@ const TicketCard = ({
     <div
       className={`bg-white rounded-lg border ${selected ? "border-blue-500 ring-2 ring-blue-100" : "border-slate-200"} ${compact ? "w-full" : "min-w-[760px]"} p-5 shadow-sm hover:shadow-md transition-shadow`}
     >
-      <div className="flex items-start justify-between gap-5">
-        <Chip
-          size="small"
-          icon={<CheckCircle />}
-          label={`成功率 ${offer.successRate}`}
-          sx={{ backgroundColor: "#ecfdf5", color: "#047857" }}
-        />
-        <p className="text-xs text-orange-500">{offer.notice}</p>
-      </div>
-
-      <div className="mt-5 flex flex-row items-center gap-5">
+      <div className="flex flex-row items-center gap-5">
         <div className="w-28">
           <p className="text-3xl font-bold" style={{ color: config.accent }}>
             {formatTicketClock(offer.departureTime)}
@@ -489,17 +455,7 @@ const TrainTicketCard = ({
     <div
       className={`bg-white rounded-lg border ${selected ? "border-blue-500 ring-2 ring-blue-100" : "border-slate-200"} p-5 shadow-sm hover:shadow-md transition-shadow`}
     >
-      <div className="flex items-start justify-between gap-5">
-        <Chip
-          size="small"
-          icon={<CheckCircle />}
-          label={`成功率 ${displayedOffer.successRate}`}
-          sx={{ backgroundColor: "#ecfdf5", color: "#047857" }}
-        />
-        <p className="text-xs text-orange-500">{displayedOffer.notice}</p>
-      </div>
-
-      <div className="mt-5 flex flex-row items-center gap-5">
+      <div className="flex flex-row items-center gap-5">
         <div className="w-28">
           <p className="text-3xl font-bold" style={{ color: config.accent }}>
             {formatTicketClock(displayedOffer.departureTime)}
@@ -509,7 +465,7 @@ const TrainTicketCard = ({
           )}
           <p className="mt-1 text-sm font-semibold text-slate-800">
             {[
-              displayedOffer.departureStationCode,
+              displayedOffer.departureStationName,
               displayedOffer.departureTerminalName,
             ]
               .filter(Boolean)
@@ -536,7 +492,7 @@ const TrainTicketCard = ({
           )}
           <p className="mt-1 text-sm font-semibold text-slate-800">
             {[
-              displayedOffer.arrivalStationCode,
+              displayedOffer.arrivalStationName,
               displayedOffer.arrivalTerminalName,
             ]
               .filter(Boolean)
@@ -681,7 +637,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       Array.from(
         new Set(
           timeAvailableOffers
-            .map((offer) => offer.departureStationCode)
+            .map((offer) => offer.departureStationName)
             .filter(Boolean),
         ),
       ).sort(),
@@ -692,7 +648,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       Array.from(
         new Set(
           timeAvailableOffers
-            .map((offer) => offer.arrivalStationCode)
+            .map((offer) => offer.arrivalStationName)
             .filter(Boolean),
         ),
       ).sort(),
@@ -703,7 +659,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       Array.from(
         new Set(
           timeAvailableOffers
-            .map((offer) => offer.departureStationCode)
+            .map((offer) => offer.departureStationName)
             .filter(Boolean),
         ),
       ).sort(),
@@ -714,7 +670,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       Array.from(
         new Set(
           timeAvailableOffers
-            .map((offer) => offer.arrivalStationCode)
+            .map((offer) => offer.arrivalStationName)
             .filter(Boolean),
         ),
       ).sort(),
@@ -726,9 +682,9 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       return timeAvailableOffers.filter((offer) => {
         return (
           (!departureAirportFilter ||
-            offer.departureStationCode === departureAirportFilter) &&
+            offer.departureStationName === departureAirportFilter) &&
           (!arrivalAirportFilter ||
-            offer.arrivalStationCode === arrivalAirportFilter)
+            offer.arrivalStationName === arrivalAirportFilter)
         );
       });
     }
@@ -738,9 +694,9 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       return (
         selectedTrainTypes.includes(getTrainTypeGroup(offer.code)) &&
         (!departureStationFilter ||
-          offer.departureStationCode === departureStationFilter) &&
+          offer.departureStationName === departureStationFilter) &&
         (!arrivalStationFilter ||
-          offer.arrivalStationCode === arrivalStationFilter) &&
+          offer.arrivalStationName === arrivalStationFilter) &&
         (!normalizedTrainCodeQuery ||
           normalizedOfferCode.includes(normalizedTrainCodeQuery))
       );
@@ -993,7 +949,10 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     }, 350);
 
     return () => window.clearTimeout(timeoutId);
-  }, [priceRange, onlyAvailable, sortBy, date]);
+    // Note: `date` is intentionally excluded so changing the date does not
+    // auto-search; the user must click the 查询 button to apply a new date,
+    // matching how departure/arrival city changes behave.
+  }, [priceRange, onlyAvailable, sortBy]);
 
   useEffect(() => {
     setDepartureAirportFilter("");
@@ -1208,6 +1167,9 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         passengerCount: selectedTravelers.length,
         price: selectedOffer.price * selectedTravelers.length,
         travelers: selectedTravelers,
+        // Pass the concrete offer id so transport-service can decrement the
+        // remaining seats for this exact dated row.
+        ticketOfferId: selectedOffer.ticketOfferId,
       });
       setReservationId(response.data.id);
       addNotification({

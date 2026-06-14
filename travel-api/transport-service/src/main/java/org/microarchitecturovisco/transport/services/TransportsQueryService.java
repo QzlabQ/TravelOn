@@ -18,7 +18,6 @@ import org.microarchitecturovisco.transport.model.dto.response.TicketOptionsDto;
 import org.microarchitecturovisco.transport.repositories.TicketOfferTemplateRepository;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,7 +26,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -107,17 +105,19 @@ public class TransportsQueryService {
             String sortBy
     ) {
         return ticketOfferTemplateRepository
-                .findByTypeAndDepartureCityIdAndArrivalCityIdOrderByDepartureDateTimeAsc(
+                .findByTypeAndDepartureCityIdAndArrivalCityIdAndDepartureDateTimeGreaterThanEqualAndDepartureDateTimeLessThanOrderByDepartureDateTimeAsc(
                         type,
                         cityCatalog.find(departureCity).cityId(),
-                        cityCatalog.find(arrivalCity).cityId()
+                        cityCatalog.find(arrivalCity).cityId(),
+                        departureDate.atStartOfDay(),
+                        departureDate.plusDays(1).atStartOfDay()
                 )
                 .stream()
                 .filter(offer -> minPrice == null || offer.getPrice() >= minPrice)
                 .filter(offer -> maxPrice == null || offer.getPrice() <= maxPrice)
                 .filter(offer -> !onlyAvailable || offer.getRemainingSeats() > 0)
                 .sorted(ticketOfferComparator(sortBy))
-                .map(offer -> mapTicketOffer(offer, departureDate))
+                .map(this::mapTicketOffer)
                 .toList();
     }
 
@@ -154,23 +154,13 @@ public class TransportsQueryService {
         };
     }
 
-    private TicketOfferDto mapTicketOffer(TicketOfferTemplate offer, LocalDate departureDate) {
-        LocalDateTime departureAt = departureDate.atTime(offer.getDepartureDateTime().toLocalTime());
-        LocalDateTime arrivalAt = departureDate.atTime(offer.getArrivalDateTime().toLocalTime());
-        if (!arrivalAt.isAfter(departureAt)) {
-            arrivalAt = arrivalAt.plusDays(1);
-        }
+    private TicketOfferDto mapTicketOffer(TicketOfferTemplate offer) {
+        LocalDateTime departureAt = offer.getDepartureDateTime();
+        LocalDateTime arrivalAt = offer.getArrivalDateTime();
         Duration duration = Duration.between(departureAt, arrivalAt);
 
-        String successRate = offer.getRemainingSeats() >= 15
-                ? "较高"
-                : offer.getRemainingSeats() >= 5 ? "中等" : "较低";
-        String notice = offer.getRemainingSeats() > 0
-                ? "余票 " + offer.getRemainingSeats() + " 张，历史样本参考价"
-                : "当前无余票，请尝试其他班次";
-
         return TicketOfferDto.builder()
-                .id(UUID.nameUUIDFromBytes((offer.getId().toString() + departureDate).getBytes(StandardCharsets.UTF_8)).toString())
+                .id(offer.getId().toString())
                 .ticketOfferId(offer.getId().toString())
                 .type(offer.getType().name())
                 .departureCity(cityCatalog.findByCityId(offer.getDepartureCityId()).cityName())
@@ -179,8 +169,10 @@ public class TransportsQueryService {
                 .arrivalCityId(offer.getArrivalCityId())
                 .departureStationCode(offer.getDepartureStationCode())
                 .departureTerminalName(offer.getDepartureTerminalName())
+                .departureStationName(offer.getDepartureStationName())
                 .arrivalStationCode(offer.getArrivalStationCode())
                 .arrivalTerminalName(offer.getArrivalTerminalName())
+                .arrivalStationName(offer.getArrivalStationName())
                 .departureTime(departureAt.toString())
                 .arrivalTime(arrivalAt.toString())
                 .duration(duration.toHours() + "h " + duration.toMinutesPart() + "m")
@@ -190,8 +182,6 @@ public class TransportsQueryService {
                 .price(offer.getPrice())
                 .remainingSeats(offer.getRemainingSeats())
                 .totalSeats(offer.getTotalSeats())
-                .successRate(successRate)
-                .notice(notice)
                 .build();
     }
 

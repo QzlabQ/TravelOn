@@ -280,8 +280,10 @@ class TransportSearchTool:
         return f"{code}，{route}，{time_text}{price_text}".strip("，")
 
     def _transport_address(self, item: dict[str, Any]) -> str | None:
-        departure = " ".join(str(part) for part in [item.get("departureStationCode"), item.get("departureTerminalName")] if part)
-        arrival = " ".join(str(part) for part in [item.get("arrivalStationCode"), item.get("arrivalTerminalName")] if part)
+        departure_station = item.get("departureStationName") or item.get("departureStationCode")
+        arrival_station = item.get("arrivalStationName") or item.get("arrivalStationCode")
+        departure = " ".join(str(part) for part in [departure_station, item.get("departureTerminalName")] if part)
+        arrival = " ".join(str(part) for part in [arrival_station, item.get("arrivalTerminalName")] if part)
         if departure and arrival:
             return f"{departure} → {arrival}"
         return departure or arrival or None

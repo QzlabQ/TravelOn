@@ -35,6 +35,8 @@ CREATE TABLE public.ticket_offer_templates (
     type character varying(255),
     arrival_city_id character varying(255),
     departure_city_id character varying(255),
+    departure_station_name character varying(255),
+    arrival_station_name character varying(255),
     CONSTRAINT ticket_offer_templates_type_check CHECK (type IN ('FLIGHT', 'TRAIN'))
 );
 
@@ -69,5 +71,7 @@ SELECT
     departure_station_code,
     departure_terminal_name,
     arrival_station_code,
-    arrival_terminal_name
+    arrival_terminal_name,
+    departure_station_name,
+    arrival_station_name
 FROM public.ticket_offer_templates;
