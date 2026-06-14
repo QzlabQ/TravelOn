@@ -13,12 +13,15 @@ CREATE TEMP TABLE seed_ticket_offers (
     seat_class text,
     price integer,
     remaining_seats integer,
-    total_seats integer
+    total_seats integer,
+    departure_station_name text,
+    arrival_station_name text
 );
 
-\copy seed_ticket_offers FROM '/seed-data/transport/plane/ticket_offers.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
+-- ticket_offers.csv files are schedule templates only; the dated booking
+-- inventory is produced by scripts/generate_dated_ticket_offers.py into the
+-- generated_ticket_offers.csv files, which are the rows actually imported.
 \copy seed_ticket_offers FROM '/seed-data/transport/plane/generated_ticket_offers.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
-\copy seed_ticket_offers FROM '/seed-data/transport/train/ticket_offers.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
 \copy seed_ticket_offers FROM '/seed-data/transport/train/generated_ticket_offers.csv' WITH (FORMAT csv, HEADER true, DELIMITER E'\t', NULL '')
 
 CREATE TEMP TABLE seed_cities_transport (
@@ -64,7 +67,9 @@ INSERT INTO public.ticket_offer_templates (
     seat_class,
     price,
     remaining_seats,
-    total_seats
+    total_seats,
+    departure_station_name,
+    arrival_station_name
 )
 SELECT (substr(md5(concat_ws(E'\t', type, departure_city_id, arrival_city_id, departure_station_code,
                              departure_terminal_name, arrival_station_code, arrival_terminal_name,
@@ -100,6 +105,8 @@ SELECT (substr(md5(concat_ws(E'\t', type, departure_city_id, arrival_city_id, de
        seat_class,
        price,
        remaining_seats,
-       total_seats
+       total_seats,
+       departure_station_name,
+       arrival_station_name
 FROM seed_ticket_offers
 ON CONFLICT (id) DO NOTHING;

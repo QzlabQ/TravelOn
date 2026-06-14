@@ -15,8 +15,10 @@ public class TicketOfferDto {
     private String arrivalCityId;
     private String departureStationCode;
     private String departureTerminalName;
+    private String departureStationName;
     private String arrivalStationCode;
     private String arrivalTerminalName;
+    private String arrivalStationName;
     private String departureTime;
     private String arrivalTime;
     private String duration;
@@ -26,6 +28,4 @@ public class TicketOfferDto {
     private int price;
     private int remainingSeats;
     private int totalSeats;
-    private String successRate;
-    private String notice;
 }

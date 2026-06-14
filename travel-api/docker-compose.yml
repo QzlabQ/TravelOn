@@ -21,6 +21,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+      # First boot replays the schema + ~300k seed rows before the real server
+      # (pid 1) starts, so the healthcheck necessarily fails until init finishes.
+      # start_period keeps those early failures from marking postgres unhealthy
+      # and tearing down dependent services on a fresh-volume build. Sized
+      # generously for low-spec deploy machines: a faster host turns healthy as
+      # soon as the first check passes, so a large value costs nothing there.
+      start_period: 1200s
     networks:
       - backend
 

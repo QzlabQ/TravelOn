@@ -32,8 +32,10 @@ public class TicketOfferTemplate {
     private String arrivalCityId;
     private String departureStationCode;
     private String departureTerminalName;
+    private String departureStationName;
     private String arrivalStationCode;
     private String arrivalTerminalName;
+    private String arrivalStationName;
     private LocalDateTime departureDateTime;
     private LocalDateTime arrivalDateTime;
     private String carrier;

@@ -666,8 +666,10 @@ export interface TicketSearchOffer {
     arrivalCityId: string,
     departureStationCode: string,
     departureTerminalName: string,
+    departureStationName: string,
     arrivalStationCode: string,
     arrivalTerminalName: string,
+    arrivalStationName: string,
     departureTime: string,
     arrivalTime: string,
     duration: string,
@@ -677,8 +679,6 @@ export interface TicketSearchOffer {
     price: number,
     remainingSeats: number,
     totalSeats: number,
-    successRate: string,
-    notice: string,
 }
 
 export interface SearchHotelsParams {

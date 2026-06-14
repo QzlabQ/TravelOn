@@ -12,6 +12,18 @@ import math
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from airport_catalog import (
+    AIRPORTS,
+    HEADER,
+    TRAIN_STATIONS,
+    load_city_id_to_name,
+    normalize_city_name,
+    normalize_legacy_row,
+)
+
+# AIRPORTS / TRAIN_STATIONS / normalize_city_name now live in airport_catalog so
+# the naming logic is shared with the column migration and stays in sync.
+
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMON_CITIES_FILE = ROOT / "seed-data/common/cities.csv"
@@ -47,59 +59,7 @@ COORDINATES = {
     "温州": (28.00, 120.67),
 }
 
-AIRPORTS = {
-    "北京": "北京首都国际机场", "上海": "上海虹桥国际机场", "天津": "天津滨海国际机场",
-    "重庆": "重庆江北国际机场", "石家庄": "石家庄正定国际机场", "太原": "太原武宿国际机场",
-    "呼和浩特": "呼和浩特白塔国际机场", "沈阳": "沈阳桃仙国际机场", "长春": "长春龙嘉国际机场",
-    "哈尔滨": "哈尔滨太平国际机场", "南京": "南京禄口国际机场", "杭州": "杭州萧山国际机场",
-    "合肥": "合肥新桥国际机场", "福州": "福州长乐国际机场", "南昌": "南昌昌北国际机场",
-    "济南": "济南遥墙国际机场", "郑州": "郑州新郑国际机场", "武汉": "武汉天河国际机场",
-    "长沙": "长沙黄花国际机场", "广州": "广州白云国际机场", "南宁": "南宁吴圩国际机场",
-    "海口": "海口美兰国际机场", "成都": "成都天府国际机场", "贵阳": "贵阳龙洞堡国际机场",
-    "昆明": "昆明长水国际机场", "拉萨": "拉萨贡嘎国际机场", "西安": "西安咸阳国际机场",
-    "兰州": "兰州中川国际机场", "西宁": "西宁曹家堡国际机场", "银川": "银川河东国际机场",
-    "乌鲁木齐": "乌鲁木齐天山国际机场", "香港": "香港国际机场", "澳门": "澳门国际机场",
-    "台北": "台北桃园国际机场", "深圳": "深圳宝安国际机场", "厦门": "厦门高崎国际机场",
-    "青岛": "青岛胶东国际机场", "大连": "大连周水子国际机场", "宁波": "宁波栎社国际机场",
-    "无锡": "苏南硕放国际机场", "桂林": "桂林两江国际机场", "三亚": "三亚凤凰国际机场",
-    "张家界": "张家界荷花国际机场", "丽江": "丽江三义国际机场", "大理": "大理凤仪机场",
-    "黄山": "黄山屯溪国际机场", "西双版纳": "西双版纳嘎洒国际机场", "珠海": "珠海金湾机场",
-    "洛阳": "洛阳北郊机场", "大同": "大同云冈国际机场", "敦煌": "敦煌莫高国际机场",
-    "喀什": "喀什徕宁国际机场", "吐鲁番": "吐鲁番交河机场", "阿勒泰": "阿勒泰雪都机场",
-    "秦皇岛": "秦皇岛北戴河机场", "威海": "威海大水泊国际机场", "泉州": "泉州晋江国际机场",
-    "扬州": "扬州泰州国际机场", "北海": "北海福成机场", "景德镇": "景德镇罗家机场",
-    "延吉": "延吉朝阳川国际机场", "伊犁": "伊宁机场", "惠州": "惠州平潭机场",
-    "九寨沟": "九寨黄龙机场", "烟台": "烟台蓬莱国际机场", "佛山": "佛山沙堤机场",
-    "满洲里": "满洲里西郊机场", "温州": "温州龙湾国际机场",
-}
-
-TRAIN_STATIONS = {
-    "北京": "北京南站", "上海": "上海虹桥站", "天津": "天津西站", "重庆": "重庆北站",
-    "石家庄": "石家庄站", "太原": "太原南站", "呼和浩特": "呼和浩特东站", "沈阳": "沈阳北站",
-    "长春": "长春西站", "哈尔滨": "哈尔滨西站", "南京": "南京南站", "杭州": "杭州东站",
-    "合肥": "合肥南站", "福州": "福州南站", "南昌": "南昌西站", "济南": "济南西站",
-    "郑州": "郑州东站", "武汉": "武汉站", "长沙": "长沙南站", "广州": "广州南站",
-    "南宁": "南宁东站", "海口": "海口东站", "成都": "成都东站", "贵阳": "贵阳北站",
-    "昆明": "昆明南站", "拉萨": "拉萨站", "西安": "西安北站", "兰州": "兰州西站",
-    "西宁": "西宁站", "银川": "银川站", "乌鲁木齐": "乌鲁木齐站", "深圳": "深圳北站",
-    "厦门": "厦门北站", "青岛": "青岛北站", "大连": "大连北站", "宁波": "宁波站",
-    "苏州": "苏州站", "无锡": "无锡站", "桂林": "桂林北站", "三亚": "三亚站",
-    "张家界": "张家界西站", "丽江": "丽江站", "大理": "大理站", "黄山": "黄山北站",
-    "珠海": "珠海站", "洛阳": "洛阳龙门站", "大同": "大同南站", "敦煌": "敦煌站",
-    "喀什": "喀什站", "吐鲁番": "吐鲁番北站", "阿勒泰": "阿勒泰站", "秦皇岛": "秦皇岛站",
-    "威海": "威海站", "泉州": "泉州站", "扬州": "扬州东站", "嘉兴": "嘉兴南站",
-    "北海": "北海站", "景德镇": "景德镇北站", "延吉": "延吉西站", "伊犁": "伊宁站",
-    "惠州": "惠州北站", "九寨沟": "黄龙九寨站", "烟台": "烟台站", "佛山": "佛山西站",
-    "满洲里": "满洲里站", "温州": "温州南站",
-    "香港": "香港西九龙站", "澳门": "珠海站", "台北": "台北车站", "西双版纳": "西双版纳站",
-}
-
 FLIGHT_CARRIERS = (("中国国航", "CA"), ("东方航空", "MU"), ("南方航空", "CZ"), ("海南航空", "HU"))
-HEADER = (
-    "type", "departureCityId", "arrivalCityId", "departureStationCode", "departureTerminalName",
-    "arrivalStationCode", "arrivalTerminalName", "departureDateTime", "arrivalDateTime",
-    "carrier", "code", "seatClass", "price", "remainingSeats", "totalSeats",
-)
 
 
 def ticket_cities() -> list[str]:
@@ -113,14 +73,6 @@ def ticket_cities() -> list[str]:
     else:
         cities = sorted(COORDINATES.keys())
     return cities + [city for city in EXTRA_TICKET_CITIES if city not in cities]
-
-
-def normalize_city_name(value: str) -> str:
-    value = value.strip()
-    for suffix in ("特别行政区", "地区", "自治州", "盟", "市"):
-        if value.endswith(suffix) and len(value) > len(suffix):
-            return value[:-len(suffix)]
-    return value
 
 
 def read_ticket_rows(path: Path) -> list[list[str]]:
@@ -167,10 +119,11 @@ def generated_flight(left: str, right: str, seed: int, ids: dict[str, str]) -> t
     price = max(260, round((230 + distance * 0.45 + seed % 170) / 10) * 10)
     seats = str(3 + seed % 35)
     return (
-        "FLIGHT", ids.get(left, left), ids.get(right, right), AIRPORTS.get(left, left), "",
-        AIRPORTS.get(right, right), "", format_datetime("2026-05-01", departure),
+        "FLIGHT", ids.get(left, left), ids.get(right, right), "", "",
+        "", "", format_datetime("2026-05-01", departure),
         format_datetime("2026-05-01", departure + duration), carrier, f"{prefix}{1000 + seed}",
         "经济舱", str(price), seats, seats,
+        AIRPORTS.get(left, left), AIRPORTS.get(right, right),
     )
 
 
@@ -181,10 +134,11 @@ def generated_train(left: str, right: str, seed: int, ids: dict[str, str]) -> tu
     price = max(24, round((18 + distance * 0.36 + seed % 55) / 5) * 5)
     seats = str(5 + seed % 31)
     return (
-        "TRAIN", ids.get(left, left), ids.get(right, right), TRAIN_STATIONS.get(left, f"{left}站"), "",
-        TRAIN_STATIONS.get(right, f"{right}站"), "", format_datetime("2026-05-01", departure),
+        "TRAIN", ids.get(left, left), ids.get(right, right), "", "",
+        "", "", format_datetime("2026-05-01", departure),
         format_datetime("2026-05-01", departure + duration), "中国铁路", f"G{1000 + seed}",
         "二等座", str(price), seats, seats,
+        TRAIN_STATIONS.get(left, f"{left}站"), TRAIN_STATIONS.get(right, f"{right}站"),
     )
 
 
@@ -194,9 +148,14 @@ def main() -> None:
     if missing:
         raise RuntimeError(f"Missing coordinates: {missing}")
     ids = city_ids()
+    city_id_to_name = load_city_id_to_name(COMMON_CITIES_FILE)
 
     existing_rows = read_ticket_rows(TRAIN_TICKETS_FILE) + read_ticket_rows(PLANE_TICKETS_FILE)
-    historical_rows = [row for row in existing_rows if len(row) == len(HEADER)]
+    historical_rows = [
+        normalize_legacy_row(row, city_id_to_name)
+        for row in existing_rows
+        if len(row) >= 15
+    ]
     covered_routes = {(row[0], row[1], row[2]) for row in historical_rows}
     generated_flight_rows: list[tuple[str, ...]] = []
     generated_train_rows: list[tuple[str, ...]] = []
