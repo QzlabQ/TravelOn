@@ -1,0 +1,1102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TravelOn 需求与设计汇报</title>
+  <style>
+    :root {
+      --bg: #eef5f3;
+      --paper: #ffffff;
+      --ink: #17252f;
+      --muted: #64727b;
+      --line: #d8e3e0;
+      --teal: #19857b;
+      --teal-dark: #0f5f58;
+      --blue: #2563a9;
+      --amber: #b7771e;
+      --purple: #6856a4;
+      --red: #b6473d;
+      --soft-teal: #e4f4f1;
+      --soft-blue: #e8f0fb;
+      --shadow: 0 18px 46px rgba(23, 37, 47, .14);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", Arial, sans-serif;
+    }
+
+    body { overflow: hidden; }
+
+    .deck {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .slide {
+      display: none;
+      position: absolute;
+      inset: 0;
+      padding: 42px 56px 38px;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(25, 133, 123, .09), transparent 42%),
+        radial-gradient(circle at 88% 14%, rgba(37, 99, 169, .10), transparent 24%),
+        var(--paper);
+    }
+
+    .slide.active {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .slide::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 8px;
+      background: linear-gradient(90deg, var(--teal), var(--blue), var(--amber), var(--purple));
+    }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .eyebrow {
+      margin-bottom: 10px;
+      color: var(--teal-dark);
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      max-width: 920px;
+      font-size: 64px;
+      line-height: 1.05;
+      font-weight: 950;
+      color: #102d3a;
+    }
+
+    h2 {
+      max-width: 940px;
+      font-size: 38px;
+      line-height: 1.12;
+      font-weight: 950;
+      color: #102d3a;
+    }
+
+    h3 {
+      font-size: 22px;
+      line-height: 1.22;
+      font-weight: 900;
+      color: #102d3a;
+    }
+
+    .lead {
+      max-width: 920px;
+      color: #53646d;
+      font-size: 21px;
+      line-height: 1.55;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .76);
+      color: #51616a;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .content {
+      min-height: 0;
+      flex: 1;
+      display: grid;
+      gap: 14px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .wide-left { grid-template-columns: 1.15fr .85fr; }
+    .wide-right { grid-template-columns: .88fr 1.12fr; }
+
+    .card {
+      min-height: 0;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .88);
+      box-shadow: 0 9px 24px rgba(23, 37, 47, .07);
+    }
+
+    .card.accent {
+      border-color: rgba(25, 133, 123, .38);
+      background: linear-gradient(180deg, #ffffff, #f3fbf9);
+    }
+
+    .visual-frame {
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #f8fbfa;
+      box-shadow: var(--shadow);
+    }
+
+    .visual-frame img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+    }
+
+    .visual-frame.contain img { object-fit: contain; padding: 12px; background: #fff; }
+    .visual-frame.medium { min-height: 280px; }
+    .visual-frame.tall { min-height: 380px; }
+    .visual-frame.short { min-height: 190px; }
+    .visual-frame.top img { object-position: top center; }
+
+    .visual-caption {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      max-width: calc(100% - 24px);
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(16, 45, 58, .84);
+      color: #fff;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .image-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .thumb {
+      min-height: 150px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 8px 20px rgba(23, 37, 47, .07);
+    }
+
+    .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .thumb.contain img { object-fit: contain; padding: 8px; background: #fff; }
+    .thumb .visual-caption {
+      left: 8px;
+      bottom: 8px;
+      padding: 5px 9px;
+      font-size: 12px;
+    }
+
+    .product-grid {
+      display: grid;
+      grid-template-columns: 1.12fr .88fr;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .shot-column {
+      display: grid;
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .uml-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .uml-grid .thumb {
+      min-height: 180px;
+    }
+
+    .evidence-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .evidence-row .thumb {
+      min-height: 160px;
+    }
+
+    .dense-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .dense-list .card p,
+    .dense-list li {
+      font-size: 16px;
+      line-height: 1.42;
+    }
+
+    .split-visual {
+      grid-template-columns: .92fr 1.08fr;
+    }
+
+    .screen-stack {
+      position: relative;
+      min-height: 0;
+    }
+
+    .hero .screen-stack {
+      min-height: 500px;
+    }
+
+    .screen-stack .visual-frame:first-child {
+      height: 360px;
+    }
+
+    .hero .screen-stack .visual-frame:first-child {
+      height: 430px;
+    }
+
+    .screen-stack .visual-frame:last-child {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 58%;
+      height: 210px;
+      border: 6px solid #fff;
+      box-shadow: 0 20px 42px rgba(23, 37, 47, .22);
+    }
+
+    .uml-pair {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .card p, li, .note {
+      color: #4a5a63;
+      font-size: 18px;
+      line-height: 1.52;
+    }
+
+    ul {
+      margin: 12px 0 0;
+      padding-left: 21px;
+    }
+
+    li + li { margin-top: 7px; }
+
+    .hero {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr .9fr;
+      gap: 38px;
+      align-items: center;
+      min-height: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-panel {
+      min-height: 430px;
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background:
+        linear-gradient(135deg, rgba(25, 133, 123, .18), transparent 48%),
+        linear-gradient(180deg, #fff, #f6fbfa);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 26px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      padding: 15px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .74);
+      border: 1px solid rgba(216, 227, 224, .9);
+    }
+
+    .metric strong {
+      display: block;
+      color: var(--teal-dark);
+      font-size: 30px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.3;
+    }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .problem {
+      padding: 18px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .problem.accent {
+      border-color: rgba(25, 133, 123, .38);
+      background: linear-gradient(180deg, #ffffff, #f3fbf9);
+    }
+
+    .problem b {
+      display: block;
+      margin-bottom: 8px;
+      color: #102d3a;
+      font-size: 19px;
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .module {
+      min-height: 156px;
+      padding: 16px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      justify-content: space-between;
+    }
+
+    .module .icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 900;
+      font-size: 19px;
+    }
+
+    .module strong {
+      font-size: 18px;
+      color: #102d3a;
+    }
+
+    .module span {
+      color: #55666f;
+      font-size: 14px;
+      line-height: 1.38;
+    }
+
+    .journey {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
+      position: relative;
+    }
+
+    .journey::before {
+      content: "";
+      position: absolute;
+      top: 46px;
+      left: 11%;
+      right: 11%;
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--teal), var(--blue), var(--amber), var(--purple));
+      opacity: .34;
+    }
+
+    .step {
+      position: relative;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 8px 20px rgba(23, 37, 47, .06);
+    }
+
+    .step .num {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      margin-bottom: 18px;
+      background: var(--teal);
+      color: #fff;
+      font-size: 22px;
+      font-weight: 900;
+      box-shadow: 0 10px 22px rgba(25, 133, 123, .24);
+    }
+
+    .diagram {
+      width: 100%;
+      height: 100%;
+      min-height: 420px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fbfdfc;
+      box-shadow: var(--shadow);
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .flow-card {
+      padding: 16px 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      text-align: center;
+      min-height: 130px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .flow-card strong {
+      color: #102d3a;
+      font-size: 17px;
+    }
+
+    .flow-card span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .decision {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .decision .card {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .badge {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 950;
+      background: var(--teal);
+    }
+
+    .footer {
+      position: absolute;
+      left: 68px;
+      right: 68px;
+      bottom: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #809098;
+      font-size: 13px;
+      z-index: 2;
+    }
+
+    .progress {
+      width: 180px;
+      height: 4px;
+      border-radius: 999px;
+      background: #d7e2df;
+      overflow: hidden;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: var(--p);
+      background: var(--teal);
+    }
+
+    .kbd {
+      padding: 3px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: #60717a;
+      font-size: 12px;
+    }
+
+    @media (max-width: 1000px) {
+      body { overflow: auto; }
+      .deck { height: auto; }
+      .slide {
+        display: flex;
+        position: relative;
+        min-height: 100vh;
+        padding: 34px 24px 50px;
+      }
+      .slide:not(.active) { display: none; }
+      h1 { font-size: 42px; }
+      h2 { font-size: 31px; }
+      .lead { font-size: 18px; }
+      .hero, .content, .cols-2, .cols-3, .cols-4, .wide-left, .wide-right, .matrix, .journey, .flow, .decision,
+      .product-grid, .image-grid, .image-grid.three, .shot-column, .uml-grid, .uml-pair, .evidence-row {
+        grid-template-columns: 1fr;
+      }
+      .module, .flow-card { min-height: auto; }
+      .journey::before { display: none; }
+      .screen-stack .visual-frame:last-child {
+        position: relative;
+        width: 100%;
+        height: 240px;
+        border-width: 1px;
+        margin-top: 12px;
+      }
+      .footer { left: 24px; right: 24px; }
+    }
+
+    @media print {
+      body { overflow: visible; background: #fff; }
+      .deck { height: auto; }
+      .slide {
+        display: flex !important;
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        page-break-after: always;
+        break-after: page;
+      }
+      .footer .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck" id="deck">
+    <section class="slide active">
+      <div class="hero">
+        <div>
+          <div class="eyebrow">TravelOn / Requirements & Design</div>
+          <h1>智能出行平台：从行程规划到预订分享的闭环设计</h1>
+          <p class="lead" style="margin-top:24px">
+            本次汇报聚焦两个问题：系统要解决哪些核心需求，以及当前项目如何通过微服务、AI 规划和版本化快照支撑可演示的业务闭环。
+          </p>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:26px">
+            <span class="tag">5 分钟汇报</span>
+            <span class="tag">需求划分</span>
+            <span class="tag">系统设计</span>
+            <span class="tag">AI 规划闭环</span>
+          </div>
+        </div>
+        <div class="screen-stack">
+          <div class="visual-frame top">
+            <img src="../src/01-home.png" alt="TravelOn 首页截图">
+            <span class="visual-caption">TravelOn 首页与核心入口</span>
+          </div>
+          <div class="visual-frame top">
+            <img src="../src/11-ai-planner-session.png" alt="AI 规划会话页截图">
+            <span class="visual-caption">AI 规划工作台</span>
+          </div>
+        </div>
+      </div>
+      <footer class="footer"><span>TravelOn 项目汇报</span><span class="hint"><span class="kbd">←</span> <span class="kbd">→</span> 翻页</span></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">01 / 背景与目标</div>
+          <h2>目标不是单点订票，而是降低出行决策成本</h2>
+        </div>
+        <span class="tag">行前规划 - 预订 - 订单 - 分享</span>
+      </div>
+      <div class="content product-grid">
+        <div class="shot-column">
+          <div class="visual-frame medium">
+            <img src="../src/05-hotel.png" alt="酒店列表页面">
+            <span class="visual-caption">酒店搜索与推荐</span>
+          </div>
+          <div class="visual-frame medium">
+            <img src="../src/06-train.png" alt="火车票页面">
+            <span class="visual-caption">火车票查询与预订</span>
+          </div>
+        </div>
+        <div class="dense-list">
+          <div class="problem"><b>搜索分散</b><p>酒店、火车票、机票和景点信息分散，用户需要多次切换页面和条件。</p></div>
+          <div class="problem"><b>规划割裂</b><p>行程安排、地图路线和票务住宿缺少统一规划入口。</p></div>
+          <div class="problem"><b>预订链路不连贯</b><p>推荐结果如果不能跳转到预订页，用户还要重新检索。</p></div>
+          <div class="problem accent"><b>产品目标</b><p>用一个入口串起出行基础信息、AI 行程生成、地图点位、酒店/票务推荐、订单管理和社区发布，形成课程验收可展示的完整链路。</p></div>
+        </div>
+      </div>
+      <footer class="footer"><span>核心判断：围绕用户旅程组织功能，而不是按页面堆功能</span><div class="progress" style="--p:22%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">02 / 核心需求划分</div>
+          <h2>系统需求按“出行闭环”拆成七个模块</h2>
+        </div>
+        <span class="tag">需求边界清晰，可验收</span>
+      </div>
+      <div class="content wide-right">
+        <div class="matrix" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+          <div class="module"><div class="icon" style="background:var(--blue)">U</div><strong>用户账户</strong><span>注册登录、资料维护、常用旅客管理</span></div>
+          <div class="module"><div class="icon" style="background:var(--teal)">H</div><strong>酒店</strong><span>目的地、酒店列表、详情、房型与预订入口</span></div>
+          <div class="module"><div class="icon" style="background:var(--amber)">T</div><strong>交通</strong><span>机票/火车票查询、票务结果与预订入口</span></div>
+          <div class="module"><div class="icon" style="background:var(--purple)">O</div><strong>订单支付</strong><span>订单详情、模拟支付、取消退款、时间线</span></div>
+          <div class="module"><div class="icon" style="background:#3f7f52">C</div><strong>社区</strong><span>帖子、评论、点赞、收藏、图片和 Markdown 游记</span></div>
+          <div class="module"><div class="icon" style="background:#0b7285">AI</div><strong>AI 规划</strong><span>基础槽位、对话生成、地图点位、快照版本</span></div>
+          <div class="module"><div class="icon" style="background:#596579">Ops</div><strong>部署运维</strong><span>Docker Compose、Gateway、Eureka、数据库验证</span></div>
+          <div class="module" style="border-style:dashed"><strong>验收标准</strong><span>每个需求都能回到页面、接口和数据层的具体实现</span></div>
+        </div>
+        <div class="uml-pair">
+          <div class="visual-frame contain short">
+            <img src="../src/legacy/需求规格/需求规格-p05-fig01.png" alt="系统架构 UML 图">
+            <span class="visual-caption">总体架构 UML</span>
+          </div>
+          <div class="card">
+            <h3>需求组织方式</h3>
+            <p style="margin-top:12px">核心不是功能列表本身，而是把每个模块放进“用户从规划到消费再到分享”的路径中，保证每个需求都有明确入口、输出和验收点。</p>
+          </div>
+        </div>
+      </div>
+      <footer class="footer"><span>来源：需求规格、概要设计、详细设计与当前代码实现</span><div class="progress" style="--p:33%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">03 / 用户旅程闭环</div>
+          <h2>四步形成可演示的业务闭环</h2>
+        </div>
+        <span class="tag">从 AI 计划到社区内容</span>
+      </div>
+      <div class="content">
+        <div class="journey">
+          <div class="step"><div class="num">1</div><h3>行前规划</h3><p style="margin-top:10px">填写城市、日期、人数和偏好，AI 生成 Markdown 行程、地图点位和推荐选项。</p></div>
+          <div class="step"><div class="num">2</div><h3>预订联动</h3><p style="margin-top:10px">酒店、火车票、机票推荐携带预约链接，跳转到对应预订页面并预填条件。</p></div>
+          <div class="step"><div class="num">3</div><h3>订单管理</h3><p style="margin-top:10px">用户可查看订单列表、详情、支付状态、取消退款和旅行时间线。</p></div>
+          <div class="step"><div class="num">4</div><h3>行后分享</h3><p style="margin-top:10px">AI 生成的 Markdown 行程可转发为社区富文本帖子，沉淀为游记内容。</p></div>
+        </div>
+        <div class="card accent">
+          <h3>验收视角</h3>
+          <p style="margin-top:12px">演示时可以从 `/ai-planner` 开始，完成一次规划，点击推荐预订入口，再将行程转发到社区，覆盖主要业务链路。</p>
+        </div>
+      </div>
+      <footer class="footer"><span>闭环比单点功能更能体现系统完整性</span><div class="progress" style="--p:44%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">04 / 产品界面证据</div>
+          <h2>核心需求已经落到可操作页面，演示路径清晰</h2>
+        </div>
+        <span class="tag">实际页面截图</span>
+      </div>
+      <div class="content product-grid">
+        <div class="visual-frame tall top">
+          <img src="../src/12-ai-planner-result.png" alt="AI 规划结果页面">
+          <span class="visual-caption">AI 规划结果：Markdown、地图点位、推荐卡</span>
+        </div>
+        <div class="image-grid">
+          <div class="thumb">
+            <img src="../src/07-flight.png" alt="机票搜索页面">
+            <span class="visual-caption">机票预订</span>
+          </div>
+          <div class="thumb">
+            <img src="../src/08-reservations.png" alt="订单列表页面">
+            <span class="visual-caption">订单管理</span>
+          </div>
+          <div class="thumb">
+            <img src="../src/09-payment.png" alt="支付页面">
+            <span class="visual-caption">支付流程</span>
+          </div>
+          <div class="thumb">
+            <img src="../src/10-community.png" alt="社区页面">
+            <span class="visual-caption">社区分享</span>
+          </div>
+        </div>
+      </div>
+      <footer class="footer"><span>这些截图对应演示闭环的四个关键节点</span><div class="progress" style="--p:50%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">05 / UML 设计视图</div>
+          <h2>用 UML 图补足模块边界、流程和数据对象说明</h2>
+        </div>
+        <span class="tag">来自 docs/src/legacy/需求规格</span>
+      </div>
+      <div class="content">
+        <div class="uml-grid">
+          <div class="thumb contain">
+            <img src="../src/legacy/需求规格/需求规格-p07-fig02.png" alt="票务模块 UML 图">
+            <span class="visual-caption">票务模块结构</span>
+          </div>
+          <div class="thumb contain">
+            <img src="../src/legacy/需求规格/需求规格-p08-fig04.png" alt="服务交互 UML 图">
+            <span class="visual-caption">业务交互关系</span>
+          </div>
+          <div class="thumb contain">
+            <img src="../src/legacy/需求规格/需求规格-p09-fig05.png" alt="订单支付 UML 图">
+            <span class="visual-caption">订单支付设计</span>
+          </div>
+          <div class="thumb contain">
+            <img src="../src/legacy/需求规格/需求规格-p09-fig06.png" alt="订单支付流程 UML 图">
+            <span class="visual-caption">订单流程补充</span>
+          </div>
+          <div class="thumb contain">
+            <img src="../src/legacy/需求规格/需求规格-p10-fig08.png" alt="社区模块 UML 图">
+            <span class="visual-caption">社区模块设计</span>
+          </div>
+          <div class="thumb contain">
+            <img src="../src/legacy/需求规格/需求规格-p12-fig10.png" alt="数据对象 UML 图">
+            <span class="visual-caption">数据对象关系</span>
+          </div>
+        </div>
+        <div class="card accent">
+          <h3>展示方式</h3>
+          <p style="margin-top:10px">这页不逐个讲图细节，而是用于说明项目不是只有页面堆叠：需求、模块边界、订单流程和社区内容都能对应到设计产物。</p>
+        </div>
+      </div>
+      <footer class="footer"><span>UML 图作为答辩时的设计证据，而非页面截图替代品</span><div class="progress" style="--p:58%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">06 / 总体架构设计</div>
+          <h2>微服务架构通过网关统一入口，AI 规划独立演进</h2>
+        </div>
+        <span class="tag">React + Spring Cloud + Python Agent</span>
+      </div>
+      <div class="content wide-right">
+        <div class="card">
+          <h3>设计要点</h3>
+          <ul>
+            <li>前端只访问 API Gateway，降低页面对服务地址的耦合。</li>
+            <li>业务服务通过 Eureka 注册发现，PostgreSQL 按服务拆分数据库。</li>
+            <li>AI Java 服务保存会话和快照，Python Agent 专注规划执行。</li>
+            <li>WebSocket 承载 AI 流式状态，提升等待过程可解释性。</li>
+          </ul>
+        </div>
+        <svg class="diagram" viewBox="0 0 840 470" role="img" aria-label="系统架构图">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 z" fill="#83939b"></path>
+            </marker>
+            <style>
+              .box{fill:#fff;stroke:#d8e3e0;stroke-width:2;rx:12}
+              .box2{fill:#e4f4f1;stroke:#89c8c0;stroke-width:2;rx:12}
+              .txt{font:700 20px Microsoft YaHei,Arial;fill:#102d3a}
+              .sub{font:500 14px Microsoft YaHei,Arial;fill:#65747c}
+              .ln{stroke:#83939b;stroke-width:2;fill:none;marker-end:url(#arrow)}
+            </style>
+          </defs>
+          <rect x="34" y="178" width="132" height="82" class="box2"></rect>
+          <text x="100" y="212" text-anchor="middle" class="txt">travel-ui</text>
+          <text x="100" y="236" text-anchor="middle" class="sub">React / MUI</text>
+          <rect x="218" y="178" width="150" height="82" class="box2"></rect>
+          <text x="293" y="212" text-anchor="middle" class="txt">API Gateway</text>
+          <text x="293" y="236" text-anchor="middle" class="sub">HTTP / WebSocket</text>
+          <path d="M166 219 H218" class="ln"></path>
+          <rect x="428" y="46" width="145" height="64" class="box"></rect>
+          <text x="500" y="84" text-anchor="middle" class="txt">hotel</text>
+          <rect x="428" y="126" width="145" height="64" class="box"></rect>
+          <text x="500" y="164" text-anchor="middle" class="txt">transport</text>
+          <rect x="428" y="206" width="145" height="64" class="box"></rect>
+          <text x="500" y="244" text-anchor="middle" class="txt">reservation</text>
+          <rect x="428" y="286" width="145" height="64" class="box"></rect>
+          <text x="500" y="324" text-anchor="middle" class="txt">community</text>
+          <rect x="428" y="366" width="145" height="64" class="box"></rect>
+          <text x="500" y="404" text-anchor="middle" class="txt">user / payment</text>
+          <path d="M368 199 C390 90,400 78,428 78" class="ln"></path>
+          <path d="M368 211 C394 158,402 158,428 158" class="ln"></path>
+          <path d="M368 223 H428" class="ln"></path>
+          <path d="M368 235 C394 318,402 318,428 318" class="ln"></path>
+          <path d="M368 247 C390 398,400 398,428 398" class="ln"></path>
+          <rect x="644" y="118" width="148" height="82" class="box2"></rect>
+          <text x="718" y="152" text-anchor="middle" class="txt">PostgreSQL</text>
+          <text x="718" y="176" text-anchor="middle" class="sub">业务数据</text>
+          <path d="M573 158 H644" class="ln"></path>
+          <path d="M573 238 C610 238,610 178,644 178" class="ln"></path>
+          <path d="M573 318 C610 318,610 188,644 188" class="ln"></path>
+          <rect x="226" y="318" width="150" height="80" class="box"></rect>
+          <text x="301" y="350" text-anchor="middle" class="txt">Eureka</text>
+          <text x="301" y="374" text-anchor="middle" class="sub">服务发现</text>
+          <rect x="644" y="244" width="148" height="82" class="box2"></rect>
+          <text x="718" y="278" text-anchor="middle" class="txt">MongoDB</text>
+          <text x="718" y="302" text-anchor="middle" class="sub">AI 会话 / 快照</text>
+          <rect x="644" y="350" width="148" height="64" class="box"></rect>
+          <text x="718" y="388" text-anchor="middle" class="txt">RabbitMQ</text>
+          <rect x="218" y="52" width="150" height="82" class="box2"></rect>
+          <text x="293" y="84" text-anchor="middle" class="txt">AI Java</text>
+          <text x="293" y="108" text-anchor="middle" class="sub">会话 / 快照 / WS</text>
+          <rect x="644" y="34" width="148" height="64" class="box"></rect>
+          <text x="718" y="72" text-anchor="middle" class="txt">Python Agent</text>
+          <path d="M293 178 V134" class="ln"></path>
+          <path d="M368 93 H644" class="ln"></path>
+          <path d="M368 112 C520 170,524 266,644 278" class="ln"></path>
+        </svg>
+      </div>
+      <footer class="footer"><span>设计原则：服务边界明确，统一入口，AI 与业务数据解耦</span><div class="progress" style="--p:64%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">07 / AI 规划设计</div>
+          <h2>AI 模块承担“理解需求、组织行程、联动预订”的中枢角色</h2>
+        </div>
+        <span class="tag">悬浮助手 + Markdown + 快照</span>
+      </div>
+      <div class="content wide-left">
+        <div class="screen-stack">
+          <div class="visual-frame top">
+            <img src="../src/11-ai-planner-session.png" alt="AI 规划会话页">
+            <span class="visual-caption">悬浮助手与生成过程</span>
+          </div>
+          <div class="visual-frame top">
+            <img src="../src/12-ai-planner-result.png" alt="AI 规划结果页">
+            <span class="visual-caption">Markdown、地图和推荐结果</span>
+          </div>
+        </div>
+        <div class="problem-grid">
+          <div class="problem"><b>基础槽位</b><p>出发城市、目的地、日期、人数、偏好构成规划输入。</p></div>
+          <div class="problem"><b>结构化结果</b><p>places、routes、bookingLinks 驱动推荐卡和预订跳转。</p></div>
+          <div class="problem"><b>版本设计</b><p>手动编辑通过 baseVersion 保存为新快照，避免覆盖 AI 结果。</p></div>
+          <div class="problem accent"><b>交互设计</b><p>把 AI 操作从主工作区收束到悬浮窗，主区专注 Markdown、地图和推荐结果。</p></div>
+        </div>
+      </div>
+      <footer class="footer"><span>AI 规划不是聊天框，而是行程方案生产和业务入口编排器</span><div class="progress" style="--p:73%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">08 / 数据与服务设计</div>
+          <h2>不同数据用不同存储，降低业务耦合</h2>
+        </div>
+        <span class="tag">PostgreSQL / MongoDB / RabbitMQ</span>
+      </div>
+      <div class="content wide-right">
+        <div class="image-grid">
+          <div class="thumb">
+            <img src="../src/01-home.png" alt="首页截图">
+            <span class="visual-caption">首页与统一入口</span>
+          </div>
+          <div class="thumb">
+            <img src="../src/03-account.png" alt="账户页面截图">
+            <span class="visual-caption">账户与基础资料</span>
+          </div>
+          <div class="thumb">
+            <img src="../src/08-reservations.png" alt="订单列表截图">
+            <span class="visual-caption">订单管理</span>
+          </div>
+          <div class="thumb">
+            <img src="../src/10-community.png" alt="社区页面截图">
+            <span class="visual-caption">社区与内容沉淀</span>
+          </div>
+        </div>
+        <div class="dense-list">
+          <div class="card accent">
+            <h3>PostgreSQL</h3>
+            <ul>
+              <li>承载酒店、交通、用户、订单、支付、社区等业务数据。</li>
+              <li>按服务拆分数据库，表结构通过初始化脚本维护。</li>
+              <li>适合强结构、可查询、可验证的交易数据。</li>
+            </ul>
+          </div>
+          <div class="card accent">
+            <h3>MongoDB</h3>
+            <ul>
+              <li>保存 AI 规划会话、消息、Planner Snapshot。</li>
+              <li>适合半结构化规划结果和版本历史。</li>
+              <li>支撑历史回看、回滚、手动 Markdown 新版本。</li>
+            </ul>
+          </div>
+          <div class="card accent">
+            <h3>Gateway / RabbitMQ</h3>
+            <ul>
+              <li>Gateway 统一 HTTP 与 WebSocket 入口。</li>
+              <li>RabbitMQ 支持部分服务间消息协作。</li>
+              <li>Eureka 提供服务注册发现，便于容器化部署。</li>
+            </ul>
+          </div>
+          <div class="card" style="grid-column:1/-1">
+            <h3>数据设计结论</h3>
+            <p style="margin-top:10px">业务订单和产品数据需要稳定约束，放在 PostgreSQL；AI 规划结果变化快、结构丰富，放在 MongoDB；跨服务入口和通信由 Gateway、Eureka、RabbitMQ 处理。</p>
+          </div>
+        </div>
+      </div>
+      <footer class="footer"><span>分层存储让 AI 迭代不影响核心交易数据</span><div class="progress" style="--p:82%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">09 / 关键设计取舍</div>
+          <h2>当前实现优先保证演示闭环稳定、边界清晰</h2>
+        </div>
+        <span class="tag">Pragmatic Design Choices</span>
+      </div>
+      <div class="content decision">
+        <div class="card"><div class="badge">1</div><div><h3>统一入口</h3><p style="margin-top:8px">前端不直接调用各服务，统一走 Gateway，后续替换服务地址或容器部署不影响页面。</p></div></div>
+        <div class="card"><div class="badge" style="background:var(--blue)">2</div><div><h3>AI 服务解耦</h3><p style="margin-top:8px">Java 负责协议、版本和持久化；Python Agent 负责模型和工具编排，职责分离。</p></div></div>
+        <div class="card"><div class="badge" style="background:var(--amber)">3</div><div><h3>快照防覆盖</h3><p style="margin-top:8px">AI 返回、用户手动编辑、历史版本切换都进入版本体系，避免状态被静默覆盖。</p></div></div>
+        <div class="card"><div class="badge" style="background:var(--purple)">4</div><div><h3>真实接口优先</h3><p style="margin-top:8px">酒店、票务、景点推荐优先走业务接口或 AMAP 数据，失败时明确 warning，不回退到伪链接。</p></div></div>
+      </div>
+      <footer class="footer"><span>取舍标准：能解释、能演示、能继续迭代</span><div class="progress" style="--p:91%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">10 / 演示闭环与总结</div>
+          <h2>最终展示重点：需求闭环已经落到可操作页面和服务接口</h2>
+        </div>
+        <span class="tag">Demo Path</span>
+      </div>
+      <div class="content wide-right">
+        <div class="card accent">
+          <h3>建议演示路径</h3>
+          <ul>
+            <li>进入 `/ai-planner`，填写出发城市、目的地、日期、人数和偏好。</li>
+            <li>用 AI 悬浮助手生成每日计划，查看 Markdown、地图点位和推荐卡。</li>
+            <li>点击酒店/火车票/机票推荐链接，跳转对应预订页面。</li>
+            <li>保存或编辑 Markdown 版本，将完整行程一键转发到社区。</li>
+          </ul>
+        </div>
+        <div class="image-grid">
+          <div class="thumb">
+            <img src="../src/05-hotel.png" alt="酒店页面截图">
+            <span class="visual-caption">酒店预订</span>
+          </div>
+          <div class="thumb">
+            <img src="../src/06-train.png" alt="火车票页面截图">
+            <span class="visual-caption">火车票预订</span>
+          </div>
+          <div class="thumb">
+            <img src="../src/09-payment.png" alt="支付页面截图">
+            <span class="visual-caption">支付闭环</span>
+          </div>
+          <div class="thumb">
+            <img src="../src/10-community.png" alt="社区页面截图">
+            <span class="visual-caption">社区转发</span>
+          </div>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <h3>总结</h3>
+          <p style="margin-top:12px">TravelOn 当前实现围绕“行前规划、预订联动、订单管理、行后分享”组织需求，并用微服务架构和 AI 快照机制支撑可演示、可扩展、可验收的系统设计。</p>
+        </div>
+      </div>
+      <footer class="footer"><span>结束页</span><div class="progress" style="--p:100%"><span></span></div></footer>
+    </section>
+  </main>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll(".slide"));
+    let current = 0;
+
+    function show(index) {
+      current = Math.max(0, Math.min(slides.length - 1, index));
+      slides.forEach((slide, slideIndex) => {
+        slide.classList.toggle("active", slideIndex === current);
+      });
+      location.hash = String(current + 1).padStart(2, "0");
+    }
+
+    function fromHash() {
+      const value = Number(location.hash.replace("#", ""));
+      if (Number.isFinite(value) && value >= 1 && value <= slides.length) {
+        show(value - 1);
+      }
+    }
+
+    window.addEventListener("keydown", event => {
+      if (["ArrowRight", "PageDown", " "].includes(event.key)) {
+        event.preventDefault();
+        show(current + 1);
+      }
+      if (["ArrowLeft", "PageUp"].includes(event.key)) {
+        event.preventDefault();
+        show(current - 1);
+      }
+      if (event.key === "Home") show(0);
+      if (event.key === "End") show(slides.length - 1);
+    });
+
+    window.addEventListener("hashchange", fromHash);
+    fromHash();
+  </script>
+</body>
+</html>
