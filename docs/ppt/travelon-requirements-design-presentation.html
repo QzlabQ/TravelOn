@@ -45,7 +45,7 @@
       display: none;
       position: absolute;
       inset: 0;
-      padding: 42px 56px 38px;
+      padding: 38px 52px 34px;
       overflow: hidden;
       background:
         linear-gradient(135deg, rgba(25, 133, 123, .09), transparent 42%),
@@ -56,7 +56,7 @@
     .slide.active {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
 
     .slide::before {
@@ -99,7 +99,7 @@
 
     h2 {
       max-width: 940px;
-      font-size: 38px;
+      font-size: 40px;
       line-height: 1.12;
       font-weight: 950;
       color: #102d3a;
@@ -115,8 +115,8 @@
     .lead {
       max-width: 920px;
       color: #53646d;
-      font-size: 21px;
-      line-height: 1.55;
+      font-size: 22px;
+      line-height: 1.5;
     }
 
     .tag {
@@ -136,7 +136,7 @@
       min-height: 0;
       flex: 1;
       display: grid;
-      gap: 14px;
+      gap: 12px;
       position: relative;
       z-index: 1;
     }
@@ -146,10 +146,11 @@
     .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .wide-left { grid-template-columns: 1.15fr .85fr; }
     .wide-right { grid-template-columns: .88fr 1.12fr; }
+    .balanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
     .card {
       min-height: 0;
-      padding: 18px;
+      padding: 20px;
       border: 1px solid var(--line);
       border-radius: 10px;
       background: rgba(255, 255, 255, .88);
@@ -193,7 +194,7 @@
       border-radius: 999px;
       background: rgba(16, 45, 58, .84);
       color: #fff;
-      font-size: 13px;
+      font-size: 14px;
       white-space: nowrap;
     }
 
@@ -274,7 +275,7 @@
 
     .dense-list .card p,
     .dense-list li {
-      font-size: 16px;
+      font-size: 17px;
       line-height: 1.42;
     }
 
@@ -316,10 +317,21 @@
       min-height: 0;
     }
 
+    .equal-screens {
+      display: grid;
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .equal-screens .visual-frame {
+      min-height: 0;
+    }
+
     .card p, li, .note {
       color: #4a5a63;
-      font-size: 18px;
-      line-height: 1.52;
+      font-size: 19px;
+      line-height: 1.48;
     }
 
     ul {
@@ -389,7 +401,7 @@
     }
 
     .problem {
-      padding: 18px;
+      padding: 20px;
       border-radius: 10px;
       border: 1px solid var(--line);
       background: #fff;
@@ -404,7 +416,7 @@
       display: block;
       margin-bottom: 8px;
       color: #102d3a;
-      font-size: 19px;
+      font-size: 21px;
     }
 
     .matrix {
@@ -415,8 +427,8 @@
     }
 
     .module {
-      min-height: 156px;
-      padding: 16px 12px;
+      min-height: 138px;
+      padding: 16px 14px;
       border: 1px solid var(--line);
       border-radius: 10px;
       background: #fff;
@@ -438,14 +450,14 @@
     }
 
     .module strong {
-      font-size: 18px;
+      font-size: 20px;
       color: #102d3a;
     }
 
     .module span {
       color: #55666f;
-      font-size: 14px;
-      line-height: 1.38;
+      font-size: 15px;
+      line-height: 1.4;
     }
 
     .journey {
@@ -470,7 +482,7 @@
 
     .step {
       position: relative;
-      padding: 20px;
+      padding: 22px;
       border: 1px solid var(--line);
       border-radius: 12px;
       background: #fff;
@@ -556,6 +568,112 @@
       background: var(--teal);
     }
 
+    .statement {
+      padding: 24px;
+      border: 1px solid rgba(25, 133, 123, .34);
+      border-radius: 12px;
+      background: linear-gradient(180deg, #ffffff, #f2fbf9);
+      box-shadow: 0 12px 28px rgba(23, 37, 47, .08);
+    }
+
+    .statement p {
+      color: #24343d;
+      font-size: 22px;
+      line-height: 1.56;
+      font-weight: 650;
+    }
+
+    .compact-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .ai-tool-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .member-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .member-card {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 16px;
+    }
+
+    .member-name {
+      display: grid;
+      place-items: center;
+      min-height: 68px;
+      border-radius: 12px;
+      background: var(--teal);
+      color: #fff;
+      font-size: 22px;
+      font-weight: 950;
+    }
+
+    .member-card p {
+      font-size: 16px;
+      line-height: 1.38;
+    }
+
+    .tool-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .tool-card .badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+    }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .workflow-node {
+      min-height: 96px;
+      padding: 14px 10px;
+      border: 1px solid rgba(25, 133, 123, .28);
+      border-radius: 10px;
+      background: #fff;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: #17313d;
+      font-size: 16px;
+      font-weight: 850;
+      position: relative;
+    }
+
+    .workflow-node:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--teal);
+      font-size: 20px;
+      font-weight: 900;
+      z-index: 2;
+    }
+
     .footer {
       position: absolute;
       left: 68px;
@@ -606,12 +724,14 @@
       h1 { font-size: 42px; }
       h2 { font-size: 31px; }
       .lead { font-size: 18px; }
-      .hero, .content, .cols-2, .cols-3, .cols-4, .wide-left, .wide-right, .matrix, .journey, .flow, .decision,
-      .product-grid, .image-grid, .image-grid.three, .shot-column, .uml-grid, .uml-pair, .evidence-row {
+      .hero, .content, .cols-2, .cols-3, .cols-4, .wide-left, .wide-right, .balanced, .matrix, .journey, .flow, .decision,
+      .product-grid, .image-grid, .image-grid.three, .shot-column, .uml-grid, .uml-pair, .evidence-row,
+      .compact-grid, .ai-tool-grid, .workflow, .member-grid, .equal-screens {
         grid-template-columns: 1fr;
       }
       .module, .flow-card { min-height: auto; }
       .journey::before { display: none; }
+      .workflow-node:not(:last-child)::after { display: none; }
       .screen-stack .visual-frame:last-child {
         position: relative;
         width: 100%;
@@ -672,29 +792,34 @@
       <div class="head">
         <div>
           <div class="eyebrow">01 / 背景与目标</div>
-          <h2>目标不是单点订票，而是降低出行决策成本</h2>
+          <h2>面向全旅程场景的一体化出行旅游平台</h2>
         </div>
-        <span class="tag">行前规划 - 预订 - 订单 - 分享</span>
+        <span class="tag">行前规划 - 行中服务 - 行后分享</span>
       </div>
-      <div class="content product-grid">
+      <div class="content wide-left">
+        <div class="dense-list">
+          <div class="statement">
+            <p>为满足用户日益增长的出行与旅游预订需求，TravelOn 需要建设一款集机票预订、酒店住宿、旅游度假、火车票购买于一体的综合出行旅游平台。平台提供丰富的出行产品选择、智能的行程规划工具、透明的价格信息与便捷的预订流程，覆盖用户“行前规划 - 行中服务 - 行后分享”的全旅程场景。</p>
+          </div>
+          <div class="compact-grid">
+            <div class="problem"><b>搜索分散</b><p>酒店、火车票、机票和景点信息分散，用户需要多次切换页面和条件。</p></div>
+            <div class="problem"><b>规划割裂</b><p>行程安排、地图路线和票务住宿缺少统一规划入口。</p></div>
+            <div class="problem"><b>预订链路断点</b><p>推荐结果若不能跳转预订页，用户仍需重复检索和确认条件。</p></div>
+            <div class="problem accent"><b>产品目标</b><p>串联基础信息、AI 行程、地图点位、酒店/票务推荐、订单管理和社区发布，形成完整业务闭环。</p></div>
+          </div>
+        </div>
         <div class="shot-column">
-          <div class="visual-frame medium">
+          <div class="visual-frame medium top">
             <img src="../src/05-hotel.png" alt="酒店列表页面">
             <span class="visual-caption">酒店搜索与推荐</span>
           </div>
-          <div class="visual-frame medium">
+          <div class="visual-frame medium top">
             <img src="../src/06-train.png" alt="火车票页面">
             <span class="visual-caption">火车票查询与预订</span>
           </div>
         </div>
-        <div class="dense-list">
-          <div class="problem"><b>搜索分散</b><p>酒店、火车票、机票和景点信息分散，用户需要多次切换页面和条件。</p></div>
-          <div class="problem"><b>规划割裂</b><p>行程安排、地图路线和票务住宿缺少统一规划入口。</p></div>
-          <div class="problem"><b>预订链路不连贯</b><p>推荐结果如果不能跳转到预订页，用户还要重新检索。</p></div>
-          <div class="problem accent"><b>产品目标</b><p>用一个入口串起出行基础信息、AI 行程生成、地图点位、酒店/票务推荐、订单管理和社区发布，形成课程验收可展示的完整链路。</p></div>
-        </div>
       </div>
-      <footer class="footer"><span>核心判断：围绕用户旅程组织功能，而不是按页面堆功能</span><div class="progress" style="--p:22%"><span></span></div></footer>
+      <footer class="footer"><span>业务价值：减少跨平台切换成本，提升规划、预订与内容沉淀的一致性</span><div class="progress" style="--p:17%"><span></span></div></footer>
     </section>
 
     <section class="slide">
@@ -703,7 +828,7 @@
           <div class="eyebrow">02 / 核心需求划分</div>
           <h2>系统需求按“出行闭环”拆成七个模块</h2>
         </div>
-        <span class="tag">需求边界清晰，可验收</span>
+        <span class="tag">需求边界清晰，功能可验收</span>
       </div>
       <div class="content wide-right">
         <div class="matrix" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
@@ -714,7 +839,7 @@
           <div class="module"><div class="icon" style="background:#3f7f52">C</div><strong>社区</strong><span>帖子、评论、点赞、收藏、图片和 Markdown 游记</span></div>
           <div class="module"><div class="icon" style="background:#0b7285">AI</div><strong>AI 规划</strong><span>基础槽位、对话生成、地图点位、快照版本</span></div>
           <div class="module"><div class="icon" style="background:#596579">Ops</div><strong>部署运维</strong><span>Docker Compose、Gateway、Eureka、数据库验证</span></div>
-          <div class="module" style="border-style:dashed"><strong>验收标准</strong><span>每个需求都能回到页面、接口和数据层的具体实现</span></div>
+          <div class="module" style="border-style:dashed"><strong>系统边界</strong><span>每个需求都映射到页面入口、服务接口和数据实体</span></div>
         </div>
         <div class="uml-pair">
           <div class="visual-frame contain short">
@@ -722,8 +847,8 @@
             <span class="visual-caption">总体架构 UML</span>
           </div>
           <div class="card">
-            <h3>需求组织方式</h3>
-            <p style="margin-top:12px">核心不是功能列表本身，而是把每个模块放进“用户从规划到消费再到分享”的路径中，保证每个需求都有明确入口、输出和验收点。</p>
+            <h3>需求组织原则</h3>
+            <p style="margin-top:12px">系统围绕用户旅程组织模块：账户提供身份与旅客信息，酒店和交通提供可交易产品，订单支付完成履约闭环，社区与 AI 规划承担内容生成和复用能力。</p>
           </div>
         </div>
       </div>
@@ -734,7 +859,7 @@
       <div class="head">
         <div>
           <div class="eyebrow">03 / 用户旅程闭环</div>
-          <h2>四步形成可演示的业务闭环</h2>
+          <h2>四步覆盖用户从出发前到归来后的核心场景</h2>
         </div>
         <span class="tag">从 AI 计划到社区内容</span>
       </div>
@@ -746,20 +871,20 @@
           <div class="step"><div class="num">4</div><h3>行后分享</h3><p style="margin-top:10px">AI 生成的 Markdown 行程可转发为社区富文本帖子，沉淀为游记内容。</p></div>
         </div>
         <div class="card accent">
-          <h3>验收视角</h3>
-          <p style="margin-top:12px">演示时可以从 `/ai-planner` 开始，完成一次规划，点击推荐预订入口，再将行程转发到社区，覆盖主要业务链路。</p>
+          <h3>闭环价值</h3>
+          <p style="margin-top:12px">TravelOn 将行程规划、产品预订、订单履约和社区分享纳入统一流程，使用户数据、推荐结果和内容资产能够在系统内持续流转。</p>
         </div>
       </div>
-      <footer class="footer"><span>闭环比单点功能更能体现系统完整性</span><div class="progress" style="--p:44%"><span></span></div></footer>
+      <footer class="footer"><span>业务闭环：规划产生需求，预订承接交易，订单沉淀履约，社区复用内容</span><div class="progress" style="--p:33%"><span></span></div></footer>
     </section>
 
     <section class="slide">
       <div class="head">
         <div>
           <div class="eyebrow">04 / 产品界面证据</div>
-          <h2>核心需求已经落到可操作页面，演示路径清晰</h2>
+          <h2>核心需求已经落到可操作页面与业务入口</h2>
         </div>
-        <span class="tag">实际页面截图</span>
+        <span class="tag">实现对应关系</span>
       </div>
       <div class="content product-grid">
         <div class="visual-frame tall top">
@@ -785,7 +910,7 @@
           </div>
         </div>
       </div>
-      <footer class="footer"><span>这些截图对应演示闭环的四个关键节点</span><div class="progress" style="--p:50%"><span></span></div></footer>
+      <footer class="footer"><span>实现证据：AI 规划、票务预订、订单支付、社区内容均有对应页面承载</span><div class="progress" style="--p:42%"><span></span></div></footer>
     </section>
 
     <section class="slide">
@@ -794,7 +919,7 @@
           <div class="eyebrow">05 / UML 设计视图</div>
           <h2>用 UML 图补足模块边界、流程和数据对象说明</h2>
         </div>
-        <span class="tag">来自 docs/src/legacy/需求规格</span>
+        <span class="tag">设计证据</span>
       </div>
       <div class="content">
         <div class="uml-grid">
@@ -824,11 +949,11 @@
           </div>
         </div>
         <div class="card accent">
-          <h3>展示方式</h3>
-          <p style="margin-top:10px">这页不逐个讲图细节，而是用于说明项目不是只有页面堆叠：需求、模块边界、订单流程和社区内容都能对应到设计产物。</p>
+          <h3>设计说明</h3>
+          <p style="margin-top:10px">UML 图用于说明需求并非页面堆叠，而是经过模块边界、订单流程、票务结构、社区内容和数据对象关系的系统化设计。</p>
         </div>
       </div>
-      <footer class="footer"><span>UML 图作为答辩时的设计证据，而非页面截图替代品</span><div class="progress" style="--p:58%"><span></span></div></footer>
+      <footer class="footer"><span>设计证据：模块划分、业务流程与数据对象均具备可追溯设计产物</span><div class="progress" style="--p:50%"><span></span></div></footer>
     </section>
 
     <section class="slide">
@@ -840,14 +965,23 @@
         <span class="tag">React + Spring Cloud + Python Agent</span>
       </div>
       <div class="content wide-right">
-        <div class="card">
-          <h3>设计要点</h3>
-          <ul>
-            <li>前端只访问 API Gateway，降低页面对服务地址的耦合。</li>
-            <li>业务服务通过 Eureka 注册发现，PostgreSQL 按服务拆分数据库。</li>
-            <li>AI Java 服务保存会话和快照，Python Agent 专注规划执行。</li>
-            <li>WebSocket 承载 AI 流式状态，提升等待过程可解释性。</li>
-          </ul>
+        <div class="dense-list">
+          <div class="card accent">
+            <h3>入口层</h3>
+            <p style="margin-top:10px">React 前端统一通过 API Gateway 访问后端能力，页面不直接绑定各微服务地址。网关同时承载 HTTP 请求和 AI 规划 WebSocket 流式通道，使普通业务操作与 AI 生成状态都能从统一入口进入系统。</p>
+          </div>
+          <div class="card">
+            <h3>业务服务层</h3>
+            <p style="margin-top:10px">酒店、交通、预订、社区、用户与支付服务按业务边界拆分，通过 Eureka 完成服务发现。各服务负责自身领域模型和接口，避免订单、票务、社区内容互相侵入。</p>
+          </div>
+          <div class="card">
+            <h3>AI 编排层</h3>
+            <p style="margin-top:10px">AI Java 服务负责会话、消息、快照版本和 WebSocket 状态同步；Python Agent 负责模型调用、工具编排、AMAP/票务/酒店数据查询与结构化结果生成。</p>
+          </div>
+          <div class="card accent">
+            <h3>数据与协作层</h3>
+            <p style="margin-top:10px">PostgreSQL 承载稳定业务数据，MongoDB 保存 AI 会话与半结构化快照，RabbitMQ 支持部分服务间消息协作。该设计保证核心交易数据稳定，同时允许 AI 模块快速迭代。</p>
+          </div>
         </div>
         <svg class="diagram" viewBox="0 0 840 470" role="img" aria-label="系统架构图">
           <defs>
@@ -919,8 +1053,8 @@
         </div>
         <span class="tag">悬浮助手 + Markdown + 快照</span>
       </div>
-      <div class="content wide-left">
-        <div class="screen-stack">
+      <div class="content balanced">
+        <div class="equal-screens">
           <div class="visual-frame top">
             <img src="../src/11-ai-planner-session.png" alt="AI 规划会话页">
             <span class="visual-caption">悬浮助手与生成过程</span>
@@ -1004,10 +1138,10 @@
     <section class="slide">
       <div class="head">
         <div>
-          <div class="eyebrow">09 / 关键设计取舍</div>
-          <h2>当前实现优先保证演示闭环稳定、边界清晰</h2>
+          <div class="eyebrow">09 / 工程设计结论</div>
+          <h2>当前实现围绕稳定闭环、清晰边界与真实数据优先展开</h2>
         </div>
-        <span class="tag">Pragmatic Design Choices</span>
+        <span class="tag">工程实现原则</span>
       </div>
       <div class="content decision">
         <div class="card"><div class="badge">1</div><div><h3>统一入口</h3><p style="margin-top:8px">前端不直接调用各服务，统一走 Gateway，后续替换服务地址或容器部署不影响页面。</p></div></div>
@@ -1015,25 +1149,117 @@
         <div class="card"><div class="badge" style="background:var(--amber)">3</div><div><h3>快照防覆盖</h3><p style="margin-top:8px">AI 返回、用户手动编辑、历史版本切换都进入版本体系，避免状态被静默覆盖。</p></div></div>
         <div class="card"><div class="badge" style="background:var(--purple)">4</div><div><h3>真实接口优先</h3><p style="margin-top:8px">酒店、票务、景点推荐优先走业务接口或 AMAP 数据，失败时明确 warning，不回退到伪链接。</p></div></div>
       </div>
-      <footer class="footer"><span>取舍标准：能解释、能演示、能继续迭代</span><div class="progress" style="--p:91%"><span></span></div></footer>
+      <footer class="footer"><span>工程结论：核心链路可解释、可验证，并保留后续模块扩展空间</span><div class="progress" style="--p:83%"><span></span></div></footer>
     </section>
 
     <section class="slide">
       <div class="head">
         <div>
-          <div class="eyebrow">10 / 演示闭环与总结</div>
-          <h2>最终展示重点：需求闭环已经落到可操作页面和服务接口</h2>
+          <div class="eyebrow">10 / AI 工具实践与个人贡献</div>
+          <h2>通过 vibecoding、Agent 编排与工作流沉淀提升开发效率</h2>
         </div>
-        <span class="tag">Demo Path</span>
+        <span class="tag">AI-Assisted Engineering</span>
+      </div>
+      <div class="content">
+        <div class="ai-tool-grid">
+          <div class="card tool-card accent">
+            <div class="badge">V</div>
+            <h3>Vibecoding 实践</h3>
+            <p>围绕需求文档、UI 截图和验收反馈进行 prompt 迭代，辅助完成页面重构、交互调整、文案优化和 bug 定位。</p>
+            <ul>
+              <li>快速生成方案与代码草稿</li>
+              <li>根据截图反馈持续调优界面</li>
+              <li>把测试问题转化为可执行修复项</li>
+            </ul>
+          </div>
+          <div class="card tool-card accent">
+            <div class="badge" style="background:var(--blue)">A</div>
+            <h3>Agent 能力落地</h3>
+            <p>将 AI 规划拆分为可调用工具：景点、酒店、火车票、机票、地图图片与预约链接分别进入独立数据流。</p>
+            <ul>
+              <li>AMAP 与业务接口优先</li>
+              <li>失败返回 warning 而非伪数据</li>
+              <li>推荐结果沉淀为结构化快照</li>
+            </ul>
+          </div>
+          <div class="card tool-card accent">
+            <div class="badge" style="background:var(--amber)">W</div>
+            <h3>Workflow 搭建</h3>
+            <p>将需求、实现、验证和展示串成稳定工作流，使 AI 不是一次性生成器，而是项目迭代中的协作工具。</p>
+            <ul>
+              <li>需求拆解到工程任务</li>
+              <li>前后端联调与快照验证</li>
+              <li>演示稿同步沉淀项目成果</li>
+            </ul>
+          </div>
+        </div>
+        <div class="workflow">
+          <div class="workflow-node">需求反馈</div>
+          <div class="workflow-node">Prompt 迭代</div>
+          <div class="workflow-node">Agent 工具</div>
+          <div class="workflow-node">Snapshot 版本</div>
+          <div class="workflow-node">前端展示</div>
+          <div class="workflow-node">社区转发</div>
+        </div>
+        <div class="card">
+          <h3>个人作用体现</h3>
+          <p style="margin-top:10px">在 AI 工具使用中承担“需求翻译、方案约束、结果验收、问题回归”的角色：既利用 AI 提升编码速度，也通过接口约束、测试计划和真实数据校验保证工程质量。</p>
+        </div>
+      </div>
+      <footer class="footer"><span>AI 工具能力：把模糊需求稳定转化为可实现、可验证、可展示的工程结果</span><div class="progress" style="--p:91%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">11 / 团队成员分工</div>
+          <h2>围绕基础设施、业务模块、AI 规划与交付材料形成协同分工</h2>
+        </div>
+        <span class="tag">Team Contribution</span>
+      </div>
+      <div class="content">
+        <div class="member-grid">
+          <div class="card member-card accent">
+            <div class="member-name">张弛</div>
+            <p>从 0 到 1 建设并持续完善 AI 行程规划模块，并把它和真实业务数据、预约系统、地图图片、Markdown 富文本、社区发布等模块打通，形成“输入需求 -> AI 生成行程 -> 推荐酒店/票务/景点 -> 编辑保存 -> 转发社区”的完整产品闭环。</p>
+          </div>
+          <div class="card member-card">
+            <div class="member-name" style="background:var(--blue)">胡云帆</div>
+            <p>完成基础设施搭建，构建 PostgreSQL 数据库系统，统一所有微服务的数据存储与配置；完成全部社区功能开发，形成用户分享平台；负责主页和 Logo 设计，并参与测试与 bug 修复。</p>
+          </div>
+          <div class="card member-card">
+            <div class="member-name" style="background:var(--amber)">黄海城</div>
+            <p>负责预订与登录模块开发，完成票务/酒店预订、账号登录注册、订单提交与状态展示等功能，并优化相关交互体验；参与部分软件说明书撰写。</p>
+          </div>
+          <div class="card member-card">
+            <div class="member-name" style="background:var(--purple)">傅淇</div>
+            <p>参与 AI 规划模块设计、工程文档撰写、宣发视频剪辑、项目初期创意构思和需求设计，并负责用户注册系统相关工作。</p>
+          </div>
+          <div class="card member-card" style="grid-column:1/-1">
+            <div class="member-name" style="background:#596579">周昭烜</div>
+            <p>负责软件部署、服务器管理和部署文档撰写，保障项目能够在目标环境中完成服务启动、运行验证和交付说明。</p>
+          </div>
+        </div>
+      </div>
+      <footer class="footer"><span>团队协作：模块开发、基础设施、AI 能力、文档交付与部署运维共同支撑项目闭环</span><div class="progress" style="--p:96%"><span></span></div></footer>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">12 / 项目价值与交付结果</div>
+          <h2>TravelOn 已形成可演示、可扩展、可验收的出行服务闭环</h2>
+        </div>
+        <span class="tag">交付总结</span>
       </div>
       <div class="content wide-right">
         <div class="card accent">
-          <h3>建议演示路径</h3>
+          <h3>交付结果</h3>
           <ul>
-            <li>进入 `/ai-planner`，填写出发城市、目的地、日期、人数和偏好。</li>
-            <li>用 AI 悬浮助手生成每日计划，查看 Markdown、地图点位和推荐卡。</li>
-            <li>点击酒店/火车票/机票推荐链接，跳转对应预订页面。</li>
-            <li>保存或编辑 Markdown 版本，将完整行程一键转发到社区。</li>
+            <li>完成用户账户、酒店、交通、订单支付、社区与 AI 规划的核心页面和服务联动。</li>
+            <li>AI 规划支持 Markdown 行程、地图点位、推荐卡、预约链接和版本快照。</li>
+            <li>社区支持 Markdown 富文本帖子，承接 AI 行程的一键转发与内容沉淀。</li>
+            <li>微服务、网关、数据库和 Agent 工具链支撑完整业务闭环。</li>
           </ul>
         </div>
         <div class="image-grid">
@@ -1056,7 +1282,7 @@
         </div>
         <div class="card" style="grid-column:1/-1">
           <h3>总结</h3>
-          <p style="margin-top:12px">TravelOn 当前实现围绕“行前规划、预订联动、订单管理、行后分享”组织需求，并用微服务架构和 AI 快照机制支撑可演示、可扩展、可验收的系统设计。</p>
+          <p style="margin-top:12px">TravelOn 当前实现围绕“行前规划、预订联动、订单管理、行后分享”组织需求，并通过微服务架构、AI 快照机制和真实业务接口优先策略，支撑可演示、可扩展、可验收的系统设计。</p>
         </div>
       </div>
       <footer class="footer"><span>结束页</span><div class="progress" style="--p:100%"><span></span></div></footer>
