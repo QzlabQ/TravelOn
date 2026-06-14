@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TravelOn 需求划分与完成情况</title>
+  <style>
+    :root {
+      --paper: #f7f4ee;
+      --ink: #172128;
+      --sub: #66737b;
+      --line: #d9d1c4;
+      --card: #fffdf8;
+      --green: #1f7a5a;
+      --teal: #1d6f79;
+      --blue: #265c8f;
+      --amber: #bd7c25;
+      --red: #a8463b;
+      --purple: #6a5a8e;
+      --shadow: 0 22px 54px rgba(23, 33, 40, .16);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", Arial, sans-serif;
+    }
+
+    body { overflow: hidden; }
+
+    .deck {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .slide {
+      display: none;
+      position: absolute;
+      inset: 0;
+      padding: 54px 70px 44px;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(31, 122, 90, .08), transparent 36%),
+        radial-gradient(circle at 88% 12%, rgba(189, 124, 37, .13), transparent 28%),
+        var(--paper);
+    }
+
+    .slide.active {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .slide::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 10px;
+      background: linear-gradient(90deg, var(--green), var(--amber), var(--blue), var(--purple));
+    }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+    }
+
+    .eyebrow {
+      color: var(--green);
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      max-width: 920px;
+      font-size: 68px;
+      line-height: 1.04;
+      color: #143044;
+      font-weight: 950;
+    }
+
+    h2 {
+      font-size: 42px;
+      line-height: 1.12;
+      color: #143044;
+      font-weight: 950;
+    }
+
+    h3 {
+      color: #143044;
+      font-size: 21px;
+      line-height: 1.25;
+      font-weight: 900;
+    }
+
+    .lead {
+      max-width: 900px;
+      color: #526269;
+      font-size: 23px;
+      line-height: 1.55;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 8px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 253, 248, .75);
+      color: #59676e;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+      min-height: 0;
+    }
+
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 10px 26px rgba(23, 33, 40, .08);
+      padding: 22px;
+      min-height: 116px;
+    }
+
+    .card p, li, .note {
+      color: #45545b;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    .note {
+      padding: 16px 18px;
+      background: rgba(255, 253, 248, .72);
+      border-left: 6px solid var(--amber);
+      border-radius: 8px;
+    }
+
+    ul {
+      margin: 12px 0 0;
+      padding-left: 21px;
+    }
+
+    li + li { margin-top: 6px; }
+
+    .hero {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr .92fr;
+      gap: 38px;
+      align-items: center;
+      min-height: 0;
+    }
+
+    .hero-shot,
+    .shot {
+      overflow: hidden;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      background: #e2ded5;
+      position: relative;
+      min-height: 0;
+    }
+
+    .hero-shot { height: 470px; }
+
+    .hero-shot img,
+    .shot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .shots {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      min-height: 0;
+    }
+
+    .caption {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(20, 48, 68, .86);
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .metric {
+      background: #143044;
+      color: #fff;
+      border-radius: 8px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .metric b {
+      display: block;
+      font-size: 44px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .metric span {
+      font-size: 16px;
+      color: rgba(255, 255, 255, .82);
+    }
+
+    .matrix {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: 0 10px 26px rgba(23, 33, 40, .07);
+    }
+
+    .matrix th,
+    .matrix td {
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      padding: 12px 14px;
+      font-size: 16px;
+      line-height: 1.42;
+    }
+
+    .matrix th {
+      color: #143044;
+      background: #eae2d6;
+      font-weight: 900;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .done { background: var(--green); }
+    .partial { background: var(--amber); }
+    .risk { background: var(--red); }
+    .p0 { background: var(--red); }
+    .p1 { background: var(--amber); }
+    .p2 { background: var(--blue); }
+
+    .split {
+      display: grid;
+      grid-template-columns: .9fr 1.1fr;
+      gap: 22px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .bar {
+      height: 13px;
+      background: #e5ded3;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 14px;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--green), var(--teal));
+    }
+
+    .road {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .step {
+      position: relative;
+      padding: 18px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--card);
+      min-height: 140px;
+      box-shadow: 0 10px 24px rgba(23, 33, 40, .06);
+    }
+
+    .step::after {
+      content: ">";
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--amber);
+      font-weight: 950;
+      font-size: 22px;
+    }
+
+    .step:last-child::after { display: none; }
+
+    .num {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--green);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+
+    .footer {
+      position: absolute;
+      left: 70px;
+      right: 70px;
+      bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+      color: #7b766f;
+      font-size: 14px;
+    }
+
+    .progress {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      height: 5px;
+      width: 0;
+      background: linear-gradient(90deg, var(--green), var(--amber), var(--blue));
+      z-index: 10;
+      transition: width .18s ease;
+    }
+
+    .controls {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 20;
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #fffdf8;
+      color: #143044;
+      border-radius: 999px;
+      padding: 9px 13px;
+      font-weight: 900;
+      box-shadow: 0 10px 24px rgba(23, 33, 40, .12);
+      cursor: pointer;
+    }
+
+    button:hover { background: #f0e8da; }
+
+    @media (max-width: 900px) {
+      body { overflow: auto; }
+      .deck, .slide { height: auto; min-height: 100vh; }
+      .slide { position: relative; padding: 36px 20px 68px; }
+      h1 { font-size: 42px; }
+      h2 { font-size: 30px; }
+      .hero, .split, .shots, .cols-2, .cols-3, .cols-4, .metric-row, .road {
+        grid-template-columns: 1fr;
+      }
+      .hero-shot { height: 300px; }
+      .step::after { display: none; }
+      .footer { left: 20px; right: 20px; }
+    }
+
+    @media print {
+      body { overflow: visible; background: #fff; }
+      .deck, .slide { height: auto; }
+      .slide {
+        display: flex !important;
+        position: relative;
+        min-height: 100vh;
+        page-break-after: always;
+      }
+      .controls, .progress { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck">
+    <section class="slide active">
+      <div class="hero">
+        <div class="stack">
+          <div>
+            <div class="eyebrow">TravelOn / 需求汇报</div>
+            <h1>需求划分与完成情况</h1>
+          </div>
+          <p class="lead">本次展示聚焦“需求如何拆分、核心需求完成到什么程度、用哪些页面和测试证明完成”。</p>
+          <div class="metric-row">
+            <div class="metric"><b>8</b><span>P0 核心需求</span></div>
+            <div class="metric"><b>7</b><span>已完成业务模块</span></div>
+            <div class="metric"><b>49</b><span>测试用例通过</span></div>
+            <div class="metric"><b>14</b><span>课堂展示页</span></div>
+          </div>
+        </div>
+        <div class="hero-shot"><img src="src/01-home.png" alt="TravelOn 首页" /></div>
+      </div>
+      <div class="footer"><span>依据：需求.txt、需求规格、用户手册、测试文档、部署文档</span><span>1 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">需求来源</div>
+          <h2>原始目标到可验收范围</h2>
+        </div>
+        <span class="tag">从“大而全”收敛到“可演示闭环”</span>
+      </div>
+      <div class="grid cols-3">
+        <div class="card">
+          <h3>原始目标</h3>
+          <p>建设集机票预订、酒店住宿、旅游度假、火车票购买于一体的综合出行旅游平台。</p>
+        </div>
+        <div class="card">
+          <h3>场景边界</h3>
+          <p>覆盖用户“行前规划 - 行中服务 - 行后分享”的全旅程。</p>
+        </div>
+        <div class="card">
+          <h3>当前交付</h3>
+          <p>以课程演示为目标，完成账户、查询、订单支付、社区、AI 规划、部署与测试文档。</p>
+        </div>
+      </div>
+      <p class="note">需求收敛原则：先保证核心业务链路可跑通，再把价格趋势、真实第三方接口、复杂运营后台作为后续增强项。</p>
+      <div class="footer"><span>需求来源：需求.txt 与 docs/需求规格.md</span><span>2 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">划分方法</div>
+          <h2>核心需求按业务闭环划分</h2>
+        </div>
+      </div>
+      <div class="road">
+        <div class="step"><span class="num">1</span><h3>账户基础</h3><p>注册登录、资料、旅客信息。</p></div>
+        <div class="step"><span class="num">2</span><h3>产品查询</h3><p>酒店、机票、火车票、聚合产品。</p></div>
+        <div class="step"><span class="num">3</span><h3>行程规划</h3><p>AI 会话、偏好输入、规划快照。</p></div>
+        <div class="step"><span class="num">4</span><h3>订单支付</h3><p>订单详情、模拟支付、取消退款。</p></div>
+        <div class="step"><span class="num">5</span><h3>分享评价</h3><p>帖子、评论、收藏、景点路线。</p></div>
+      </div>
+      <div class="grid cols-3">
+        <div class="card"><h3><span class="badge p0">P0</span> 必须完成</h3><p>缺失会导致主流程无法验收的功能。</p></div>
+        <div class="card"><h3><span class="badge p1">P1</span> 提升完整性</h3><p>增强用户体验和系统完整度的功能。</p></div>
+        <div class="card"><h3><span class="badge p2">P2</span> 后续增强</h3><p>依赖时间、真实接口或更复杂运营能力的功能。</p></div>
+      </div>
+      <div class="footer"><span>划分逻辑：业务闭环 + 验收必要性 + 实现成本</span><span>3 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">P0 需求</div>
+          <h2>核心需求完成情况</h2>
+        </div>
+        <span class="tag">全部具备演示入口</span>
+      </div>
+      <table class="matrix">
+        <thead>
+          <tr><th>核心需求</th><th>完成情况</th><th>对应页面 / 证据</th><th>测试编号</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>用户注册与登录</td><td><span class="badge done">已完成</span></td><td>/account，注册、登录、资料、旅客管理</td><td>TC101 - TC107</td></tr>
+          <tr><td>酒店搜索与浏览</td><td><span class="badge done">已完成</span></td><td>/reservations/hotels，酒店列表与详情</td><td>TC201 - TC204</td></tr>
+          <tr><td>机票搜索与浏览</td><td><span class="badge done">已完成</span></td><td>/reservations/flights，机票查询结果</td><td>TC205 - TC206</td></tr>
+          <tr><td>火车票搜索与浏览</td><td><span class="badge done">已完成</span></td><td>/reservations/trains，车次查询结果</td><td>TC205、TC207</td></tr>
+          <tr><td>智能行程规划</td><td><span class="badge done">已完成</span></td><td>/ai-planner，会话、规划、快照</td><td>TC501 - TC505</td></tr>
+          <tr><td>订单管理</td><td><span class="badge done">已完成</span></td><td>/reservations，列表、详情、时间线</td><td>TC301 - TC306</td></tr>
+          <tr><td>支付与取消退款</td><td><span class="badge done">已完成</span></td><td>订单详情页模拟支付、取消和退款记录</td><td>TC303 - TC305</td></tr>
+          <tr><td>评价与社区查看</td><td><span class="badge done">已完成</span></td><td>/community，帖子、评论、景点、路线、收藏</td><td>TC401 - TC415</td></tr>
+        </tbody>
+      </table>
+      <div class="footer"><span>测试结果来自 docs/测试文档.md</span><span>4 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">P1 需求</div>
+          <h2>重要需求完成情况</h2>
+        </div>
+      </div>
+      <div class="split">
+        <div class="stack">
+          <div class="card">
+            <h3>资料维护与旅客管理 <span class="badge done">已完成</span></h3>
+            <p>账户中心支持查看与修改用户资料，支持常用旅客新增、删除，用于下单信息复用。</p>
+            <div class="bar"><span style="width: 100%"></span></div>
+          </div>
+          <div class="card">
+            <h3>社区互动 <span class="badge done">已完成</span></h3>
+            <p>帖子浏览、发布、点赞、评论、收藏、景点与路线评价均纳入当前实现。</p>
+            <div class="bar"><span style="width: 100%"></span></div>
+          </div>
+          <div class="card">
+            <h3>后台管理 <span class="badge partial">部分替代</span></h3>
+            <p>课程展示阶段以 seed 数据、用户侧页面和文档验收替代完整运营后台。</p>
+            <div class="bar"><span style="width: 55%"></span></div>
+          </div>
+        </div>
+        <div class="shot"><img src="src/03-account.png" alt="账户中心截图" /><span class="caption">账户与旅客管理</span></div>
+      </div>
+      <div class="footer"><span>P1 目标：在核心流程之外提升体验和系统完整性</span><span>5 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">P2 需求</div>
+          <h2>增强需求与未纳入范围</h2>
+        </div>
+      </div>
+      <table class="matrix">
+        <thead>
+          <tr><th>增强需求</th><th>当前状态</th><th>未完全实现原因</th><th>后续方向</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>价格趋势图与降价提醒</td><td><span class="badge partial">可扩展</span></td><td>需要历史价格序列和消息订阅机制</td><td>在交通与酒店服务补充价格历史表</td></tr>
+          <tr><td>真实 12306 / 航司 / 酒店接口</td><td><span class="badge partial">模拟替代</span></td><td>课程周期内真实接口不可控，且涉及认证与合规</td><td>保留供应商接口适配层</td></tr>
+          <tr><td>完整后台运营系统</td><td><span class="badge partial">文档预留</span></td><td>当前验收重点是 C 端业务闭环</td><td>补充产品、订单、评价审核后台</td></tr>
+          <tr><td>正式登录态与权限体系</td><td><span class="badge partial">演示级</span></td><td>当前部分接口仍以 userId 演示归属</td><td>接入 JWT / Session，由服务端确认用户身份</td></tr>
+        </tbody>
+      </table>
+      <p class="note">P2 不影响本次核心验收，但它们说明系统仍有继续迭代的明确方向。</p>
+      <div class="footer"><span>P2 需求定位：锦上添花或依赖外部条件</span><span>6 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">完成度总览</div>
+          <h2>按模块统计的完成情况</h2>
+        </div>
+      </div>
+      <div class="grid cols-3">
+        <div class="card"><h3>用户账户</h3><p>注册、登录、资料、旅客管理均通过测试。</p><div class="bar"><span style="width:100%"></span></div></div>
+        <div class="card"><h3>酒店与交通</h3><p>酒店、机票、火车票查询和订单入口完成。</p><div class="bar"><span style="width:100%"></span></div></div>
+        <div class="card"><h3>订单支付</h3><p>订单列表、详情、模拟支付、取消退款、旅行时间线完成。</p><div class="bar"><span style="width:100%"></span></div></div>
+        <div class="card"><h3>社区分享</h3><p>帖子、评论、点赞、收藏、景点、路线、图片展示完成。</p><div class="bar"><span style="width:100%"></span></div></div>
+        <div class="card"><h3>AI 规划</h3><p>会话、运行规划、快照完成；真实效果依赖外部 API Key。</p><div class="bar"><span style="width:88%"></span></div></div>
+        <div class="card"><h3>部署运维</h3><p>Docker Compose、Gateway、Eureka、数据库初始化文档完成。</p><div class="bar"><span style="width:92%"></span></div></div>
+      </div>
+      <div class="footer"><span>完成度按“页面可演示 + 测试有记录 + 文档有说明”综合判断</span><span>7 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">需求证据</div>
+          <h2>查询类需求的完成证明</h2>
+        </div>
+      </div>
+      <div class="shots">
+        <div class="shot"><img src="src/05-hotel.png" alt="酒店查询结果" /><span class="caption">酒店查询</span></div>
+        <div class="shot"><img src="src/07-flight.png" alt="机票查询结果" /><span class="caption">机票查询</span></div>
+        <div class="shot"><img src="src/06-train.png" alt="火车票查询结果" /><span class="caption">火车票查询</span></div>
+        <div class="card">
+          <h3>对应需求</h3>
+          <ul>
+            <li>多品类搜索与浏览</li>
+            <li>按日期、地点、人数筛选</li>
+            <li>展示价格、时间、评分等决策信息</li>
+            <li>查询结果为空时提供友好反馈</li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer"><span>证据截图来自 docs/src</span><span>8 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">需求证据</div>
+          <h2>订单与支付需求的完成证明</h2>
+        </div>
+      </div>
+      <div class="split">
+        <div class="stack">
+          <div class="card"><h3>订单列表 <span class="badge done">完成</span></h3><p>用户可查看当前订单集合，并进入详情。</p></div>
+          <div class="card"><h3>订单详情 <span class="badge done">完成</span></h3><p>展示订单编号、状态、旅客、价格、支付和退款信息。</p></div>
+          <div class="card"><h3>支付取消 <span class="badge done">完成</span></h3><p>支持模拟支付、取消订单、查看退款记录和旅行时间线。</p></div>
+        </div>
+        <div class="shots">
+          <div class="shot"><img src="src/08-reservations.png" alt="订单列表" /><span class="caption">订单列表</span></div>
+          <div class="shot"><img src="src/09-reservation-detail.png" alt="订单详情" /><span class="caption">订单详情</span></div>
+          <div class="shot"><img src="src/09-payment.png" alt="支付操作" /><span class="caption">模拟支付</span></div>
+          <div class="card"><h3>测试覆盖</h3><p>TC301 - TC306 均记录为通过。</p></div>
+        </div>
+      </div>
+      <div class="footer"><span>订单是业务完整性的关键需求</span><span>9 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">需求证据</div>
+          <h2>行前规划与行后分享完成证明</h2>
+        </div>
+      </div>
+      <div class="shots">
+        <div class="shot"><img src="src/11-ai-planner-session.png" alt="AI 规划会话" /><span class="caption">AI 会话创建</span></div>
+        <div class="shot"><img src="src/12-ai-planner-result.png" alt="AI 规划结果" /><span class="caption">AI 规划结果</span></div>
+        <div class="shot"><img src="src/10-community.png" alt="社区页面" /><span class="caption">社区分享</span></div>
+        <div class="card">
+          <h3>覆盖关系</h3>
+          <ul>
+            <li>AI 规划覆盖行前方案生成</li>
+            <li>规划快照覆盖版本保存与回看</li>
+            <li>社区覆盖行后评价、游记、路线与收藏</li>
+            <li>外部模型未配置时不影响其他模块</li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer"><span>AI 测试：TC501 - TC505；社区测试：TC401 - TC415</span><span>10 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">设计支撑</div>
+          <h2>为什么这些需求能被实现</h2>
+        </div>
+      </div>
+      <div class="grid cols-3">
+        <div class="card">
+          <h3>前端展示层</h3>
+          <p>React + TypeScript + MUI，提供账户、查询、订单、社区和 AI 规划页面。</p>
+        </div>
+        <div class="card">
+          <h3>网关与微服务层</h3>
+          <p>API Gateway 统一入口，Eureka 服务发现，业务拆分为 hotel、transport、reservation、payment、user、community。</p>
+        </div>
+        <div class="card">
+          <h3>数据与智能层</h3>
+          <p>PostgreSQL 保存业务数据，MongoDB 保存 AI 会话与快照，RabbitMQ 支持服务间解耦。</p>
+        </div>
+      </div>
+      <table class="matrix">
+        <thead><tr><th>需求类型</th><th>设计落点</th><th>好处</th></tr></thead>
+        <tbody>
+          <tr><td>查询与预订</td><td>酒店、交通、订单、支付服务</td><td>服务边界清晰，便于独立测试</td></tr>
+          <tr><td>AI 规划</td><td>ai-arrange-service + ai-arrange-agent-service</td><td>规划能力与普通业务解耦</td></tr>
+          <tr><td>部署验收</td><td>Docker Compose + Gateway + Eureka</td><td>可复现、可检查、可课堂演示</td></tr>
+        </tbody>
+      </table>
+      <div class="footer"><span>设计文档：docs/概要设计.md、docs/详细设计.md</span><span>11 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">验收路径</div>
+          <h2>课堂展示建议顺序</h2>
+        </div>
+      </div>
+      <div class="road">
+        <div class="step"><span class="num">1</span><h3>首页</h3><p>说明系统入口和功能范围。</p></div>
+        <div class="step"><span class="num">2</span><h3>账户</h3><p>展示注册登录与旅客管理。</p></div>
+        <div class="step"><span class="num">3</span><h3>查询</h3><p>展示酒店、机票、火车票。</p></div>
+        <div class="step"><span class="num">4</span><h3>订单</h3><p>展示详情、支付、取消退款。</p></div>
+        <div class="step"><span class="num">5</span><h3>AI 与社区</h3><p>展示规划结果和分享互动。</p></div>
+      </div>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>部署检查</h3>
+          <ul>
+            <li>前端：localhost:53000</li>
+            <li>Gateway：localhost:58082</li>
+            <li>Eureka：localhost:58010</li>
+            <li>RabbitMQ 管理端：localhost:55673</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>验收口径</h3>
+          <ul>
+            <li>页面可访问</li>
+            <li>查询有结果或友好空状态</li>
+            <li>订单状态可流转</li>
+            <li>测试文档记录通过</li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer"><span>展示重点：少讲架构名词，多展示需求完成证据</span><span>12 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">风险与边界</div>
+          <h2>当前完成中的限制说明</h2>
+        </div>
+      </div>
+      <table class="matrix">
+        <thead><tr><th>限制项</th><th>影响</th><th>当前处理</th></tr></thead>
+        <tbody>
+          <tr><td>AI 依赖外部模型 Key</td><td>未配置时不能保证真实生成质量</td><td>页面和会话功能可展示，并提供错误提示或 fallback 说明</td></tr>
+          <tr><td>真实票源接口未接入</td><td>不能完成真实出票</td><td>使用模拟数据完成课程级搜索、下单和支付闭环</td></tr>
+          <tr><td>完整后台管理未完成</td><td>运营侧能力不完整</td><td>通过 seed 数据、前台功能和文档完成本次验收</td></tr>
+          <tr><td>部署截图仍可补充</td><td>部署文档视觉证据不足</td><td>测试文档已有页面截图，部署状态截图可后续补齐</td></tr>
+        </tbody>
+      </table>
+      <p class="note">这些限制不改变 P0 核心流程已完成的结论，但展示时需要主动说明边界，避免把模拟演示说成真实商业系统。</p>
+      <div class="footer"><span>边界说明来自 docs/todo.md、docs/部署文档.md、docs/测试文档.md</span><span>13 / 14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="head">
+        <div>
+          <div class="eyebrow">结论</div>
+          <h2>核心需求已形成可验收闭环</h2>
+        </div>
+      </div>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>已完成的主线</h3>
+          <ul>
+            <li>账户登录后进入出行服务</li>
+            <li>酒店、机票、火车票可查询</li>
+            <li>订单可查看、支付、取消和退款</li>
+            <li>AI 可做行前规划，社区可做行后分享</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>验收支撑</h3>
+          <ul>
+            <li>测试文档覆盖部署、账户、查询、订单、社区、AI、异常处理</li>
+            <li>页面截图覆盖核心演示场景</li>
+            <li>Docker Compose 和文档保证环境可复现</li>
+            <li>P2 增强项已有后续迭代方向</li>
+          </ul>
+        </div>
+      </div>
+      <p class="lead">TravelOn 当前版本已经从原始需求中拆出可交付核心，并完成“行前规划 - 查询预订 - 订单支付 - 行后分享”的课堂验收闭环。</p>
+      <div class="footer"><span>结束</span><span>14 / 14</span></div>
+    </section>
+  </main>
+
+  <div class="controls">
+    <button id="prev" type="button">上一页</button>
+    <button id="next" type="button">下一页</button>
+  </div>
+  <div class="progress" id="progress"></div>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll(".slide"));
+    const progress = document.getElementById("progress");
+    let index = 0;
+
+    function showSlide(nextIndex) {
+      index = Math.max(0, Math.min(slides.length - 1, nextIndex));
+      slides.forEach((slide, slideIndex) => {
+        slide.classList.toggle("active", slideIndex === index);
+      });
+      progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+      window.location.hash = `slide-${index + 1}`;
+    }
+
+    document.getElementById("prev").addEventListener("click", () => showSlide(index - 1));
+    document.getElementById("next").addEventListener("click", () => showSlide(index + 1));
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
+        event.preventDefault();
+        showSlide(index + 1);
+      }
+      if (event.key === "ArrowLeft" || event.key === "PageUp") {
+        event.preventDefault();
+        showSlide(index - 1);
+      }
+      if (event.key === "Home") showSlide(0);
+      if (event.key === "End") showSlide(slides.length - 1);
+    });
+
+    const match = window.location.hash.match(/slide-(\d+)/);
+    showSlide(match ? Number(match[1]) - 1 : 0);
+  </script>
+</body>
+</html>
