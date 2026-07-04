@@ -10,8 +10,7 @@ React,Typescript, JAVA SpringBoot, docker
 
 ## 架构
 
-![Uploading image.png…]()
-
+<img width="407" height="203" alt="image" src="https://github.com/user-attachments/assets/290798fd-97da-4652-a6d7-5ef31962d1d9" />
 
 ## 演示视频
 
