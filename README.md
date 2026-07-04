@@ -1,3 +1,22 @@
+# TravelOn微服务一站式出行平台
+
+## 项目简介
+
+为满足用户日益增长的出行与旅游预订需求，TravelOn 需要建设一款集机票预订、酒店住宿、旅游度假、火车票购买于一体的综合出行旅游平台。平台提供丰富的出行产品选择、智能的行程规划工具、透明的价格信息与便捷的预订流程，覆盖用户“行前规划 - 行中服务 - 行后分享”的全旅程场景。
+
+## 技术栈
+
+React,Typescript, JAVA SpringBoot, docker
+
+## 架构
+
+![Uploading image.png…]()
+
+
+## 演示视频
+
+https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
+
 # 使用说明
 
 ## 首次部署
