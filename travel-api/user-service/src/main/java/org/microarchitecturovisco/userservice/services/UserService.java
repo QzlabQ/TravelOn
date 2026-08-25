@@ -13,11 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,10 +22,12 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordHasher passwordHasher;
 
     @Autowired
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, PasswordHasher passwordHasher) {
         this.userRepository = userRepository;
+        this.passwordHasher = passwordHasher;
     }
 
     public List<User> getAllUsers() {
@@ -57,7 +55,7 @@ public class UserService {
         User user = User.builder()
                 .id(UUID.randomUUID())
                 .email(email)
-                .passwordHash(hashPassword(request.password()))
+                .passwordHash(passwordHasher.hash(request.password()))
                 .name(request.name().trim())
                 .surname(normalizeOptional(request.surname()) == null ? "" : request.surname().trim())
                 .phone(normalizeOptional(request.phone()))
@@ -75,8 +73,12 @@ public class UserService {
         User user = userRepository.findByEmailIgnoreCase(normalizeEmail(request.email()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
 
-        if (!hashPassword(request.password()).equals(user.getPasswordHash())) {
+        if (!passwordHasher.matches(request.password(), user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+        }
+
+        if (passwordHasher.needsUpgrade(user.getPasswordHash())) {
+            user.setPasswordHash(passwordHasher.hash(request.password()));
         }
 
         user.setSessionToken(generateSessionToken());
@@ -136,13 +138,15 @@ public class UserService {
     }
 
     public String hashPassword(String password) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(("travel-ui:" + password).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is not available", e);
-        }
+        return passwordHasher.hash(password);
+    }
+
+    public boolean passwordMatches(String password, String storedHash) {
+        return passwordHasher.matches(password, storedHash);
+    }
+
+    public boolean passwordNeedsUpgrade(String storedHash) {
+        return passwordHasher.needsUpgrade(storedHash);
     }
 
     private String generateSessionToken() {
