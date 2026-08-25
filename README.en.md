@@ -18,6 +18,7 @@ https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
 - [Environment Variables](#environment-variables)
+- [Built-in Admin Accounts](#built-in-admin-accounts)
 - [Quick Start](#quick-start)
 - [Development Mode (Debug)](#development-mode-debug)
 - [Production Mode (Build and Serve)](#production-mode-build-and-serve)
@@ -86,7 +87,10 @@ corepack enable
 
 ## Environment Variables
 
-Both `.env` files must be in place before starting either mode. Neither is committed to the repository — create them locally.
+Both `.env` files must be in place before starting either mode.
+
+- `travel-api/.env`: not committed to the repository — create it locally.
+- `travel-ui/.env`: **committed to the repository**, so it works right after cloning. See the note in the [Frontend](#frontend-travel-uienv) section below for why.
 
 > Note: use `#` for comments in `.env`, not `;`.
 
@@ -149,10 +153,38 @@ REACT_APP_AMAP_SECURITY_JS_CODE=
 | `REACT_APP_AMAP_JS_API_KEY` | AMap JS key for browser map rendering |
 | `REACT_APP_AMAP_SECURITY_JS_CODE` | AMap JS security code |
 
+> **Why the AMap key is committed to Git**
+>
+> Obtaining an AMap (Gaode) key requires real-name verification and application review, which is a slow process. To make the project easy to review and try out after cloning, `travel-ui/.env` — including `REACT_APP_AMAP_JS_API_KEY` and `REACT_APP_AMAP_SECURITY_JS_CODE` — is **committed to Git for now**, so the map works without applying for your own key.
+>
+> This is a deliberate convenience trade-off for testing, not a recommended practice:
+>
+> - The key is for this project's demo only; please do not use it elsewhere.
+> - Its quota is shared across everyone who clones the repo. If the map fails to load or reports a quota error, apply for your own key and replace it.
+> - Before any real deployment, remove `travel-ui/.env` from version control (add it to `.gitignore`) and rotate the key.
+
 **Important:** `REACT_APP_*` variables are inlined at build time.
 
 - In development mode, restart `yarn start` after editing `.env`.
 - In production mode, you must re-run `yarn build` after editing `.env` — restarting `yarn serve` alone has no effect.
+
+---
+
+## Built-in Admin Accounts
+
+The project ships with three admin accounts for demonstrating the back-office features. The addresses and plaintext passwords are listed in [`admin_account.txt`](admin_account.txt) at the repository root, and are written into the database on startup by `AdminAccountBootstrap` in user-service.
+
+> **⚠️ These passwords are public in this repository, purely for course review and local testing**
+>
+> Like the AMap key above, this is a deliberate convenience trade-off so anyone can clone the repo, log in as an admin, and try the full feature set without extra setup. **It must never reach a real deployment.**
+>
+> When deploying it yourself:
+>
+> 1. Delete `admin_account.txt` from the repository root.
+> 2. Edit the hardcoded `ADMIN_ACCOUNTS` list in `travel-api/user-service/src/main/java/org/microarchitecturovisco/userservice/bootstrap/AdminAccountBootstrap.java` and replace the addresses and passwords with your own strong credentials (reading them from environment variables is recommended).
+> 3. Rebuild the user-service image and reset the database before starting.
+>
+> Note: **deleting `admin_account.txt` alone is not enough.** The same passwords are hardcoded in `AdminAccountBootstrap`, which **resets these three accounts back to the source values on every startup** — so even if you change a password through the UI, a restart will overwrite it. Editing the source is what actually takes effect.
 
 ---
 

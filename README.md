@@ -18,6 +18,7 @@ https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
 - [项目结构](#项目结构)
 - [环境要求](#环境要求)
 - [环境变量配置](#环境变量配置)
+- [内置管理员账号](#内置管理员账号)
 - [快速开始](#快速开始)
 - [开发模式 Debug](#开发模式-debug)
 - [生产模式 Build 与 Serve](#生产模式-build-与-serve)
@@ -86,7 +87,10 @@ corepack enable
 
 ## 环境变量配置
 
-启动任何模式之前，都需要先准备好两个 `.env` 文件。两个文件都不会提交到仓库，请在本地自行创建。
+启动任何模式之前，都需要先准备好两个 `.env` 文件。
+
+- `travel-api/.env`：不会提交到仓库，请在本地自行创建。
+- `travel-ui/.env`：**已随仓库同步**，克隆后即可直接使用，原因见下方[前端](#前端travel-uienv)一节的说明。
 
 > 注意：`.env` 的注释请使用 `#`，不要用 `;`。
 
@@ -149,10 +153,38 @@ REACT_APP_AMAP_SECURITY_JS_CODE=
 | `REACT_APP_AMAP_JS_API_KEY` | 浏览器端地图渲染 Key |
 | `REACT_APP_AMAP_SECURITY_JS_CODE` | 高德 JS 安全码 |
 
+> **关于高德 Key 随仓库同步的说明**
+>
+> 高德开放平台的 Key 申请需要实名认证与应用审核，流程较为繁琐。为了方便课程评审与他人克隆后直接试用，`travel-ui/.env`（含 `REACT_APP_AMAP_JS_API_KEY` 与 `REACT_APP_AMAP_SECURITY_JS_CODE`）**暂时随 Git 一起同步**，无需自行申请即可看到地图效果。
+>
+> 这是为便于测试而做的临时取舍，并非推荐做法：
+>
+> - 该 Key 仅供本项目演示使用，请勿用于其他用途；
+> - 配额由本项目共享，如遇地图加载失败或提示超限，请自行申请 Key 后替换；
+> - 正式部署前应将 `travel-ui/.env` 移出版本库（加入 `.gitignore`）并轮换 Key。
+
 **重要：** `REACT_APP_*` 变量是编译期注入的。
 
 - 开发模式下改完 `.env` 需要重启 `yarn start`；
 - 生产模式下改完 `.env` 必须重新 `yarn build`，只重启 `yarn serve` 不会生效。
+
+---
+
+## 内置管理员账号
+
+项目内置了三个管理员账号，用于演示后台管理相关功能。账号与明文口令记录在仓库根目录的 [`admin_account.txt`](admin_account.txt) 中，并在 user-service 启动时由 `AdminAccountBootstrap` 自动写入数据库。
+
+> **⚠️ 这些口令随仓库公开，仅为方便课程评审与本地试用**
+>
+> 与高德 Key 同理，这是为了让任何人克隆后无需额外配置即可登录管理员、体验完整功能而做的临时取舍，**绝不能带到真实部署中**。
+>
+> 自行部署时请务必：
+>
+> 1. 删除仓库根目录的 `admin_account.txt`；
+> 2. 修改 `travel-api/user-service/src/main/java/org/microarchitecturovisco/userservice/bootstrap/AdminAccountBootstrap.java` 中 `ADMIN_ACCOUNTS` 里硬编码的邮箱与口令（建议改为从环境变量读取），换成自己的强口令；
+> 3. 重新构建 user-service 镜像并重置数据库后再启动。
+>
+> 注意：**只删 `admin_account.txt` 是不够的**。口令同时硬编码在 `AdminAccountBootstrap` 里，且每次服务启动都会强制把这三个账号的口令**重置回源码中的值**——即使你在页面上改过密码，重启后也会被覆盖。必须改源码才真正生效。
 
 ---
 
