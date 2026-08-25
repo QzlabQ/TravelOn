@@ -19,6 +19,7 @@ import org.microarchitecturovisco.hotelservice.model.dto.response.GetHotelsBySea
 import org.microarchitecturovisco.hotelservice.queues.config.QueuesConfig;
 import org.microarchitecturovisco.hotelservice.services.HotelsCommandService;
 import org.microarchitecturovisco.hotelservice.services.HotelsService;
+import org.microarchitecturovisco.hotelservice.services.AdminAuthorizationService;
 import org.microarchitecturovisco.hotelservice.utils.JsonConverter;
 import org.microarchitecturovisco.hotelservice.utils.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.http.HttpStatus;
@@ -49,6 +51,7 @@ public class HotelsController {
 
     private final HotelsService hotelsService;
     private final HotelsCommandService hotelsCommandService;
+    private final AdminAuthorizationService adminAuthorizationService;
 
     @GetMapping("/destinations")
     public List<LocationDto> getDestinations() {
@@ -57,7 +60,11 @@ public class HotelsController {
 
     @PostMapping("/admin")
     @ResponseStatus(HttpStatus.CREATED)
-    public void createHotel(@RequestBody org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto) {
+    public void createHotel(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @RequestBody org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto
+    ) {
+        adminAuthorizationService.requireAdmin(token);
         hotelsCommandService.createHotel(org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateHotelCommand.builder()
                 .hotelId(hotelDto.getHotelId())
                 .commandTimeStamp(LocalDateTime.now())
@@ -67,24 +74,32 @@ public class HotelsController {
 
     @PutMapping("/admin/{hotelId}")
     public Hotel updateHotel(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
             @PathVariable Integer hotelId,
             @RequestBody org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto
     ) {
+        adminAuthorizationService.requireAdmin(token);
         return hotelsService.updateHotel(hotelId, hotelDto);
     }
 
     @DeleteMapping("/admin/{hotelId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteHotel(@PathVariable Integer hotelId) {
+    public void deleteHotel(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable Integer hotelId
+    ) {
+        adminAuthorizationService.requireAdmin(token);
         hotelsService.deleteHotel(hotelId);
     }
 
     @PostMapping("/admin/{hotelId}/rooms")
     @ResponseStatus(HttpStatus.CREATED)
     public void createRoom(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
             @PathVariable Integer hotelId,
             @RequestBody org.microarchitecturovisco.hotelservice.model.dto.RoomDto roomDto
     ) {
+        adminAuthorizationService.requireAdmin(token);
         Long roomId = roomDto.getRoomId() == null ? hotelsService.generateNewRoomId() : roomDto.getRoomId();
         hotelsService.createRoomFromHotel(hotelId, roomId, roomDto.getName(),
                 roomDto.getGuestCapacity(), roomDto.getPricePerAdult(), roomDto.getDescription());
@@ -92,17 +107,23 @@ public class HotelsController {
 
     @PutMapping("/admin/{hotelId}/rooms/{roomId}")
     public void updateRoom(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
             @PathVariable Integer hotelId,
             @PathVariable Long roomId,
             @RequestBody org.microarchitecturovisco.hotelservice.model.dto.RoomDto roomDto
     ) {
+        adminAuthorizationService.requireAdmin(token);
         hotelsService.updateRoomFromHotel(hotelId, roomId, roomDto.getName(),
                 roomDto.getGuestCapacity(), roomDto.getPricePerAdult(), roomDto.getDescription());
     }
 
     @DeleteMapping("/admin/rooms/{roomId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteRoom(@PathVariable Long roomId) {
+    public void deleteRoom(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @PathVariable Long roomId
+    ) {
+        adminAuthorizationService.requireAdmin(token);
         hotelsService.deleteRoom(roomId);
     }
 
@@ -259,4 +280,3 @@ public class HotelsController {
     }
 
 }
-
