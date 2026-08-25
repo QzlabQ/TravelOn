@@ -10,7 +10,7 @@ CREATE TABLE ticket_offer_templates (
     departure_date_time timestamp(6) without time zone,
     departure_station_code character varying(255),
     departure_terminal_name character varying(255),
-    price integer NOT NULL,
+    price numeric(12,2) NOT NULL,
     remaining_seats integer NOT NULL,
     seat_class character varying(255),
     total_seats integer NOT NULL,

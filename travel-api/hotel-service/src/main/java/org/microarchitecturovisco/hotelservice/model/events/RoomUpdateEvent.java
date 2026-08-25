@@ -7,6 +7,7 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -17,10 +18,10 @@ public class RoomUpdateEvent extends HotelEvent{
     private Long roomId;
     private String name;
     private int guestCapacity;
-    private float pricePerAdult;
+    private BigDecimal pricePerAdult;
     private String description;
 
-    public RoomUpdateEvent(Integer idHotel, Long roomId, String name, int guestCapacity, float pricePerAdult,
+    public RoomUpdateEvent(Integer idHotel, Long roomId, String name, int guestCapacity, BigDecimal pricePerAdult,
                            String description) {
         this.setEventTimeStamp(LocalDateTime.now());
         this.setIdHotel(idHotel);

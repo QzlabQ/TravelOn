@@ -10,6 +10,7 @@ import org.microarchitecturovisco.offerprovider.domain.dto.RoomsConfigurationDto
 import org.microarchitecturovisco.offerprovider.domain.dto.responses.TransportDto;
 
 import java.util.List;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -20,7 +21,7 @@ public class GetOfferDetailsResponseDto {
     private Integer idHotel;
     private String hotelName;
     private String description;
-    private Float price;
+    private BigDecimal price;
     private LocationDto destination;
     private List<String> imageUrls;
 

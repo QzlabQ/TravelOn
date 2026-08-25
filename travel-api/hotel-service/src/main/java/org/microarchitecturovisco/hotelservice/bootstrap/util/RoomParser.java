@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.*;
 import java.util.List;
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.logging.Logger;
 
@@ -44,7 +45,7 @@ public class RoomParser {
         int hotelId      = Integer.parseInt(data[0]);
         String roomName  = data[1];
         String description = data[2];
-        float pricePerAdult = Float.parseFloat(data[3]);
+        BigDecimal pricePerAdult = new BigDecimal(data[3]);
         Long roomId      = Long.parseLong(data[4].trim());
         int guestCapacity = data.length > 5 && !data[5].isBlank() ? Integer.parseInt(data[5].trim()) : 2;
         String roomType  = data.length > 6 && !data[6].isBlank() ? data[6].trim() : "STANDARD";

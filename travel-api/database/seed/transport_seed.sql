@@ -11,7 +11,7 @@ CREATE TEMP TABLE seed_ticket_offers (
     carrier text,
     code text,
     seat_class text,
-    price integer,
+    price numeric(12,2),
     remaining_seats integer,
     total_seats integer,
     departure_station_name text,

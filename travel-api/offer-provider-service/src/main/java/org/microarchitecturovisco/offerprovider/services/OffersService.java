@@ -9,6 +9,7 @@ import org.microarchitecturovisco.offerprovider.domain.responses.GetOfferDetails
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Service
@@ -31,17 +32,17 @@ public class OffersService {
                 .idHotel(requestDto.getIdHotel())
                 .hotelName("旅游产品功能重构中")
                 .description("旧旅游套餐组合逻辑已停用，新的旅游产品功能稍后接入。")
-                .price(-1.0f)
+                .price(new BigDecimal("-1.00"))
                 .destination(LocationDto.builder().country("").region("").build())
                 .imageUrls(List.of())
-                .roomConfiguration(RoomsConfigurationDto.builder().rooms(List.of()).pricePerAdult(-1.0f).build())
+                .roomConfiguration(RoomsConfigurationDto.builder().rooms(List.of()).pricePerAdult(new BigDecimal("-1.00")).build())
                 .possibleRoomConfigurations(List.of())
                 .departure(List.of())
                 .possibleDepartures(List.of())
                 .build();
     }
 
-    public Float getOfferPrice(GetOfferPriceRequestDto requestDto) {
-        return -1.0f;
+    public BigDecimal getOfferPrice(GetOfferPriceRequestDto requestDto) {
+        return new BigDecimal("-1.00");
     }
 }

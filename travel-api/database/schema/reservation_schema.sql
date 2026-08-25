@@ -24,7 +24,7 @@ CREATE TABLE public.reservation (
     paid boolean NOT NULL,
     paid_at timestamp(6) without time zone,
     payment_deadline timestamp(6) without time zone,
-    price real NOT NULL,
+    price numeric(12,2) NOT NULL,
     provider character varying(255),
     refund_requested_at timestamp(6) without time zone,
     refunded_at timestamp(6) without time zone,
@@ -60,7 +60,7 @@ CREATE TABLE public.reservation_travelers (
 
 CREATE TABLE public.payment_transaction (
     id uuid NOT NULL,
-    amount real NOT NULL,
+    amount numeric(12,2) NOT NULL,
     approved boolean NOT NULL,
     card_last4 character varying(4),
     created_at timestamp(6) without time zone,
@@ -71,7 +71,7 @@ CREATE TABLE public.payment_transaction (
 
 CREATE TABLE public.refund_record (
     id uuid NOT NULL,
-    amount real NOT NULL,
+    amount numeric(12,2) NOT NULL,
     completed_at timestamp(6) without time zone,
     reason character varying(240),
     requested_at timestamp(6) without time zone,

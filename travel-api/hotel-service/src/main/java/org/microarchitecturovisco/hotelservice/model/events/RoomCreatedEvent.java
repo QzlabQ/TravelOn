@@ -7,6 +7,7 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import org.microarchitecturovisco.hotelservice.model.dto.RoomDto;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -20,7 +21,7 @@ public class RoomCreatedEvent extends HotelEvent  {
     private String name;
     private int guestCapacity;
     private String roomType;
-    private float pricePerAdult;
+    private BigDecimal pricePerAdult;
     private String description;
 
     public RoomCreatedEvent(LocalDateTime eventTimeStamp, RoomDto roomDto, Integer idHotel) {

@@ -9,6 +9,8 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
+import jakarta.validation.constraints.DecimalMin;
 
 public record CreateTicketReservationRequest(
         @NotNull UUID userId,
@@ -19,7 +21,7 @@ public record CreateTicketReservationRequest(
         @NotBlank String provider,
         @NotBlank String bookingCode,
         @Min(1) int passengerCount,
-        @Min(0) float price,
+        @DecimalMin("0.00") BigDecimal price,
         List<@Valid BookingPersonRequest> travelers,
         @Nullable UUID ticketOfferId
 ) {

@@ -44,6 +44,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -78,7 +79,7 @@ public class ReservationService {
 
     public Reservation createReservation(LocalDateTime hotelTimeFrom, LocalDateTime hotelTimeTo,
                                                       int infantsQuantity, int kidsQuantity, int teensQuantity, int adultsQuantity,
-                                                      float price, Integer hotelId, List<Long> roomReservationsIds,
+                                                      BigDecimal price, Integer hotelId, List<Long> roomReservationsIds,
                                                       List<UUID> transportReservationsIds, UUID userId, UUID reservationId) {
 
         CreateReservationCommand command = CreateReservationCommand.builder()

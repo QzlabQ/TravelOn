@@ -5,11 +5,12 @@ import org.microarchitecturovisco.reservationservice.domain.entity.PaymentTransa
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 public record PaymentTransactionResponse(
         UUID id,
         UUID reservationId,
-        float amount,
+        BigDecimal amount,
         String cardLast4,
         boolean approved,
         String status,

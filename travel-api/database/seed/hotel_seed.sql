@@ -16,7 +16,7 @@ CREATE TEMP TABLE seed_hotel_rooms (
     source_hotel_id integer,
     name text,
     description text,
-    price real,
+    price numeric(12,2),
     id bigint,
     guest_capacity integer,
     room_type text

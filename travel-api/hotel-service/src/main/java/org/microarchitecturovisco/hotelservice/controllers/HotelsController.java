@@ -42,6 +42,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
 import java.util.logging.Logger;
 
 @RestController()
@@ -155,8 +156,8 @@ public class HotelsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(defaultValue = "2") int adults,
             @RequestParam(required = false) String hotelName,
-            @RequestParam(required = false) Float minPrice,
-            @RequestParam(required = false) Float maxPrice,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) Float minRating,
             @RequestParam(defaultValue = "ALL") String hotelType,
             @RequestParam(defaultValue = "ALL") String roomType,

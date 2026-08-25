@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -60,12 +61,12 @@ public class TransportCommandService {
         log.info("Restored {} seats for template {}, remaining: {}", seats, templateId, updated);
     }
 
-    public void updateTransport(UUID transportId, int capacity, float pricePerAdult) {
+    public void updateTransport(UUID transportId, int capacity, BigDecimal pricePerAdult) {
         log.warn("Ignoring legacy updateTransport command {}", transportId);
     }
 
     public void createTransport(UUID transportId, UUID courseId, LocalDateTime departureDate, int capacity,
-                                float pricePerAdult) {
+                                BigDecimal pricePerAdult) {
         log.warn("Ignoring legacy createTransport overload {}", transportId);
     }
 

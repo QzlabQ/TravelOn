@@ -48,6 +48,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
 import java.util.logging.Logger;
 
 @RestController()
@@ -124,8 +125,8 @@ public class TransportsQueryController {
             @RequestParam String departureCity,
             @RequestParam String arrivalCity,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate departureDate,
-            @RequestParam(required = false) Integer minPrice,
-            @RequestParam(required = false) Integer maxPrice,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(defaultValue = "false") boolean studentOnly,
             @RequestParam(defaultValue = "false") boolean onlyAvailable,
             @RequestParam(defaultValue = "departure") String sortBy

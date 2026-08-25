@@ -9,6 +9,8 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
+import jakarta.validation.constraints.DecimalMin;
 
 public record CreateHotelOnlyReservationRequest(
         @NotNull UUID userId,
@@ -20,7 +22,7 @@ public record CreateHotelOnlyReservationRequest(
         @Min(0) int childrenUnder3Quantity,
         @Min(0) int childrenUnder10Quantity,
         @Min(0) int childrenUnder18Quantity,
-        @Min(0) float price,
+        @DecimalMin("0.00") BigDecimal price,
         String roomName,
         List<@Valid BookingPersonRequest> travelers,
         @Nullable Long roomId

@@ -6,6 +6,7 @@ import org.microarchitecturovisco.transport.model.domain.TransportType;
 import org.microarchitecturovisco.transport.model.dto.TransportDto;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -17,7 +18,7 @@ public class TransportCreatedEvent extends TransportEvent {
 
     private LocalDateTime departureDate;
     private Integer capacity;
-    private Float pricePerAdult;
+    private BigDecimal pricePerAdult;
 
     private UUID idTransportCourse;
     private TransportType type;
