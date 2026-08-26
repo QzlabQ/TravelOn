@@ -17,6 +17,14 @@ const reservation = (overrides: Partial<ReservationResponse> = {}): ReservationR
     createdAt: '2026-06-15T10:00:00',
     hotelTimeFrom: '2026-07-01T00:00:00',
     hotelTimeTo: '2026-07-02T00:00:00',
+    adultsQuantity: 1,
+    childrenUnder3Quantity: 0,
+    childrenUnder10Quantity: 0,
+    childrenUnder18Quantity: 0,
+    bookingType: 'HOTEL',
+    roomReservationsIds: [],
+    transportReservationsIds: [],
+    travelers: [],
     ...overrides,
 });
 

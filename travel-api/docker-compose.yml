@@ -82,14 +82,10 @@ services:
     build: ./hotel-service
     volumes:
       - ./logs/hotel:/logs
-      - ./seed-data/hotel:/seed-data/hotel:ro
-      - ./seed-data/common:/seed-data/common:ro
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${HOTEL_DB_NAME:-hotel_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
-      APP_SEED_DATA_BASE_PATH: file:/seed-data/hotel/
-      APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
     depends_on:
       postgres:
         condition: service_healthy
@@ -157,16 +153,13 @@ services:
     build: ./transport-service
     volumes:
       - ./logs/transport:/logs
-      - ./seed-data/transport:/seed-data/transport:ro
+      # Runtime dependency: CityCatalog reads common/cities.csv for city lookups.
       - ./seed-data/common:/seed-data/common:ro
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${TRANSPORT_DB_NAME:-transport_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
-      APP_SEED_DATA_BASE_PATH: file:/seed-data/transport/
       APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
-      APP_SEED_DATA_TRAIN_BASE_PATH: file:/seed-data/transport/train/
-      APP_SEED_DATA_PLANE_BASE_PATH: file:/seed-data/transport/plane/
     depends_on:
       postgres:
         condition: service_healthy
@@ -183,12 +176,10 @@ services:
     build: ./user-service
     volumes:
       - ./logs/user:/logs
-      - ./seed-data/user:/seed-data/user:ro
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${USER_DB_NAME:-user_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
-      APP_SEED_DATA_BASE_PATH: file:/seed-data/user/
     depends_on:
       postgres:
         condition: service_healthy
@@ -205,13 +196,11 @@ services:
     build: ./community-service
     volumes:
       - ./logs/community:/logs
-      - ./seed-data/hotel:/seed-data/hotel:ro
       - ./data/community/uploads:/uploads
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${COMMUNITY_DB_NAME:-community_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
-      APP_SEED_DATA_HOTEL_REVIEWS_CSV: file:/seed-data/hotel/hotel_reviews.csv
       APP_UPLOADS_DIR: /uploads
     depends_on:
       postgres:
