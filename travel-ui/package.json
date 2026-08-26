@@ -33,6 +33,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:coverage": "react-scripts test --runInBand --coverage",
     "eject": "react-scripts eject",
     "serve": "serve -s build -l 53000"
   },
