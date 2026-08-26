@@ -234,8 +234,8 @@ services:
       TRAVEL_GATEWAY_BASE_URL: "http://gateway:8082"
       NO_PROXY: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
       no_proxy: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
-    ports:
-      - "${AI_ARRANGE_AGENT_HOST_PORT:-58090}:8090"
+    expose:
+      - "8090"
     networks:
       - backend
 

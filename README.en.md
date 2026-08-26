@@ -128,7 +128,6 @@ Every port in `docker-compose.yml` has a default. Override them in the same `.en
 | --- | --- |
 | `GATEWAY_HOST_PORT` | `58082` |
 | `DISCOVERY_HOST_PORT` | `58010` |
-| `AI_ARRANGE_AGENT_HOST_PORT` | `58090` |
 | `POSTGRES_HOST_PORT` | `55432` |
 | `RABBITMQ_HOST_PORT` | `55672` |
 | `RABBITMQ_MANAGEMENT_HOST_PORT` | `55673` |
