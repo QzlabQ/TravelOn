@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -98,8 +99,8 @@ public class TransportsQueryService {
             String departureCity,
             String arrivalCity,
             LocalDate departureDate,
-            Integer minPrice,
-            Integer maxPrice,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
             boolean studentOnly,
             boolean onlyAvailable,
             String sortBy
@@ -113,8 +114,8 @@ public class TransportsQueryService {
                         departureDate.plusDays(1).atStartOfDay()
                 )
                 .stream()
-                .filter(offer -> minPrice == null || offer.getPrice() >= minPrice)
-                .filter(offer -> maxPrice == null || offer.getPrice() <= maxPrice)
+                .filter(offer -> minPrice == null || offer.getPrice().compareTo(minPrice) >= 0)
+                .filter(offer -> maxPrice == null || offer.getPrice().compareTo(maxPrice) <= 0)
                 .filter(offer -> !onlyAvailable || offer.getRemainingSeats() > 0)
                 .sorted(ticketOfferComparator(sortBy))
                 .map(this::mapTicketOffer)
@@ -144,13 +145,13 @@ public class TransportsQueryService {
 
     private Comparator<TicketOfferTemplate> ticketOfferComparator(String sortBy) {
         return switch (sortBy == null ? "departure" : sortBy.toLowerCase()) {
-            case "price" -> Comparator.comparingInt(TicketOfferTemplate::getPrice)
+            case "price" -> Comparator.comparing(TicketOfferTemplate::getPrice)
                     .thenComparing(TicketOfferTemplate::getDepartureDateTime);
             case "seats" -> Comparator.comparingInt(TicketOfferTemplate::getRemainingSeats)
                     .reversed()
                     .thenComparing(TicketOfferTemplate::getDepartureDateTime);
             default -> Comparator.comparing(TicketOfferTemplate::getDepartureDateTime)
-                    .thenComparingInt(TicketOfferTemplate::getPrice);
+                    .thenComparing(TicketOfferTemplate::getPrice);
         };
     }
 

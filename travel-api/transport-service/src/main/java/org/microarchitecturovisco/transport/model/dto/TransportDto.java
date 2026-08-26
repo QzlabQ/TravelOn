@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -14,7 +15,7 @@ public class TransportDto implements Serializable {
 
     private LocalDateTime departureDate;
     private Integer capacity;
-    private Float pricePerAdult;
+    private BigDecimal pricePerAdult;
 
     private TransportCourseDto transportCourse;
 }

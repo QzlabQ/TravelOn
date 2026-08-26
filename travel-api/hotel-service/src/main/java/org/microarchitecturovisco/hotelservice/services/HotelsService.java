@@ -25,6 +25,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -52,8 +54,8 @@ public class HotelsService {
             LocalDate dateTo,
             int adults,
             String hotelName,
-            Float minPrice,
-            Float maxPrice,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
             Float minRating,
             String hotelType,
             String roomType,
@@ -80,13 +82,13 @@ public class HotelsService {
                 continue;
             }
 
-            Pair<List<Room>, Float> pair = getRoomConfigurationForAmountOfPeople(entry.getValue(), numberOfGuests);
-            if (pair.getSecond() == 0) {
+            Pair<List<Room>, BigDecimal> pair = getRoomConfigurationForAmountOfPeople(entry.getValue(), numberOfGuests);
+            if (pair.getSecond().signum() == 0) {
                 continue;
             }
 
-            float price = pair.getSecond();
-            if ((minPrice != null && price < minPrice) || (maxPrice != null && price > maxPrice)) {
+            BigDecimal price = pair.getSecond();
+            if ((minPrice != null && price.compareTo(minPrice) < 0) || (maxPrice != null && price.compareTo(maxPrice) > 0)) {
                 continue;
             }
 
@@ -141,10 +143,10 @@ public class HotelsService {
     private Comparator<HotelResponseDto> hotelComparator(String sortBy) {
         return switch (normalizeFilter(sortBy)) {
             case "RATING" -> Comparator.comparingDouble(HotelResponseDto::getRating).reversed()
-                    .thenComparingDouble(HotelResponseDto::getPricePerAdult);
-            case "PRICE_DESC" -> Comparator.comparingDouble(HotelResponseDto::getPricePerAdult).reversed()
+                    .thenComparing(HotelResponseDto::getPricePerAdult);
+            case "PRICE_DESC" -> Comparator.comparing(HotelResponseDto::getPricePerAdult).reversed()
                     .thenComparing(Comparator.comparingDouble(HotelResponseDto::getRating).reversed());
-            default -> Comparator.comparingDouble(HotelResponseDto::getPricePerAdult)
+            default -> Comparator.comparing(HotelResponseDto::getPricePerAdult)
                     .thenComparing(Comparator.comparingDouble(HotelResponseDto::getRating).reversed());
         };
     }
@@ -174,8 +176,8 @@ public class HotelsService {
         int HOTEL_CONFIGURATION_NUMBER = 3;
         for (int i = 0; i< HOTEL_CONFIGURATION_NUMBER; i++)
         {
-            Pair<List<Room>, Float> pair = getRoomConfigurationForAmountOfPeople(hotelRooms, numberOfGuests);
-            if (pair.getSecond() != 0) {
+            Pair<List<Room>, BigDecimal> pair = getRoomConfigurationForAmountOfPeople(hotelRooms, numberOfGuests);
+            if (pair.getSecond().signum() != 0) {
                 RoomsConfigurationDto roomsConfigurationDto = RoomsConfigurationDto.builder()
                         .rooms(RoomMapper.mapList(pair.getFirst()))
                         .pricePerAdult(pair.getSecond())
@@ -188,19 +190,19 @@ public class HotelsService {
 
     }
 
-    public Pair<List<Room>, Float> getRoomConfigurationForAmountOfPeople(List<Room> rooms, int numberOfPeople){
+    public Pair<List<Room>, BigDecimal> getRoomConfigurationForAmountOfPeople(List<Room> rooms, int numberOfPeople){
         List<Room> roomConfiguration = new ArrayList<>();
         List<Room> sortedRooms = new ArrayList<>(rooms.stream()
                 .sorted(Comparator.comparingInt(Room::getGuestCapacity))
                 .toList());
-        float currentPrice = 0;
+        BigDecimal totalPrice = BigDecimal.ZERO;
         int currentPeople = 0;
         while (numberOfPeople > 0) {
             for (int i = 0; i < sortedRooms.size(); i++) {
                 if (sortedRooms.get(i).getGuestCapacity() >= numberOfPeople || i == sortedRooms.size() - 1) {
                     numberOfPeople-= sortedRooms.get(i).getGuestCapacity();
-                    currentPrice = ((currentPrice * currentPeople) + (sortedRooms.get(i).getPricePerAdult() * sortedRooms.get(i).getGuestCapacity()))
-                            / (currentPeople + sortedRooms.get(i).getGuestCapacity());
+                    totalPrice = totalPrice.add(sortedRooms.get(i).getPricePerAdult()
+                            .multiply(BigDecimal.valueOf(sortedRooms.get(i).getGuestCapacity())));
                     currentPeople += sortedRooms.get(i).getGuestCapacity();
                     roomConfiguration.add(sortedRooms.get(i));
                     sortedRooms.remove(i);
@@ -211,10 +213,10 @@ public class HotelsService {
             if (sortedRooms.isEmpty()) {break;}
         }
         if (numberOfPeople <= 0) {
-            return Pair.of(roomConfiguration, currentPrice);
+            BigDecimal averagePrice = totalPrice.divide(BigDecimal.valueOf(currentPeople), 2, RoundingMode.HALF_UP);
+            return Pair.of(roomConfiguration, averagePrice);
         }
-        currentPrice = 0;
-        return Pair.of(new ArrayList<>(), currentPrice);
+        return Pair.of(new ArrayList<>(), BigDecimal.ZERO.setScale(2));
     }
 
 
@@ -223,7 +225,7 @@ public class HotelsService {
         LocalDateTime dateTo = requestDto.getDateTo();
 
         List<Hotel> availableHotels = new ArrayList<>();
-        List<Float> pricesPerAdult = new ArrayList<>();
+        List<BigDecimal> pricesPerAdult = new ArrayList<>();
 
         List<UUID> arrivalLocationIds = requestDto.getArrivalLocationIds();
 
@@ -235,8 +237,8 @@ public class HotelsService {
         for (Map.Entry<Hotel, List<Room>> entry : roomsByHotel.entrySet()) {
             Hotel hotel = entry.getKey();
             List<Room> rooms = entry.getValue();
-            Pair<List<Room>, Float> pair = getRoomConfigurationForAmountOfPeople(rooms, numberOfGuests);
-            if (pair.getSecond() != 0) {
+            Pair<List<Room>, BigDecimal> pair = getRoomConfigurationForAmountOfPeople(rooms, numberOfGuests);
+            if (pair.getSecond().signum() != 0) {
                 availableHotels.add(hotel);
                 pricesPerAdult.add(pair.getSecond());
             }
@@ -305,7 +307,7 @@ public class HotelsService {
         return hotelRepository.findById(id).orElseThrow(HotelNoFoundException::new);
     }
 
-    public void createRoomFromHotel(Integer hotelId, Long roomId, String name, int guestCapacity, float pricePerAdult,
+    public void createRoomFromHotel(Integer hotelId, Long roomId, String name, int guestCapacity, BigDecimal pricePerAdult,
                                     String description) {
         // hotel event projector
         RoomCreatedEvent roomCreatedEvent = RoomCreatedEvent.builder()
@@ -320,7 +322,7 @@ public class HotelsService {
         hotelEventProjector.project(List.of(roomCreatedEvent));
     }
 
-    public void updateRoomFromHotel(Integer hotelId, Long roomId, String name, int guestCapacity, float pricePerAdult,
+    public void updateRoomFromHotel(Integer hotelId, Long roomId, String name, int guestCapacity, BigDecimal pricePerAdult,
                                     String description) {
         RoomUpdateEvent roomUpdateEvent = new RoomUpdateEvent(hotelId, roomId, name, guestCapacity, pricePerAdult, description);
         hotelEventProjector.project(List.of(roomUpdateEvent));
@@ -363,4 +365,3 @@ public class HotelsService {
         hotelRepository.delete(hotel);
     }
 }
-

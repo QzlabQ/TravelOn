@@ -6,11 +6,12 @@ import org.microarchitecturovisco.reservationservice.domain.entity.RefundStatus;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 public record RefundRecordResponse(
         UUID id,
         UUID reservationId,
-        float amount,
+        BigDecimal amount,
         String reason,
         RefundStatus status,
         String requestedAt,

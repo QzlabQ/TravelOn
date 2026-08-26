@@ -35,7 +35,10 @@ public class AdminAccountBootstrap implements CommandLineRunner {
     private void upsertAdmin(AdminAccount account) {
         userRepository.findByEmailIgnoreCase(account.email())
                 .map(user -> {
-                    user.setPasswordHash(userService.hashPassword(account.password()));
+                    if (!userService.passwordMatches(account.password(), user.getPasswordHash())
+                            || userService.passwordNeedsUpgrade(user.getPasswordHash())) {
+                        user.setPasswordHash(userService.hashPassword(account.password()));
+                    }
                     user.setRole(UserRole.ADMIN);
                     if (user.getName() == null || user.getName().isBlank()) {
                         user.setName("Admin");

@@ -11,6 +11,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Logger;
 
@@ -33,7 +34,7 @@ public class OfferPriceWebSocketHandler extends TextWebSocketHandler {
 
         GetOfferPriceRequestDto requestDto = JsonReader.readJson(message.getPayload(), GetOfferPriceRequestDto.class);
 
-        Float offerPrice = offersController.getOfferPrice(requestDto);
+        BigDecimal offerPrice = offersController.getOfferPrice(requestDto);
 
         if (session.isOpen()) {
             try {

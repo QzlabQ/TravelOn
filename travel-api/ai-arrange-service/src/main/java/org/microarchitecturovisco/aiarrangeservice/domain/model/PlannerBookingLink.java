@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 @Data
 @Builder
@@ -22,5 +23,5 @@ public class PlannerBookingLink {
     private LocalDate departureDate;
     private String bookingCode;
     private String provider;
-    private Double price;
+    private BigDecimal price;
 }

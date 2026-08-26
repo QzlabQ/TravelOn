@@ -4,13 +4,14 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.Map;
 
 @Data
 @Builder
 public class ReservationConfirmationResponse {
     private String hotelName;
-    private Float price;
+    private BigDecimal price;
     private LocalDateTime dateFrom;
     private LocalDateTime dateTo;
     private Integer adults;

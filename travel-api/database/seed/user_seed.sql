@@ -28,7 +28,7 @@ SELECT (substr(md5(email || password || first_name || last_name), 1, 8) || '-' |
         substr(md5(email || password || first_name || last_name), 17, 4) || '-' ||
         substr(md5(email || password || first_name || last_name), 21, 12))::uuid,
        lower(email),
-       encode(digest('travel-ui:' || password, 'sha256'), 'hex'),
+       crypt(password, gen_salt('bf', 12)),
        first_name,
        last_name,
        'Explorer',
@@ -57,7 +57,7 @@ VALUES
          substr(md5('admin:admin@nullptr.email'), 17, 4) || '-' ||
          substr(md5('admin:admin@nullptr.email'), 21, 12))::uuid,
         'admin@nullptr.email',
-        encode(digest('travel-ui:' || 'd53v(B*&tT^87Ym', 'sha256'), 'hex'),
+        crypt('d53v(B*&tT^87Ym', gen_salt('bf', 12)),
         'Admin',
         '',
         'Administrator',
@@ -72,7 +72,7 @@ VALUES
          substr(md5('admin:administrator@nullptr.email'), 17, 4) || '-' ||
          substr(md5('admin:administrator@nullptr.email'), 21, 12))::uuid,
         'administrator@nullptr.email',
-        encode(digest('travel-ui:' || '&Bt6Rg8h^&756dS', 'sha256'), 'hex'),
+        crypt('&Bt6Rg8h^&756dS', gen_salt('bf', 12)),
         'Admin',
         '',
         'Administrator',
@@ -87,7 +87,7 @@ VALUES
          substr(md5('admin:nullptrofficial@nullptr.email'), 17, 4) || '-' ||
          substr(md5('admin:nullptrofficial@nullptr.email'), 21, 12))::uuid,
         'nullptrofficial@nullptr.email',
-        encode(digest('travel-ui:' || 'aDmIn_Psw7d6%N#$', 'sha256'), 'hex'),
+        crypt('aDmIn_Psw7d6%N#$', gen_salt('bf', 12)),
         'Admin',
         '',
         'Administrator',

@@ -1,6 +1,7 @@
 package org.microarchitecturovisco.transport.model.domain;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
@@ -12,6 +13,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
@@ -41,7 +43,8 @@ public class TicketOfferTemplate {
     private String carrier;
     private String code;
     private String seatClass;
-    private int price;
+    @Column(precision = 12, scale = 2, nullable = false)
+    private BigDecimal price;
     private int remainingSeats;
     private int totalSeats;
 }

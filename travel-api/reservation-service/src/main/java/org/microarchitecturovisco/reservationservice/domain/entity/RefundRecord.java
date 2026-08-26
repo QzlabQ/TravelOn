@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
@@ -31,7 +32,8 @@ public class RefundRecord {
     private UUID reservationId;
 
     @NotNull
-    private float amount;
+    @Column(precision = 12, scale = 2, nullable = false)
+    private BigDecimal amount;
 
     @Column(length = 240)
     private String reason;

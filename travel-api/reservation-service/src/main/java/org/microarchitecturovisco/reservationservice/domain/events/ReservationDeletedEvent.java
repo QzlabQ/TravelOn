@@ -3,6 +3,7 @@ package org.microarchitecturovisco.reservationservice.domain.events;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,7 +20,7 @@ public class ReservationDeletedEvent extends ReservationEvent {
     private int kidsQuantity;
     private int teensQuantity;
     private int adultsQuantity;
-    private float price;
+    private BigDecimal price;
     private boolean paid;
     private Integer hotelId;
     private List<Long> roomReservationsIds;

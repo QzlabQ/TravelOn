@@ -2,6 +2,7 @@ package org.microarchitecturovisco.transport.model.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
+import java.math.BigDecimal;
 
 @Data
 @Builder
@@ -25,7 +26,7 @@ public class TicketOfferDto {
     private String carrier;
     private String code;
     private String seatClass;
-    private int price;
+    private BigDecimal price;
     private int remainingSeats;
     private int totalSeats;
 }

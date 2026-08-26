@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 
 @Entity
@@ -31,7 +31,8 @@ public class Room {
     private String roomType;
 
     @NotNull
-    private float pricePerAdult;
+    @Column(precision = 12, scale = 2, nullable = false)
+    private BigDecimal pricePerAdult;
     @Column(columnDefinition = "TEXT")
     private String description;
 

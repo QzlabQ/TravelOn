@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Data;
 import java.util.List;
-import java.util.UUID;
+import java.math.BigDecimal;
 
 @Data
 @Builder
@@ -20,7 +20,7 @@ public class RoomDto {
 
     private String roomType;
 
-    private float pricePerAdult;
+    private BigDecimal pricePerAdult;
     @Lob
     private String description;
 

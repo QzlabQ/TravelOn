@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
 import java.util.logging.Logger;
 
 @Component
@@ -116,7 +117,7 @@ public class TicketOfferBootstrap implements CommandLineRunner {
                         .carrier(values[9])
                         .code(values[10])
                         .seatClass(values[11])
-                        .price(Integer.parseInt(values[12]))
+                        .price(new BigDecimal(values[12]))
                         .remainingSeats(Integer.parseInt(values[13]))
                         .totalSeats(Integer.parseInt(values[14]))
                         .build());

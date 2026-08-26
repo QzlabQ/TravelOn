@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,7 +38,8 @@ public class Reservation {
     private int adultsQuantity;
 
     @NotNull
-    private float price;
+    @Column(precision = 12, scale = 2, nullable = false)
+    private BigDecimal price;
 
     @NotNull
     private boolean paid;

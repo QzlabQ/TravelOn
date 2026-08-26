@@ -7,6 +7,7 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @NoArgsConstructor
@@ -15,9 +16,9 @@ import java.util.UUID;
 @Setter
 public class TransportUpdateEvent extends TransportEvent {
     private int capacity;
-    private float pricePerAdult;
+    private BigDecimal pricePerAdult;
 
-    public TransportUpdateEvent(UUID transportId, int capacity, float pricePerAdult){
+    public TransportUpdateEvent(UUID transportId, int capacity, BigDecimal pricePerAdult){
         this.setEventTimeStamp(LocalDateTime.now());
         this.setIdTransport(transportId);
         this.capacity = capacity;

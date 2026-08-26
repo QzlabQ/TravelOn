@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
 import java.util.logging.Logger;
 
 @RestController
@@ -143,7 +144,7 @@ public class ReservationController {
 
     private void deleteReservation(LocalDateTime hotelTimeFrom, LocalDateTime hotelTimeTo,
                                    int infantsQuantity, int kidsQuantity, int teensQuantity, int adultsQuantity,
-                                   float price, Integer hotelId, List<Long> roomReservationsIds,
+                                   BigDecimal price, Integer hotelId, List<Long> roomReservationsIds,
                                    List<UUID> transportReservationsIds, UUID userId, UUID reservationId) {
 
         DeleteReservationCommand command = DeleteReservationCommand.builder()

@@ -39,7 +39,7 @@ CREATE TABLE public.room (
     description text,
     guest_capacity integer NOT NULL,
     name character varying(255) NOT NULL,
-    price_per_adult real NOT NULL,
+    price_per_adult numeric(12,2) NOT NULL,
     room_type character varying(255),
     hotel_id integer
 );

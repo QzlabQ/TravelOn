@@ -9,6 +9,7 @@ import org.microarchitecturovisco.offerprovider.services.OffersService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -63,7 +64,7 @@ public class OffersController {
         return responseDto;
     }
 
-    public Float getOfferPrice(GetOfferPriceRequestDto requestDto) {
+    public BigDecimal getOfferPrice(GetOfferPriceRequestDto requestDto) {
         return offersService.getOfferPrice(requestDto);
     }
 }

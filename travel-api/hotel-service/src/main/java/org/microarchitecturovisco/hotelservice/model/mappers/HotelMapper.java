@@ -4,10 +4,11 @@ import org.microarchitecturovisco.hotelservice.model.domain.Hotel;
 import org.microarchitecturovisco.hotelservice.model.dto.HotelResponseDto;
 
 import java.util.ArrayList;
+import java.math.BigDecimal;
 import java.util.List;
 
 public class HotelMapper {
-    public static HotelResponseDto map(Hotel hotel, float price) {
+    public static HotelResponseDto map(Hotel hotel, BigDecimal price) {
         return HotelResponseDto.builder()
                 .hotelId(hotel.getId())
                 .name(hotel.getName())
@@ -19,7 +20,7 @@ public class HotelMapper {
                 .build();
     }
 
-    public static List<HotelResponseDto> mapList(List<Hotel> hotels, List<Float> prices) {
+    public static List<HotelResponseDto> mapList(List<Hotel> hotels, List<BigDecimal> prices) {
         List<HotelResponseDto> hotelDtos = new ArrayList<>();
         for (int i = 0; i < hotels.size(); i++) {
             hotelDtos.add(map(hotels.get(i), prices.get(i)));

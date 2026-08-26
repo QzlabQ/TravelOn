@@ -6,6 +6,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @Builder
 @Data
@@ -26,7 +27,7 @@ public class ReservationRequest implements Serializable {
 
     private int childrenUnder18Quantity;
 
-    private float price;
+    private BigDecimal price;
     private Integer hotelId;
     private List<Long> roomReservationsIds;
     private List<UUID> transportReservationsIds;
