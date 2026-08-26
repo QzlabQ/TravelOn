@@ -33,31 +33,6 @@ public class UserController {
         this.travelerService = travelerService;
     }
 
-    @GetMapping
-    public List<UserProfileResponse> getAllUsers() {
-        return userService.getAllUsers().stream()
-                .map(UserProfileResponse::from)
-                .toList();
-    }
-
-    @GetMapping("/{id}")
-    public UserProfileResponse getUserById(@PathVariable UUID id) {
-        return userService.getUserById(id)
-                .map(UserProfileResponse::from)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id " + id));
-    }
-
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public AuthResponse createUser(@Valid @RequestBody RegisterRequest request) {
-        return userService.register(request);
-    }
-
-    @DeleteMapping("/{id}")
-    public void deleteUser(@PathVariable UUID id) {
-        userService.deleteUser(id);
-    }
-
     @PostMapping("/auth/register")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
