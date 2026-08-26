@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -113,6 +114,22 @@ class PlannerConversationServiceTest {
         PlannerDataRefreshPayload payload = (PlannerDataRefreshPayload) payloadCaptor.getValue();
         assertThat(payload.getSnapshotVersion()).isEqualTo(2);
         assertThat(payload.getSelectedPlaceIds()).containsExactly(placeId);
+    }
+
+    @Test
+    void rejectsConversationAccessWhenUserDoesNotOwnConversation() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.empty());
+
+        PlannerConversationService service = new PlannerConversationService(
+                conversationRepository, messageRepository, snapshotRepository, promptFactory,
+                plannerAiClient, plannerAgentClient, snapshotService, webSocketSessionRegistry, plannerExecutorService
+        );
+
+        assertThatThrownBy(() -> service.getConversation(conversationId, userId))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("404 NOT_FOUND");
     }
 
     @Test
