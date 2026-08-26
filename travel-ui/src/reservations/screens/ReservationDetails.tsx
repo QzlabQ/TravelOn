@@ -208,10 +208,11 @@ export default function ReservationDetails() {
         setLoading(true);
         setErrorMessage("");
         try {
+            if (!session) throw new Error("Authentication required");
             const [reservationResponse, paymentsResponse, refundsResponse] = await Promise.all([
-                ApiRequests.getReservation(reservationId),
-                ApiRequests.getReservationPayments(reservationId),
-                ApiRequests.getReservationRefunds(reservationId)
+                ApiRequests.getReservation(session.token, reservationId),
+                ApiRequests.getReservationPayments(session.token, reservationId),
+                ApiRequests.getReservationRefunds(session.token, reservationId)
             ]);
             const loadedReservation = reservationResponse.data;
             const loadedRefunds = refundsResponse.data;
@@ -237,7 +238,7 @@ export default function ReservationDetails() {
 
     useEffect(() => {
         loadReservation().then(r => r);
-    }, [reservationId]);
+    }, [reservationId, session?.token]);
 
     useEffect(() => {
         const refreshPaymentAssets = () => {
@@ -462,7 +463,8 @@ export default function ReservationDetails() {
         setErrorMessage("");
         setSuccessMessage("");
         try {
-            const response = await ApiRequests.cancelReservation(reservation.id, cancellationReason || "行程有变");
+            if (!session) throw new Error("Authentication required");
+            const response = await ApiRequests.cancelReservation(session.token, reservation.id, cancellationReason || "行程有变");
             const walletRefunded = effectiveStatus === "PAID" && refundWalletPaymentIfNeeded();
             setReservation(response.data);
             setCancelDialogOpen(false);

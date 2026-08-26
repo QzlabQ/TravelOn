@@ -80,28 +80,40 @@ export class ApiRequests {
         return await axiosInstance.post('reservations/purchase', payload);
     }
 
-    static getReservationsForUser = async (userId: string) => {
-        return await axiosInstance.get(`reservations/user/${userId}`);
+    static getReservationsForUser = async (token: string, userId: string) => {
+        return await axiosInstance.get(`reservations/user/${userId}`, {
+            headers: {'X-User-Token': token}
+        });
     }
 
-    static getReservation = async (reservationId: string) => {
-        return await axiosInstance.get<ReservationResponse>(`reservations/${reservationId}`);
+    static getReservation = async (token: string, reservationId: string) => {
+        return await axiosInstance.get<ReservationResponse>(`reservations/${reservationId}`, {
+            headers: {'X-User-Token': token}
+        });
     }
 
-    static cancelReservation = async (reservationId: string, reason?: string) => {
-        return await axiosInstance.post<ReservationResponse>(`reservations/${reservationId}/cancel`, {reason});
+    static cancelReservation = async (token: string, reservationId: string, reason?: string) => {
+        return await axiosInstance.post<ReservationResponse>(`reservations/${reservationId}/cancel`, {reason}, {
+            headers: {'X-User-Token': token}
+        });
     }
 
-    static getReservationPayments = async (reservationId: string) => {
-        return await axiosInstance.get<PaymentTransactionResponse[]>(`reservations/${reservationId}/payments`);
+    static getReservationPayments = async (token: string, reservationId: string) => {
+        return await axiosInstance.get<PaymentTransactionResponse[]>(`reservations/${reservationId}/payments`, {
+            headers: {'X-User-Token': token}
+        });
     }
 
-    static getReservationRefunds = async (reservationId: string) => {
-        return await axiosInstance.get<RefundRecordResponse[]>(`reservations/${reservationId}/refunds`);
+    static getReservationRefunds = async (token: string, reservationId: string) => {
+        return await axiosInstance.get<RefundRecordResponse[]>(`reservations/${reservationId}/refunds`, {
+            headers: {'X-User-Token': token}
+        });
     }
 
-    static completeRefund = async (reservationId: string) => {
-        return await axiosInstance.post<ReservationResponse>(`reservations/${reservationId}/refunds/complete`);
+    static completeRefund = async (token: string, reservationId: string) => {
+        return await axiosInstance.post<ReservationResponse>(`reservations/${reservationId}/refunds/complete`, undefined, {
+            headers: {'X-User-Token': token}
+        });
     }
 
     static createTicketReservation = async (payload: CreateTicketReservationPayload) => {

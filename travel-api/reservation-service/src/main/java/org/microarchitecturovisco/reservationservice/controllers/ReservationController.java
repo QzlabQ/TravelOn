@@ -18,6 +18,7 @@ import org.microarchitecturovisco.reservationservice.domain.exceptions.Reservati
 import org.microarchitecturovisco.reservationservice.domain.model.PurchaseRequestBody;
 import org.microarchitecturovisco.reservationservice.domain.model.ReservationConfirmationResponse;
 import org.microarchitecturovisco.reservationservice.services.ReservationAggregate;
+import org.microarchitecturovisco.reservationservice.services.ReservationAuthorizationService;
 import org.microarchitecturovisco.reservationservice.services.ReservationService;
 import org.microarchitecturovisco.reservationservice.utils.json.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
@@ -41,38 +43,61 @@ public class ReservationController {
 
     private final ReservationService reservationService;
     private final ReservationAggregate reservationAggregate;
+    private final ReservationAuthorizationService authorizationService;
     public static Logger logger = Logger.getLogger(ReservationController.class.getName());
 
     @GetMapping("/user/{userId}")
-    public List<ReservationResponse> getReservationsForUser(@PathVariable UUID userId) {
+    public List<ReservationResponse> getReservationsForUser(
+            @PathVariable UUID userId,
+            @RequestHeader(value = "X-User-Token", required = false) String token
+    ) {
+        authorizationService.requireOwnerOrAdmin(token, userId);
         return reservationService.getReservationsForUser(userId);
     }
 
     @GetMapping("/{reservationId}")
-    public ReservationResponse getReservation(@PathVariable UUID reservationId) {
+    public ReservationResponse getReservation(
+            @PathVariable UUID reservationId,
+            @RequestHeader(value = "X-User-Token", required = false) String token
+    ) {
+        authorizationService.requireReservationOwnerOrAdmin(token, reservationId);
         return reservationService.getReservation(reservationId);
     }
 
     @PostMapping("/{reservationId}/cancel")
     public ReservationResponse cancelReservation(
             @PathVariable UUID reservationId,
+            @RequestHeader(value = "X-User-Token", required = false) String token,
             @Valid @RequestBody(required = false) CancelReservationRequest request
     ) {
+        authorizationService.requireReservationOwnerOrAdmin(token, reservationId);
         return reservationService.cancelReservation(reservationId, request == null ? null : request.reason());
     }
 
     @GetMapping("/{reservationId}/payments")
-    public List<PaymentTransactionResponse> getPaymentTransactions(@PathVariable UUID reservationId) {
+    public List<PaymentTransactionResponse> getPaymentTransactions(
+            @PathVariable UUID reservationId,
+            @RequestHeader(value = "X-User-Token", required = false) String token
+    ) {
+        authorizationService.requireReservationOwnerOrAdmin(token, reservationId);
         return reservationService.getPaymentTransactions(reservationId);
     }
 
     @GetMapping("/{reservationId}/refunds")
-    public List<RefundRecordResponse> getRefundRecords(@PathVariable UUID reservationId) {
+    public List<RefundRecordResponse> getRefundRecords(
+            @PathVariable UUID reservationId,
+            @RequestHeader(value = "X-User-Token", required = false) String token
+    ) {
+        authorizationService.requireReservationOwnerOrAdmin(token, reservationId);
         return reservationService.getRefundRecords(reservationId);
     }
 
     @PostMapping("/{reservationId}/refunds/complete")
-    public ReservationResponse completeRefund(@PathVariable UUID reservationId) {
+    public ReservationResponse completeRefund(
+            @PathVariable UUID reservationId,
+            @RequestHeader(value = "X-User-Token", required = false) String token
+    ) {
+        authorizationService.requireAdmin(token);
         return reservationService.completeRefund(reservationId);
     }
 
