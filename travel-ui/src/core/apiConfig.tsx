@@ -617,6 +617,7 @@ export interface CreateHotelReservationPayload {
     price: number,
     roomName?: string,
     travelers: BookingPersonPayload[],
+    roomIds: number[],
 }
 
 export type TravelerType = 'ADULT' | 'CHILD' | 'STUDENT';
