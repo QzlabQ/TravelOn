@@ -89,6 +89,8 @@ const emptyProfileForm = {
     avatarUrl: ""
 };
 
+const isUploadedAvatarPath = (value?: string | null) => Boolean(value?.startsWith("/community/uploads/"));
+
 const emptyIdentityForm: AccountIdentity = {
     realName: "",
     documentType: "身份证",
@@ -174,6 +176,7 @@ export default function Account() {
     const navigate = useNavigate();
     const [session, setSession] = useState<UserSession | null>(getCurrentUserSession());
     const [profileForm, setProfileForm] = useState(emptyProfileForm);
+    const [avatarInput, setAvatarInput] = useState("");
     const [authOpen, setAuthOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -223,6 +226,7 @@ export default function Account() {
             phone: user.phone || "",
             avatarUrl: user.avatarUrl || ""
         });
+        setAvatarInput(isUploadedAvatarPath(user.avatarUrl) ? "" : user.avatarUrl || "");
     };
 
     const refreshProfile = async (currentSession = session) => {
@@ -341,6 +345,7 @@ export default function Account() {
         try {
             const response = await ApiRequests.uploadCommunityImage(session.token, file);
             setProfileForm(current => ({...current, avatarUrl: response.data.url}));
+            setAvatarInput("");
             setMessage("头像已上传，请点击保存资料完成更新。");
         } catch (error: any) {
             setErrorMessage(extractApiErrorMessage(error, "头像上传失败，请稍后再试。"));
@@ -363,6 +368,7 @@ export default function Account() {
         clearCurrentUserSession();
         setSession(null);
         setProfileForm(emptyProfileForm);
+        setAvatarInput("");
         setIdentityForm(emptyIdentityForm);
         setWallet({balance: 0, transactions: []});
         setSavedBankCards([]);
@@ -722,8 +728,12 @@ export default function Account() {
                                     <div className="min-w-0 flex-1">
                                         <TextField
                                             label="头像"
-                                            value={profileForm.avatarUrl}
-                                            onChange={event => setProfileForm({...profileForm, avatarUrl: event.target.value})}
+                                            value={avatarInput}
+                                            onChange={event => {
+                                                const value = event.target.value;
+                                                setAvatarInput(value);
+                                                setProfileForm(current => ({...current, avatarUrl: value}));
+                                            }}
                                             placeholder="粘贴图片 URL，或使用本地上传"
                                             helperText="支持从 URL 获取头像，也支持上传本地图片"
                                             fullWidth
@@ -747,7 +757,10 @@ export default function Account() {
                                             {profileForm.avatarUrl &&
                                                 <Button
                                                     variant="text"
-                                                    onClick={() => setProfileForm({...profileForm, avatarUrl: ""})}
+                                                    onClick={() => {
+                                                        setAvatarInput("");
+                                                        setProfileForm(current => ({...current, avatarUrl: ""}));
+                                                    }}
                                                     disabled={avatarUploading}
                                                 >
                                                     清除头像
