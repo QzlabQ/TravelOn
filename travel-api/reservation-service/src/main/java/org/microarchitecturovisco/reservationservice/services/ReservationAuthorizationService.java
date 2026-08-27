@@ -10,7 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestOperations;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
@@ -18,9 +18,9 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class ReservationAuthorizationService {
+public class ReservationAuthorizationService implements ReservationAuthorizationOperations {
 
-    private final RestTemplate restTemplate;
+    private final RestOperations restTemplate;
     private final ReservationRepository reservationRepository;
 
     public void requireReservationOwnerOrAdmin(String token, UUID reservationId) {

@@ -11,7 +11,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.server.ResponseStatusException;
@@ -35,7 +35,7 @@ class ReservationAuthorizationServiceTest {
     private static final UUID RESERVATION_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
     @Mock
-    private RestTemplate restTemplate;
+    private RestOperations restTemplate;
 
     @Mock
     private ReservationRepository reservationRepository;

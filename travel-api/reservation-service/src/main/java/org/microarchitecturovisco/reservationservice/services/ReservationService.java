@@ -57,7 +57,7 @@ import java.util.logging.Logger;
 
 @Service
 @RequiredArgsConstructor
-public class ReservationService {
+public class ReservationService implements ReservationOperations {
 
     private static final org.slf4j.Logger log = LoggerFactory.getLogger(ReservationService.class);
 

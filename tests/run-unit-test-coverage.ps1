@@ -25,6 +25,7 @@ $summaryPath = Join-Path $artifactDirectory 'summary.json'
 $markdownPath = Join-Path $artifactDirectory 'latest.md'
 $pythonJUnitPath = Join-Path $artifactDirectory 'python-junit.xml'
 $frontendJunitPath = Join-Path $artifactDirectory 'frontend-junit.json'
+$pythonEnvironmentName = 'travelon-tests'
 
 New-Item -ItemType Directory -Force -Path $logsDirectory | Out-Null
 
@@ -149,10 +150,19 @@ function Get-PytestResults {
     try {
         [xml]$document = Get-Content -Raw $ReportPath
         $root = $document.DocumentElement
-        $total = ConvertTo-NullableInt $root.tests
-        $failed = ConvertTo-NullableInt $root.failures
-        $errors = ConvertTo-NullableInt $root.errors
-        $skipped = ConvertTo-NullableInt $root.skipped
+        # pytest writes a <testsuites> wrapper, while other JUnit producers may
+        # write a single <testsuite>. Aggregate both shapes consistently.
+        $suites = if ($root.LocalName -eq 'testsuites') { @($root.testsuite) } else { @($root) }
+        $total = 0
+        $failed = 0
+        $errors = 0
+        $skipped = 0
+        foreach ($suite in $suites) {
+            $total += ConvertTo-NullableInt $suite.tests
+            $failed += ConvertTo-NullableInt $suite.failures
+            $errors += ConvertTo-NullableInt $suite.errors
+            $skipped += ConvertTo-NullableInt $suite.skipped
+        }
         $passed = $null
         if ($null -ne $total) { $passed = $total - $failed - $errors - $skipped }
         return [pscustomobject]@{
@@ -394,13 +404,13 @@ foreach ($moduleName in $javaModules) {
 }
 
 $pythonRoot = Join-Path $repositoryRoot 'travel-api/ai-arrange-agent-service'
-$pythonResult = Invoke-TestModule -Name 'ai-arrange-agent-service' -Command 'python -m pytest -q --junitxml=artifacts/test-results/python-junit.xml' -NativeReports @(
+$pythonResult = Invoke-TestModule -Name 'ai-arrange-agent-service' -Command "conda run -n $pythonEnvironmentName python -m pytest -q --junitxml=artifacts/test-results/python-junit.xml" -NativeReports @(
     'artifacts/test-results/python-junit.xml',
     'travel-api/ai-arrange-agent-service/coverage.xml',
     'travel-api/ai-arrange-agent-service/htmlcov/index.html'
 ) -Action {
     Push-Location $pythonRoot
-    try { python -m pytest -q "--junitxml=$pythonJUnitPath" } finally { Pop-Location }
+    try { conda run -n $pythonEnvironmentName python -m pytest -q "--junitxml=$pythonJUnitPath" } finally { Pop-Location }
 }
 $pythonJUnit = Get-PytestResults -ReportPath $pythonJUnitPath -NotOlderThan $startedAt
 $pythonCoverage = Get-CoberturaCoverage -ReportPath (Join-Path $pythonRoot 'coverage.xml') -NotOlderThan $startedAt
