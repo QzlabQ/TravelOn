@@ -221,6 +221,7 @@ const HotelDetails = () => {
                 price: totalPrice,
                 roomName: selectedRoomNames,
                 travelers: selectedTravelers,
+                roomIds: selectedConfiguration.rooms.map(room => Number(room.roomId)),
             });
             setReservationId(response.data.id);
             addNotification({

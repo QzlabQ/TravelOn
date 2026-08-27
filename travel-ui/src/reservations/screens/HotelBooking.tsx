@@ -430,19 +430,39 @@ const HotelBooking = () => {
         }
 
         try {
+            const guestAdults = selectedTravelers.filter(traveler => traveler.travelerType !== 'CHILD').length;
+            const guestChildren = selectedTravelers.filter(traveler => traveler.travelerType === 'CHILD').length;
+            const detailsResponse = await ApiRequests.getHotelDetails(selectedOffer.idHotel, {
+                dateFrom,
+                dateTo,
+                adults: guestAdults,
+                childrenUnder18: guestChildren,
+                childrenUnder10: 0,
+                childrenUnder3: 0,
+            });
+            const roomConfiguration = detailsResponse.data.roomsConfigurations[0];
+            const roomIds = roomConfiguration?.rooms
+                .map(room => Number(room.roomId))
+                .filter(roomId => Number.isSafeInteger(roomId) && roomId > 0) ?? [];
+
+            if (!roomConfiguration || roomIds.length === 0) {
+                throw new Error('No bookable room configuration was returned.');
+            }
+
             const response = await ApiRequests.createHotelReservation(session.token, {
                 userId: session.user.id,
                 hotelId: selectedOffer.idHotel,
                 hotelName: selectedOffer.hotelName,
                 dateFrom,
                 dateTo,
-                adultsQuantity: selectedTravelers.filter(traveler => traveler.travelerType !== 'CHILD').length,
+                adultsQuantity: guestAdults,
                 childrenUnder3Quantity: 0,
                 childrenUnder10Quantity: 0,
-                childrenUnder18Quantity: selectedTravelers.filter(traveler => traveler.travelerType === 'CHILD').length,
+                childrenUnder18Quantity: guestChildren,
                 price: selectedOffer.price * selectedTravelers.length,
-                roomName: selectedRoomName,
+                roomName: roomConfiguration.rooms.map(room => room.name).join(' + '),
                 travelers: selectedTravelers,
+                roomIds,
             });
             setReservationId(response.data.id);
             addNotification({

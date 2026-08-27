@@ -13,7 +13,7 @@ dependency interaction, HTTP status, or thrown exception.
 Run command:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-test-coverage.ps1
+powershell -ExecutionPolicy Bypass -File .\tests\run-unit-test-coverage.ps1
 ```
 
 The runner generated `artifacts/test-results/latest.md`,

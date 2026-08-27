@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Runs the repository's local test suites and writes a consolidated result.
 
@@ -96,14 +96,14 @@ function Get-JUnitResults {
 
     $warnings = [System.Collections.Generic.List[string]]::new()
     if (-not (Test-Path $ReportDirectory)) {
-        $warnings.Add("JUnit report directory was not created: $ReportDirectory")
+        $warnings.Add("未生成 JUnit 报告目录：$ReportDirectory")
         return [pscustomobject]@{ tests = New-TestCounts; warnings = $warnings }
     }
 
     $reports = @(Get-ChildItem -Path $ReportDirectory -Filter $Filter -File -ErrorAction SilentlyContinue |
         Where-Object { $_.LastWriteTime -ge $NotOlderThan })
     if ($reports.Count -eq 0) {
-        $warnings.Add("No JUnit reports matching $Filter were updated during this execution in $ReportDirectory")
+        $warnings.Add("本次执行未更新匹配 $Filter 的 JUnit 报告：$ReportDirectory")
         return [pscustomobject]@{ tests = New-TestCounts; warnings = $warnings }
     }
 
@@ -121,7 +121,7 @@ function Get-JUnitResults {
             $skipped += (ConvertTo-NullableInt $root.skipped) + (ConvertTo-NullableInt $root.disabled)
         }
         catch {
-            $warnings.Add("Could not parse JUnit report $($report.FullName): $($_.Exception.Message)")
+            $warnings.Add("无法解析 JUnit 报告 $($report.FullName)：$($_.Exception.Message)")
         }
     }
 
@@ -138,11 +138,11 @@ function Get-PytestResults {
 
     $warnings = [System.Collections.Generic.List[string]]::new()
     if (-not (Test-Path $ReportPath)) {
-        $warnings.Add("pytest JUnit report was not created: $ReportPath")
+        $warnings.Add("未生成 pytest JUnit 报告：$ReportPath")
         return [pscustomobject]@{ tests = New-TestCounts; warnings = $warnings }
     }
     if ((Get-Item $ReportPath).LastWriteTime -lt $NotOlderThan) {
-        $warnings.Add("pytest JUnit report was not updated during this execution: $ReportPath")
+        $warnings.Add("pytest JUnit 报告未在本次执行中更新：$ReportPath")
         return [pscustomobject]@{ tests = New-TestCounts; warnings = $warnings }
     }
 
@@ -161,7 +161,7 @@ function Get-PytestResults {
         }
     }
     catch {
-        $warnings.Add("Could not parse pytest JUnit report ${ReportPath}: $($_.Exception.Message)")
+        $warnings.Add("无法解析 pytest JUnit 报告 ${ReportPath}：$($_.Exception.Message)")
         return [pscustomobject]@{ tests = New-TestCounts; warnings = $warnings }
     }
 }
@@ -172,18 +172,18 @@ function Get-JacocoCoverage {
     $coverage = New-CoverageSummary
     $warnings = [System.Collections.Generic.List[string]]::new()
     if (-not (Test-Path $ReportPath)) {
-        $warnings.Add("JaCoCo CSV report was not created: $ReportPath")
+        $warnings.Add("未生成 JaCoCo CSV 报告：$ReportPath")
         return [pscustomobject]@{ coverage = $coverage; warnings = $warnings }
     }
     if ((Get-Item $ReportPath).LastWriteTime -lt $NotOlderThan) {
-        $warnings.Add("JaCoCo CSV report was not updated during this execution: $ReportPath")
+        $warnings.Add("JaCoCo CSV 报告未在本次执行中更新：$ReportPath")
         return [pscustomobject]@{ coverage = $coverage; warnings = $warnings }
     }
 
     try {
         $rows = @(Import-Csv -Path $ReportPath)
         if ($rows.Count -eq 0) {
-            $warnings.Add("JaCoCo CSV report has no data rows: $ReportPath")
+            $warnings.Add("JaCoCo CSV 报告没有数据行：$ReportPath")
             return [pscustomobject]@{ coverage = $coverage; warnings = $warnings }
         }
         $lineCovered = ($rows | Measure-Object -Property LINE_COVERED -Sum).Sum
@@ -194,7 +194,7 @@ function Get-JacocoCoverage {
         $coverage.branches = New-CoverageMetric -Covered $branchCovered -Missed $branchMissed
     }
     catch {
-        $warnings.Add("Could not parse JaCoCo CSV report ${ReportPath}: $($_.Exception.Message)")
+        $warnings.Add("无法解析 JaCoCo CSV 报告 ${ReportPath}：$($_.Exception.Message)")
     }
 
     return [pscustomobject]@{ coverage = $coverage; warnings = $warnings }
@@ -206,11 +206,11 @@ function Get-CoberturaCoverage {
     $coverage = New-CoverageSummary
     $warnings = [System.Collections.Generic.List[string]]::new()
     if (-not (Test-Path $ReportPath)) {
-        $warnings.Add("Python coverage report was not created: $ReportPath")
+        $warnings.Add("未生成 Python 覆盖率报告：$ReportPath")
         return [pscustomobject]@{ coverage = $coverage; warnings = $warnings }
     }
     if ((Get-Item $ReportPath).LastWriteTime -lt $NotOlderThan) {
-        $warnings.Add("Python coverage report was not updated during this execution: $ReportPath")
+        $warnings.Add("Python 覆盖率报告未在本次执行中更新：$ReportPath")
         return [pscustomobject]@{ coverage = $coverage; warnings = $warnings }
     }
 
@@ -221,7 +221,7 @@ function Get-CoberturaCoverage {
         $coverage.branches = New-CoverageMetric -Percent ([math]::Round(([double]$root.'branch-rate') * 100, 2))
     }
     catch {
-        $warnings.Add("Could not parse Python coverage report ${ReportPath}: $($_.Exception.Message)")
+        $warnings.Add("无法解析 Python 覆盖率报告 ${ReportPath}：$($_.Exception.Message)")
     }
 
     return [pscustomobject]@{ coverage = $coverage; warnings = $warnings }
@@ -232,11 +232,11 @@ function Get-FrontendTestResults {
 
     $warnings = [System.Collections.Generic.List[string]]::new()
     if (-not (Test-Path $ReportPath)) {
-        $warnings.Add("Jest JSON report was not created: $ReportPath")
+        $warnings.Add("未生成 Jest JSON 报告：$ReportPath")
         return [pscustomobject]@{ tests = New-TestCounts; warnings = $warnings }
     }
     if ((Get-Item $ReportPath).LastWriteTime -lt $NotOlderThan) {
-        $warnings.Add("Jest JSON report was not updated during this execution: $ReportPath")
+        $warnings.Add("Jest JSON 报告未在本次执行中更新：$ReportPath")
         return [pscustomobject]@{ tests = New-TestCounts; warnings = $warnings }
     }
 
@@ -252,7 +252,7 @@ function Get-FrontendTestResults {
         }
     }
     catch {
-        $warnings.Add("Could not parse Jest JSON report ${ReportPath}: $($_.Exception.Message)")
+        $warnings.Add("无法解析 Jest JSON 报告 ${ReportPath}：$($_.Exception.Message)")
         return [pscustomobject]@{ tests = New-TestCounts; warnings = $warnings }
     }
 }
@@ -263,11 +263,11 @@ function Get-IstanbulCoverage {
     $coverage = New-CoverageSummary
     $warnings = [System.Collections.Generic.List[string]]::new()
     if (-not (Test-Path $ReportPath)) {
-        $warnings.Add("Istanbul coverage report was not created: $ReportPath")
+        $warnings.Add("未生成 Istanbul 覆盖率报告：$ReportPath")
         return [pscustomobject]@{ coverage = $coverage; warnings = $warnings }
     }
     if ((Get-Item $ReportPath).LastWriteTime -lt $NotOlderThan) {
-        $warnings.Add("Istanbul coverage report was not updated during this execution: $ReportPath")
+        $warnings.Add("Istanbul 覆盖率报告未在本次执行中更新：$ReportPath")
         return [pscustomobject]@{ coverage = $coverage; warnings = $warnings }
     }
 
@@ -303,7 +303,7 @@ function Get-IstanbulCoverage {
         $coverage.lines = New-CoverageMetric -Covered $lineCovered -Missed $lineMissed
     }
     catch {
-        $warnings.Add("Could not parse Istanbul coverage report ${ReportPath}: $($_.Exception.Message)")
+        $warnings.Add("无法解析 Istanbul 覆盖率报告 ${ReportPath}：$($_.Exception.Message)")
     }
 
     return [pscustomobject]@{ coverage = $coverage; warnings = $warnings }
@@ -446,24 +446,26 @@ $summary = [pscustomobject][ordered]@{
 }
 $summary | ConvertTo-Json -Depth 8 | Set-Content -Path $summaryPath -Encoding UTF8
 
+$overallStatusLabel = if ($summary.overallStatus -eq 'passed') { '通过' } else { '失败' }
 $markdown = [System.Collections.Generic.List[string]]::new()
-$markdown.Add('# Local Test and Coverage Summary')
+$markdown.Add('# 本地测试与覆盖率汇总')
 $markdown.Add('')
-$markdown.Add("- Started: $($summary.startedAt)")
-$markdown.Add("- Completed: $($summary.completedAt)")
-$markdown.Add("- Overall status: $($summary.overallStatus)")
+$markdown.Add("- 开始时间：$($summary.startedAt)")
+$markdown.Add("- 完成时间：$($summary.completedAt)")
+$markdown.Add("- 总体状态：$overallStatusLabel")
 $markdown.Add('')
-$markdown.Add('| Module | Command | Status | Tests (pass/total) | Line coverage | Branch coverage | Reports | Log |')
+$markdown.Add('| 模块 | 执行命令 | 状态 | 测试（通过/总数） | 行覆盖率 | 分支覆盖率 | 原生报告 | 日志 |')
 $markdown.Add('| --- | --- | --- | ---: | ---: | ---: | --- | --- |')
 foreach ($module in $modules) {
-    $tests = if ($null -eq $module.tests.total) { 'unavailable' } else { "$($module.tests.passed)/$($module.tests.total)" }
-    $lineCoverage = if ($null -eq $module.coverage.lines.percent) { 'unavailable' } else { "$($module.coverage.lines.percent)%" }
-    $branchCoverage = if ($null -eq $module.coverage.branches.percent) { 'unavailable' } else { "$($module.coverage.branches.percent)%" }
+    $tests = if ($null -eq $module.tests.total) { '未获取' } else { "$($module.tests.passed)/$($module.tests.total)" }
+    $lineCoverage = if ($null -eq $module.coverage.lines.percent) { '未获取' } else { "$($module.coverage.lines.percent)%" }
+    $branchCoverage = if ($null -eq $module.coverage.branches.percent) { '未获取' } else { "$($module.coverage.branches.percent)%" }
     $reports = $module.nativeReports -join '<br>'
-    $markdown.Add("| $($module.name) | ``$($module.command)`` | $($module.status) | $tests | $lineCoverage | $branchCoverage | $reports | $($module.logPath) |")
+    $status = if ($module.status -eq 'passed') { '通过' } else { '失败' }
+    $markdown.Add("| $($module.name) | ``$($module.command)`` | $status | $tests | $lineCoverage | $branchCoverage | $reports | $($module.logPath) |")
 }
 $markdown.Add('')
-$markdown.Add('## Parsing Warnings')
+$markdown.Add('## 报告解析警告')
 $markdown.Add('')
 foreach ($module in $modules) {
     foreach ($warning in $module.warnings) {
@@ -471,10 +473,10 @@ foreach ($module in $modules) {
     }
 }
 if (@($modules | ForEach-Object { $_.warnings }).Count -eq 0) {
-    $markdown.Add('- None')
+    $markdown.Add('- 无')
 }
 $markdown | Set-Content -Path $markdownPath -Encoding UTF8
 
-Write-Host "Consolidated summary: $summaryPath"
-Write-Host "Readable summary: $markdownPath"
+Write-Host "汇总数据：$summaryPath"
+Write-Host "可读报告：$markdownPath"
 if ($overallStatus -eq 'failed') { exit 1 }

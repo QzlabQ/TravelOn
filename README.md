@@ -338,7 +338,7 @@ Run all local Java, Python, and frontend test suites and collect their native
 coverage reports with one command:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-test-coverage.ps1
+powershell -ExecutionPolicy Bypass -File .\tests\run-unit-test-coverage.ps1
 ```
 
 Prerequisites are Java 21 with Maven, a Python environment with the
