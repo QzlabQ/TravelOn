@@ -785,18 +785,18 @@ export default function Account() {
                         <Paper elevation={0} className="border border-gray-200 p-6">
                         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <Typography variant="h5" className="font-semibold">实名与出行信息</Typography>
+                                <Typography variant="h5" className="font-semibold">实名信息</Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    本地模拟实名、余额充值和交易记录，让支付流程更接近真实产品。
+                                    实名资料会用于机票、火车票和酒店预订时的身份核验。
                                 </Typography>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Chip color={identityVerified ? "success" : "warning"} label={identityVerified ? "已实名" : "待完善"}/>
-                                <AccountBalanceWallet style={{fontSize: 36, color: "#f97316"}}/>
+                                <CreditCard style={{fontSize: 36, color: "#0f766e"}}/>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
+                        <div>
                             <div className="rounded-lg border border-gray-200 p-4">
                                 <div className="mb-4 flex items-center justify-between">
                                     <div>
@@ -837,7 +837,19 @@ export default function Account() {
                                     <Button variant="contained" startIcon={<Save/>} onClick={saveIdentity}>保存实名信息</Button>
                                 </div>
                             </div>
+                        </div>
+                        </Paper>
 
+                        <Paper elevation={0} className="border border-gray-200 p-6">
+                            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <Typography variant="h5" className="font-semibold">支付信息</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        管理钱包余额、默认支付方式、已绑定银联卡和交易记录。
+                                    </Typography>
+                                </div>
+                                <AccountBalanceWallet style={{fontSize: 36, color: "#f97316"}}/>
+                            </div>
                             <div className="rounded-lg border border-orange-100 bg-orange-50 p-4">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
@@ -964,7 +976,6 @@ export default function Account() {
                                     }
                                 </div>
                             </div>
-                        </div>
                         </Paper>
 
                     <WalletTopUpDialog
