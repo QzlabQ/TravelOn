@@ -14,8 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -30,20 +28,8 @@ public class UserService {
         this.passwordHasher = passwordHasher;
     }
 
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
-    }
-
-    public Optional<User> getUserById(UUID id) {
-        return userRepository.findById(id);
-    }
-
     public User saveUser(User user) {
         return userRepository.save(user);
-    }
-
-    public void deleteUser(UUID id) {
-        userRepository.deleteById(id);
     }
 
     public AuthResponse register(RegisterRequest request) {

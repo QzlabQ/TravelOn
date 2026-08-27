@@ -21,6 +21,7 @@ import {
 import {Link} from "react-router-dom";
 import {ApiRequests, ReservationResponse} from "../../core/apiConfig";
 import {getCurrentUserId, getCurrentUserMode} from "../../core/currentUser";
+import {useAuthSession} from "../../core/useAuthSession";
 import {getEffectiveReservationStatus} from "../orderStatus";
 
 type TimelineKind = "FLIGHT" | "TRAIN" | "HOTEL" | "OTHER";
@@ -351,6 +352,7 @@ const TimelineCard = ({item}: { item: TravelTimelineItem }) => {
 };
 
 const TravelTimeline = () => {
+    const session = useAuthSession();
     const [reservations, setReservations] = useState<ReservationResponse[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
@@ -363,7 +365,8 @@ const TravelTimeline = () => {
         setLoading(true);
         setError(false);
         try {
-            const response = await ApiRequests.getReservationsForUser(userId);
+            if (!session) throw new Error("Authentication required");
+            const response = await ApiRequests.getReservationsForUser(session.token, userId);
             setReservations(response.data);
         } catch (e) {
             console.log(e);
@@ -375,7 +378,7 @@ const TravelTimeline = () => {
 
     useEffect(() => {
         loadReservations().then(r => r);
-    }, []);
+    }, [session?.token, userId]);
 
     useEffect(() => {
         const timer = window.setInterval(() => {

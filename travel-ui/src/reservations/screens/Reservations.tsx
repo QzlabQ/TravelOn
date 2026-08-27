@@ -16,6 +16,7 @@ import {
 import {Cancel, EventNote, Refresh, Replay, Visibility} from "@mui/icons-material";
 import {ApiRequests, ReservationResponse} from "../../core/apiConfig";
 import {getCurrentUserId, getCurrentUserMode} from "../../core/currentUser";
+import {useAuthSession} from "../../core/useAuthSession";
 import {Link} from "react-router-dom";
 import {
     canCancelReservation,
@@ -78,6 +79,7 @@ const getRebookTarget = (reservation: ReservationResponse) => {
 };
 
 const Reservations = () => {
+    const session = useAuthSession();
     const [reservations, setReservations] = useState<ReservationResponse[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
@@ -91,7 +93,8 @@ const Reservations = () => {
         setError(false);
 
         try {
-            const response = await ApiRequests.getReservationsForUser(userId);
+            if (!session) throw new Error("Authentication required");
+            const response = await ApiRequests.getReservationsForUser(session.token, userId);
             setReservations(response.data);
         } catch (e) {
             console.log(e);
@@ -104,7 +107,8 @@ const Reservations = () => {
     const cancelReservation = async (reservationId: string) => {
         setCancellingId(reservationId);
         try {
-            await ApiRequests.cancelReservation(reservationId, '从订单列表取消');
+            if (!session) throw new Error("Authentication required");
+            await ApiRequests.cancelReservation(session.token, reservationId, '从订单列表取消');
             await loadReservations();
         } catch (e) {
             console.log(e);
@@ -116,7 +120,7 @@ const Reservations = () => {
 
     useEffect(() => {
         loadReservations().then(r => r);
-    }, []);
+    }, [session?.token, userId]);
 
     return (
         <div className='flex flex-col px-48 py-16'>

@@ -129,5 +129,4 @@ Default host ports are intentionally placed in a high, project-specific range to
 | MongoDB | 57017 | 27017 | `MONGO_HOST_PORT` |
 | Eureka discovery | 58010 | 8010 | `DISCOVERY_HOST_PORT` |
 | API gateway | 58082 | 8082 | `GATEWAY_HOST_PORT` |
-| AI arrange agent | 58090 | 8090 | `AI_ARRANGE_AGENT_HOST_PORT` |
-
+| AI arrange agent | Not published | 8090 | Internal `backend` network only |

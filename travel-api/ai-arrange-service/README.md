@@ -150,7 +150,7 @@ When the final Agent response is saved as a Java-owned snapshot, the server send
 - `DEEPSEEK_API_KEY`: enables real AI calls.
 - `DEEPSEEK_BASE_URL`: default `https://api.deepseek.com`.
 - `DEEPSEEK_MODEL`: default `deepseek-v4-pro`.
-- `AI_ARRANGE_AGENT_BASE_URL`: Python Agent base URL, default `http://ai-arrange-agent:8090` in Docker Compose. From the host, the compose default is exposed at `http://localhost:58090`; for a local non-Docker agent process, the documented default is `http://localhost:58090`.
+- `AI_ARRANGE_AGENT_BASE_URL`: Python Agent base URL, default `http://ai-arrange-agent:8090` in Docker Compose. The Compose service is available only on the internal `backend` network and is not published to the host. For a local non-Docker agent process, the documented default remains `http://localhost:58090`.
 - `AI_ARRANGE_AGENT_TIMEOUT_SECONDS`: Python Agent HTTP timeout, default `150`.
 - `AMAP_API_KEY`: enables Amap POI enrichment.
 - `MONGODB_URI` or `MONGO_HOST`: MongoDB persistence.
