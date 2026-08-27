@@ -136,3 +136,6 @@ travel-ui/logs/
 
 # vscode settings
 .vscode/
+
+# Local Git worktrees
+.worktrees/
