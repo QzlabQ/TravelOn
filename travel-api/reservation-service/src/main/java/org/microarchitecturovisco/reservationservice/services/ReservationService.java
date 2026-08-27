@@ -162,7 +162,7 @@ public class ReservationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
     }
 
-    public ReservationResponse createTicketReservation(CreateTicketReservationRequest request) {
+    public ReservationResponse createTicketReservation(CreateTicketReservationRequest request, UUID userId) {
         LocalDateTime departureAt = request.departureDate().atTime(parseTime(request.departureTime()));
         LocalDateTime arrivalAt = request.departureDate().atTime(parseTime(request.arrivalTime()));
         if (arrivalAt.isBefore(departureAt)) {
@@ -197,7 +197,7 @@ public class ReservationService {
                 .bookingType(bookingType)
                 .roomReservationsIds(Collections.emptyList())
                 .transportReservationsIds(List.of(transportReservationId))
-                .userId(request.userId())
+                .userId(userId)
                 .title((bookingType.equals("FLIGHT") ? "机票预订 " : "火车票预订 ") + request.bookingCode())
                 .provider(request.provider())
                 .bookingCode(request.bookingCode())
@@ -219,7 +219,7 @@ public class ReservationService {
                 .hotelTimeFrom(departureAt)
                 .hotelTimeTo(arrivalAt)
                 .price(request.price())
-                .userId(request.userId())
+                .userId(userId)
                 .build();
         bookTransportsSaga.createTransportReservation(rollbackRequest);
         invalidPaymentHandler.schedulePaymentTimeoutCheck(rollbackRequest);
@@ -227,7 +227,7 @@ public class ReservationService {
         return getReservation(reservationId);
     }
 
-    public ReservationResponse createHotelOnlyReservation(CreateHotelOnlyReservationRequest request) {
+    public ReservationResponse createHotelOnlyReservation(CreateHotelOnlyReservationRequest request, UUID userId) {
         if (!request.dateTo().isAfter(request.dateFrom())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateTo must be after dateFrom");
         }
@@ -246,7 +246,7 @@ public class ReservationService {
         long roomReservationId = request.roomId() != null
                 ? request.roomId()
                 : Math.abs(UUID.nameUUIDFromBytes(
-                        (request.hotelId() + roomName + request.dateFrom() + request.dateTo() + request.userId())
+                        (request.hotelId() + roomName + request.dateFrom() + request.dateTo() + userId)
                                 .getBytes(StandardCharsets.UTF_8)
                 ).getMostSignificantBits());
 
@@ -265,7 +265,7 @@ public class ReservationService {
                 .hotelId(request.hotelId())
                 .roomReservationsIds(List.of(roomReservationId))
                 .transportReservationsIds(Collections.emptyList())
-                .userId(request.userId())
+                .userId(userId)
                 .title(request.hotelName())
                 .provider(roomName)
                 .bookingCode("HOTEL-" + reservationId.toString().substring(0, 8).toUpperCase())
@@ -288,7 +288,7 @@ public class ReservationService {
                 .hotelTimeFrom(checkIn)
                 .hotelTimeTo(checkOut)
                 .price(request.price())
-                .userId(request.userId())
+                .userId(userId)
                 .build();
         bookHotelsSaga.createHotelReservation(rollbackRequest);
         invalidPaymentHandler.schedulePaymentTimeoutCheck(rollbackRequest);

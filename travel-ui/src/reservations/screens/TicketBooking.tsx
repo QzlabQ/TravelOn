@@ -28,7 +28,7 @@ import { BookingPersonPayload } from "../../core/apiConfig";
 import {
   addNotification,
   getBookingPreferences,
-  getCurrentUserId,
+  getCurrentUserSession,
 } from "../../core/currentUser";
 import TravelerSelector from "../../account/components/TravelerSelector";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -1155,9 +1155,16 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     setBookingMessage("");
     setCheckoutConfirmOpen(false);
 
+    const session = getCurrentUserSession();
+    if (!session) {
+      setBookingError(true);
+      setBookingMessage("请先登录后再预订");
+      return;
+    }
+
     try {
-      const response = await ApiRequests.createTicketReservation({
-        userId: getCurrentUserId(),
+      const response = await ApiRequests.createTicketReservation(session.token, {
+        userId: session.user.id,
         transportType: mode === "flight" ? "FLIGHT" : "TRAIN",
         departureDate: date,
         departureTime: selectedOffer.departureTime,

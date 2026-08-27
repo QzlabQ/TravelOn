@@ -19,7 +19,7 @@ import {ApiRequests, GetOffersBySearchQueryOffer} from "../../core/apiConfig";
 import {BookingPersonPayload} from "../../core/apiConfig";
 import {Location} from "../../core/domain/DomainInterfaces";
 import {formatDate} from "../../core/utils";
-import {addNotification, getBookingPreferences, getCurrentUserId} from "../../core/currentUser";
+import {addNotification, getBookingPreferences, getCurrentUserSession} from "../../core/currentUser";
 import TravelerSelector from "../../account/components/TravelerSelector";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
 import {useAuthSession} from "../../core/useAuthSession";
@@ -422,9 +422,16 @@ const HotelBooking = () => {
         setBookingMessage('');
         setCheckoutConfirmOpen(false);
 
+        const session = getCurrentUserSession();
+        if (!session) {
+            setBookingError(true);
+            setBookingMessage('请先登录后再预订');
+            return;
+        }
+
         try {
-            const response = await ApiRequests.createHotelReservation({
-                userId: getCurrentUserId(),
+            const response = await ApiRequests.createHotelReservation(session.token, {
+                userId: session.user.id,
                 hotelId: selectedOffer.idHotel,
                 hotelName: selectedOffer.hotelName,
                 dateFrom,

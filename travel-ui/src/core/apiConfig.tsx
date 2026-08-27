@@ -76,8 +76,10 @@ export class ApiRequests {
         return await axiosInstance.post('reservations/reservation', payload);
     }
 
-    static payForReservation = async (payload: PaymentPayload) => {
-        return await axiosInstance.post('reservations/purchase', payload);
+    static payForReservation = async (token: string, payload: PaymentPayload) => {
+        return await axiosInstance.post('reservations/purchase', payload, {
+            headers: {'X-User-Token': token}
+        });
     }
 
     static getReservationsForUser = async (token: string, userId: string) => {
@@ -116,12 +118,16 @@ export class ApiRequests {
         });
     }
 
-    static createTicketReservation = async (payload: CreateTicketReservationPayload) => {
-        return await axiosInstance.post<ReservationResponse>('reservations/tickets', payload);
+    static createTicketReservation = async (token: string, payload: CreateTicketReservationPayload) => {
+        return await axiosInstance.post<ReservationResponse>('reservations/tickets', payload, {
+            headers: {'X-User-Token': token}
+        });
     }
 
-    static createHotelReservation = async (payload: CreateHotelReservationPayload) => {
-        return await axiosInstance.post<ReservationResponse>('reservations/hotels', payload);
+    static createHotelReservation = async (token: string, payload: CreateHotelReservationPayload) => {
+        return await axiosInstance.post<ReservationResponse>('reservations/hotels', payload, {
+            headers: {'X-User-Token': token}
+        });
     }
 
     static login = async (payload: LoginPayload) => {

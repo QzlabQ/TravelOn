@@ -21,7 +21,7 @@ import {
     HotelRoomConfiguration
 } from "../../core/apiConfig";
 import TravelerSelector from "../../account/components/TravelerSelector";
-import {addNotification, getCurrentUserId} from "../../core/currentUser";
+import {addNotification, getCurrentUserSession} from "../../core/currentUser";
 import {formatDate} from "../../core/utils";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
 import {useAuthSession} from "../../core/useAuthSession";
@@ -199,9 +199,17 @@ const HotelDetails = () => {
         setBookingError(false);
         setBookingMessage("");
         setCheckoutConfirmOpen(false);
+        const session = getCurrentUserSession();
+        if (!session) {
+            setBookingError(true);
+            setBookingMessage("请先登录后再预订");
+            setSubmitting(false);
+            return;
+        }
+
         try {
-            const response = await ApiRequests.createHotelReservation({
-                userId: getCurrentUserId(),
+            const response = await ApiRequests.createHotelReservation(session.token, {
+                userId: session.user.id,
                 hotelId: details.hotelId,
                 hotelName: details.hotelName,
                 dateFrom,
