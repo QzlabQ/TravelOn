@@ -21,6 +21,7 @@ import {
     getCurrentUserSession,
     UserSession
 } from "../currentUser";
+import {resolveCommunityImageUrl} from "../apiConfig";
 
 export default function Navbar() {
     const [authDialogOpen, setAuthDialogOpen] = useState(false);
@@ -193,7 +194,7 @@ export default function Navbar() {
                             }}
                         >
                             <Avatar
-                                src={session.user.avatarUrl || undefined}
+                                src={resolveCommunityImageUrl(session.user.avatarUrl) || undefined}
                                 sx={{
                                     width: 30,
                                     height: 30,

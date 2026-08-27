@@ -1,10 +1,11 @@
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import {
     Alert,
     Avatar,
     Button,
     Checkbox,
     Chip,
+    CircularProgress,
     Divider,
     FormControlLabel,
     InputAdornment,
@@ -13,6 +14,8 @@ import {
     Paper,
     Rating,
     Switch,
+    Tab,
+    Tabs,
     TextField,
     ToggleButton,
     ToggleButtonGroup,
@@ -23,6 +26,7 @@ import {
     AccountBalanceWallet,
     Badge,
     Bookmarks,
+    CloudUpload,
     CreditCard,
     Delete,
     Edit,
@@ -67,7 +71,7 @@ import {
     WalletTransactionType,
     WalletState
 } from "../../core/currentUser";
-import {ApiRequests} from "../../core/apiConfig";
+import {ApiRequests, resolveCommunityImageUrl} from "../../core/apiConfig";
 import {TravelerPayload, TravelerResponse, TravelerType} from "../../core/apiConfig";
 import {
     getChineseResidentIdInfo,
@@ -188,6 +192,9 @@ export default function Account() {
     const [bankCardDialogOpen, setBankCardDialogOpen] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethodPreference>(() => getPaymentPreferences().defaultPaymentMethod);
     const [walletFilter, setWalletFilter] = useState<WalletTransactionFilter>("ALL");
+    const [activeTab, setActiveTab] = useState<"profile" | "travel">("profile");
+    const [avatarUploading, setAvatarUploading] = useState(false);
+    const avatarInputRef = useRef<HTMLInputElement>(null);
     const profilePhoneError = validateChinaMainlandPhone(profileForm.phone, false);
     const identityDocumentError = validateDocumentNumber(identityForm.documentType, identityForm.documentNumber, false);
     const travelerDocumentError = validateDocumentNumber(travelerForm.documentType, travelerForm.documentNumber, false);
@@ -318,6 +325,30 @@ export default function Account() {
             }
         } finally {
             setSaving(false);
+        }
+    };
+
+    const uploadAvatar = async (file: File | undefined) => {
+        if (!file || !session) return;
+        if (!file.type.startsWith("image/")) {
+            setErrorMessage("请选择图片文件。");
+            return;
+        }
+
+        setAvatarUploading(true);
+        setMessage("");
+        setErrorMessage("");
+        try {
+            const response = await ApiRequests.uploadCommunityImage(session.token, file);
+            setProfileForm(current => ({...current, avatarUrl: response.data.url}));
+            setMessage("头像已上传，请点击保存资料完成更新。");
+        } catch (error: any) {
+            setErrorMessage(extractApiErrorMessage(error, "头像上传失败，请稍后再试。"));
+        } finally {
+            setAvatarUploading(false);
+            if (avatarInputRef.current) {
+                avatarInputRef.current.value = "";
+            }
         }
     };
 
@@ -579,12 +610,12 @@ export default function Account() {
             <section className="mx-auto grid max-w-7xl grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
                 <Paper elevation={0} className="h-fit border border-gray-200 p-6">
                     <div className="flex items-center gap-4">
-                        <Avatar src={profile.avatarUrl || undefined} sx={{width: 72, height: 72, bgcolor: "#0f766e"}}>
+                        <Avatar src={resolveCommunityImageUrl(profile.avatarUrl) || undefined} sx={{width: 72, height: 72, bgcolor: "#0f766e"}}>
                             {initials}
                         </Avatar>
                         <div>
                             <Typography variant="h5" className="font-semibold">
-                                {[profile.name, profile.surname].filter(Boolean).join(" ")}
+                                {profile.name || "我的账户"}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 {profile.email}
@@ -595,10 +626,6 @@ export default function Account() {
                     <Divider className="my-5"/>
 
                     <div className="grid gap-3">
-                        <div className="flex items-center justify-between rounded-lg bg-[#eef7f5] px-4 py-3">
-                            <span className="text-sm text-gray-600">会员等级</span>
-                            <Chip size="small" color="success" label={profile.loyaltyTier || "Explorer"}/>
-                        </div>
                         <div className="flex items-center justify-between rounded-lg bg-[#fff7ed] px-4 py-3">
                             <span className="text-sm text-gray-600">钱包余额</span>
                             <span className="text-sm font-semibold text-orange-600">{formatCurrency(wallet.balance)}</span>
@@ -606,10 +633,6 @@ export default function Account() {
                         <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
                             <span className="text-sm text-gray-600">实名状态</span>
                             <Chip size="small" color={identityVerified ? "primary" : "default"} label={identityVerified ? "已实名" : "未实名"}/>
-                        </div>
-                        <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
-                            <span className="text-sm text-gray-600">账户 ID</span>
-                            <span className="max-w-[180px] truncate text-xs text-gray-500">{profile.id}</span>
                         </div>
                     </div>
 
@@ -627,7 +650,22 @@ export default function Account() {
                 </Paper>
 
                 <div className="grid gap-6">
-                    <Paper elevation={0} className="border border-gray-200 p-6">
+                    <Paper elevation={0} className="border border-gray-200 px-2">
+                        <Tabs
+                            value={activeTab}
+                            onChange={(_, value: "profile" | "travel") => setActiveTab(value)}
+                            variant="fullWidth"
+                            textColor="primary"
+                            indicatorColor="primary"
+                            aria-label="账户中心选项卡"
+                        >
+                            <Tab value="profile" label="账户资料"/>
+                            <Tab value="travel" label="实名与出行信息"/>
+                        </Tabs>
+                    </Paper>
+
+                    {activeTab === "profile" &&
+                        <Paper elevation={0} className="border border-gray-200 p-6">
                         <div className="mb-5 flex items-center justify-between">
                             <div>
                                 <Typography variant="h5" className="font-semibold">账户资料</Typography>
@@ -642,14 +680,14 @@ export default function Account() {
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <TextField
-                                label="真实姓名"
+                                label="用户昵称"
                                 value={profileForm.name}
                                 onChange={event => setProfileForm({
                                     ...profileForm,
                                     name: event.target.value,
                                     surname: ""
                                 })}
-                                helperText="请填写与证件一致的姓名"
+                                helperText="用于社区互动和账户展示"
                                 fullWidth
                             />
                             <TextField
@@ -673,13 +711,52 @@ export default function Account() {
                                     startAdornment: <InputAdornment position="start"><Phone fontSize="small"/></InputAdornment>
                                 }}
                             />
-                            <TextField
-                                className="md:col-span-2"
-                                label="头像 URL"
-                                value={profileForm.avatarUrl}
-                                onChange={event => setProfileForm({...profileForm, avatarUrl: event.target.value})}
-                                fullWidth
-                            />
+                            <div className="md:col-span-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
+                                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                                    <Avatar
+                                        src={resolveCommunityImageUrl(profileForm.avatarUrl) || undefined}
+                                        sx={{width: 76, height: 76, bgcolor: "#0f766e", flexShrink: 0}}
+                                    >
+                                        {initials}
+                                    </Avatar>
+                                    <div className="min-w-0 flex-1">
+                                        <TextField
+                                            label="头像"
+                                            value={profileForm.avatarUrl}
+                                            onChange={event => setProfileForm({...profileForm, avatarUrl: event.target.value})}
+                                            placeholder="粘贴图片 URL，或使用本地上传"
+                                            helperText="支持从 URL 获取头像，也支持上传本地图片"
+                                            fullWidth
+                                        />
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <Button
+                                                variant="outlined"
+                                                component="label"
+                                                startIcon={avatarUploading ? <CircularProgress size={16}/> : <CloudUpload/>}
+                                                disabled={avatarUploading}
+                                            >
+                                                {avatarUploading ? "上传中..." : "本地上传"}
+                                                <input
+                                                    ref={avatarInputRef}
+                                                    hidden
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={event => uploadAvatar(event.target.files?.[0])}
+                                                />
+                                            </Button>
+                                            {profileForm.avatarUrl &&
+                                                <Button
+                                                    variant="text"
+                                                    onClick={() => setProfileForm({...profileForm, avatarUrl: ""})}
+                                                    disabled={avatarUploading}
+                                                >
+                                                    清除头像
+                                                </Button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="mt-6 flex justify-end">
@@ -687,12 +764,15 @@ export default function Account() {
                                 {saving ? "保存中..." : "保存资料"}
                             </Button>
                         </div>
-                    </Paper>
+                        </Paper>
+                    }
 
-                    <Paper elevation={0} className="border border-gray-200 p-6">
+                    {activeTab === "travel" &&
+                        <>
+                        <Paper elevation={0} className="border border-gray-200 p-6">
                         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <Typography variant="h5" className="font-semibold">实名与钱包</Typography>
+                                <Typography variant="h5" className="font-semibold">实名与出行信息</Typography>
                                 <Typography variant="body2" color="text.secondary">
                                     本地模拟实名、余额充值和交易记录，让支付流程更接近真实产品。
                                 </Typography>
@@ -872,7 +952,7 @@ export default function Account() {
                                 </div>
                             </div>
                         </div>
-                    </Paper>
+                        </Paper>
 
                     <WalletTopUpDialog
                         open={topUpDialogOpen}
@@ -1059,6 +1139,8 @@ export default function Account() {
                             }
                         </div>
                     </Paper>
+                        </>
+                    }
                 </div>
             </section>
         </main>
