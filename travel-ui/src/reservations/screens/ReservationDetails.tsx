@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
-import {Link, useLocation, useNavigate, useParams} from "react-router-dom";
+import {Link, useLocation, useParams} from "react-router-dom";
 import Countdown, {CountdownRenderProps} from "react-countdown";
 import {
     Alert,
@@ -10,13 +10,9 @@ import {
     DialogContent,
     DialogTitle,
     Divider,
-    FormControlLabel,
-    InputAdornment,
     LinearProgress,
     MenuItem,
     Paper,
-    Radio,
-    RadioGroup,
     TextField
 } from "@mui/material";
 import {
@@ -39,27 +35,13 @@ import {
     RefundRecordResponse,
     ReservationResponse
 } from "../../core/apiConfig";
-import WalletTopUpDialog, {WalletTopUpDialogPayload} from "../../account/components/WalletTopUpDialog";
 import {
     ACCOUNT_IDENTITY_EVENT,
     AccountIdentity,
     addNotification,
-    BANK_CARDS_EVENT,
     getAccountIdentity,
     getCurrentUserSession,
-    getPaymentPreferences,
-    getSavedBankCards,
-    getWalletState,
-    PAYMENT_PREFERENCES_EVENT,
-    PaymentMethodPreference,
-    rechargeWallet,
-    refundWallet,
-    SavedBankCard,
     setAccountIdentity,
-    setPaymentPreferences,
-    spendWallet,
-    WALLET_EVENT,
-    WalletState
 } from "../../core/currentUser";
 import {
     canCancelReservation,
@@ -88,11 +70,6 @@ const bookingTypeMeta: Record<string, {label: string; icon: JSX.Element}> = {
 };
 
 const formatCurrency = (value: number) => `¥${value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-
-const parsePositiveAmount = (value: string | number) => {
-    const amount = typeof value === "number" ? value : Number(value);
-    return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;
-};
 
 const formatCountdownNumber = (value: number) => value.toString().padStart(2, "0");
 
@@ -134,13 +111,6 @@ const TimelineItem = ({
 );
 
 const documentTypeOptions = ["身份证", "护照", "港澳通行证", "台胞证", "其他"];
-const WALLET_PAYMENT_CARD_NUMBER = "6222020000078888";
-
-const walletTransactionMeta = {
-    TOP_UP: {label: "充值", color: "success" as const},
-    PAYMENT: {label: "支付", color: "warning" as const},
-    REFUND: {label: "退款", color: "info" as const},
-};
 
 const validatePayerIdentity = (identity: AccountIdentity) => {
     if (!identity.realName.trim()) {
@@ -151,7 +121,6 @@ const validatePayerIdentity = (identity: AccountIdentity) => {
 
 export default function ReservationDetails() {
     const {reservationId = ""} = useParams();
-    const navigate = useNavigate();
     const location = useLocation();
     const session = useAuthSession();
     const isAuthenticated = Boolean(session);
@@ -164,46 +133,12 @@ export default function ReservationDetails() {
     const [payDialogOpen, setPayDialogOpen] = useState(false);
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
     const [cardNumber, setCardNumber] = useState("6222020000000056");
-    const [paymentMethod, setPaymentMethod] = useState<PaymentMethodPreference>(() => getPaymentPreferences().defaultPaymentMethod);
     const [payerIdentity, setPayerIdentity] = useState<AccountIdentity>(() => getAccountIdentity());
-    const [wallet, setWallet] = useState<WalletState>(() => getWalletState());
-    const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>(() => getSavedBankCards());
-    const [topUpAmount, setTopUpAmount] = useState("500");
-    const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
     const [cancellationReason, setCancellationReason] = useState("");
     const [payments, setPayments] = useState<PaymentTransactionResponse[]>([]);
     const [refunds, setRefunds] = useState<RefundRecordResponse[]>([]);
     const [submitting, setSubmitting] = useState(false);
     const paymentDeadline = useMemo(() => getPaymentDeadlineMillis(reservation), [reservation?.createdAt, reservation?.paymentDeadline]);
-
-    const refundWalletIfReservationAlreadyRefunded = (loadedReservation: ReservationResponse, loadedRefunds: RefundRecordResponse[]) => {
-        const completedRefundRecord = loadedRefunds.find(refund => refund.status === "COMPLETED");
-        const refundStarted = Boolean(loadedReservation.refundRequestedAt || loadedReservation.refundedAt || loadedRefunds.length > 0);
-        if (loadedReservation.status !== "REFUNDED" && !completedRefundRecord && !refundStarted) {
-            return false;
-        }
-
-        const currentWallet = getWalletState();
-        const walletPaidReservation = currentWallet.transactions.some(transaction =>
-            transaction.type === "PAYMENT" && transaction.reservationId === loadedReservation.id
-        );
-        const alreadyRefunded = currentWallet.transactions.some(transaction =>
-            transaction.type === "REFUND" && transaction.reservationId === loadedReservation.id
-        );
-
-        if (!walletPaidReservation || alreadyRefunded) {
-            setWallet(currentWallet);
-            return false;
-        }
-
-        const nextWallet = refundWallet(
-            Math.round(Number(loadedReservation.price || 0) * 100) / 100,
-            `订单退款 ${loadedReservation.title || loadedReservation.id}`,
-            loadedReservation.id
-        );
-        setWallet(nextWallet);
-        return true;
-    };
 
     const loadReservation = async () => {
         setLoading(true);
@@ -216,20 +151,9 @@ export default function ReservationDetails() {
                 ApiRequests.getReservationRefunds(session.token, reservationId)
             ]);
             const loadedReservation = reservationResponse.data;
-            const loadedRefunds = refundsResponse.data;
-            const walletRefunded = refundWalletIfReservationAlreadyRefunded(loadedReservation, loadedRefunds);
             setReservation(loadedReservation);
             setPayments(paymentsResponse.data);
-            setRefunds(loadedRefunds);
-            if (walletRefunded) {
-                addNotification({
-                    type: "REFUND_COMPLETED",
-                    title: "退款已到账",
-                    message: `订单 ${loadedReservation.title || loadedReservation.id} 的退款已退回钱包。`,
-                    reservationId: loadedReservation.id,
-                });
-                setSuccessMessage("退款已完成，金额已退回钱包。");
-            }
+            setRefunds(refundsResponse.data);
         } catch {
             setErrorMessage("订单读取失败，请检查订单是否存在。");
         } finally {
@@ -244,21 +168,12 @@ export default function ReservationDetails() {
     useEffect(() => {
         const refreshPaymentAssets = () => {
             setPayerIdentity(getAccountIdentity());
-            setWallet(getWalletState());
-            setSavedBankCards(getSavedBankCards());
-            setPaymentMethod(getPaymentPreferences().defaultPaymentMethod);
         };
         refreshPaymentAssets();
         window.addEventListener(ACCOUNT_IDENTITY_EVENT, refreshPaymentAssets);
-        window.addEventListener(BANK_CARDS_EVENT, refreshPaymentAssets);
-        window.addEventListener(WALLET_EVENT, refreshPaymentAssets);
-        window.addEventListener(PAYMENT_PREFERENCES_EVENT, refreshPaymentAssets);
 
         return () => {
             window.removeEventListener(ACCOUNT_IDENTITY_EVENT, refreshPaymentAssets);
-            window.removeEventListener(BANK_CARDS_EVENT, refreshPaymentAssets);
-            window.removeEventListener(WALLET_EVENT, refreshPaymentAssets);
-            window.removeEventListener(PAYMENT_PREFERENCES_EVENT, refreshPaymentAssets);
         };
     }, []);
 
@@ -315,28 +230,20 @@ export default function ReservationDetails() {
     const reservationAmount = Math.round(Number(reservation.price || 0) * 100) / 100;
     const payerIdentityError = validatePayerIdentity(payerIdentity);
     const normalizedCardNumber = normalizeDigits(cardNumber);
-    const bankCardError = paymentMethod === "CARD" ? validateBankCard(normalizedCardNumber) : "";
+    const bankCardError = validateBankCard(normalizedCardNumber);
     const payerIdentityInfo = payerIdentity.documentType === "身份证" ? getChineseResidentIdInfo(payerIdentity.documentNumber) : null;
-    const cardIssuerInfo = paymentMethod === "CARD" ? getBankCardIssuerInfo(normalizedCardNumber) : null;
+    const cardIssuerInfo = getBankCardIssuerInfo(normalizedCardNumber);
     const hasValidPayerIdentity = !payerIdentityError;
-    const walletCanPay = wallet.balance >= reservationAmount;
-    const walletPaymentTransaction = wallet.transactions.find(transaction => transaction.type === "PAYMENT" && transaction.reservationId === reservation.id);
-    const walletAlreadyRefunded = wallet.transactions.some(transaction => transaction.type === "REFUND" && transaction.reservationId === reservation.id);
-    const walletBalanceGap = Math.max(0, Math.round((reservationAmount - wallet.balance) * 100) / 100);
-    const isWalletPayment = Boolean(walletPaymentTransaction || latestApprovedPayment?.cardLast4 === "8888");
-    const paymentMethodLabel = latestApprovedPayment
-        ? isWalletPayment ? "钱包" : "银联卡"
-        : "未支付";
+    const paymentMethodLabel = latestApprovedPayment ? "银联卡" : "未支付";
     const refundDestination = effectiveStatus === "REFUNDED"
-        ? isWalletPayment ? "退回钱包余额" : "原银联卡"
+        ? "原银联卡"
         : effectiveStatus === "PAID"
-            ? isWalletPayment ? "退款将退回钱包余额" : "退款将退回原银联卡"
+            ? "退款将退回原银联卡"
             : "无";
     const paymentDisabled = submitting
         || !isAuthenticated
         || !hasValidPayerIdentity
-        || (paymentMethod === "CARD" && Boolean(bankCardError))
-        || (paymentMethod === "WALLET" && !walletCanPay);
+        || Boolean(bankCardError);
 
     const openPaymentDialog = () => {
         if (!isAuthenticated) {
@@ -345,55 +252,7 @@ export default function ReservationDetails() {
         }
 
         setPayerIdentity(getAccountIdentity());
-        setWallet(getWalletState());
-        setPaymentMethod(getPaymentPreferences().defaultPaymentMethod);
         setPayDialogOpen(true);
-    };
-
-    const updatePaymentMethod = (method: PaymentMethodPreference) => {
-        setPaymentMethod(method);
-        setPaymentPreferences({defaultPaymentMethod: method});
-    };
-
-    const rechargeFromPaymentDialog = (amountValue?: number) => {
-        if (!isAuthenticated) {
-            setErrorMessage("请先登录账户后再充值。");
-            return;
-        }
-
-        const amount = parsePositiveAmount(amountValue ?? topUpAmount);
-        if (amount > 0) {
-            setTopUpAmount(String(amount));
-        }
-        setTopUpDialogOpen(true);
-        setErrorMessage("");
-    };
-
-    const confirmWalletTopUp = async (payload: WalletTopUpDialogPayload) => {
-        if (!isAuthenticated) {
-            throw new Error("请先登录账户后再充值。");
-        }
-
-        const nextWallet = rechargeWallet(payload.amount, {
-            title: "银联卡快捷充值",
-            channel: "BANK_CARD",
-            accountLabel: payload.accountLabel,
-            referenceNo: payload.referenceNo,
-        });
-        setWallet(nextWallet);
-        setTopUpAmount(String(payload.amount));
-        setSuccessMessage(`已通过${payload.accountLabel}充值 ${formatCurrency(payload.amount)}，当前余额 ${formatCurrency(nextWallet.balance)}。`);
-        setErrorMessage("");
-    };
-
-    const refundWalletPaymentIfNeeded = () => {
-        if (!walletPaymentTransaction || walletAlreadyRefunded) {
-            return false;
-        }
-
-        const nextWallet = refundWallet(reservationAmount, `订单退款 ${reservation.title || reservation.id}`, reservation.id);
-        setWallet(nextWallet);
-        return true;
     };
 
     const submitPayment = async () => {
@@ -414,12 +273,8 @@ export default function ReservationDetails() {
             setErrorMessage(payerError);
             return;
         }
-        if (paymentMethod === "WALLET" && wallet.balance < reservationAmount) {
-            setErrorMessage("钱包余额不足，请先充值或改用银联卡支付。");
-            return;
-        }
         const normalizedPaymentCardNumber = normalizeDigits(cardNumber);
-        const cardError = paymentMethod === "CARD" ? validateBankCard(normalizedPaymentCardNumber) : "";
+        const cardError = validateBankCard(normalizedPaymentCardNumber);
         if (cardError) {
             setErrorMessage(cardError);
             return;
@@ -431,26 +286,20 @@ export default function ReservationDetails() {
         try {
             const nextIdentity = setAccountIdentity(normalizedIdentity);
             setPayerIdentity(nextIdentity);
-            const paymentCardNumber = paymentMethod === "WALLET" ? WALLET_PAYMENT_CARD_NUMBER : normalizedPaymentCardNumber;
             const session = getCurrentUserSession();
             if (!session) {
                 setErrorMessage("请先登录后再支付");
                 return;
             }
-            await ApiRequests.payForReservation(session.token, {reservationId: reservation.id, cardNumber: paymentCardNumber});
-            if (paymentMethod === "WALLET") {
-                const nextWallet = spendWallet(reservationAmount, `支付订单 ${reservation.title || reservation.id}`, reservation.id);
-                setWallet(nextWallet);
-            }
-            setPaymentPreferences({defaultPaymentMethod: paymentMethod});
+            await ApiRequests.payForReservation(session.token, {reservationId: reservation.id, cardNumber: normalizedPaymentCardNumber});
             addNotification({
                 type: "PAYMENT_SUCCESS",
                 title: "支付成功",
-                message: `${paymentMethod === "WALLET" ? "钱包" : "银联卡"}已支付 ${formatCurrency(reservationAmount)}。`,
+                message: `银联卡已支付 ${formatCurrency(reservationAmount)}。`,
                 reservationId: reservation.id,
             });
             setPayDialogOpen(false);
-            setSuccessMessage(paymentMethod === "WALLET" ? "钱包支付成功，订单状态已经更新。" : "银联卡支付成功，订单状态已经更新。");
+            setSuccessMessage("银联卡支付成功，订单状态已经更新。");
             await loadReservation();
         } catch (error: any) {
             const responseData = error?.response?.data;
@@ -471,22 +320,19 @@ export default function ReservationDetails() {
         try {
             if (!session) throw new Error("Authentication required");
             const response = await ApiRequests.cancelReservation(session.token, reservation.id, cancellationReason || "行程有变");
-            const walletRefunded = effectiveStatus === "PAID" && refundWalletPaymentIfNeeded();
             setReservation(response.data);
             setCancelDialogOpen(false);
             if (effectiveStatus === "PAID") {
                 addNotification({
                     type: "REFUND_COMPLETED",
                     title: "退款完成",
-                    message: walletRefunded ? "退款已退回钱包余额。" : "退款已按原支付方式退回。",
+                    message: "退款已按原支付方式退回。",
                     reservationId: reservation.id,
                 });
             }
             setSuccessMessage(
                 effectiveStatus === "PAID"
-                    ? walletRefunded
-                        ? "退款已完成，金额已退回钱包。"
-                        : "退款已完成，订单状态已更新。"
+                    ? "退款已完成，订单状态已更新。"
                     : "订单已取消。"
             );
             await loadReservation();
@@ -667,7 +513,7 @@ export default function ReservationDetails() {
                 <DialogTitle>支付订单</DialogTitle>
                 <DialogContent>
                     <Alert severity="info" className="mb-4">
-                        可使用钱包余额或银联卡完成支付，支付成功后订单状态会立即更新。
+                        请使用银联卡完成支付，支付成功后订单状态会立即更新。
                     </Alert>
 
                     <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
@@ -714,96 +560,17 @@ export default function ReservationDetails() {
                         </div>
 
                         <div className="rounded-lg border border-slate-200 p-4">
-                            <p className="mb-2 font-semibold text-slate-900">选择支付方式</p>
-                            <RadioGroup
-                                value={paymentMethod}
-                                onChange={event => updatePaymentMethod(event.target.value as PaymentMethodPreference)}
-                            >
-                                <FormControlLabel
-                                    value="WALLET"
-                                    control={<Radio/>}
-                                    label={`钱包余额支付（余额 ${formatCurrency(wallet.balance)}）`}
-                                />
-                                <FormControlLabel
-                                    value="CARD"
-                                    control={<Radio/>}
-                                    label="银联卡支付"
-                                />
-                            </RadioGroup>
-
-                            {paymentMethod === "WALLET" &&
-                                <div className="mt-3 rounded-lg bg-orange-50 p-3">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <span className="text-sm text-orange-700">
-                                            {walletCanPay ? "余额充足，可直接支付。" : `还差 ${formatCurrency(Math.max(0, reservationAmount - wallet.balance))}。`}
-                                        </span>
-                                        <div className="flex flex-wrap gap-2">
-                                            {!walletCanPay && walletBalanceGap > 0 &&
-                                                <Button size="small" variant="contained" onClick={() => rechargeFromPaymentDialog(walletBalanceGap)}>
-                                                    补差额 {formatCurrency(walletBalanceGap)}
-                                                </Button>
-                                            }
-                                            {[100, 500, 1000].map(amount => (
-                                                <Button key={amount} size="small" variant="outlined" onClick={() => rechargeFromPaymentDialog(amount)}>
-                                                    充 {formatCurrency(amount)}
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 flex gap-2">
-                                        <TextField
-                                            size="small"
-                                            label="自定义充值"
-                                            type="number"
-                                            value={topUpAmount}
-                                            onChange={event => setTopUpAmount(event.target.value)}
-                                            inputProps={{min: 1, step: 1}}
-                                            InputProps={{
-                                                startAdornment: <InputAdornment position="start">¥</InputAdornment>
-                                            }}
-                                        />
-                                        <Button variant="contained" onClick={() => rechargeFromPaymentDialog()}>去充值</Button>
-                                    </div>
-                                    <p className="mt-2 text-xs text-orange-700">充值前请先绑定银联卡，充值时可直接选择已保存的银联卡。</p>
-                                    {wallet.transactions.length > 0 &&
-                                        <div className="mt-3 grid gap-2">
-                                            {wallet.transactions.slice(0, 3).map(transaction => {
-                                                const meta = walletTransactionMeta[transaction.type];
-                                                return (
-                                                    <div key={transaction.id} className="rounded bg-white px-3 py-2 text-xs">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <span className="truncate text-slate-500">{meta.label} · {transaction.title}</span>
-                                                            <span className={transaction.type === "PAYMENT" ? "font-semibold text-red-500" : "font-semibold text-emerald-600"}>
-                                                                {transaction.type === "PAYMENT" ? "-" : "+"}{formatCurrency(transaction.amount)}
-                                                            </span>
-                                                        </div>
-                                                        {transaction.accountLabel &&
-                                                            <p className="mt-1 truncate text-slate-400">
-                                                                {transaction.accountLabel}{transaction.referenceNo ? ` · 流水号 ${transaction.referenceNo}` : ""}
-                                                            </p>
-                                                        }
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    }
-                                </div>
-                            }
-
-                            {paymentMethod === "CARD" &&
-                                <div className="mt-3">
-                                    <TextField
-                                        fullWidth
-                                        label="银联卡号"
-                                        value={cardNumber}
-                                        onChange={event => setCardNumber(normalizeDigits(event.target.value).slice(0, 19))}
-                                        error={Boolean(cardNumber && bankCardError)}
-                                        helperText={cardNumber
-                                            ? bankCardError || `${cardIssuerInfo ? `已识别 ${cardIssuerInfo.displayName}；` : ""}仅支持 16-19 位银联卡号。`
-                                            : "仅支持 16-19 位银联卡号。"}
-                                    />
-                                </div>
-                            }
+                            <p className="mb-3 font-semibold text-slate-900">银联卡支付</p>
+                            <TextField
+                                fullWidth
+                                label="银联卡号"
+                                value={cardNumber}
+                                onChange={event => setCardNumber(normalizeDigits(event.target.value).slice(0, 19))}
+                                error={Boolean(cardNumber && bankCardError)}
+                                helperText={cardNumber
+                                    ? bankCardError || `${cardIssuerInfo ? `已识别 ${cardIssuerInfo.displayName}；` : ""}仅支持 16-19 位银联卡号。`
+                                    : "仅支持 16-19 位银联卡号。"}
+                            />
                         </div>
                     </div>
                 </DialogContent>
@@ -835,14 +602,6 @@ export default function ReservationDetails() {
                 </DialogActions>
             </Dialog>
 
-            <WalletTopUpDialog
-                open={topUpDialogOpen}
-                defaultAmount={topUpAmount}
-                savedCards={savedBankCards}
-                onClose={() => setTopUpDialogOpen(false)}
-                onConfirm={confirmWalletTopUp}
-                onAddCard={() => navigate("/account")}
-            />
         </main>
     );
 }
