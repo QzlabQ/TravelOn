@@ -102,13 +102,21 @@ public class ReservationController {
     }
 
     @PostMapping("/tickets")
-    public ReservationResponse createTicketReservation(@Valid @RequestBody CreateTicketReservationRequest request) {
-        return reservationService.createTicketReservation(request);
+    public ReservationResponse createTicketReservation(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @Valid @RequestBody CreateTicketReservationRequest request
+    ) {
+        UUID userId = authorizationService.requireUserId(token);
+        return reservationService.createTicketReservation(request, userId);
     }
 
     @PostMapping("/hotels")
-    public ReservationResponse createHotelOnlyReservation(@Valid @RequestBody CreateHotelOnlyReservationRequest request) {
-        return reservationService.createHotelOnlyReservation(request);
+    public ReservationResponse createHotelOnlyReservation(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @Valid @RequestBody CreateHotelOnlyReservationRequest request
+    ) {
+        UUID userId = authorizationService.requireUserId(token);
+        return reservationService.createHotelOnlyReservation(request, userId);
     }
 
     @PostMapping("/reservation")
@@ -118,7 +126,11 @@ public class ReservationController {
     }
 
     @PostMapping("/purchase")
-    public ReservationConfirmationResponse purchase(@RequestBody PurchaseRequestBody requestBody) {
+    public ReservationConfirmationResponse purchase(
+            @RequestHeader(value = "X-User-Token", required = false) String token,
+            @RequestBody PurchaseRequestBody requestBody
+    ) {
+        authorizationService.requireReservationOwnerOrAdmin(token, UUID.fromString(requestBody.getReservationId()));
         return reservationService.purchaseReservation(requestBody.getReservationId(), requestBody.getCardNumber());
     }
 

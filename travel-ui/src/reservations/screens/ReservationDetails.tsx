@@ -46,6 +46,7 @@ import {
     addNotification,
     BANK_CARDS_EVENT,
     getAccountIdentity,
+    getCurrentUserSession,
     getPaymentPreferences,
     getSavedBankCards,
     getWalletState,
@@ -431,7 +432,12 @@ export default function ReservationDetails() {
             const nextIdentity = setAccountIdentity(normalizedIdentity);
             setPayerIdentity(nextIdentity);
             const paymentCardNumber = paymentMethod === "WALLET" ? WALLET_PAYMENT_CARD_NUMBER : normalizedPaymentCardNumber;
-            await ApiRequests.payForReservation({reservationId: reservation.id, cardNumber: paymentCardNumber});
+            const session = getCurrentUserSession();
+            if (!session) {
+                setErrorMessage("请先登录后再支付");
+                return;
+            }
+            await ApiRequests.payForReservation(session.token, {reservationId: reservation.id, cardNumber: paymentCardNumber});
             if (paymentMethod === "WALLET") {
                 const nextWallet = spendWallet(reservationAmount, `支付订单 ${reservation.title || reservation.id}`, reservation.id);
                 setWallet(nextWallet);

@@ -46,6 +46,11 @@ public class ReservationAuthorizationService {
         }
     }
 
+    /** Resolves the authenticated caller's user id from the token (throws 401 if missing/invalid). */
+    public UUID requireUserId(String token) {
+        return requireUser(token).id();
+    }
+
     private AuthenticatedUser requireUser(String token) {
         if (token == null || token.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing session token");
