@@ -782,10 +782,11 @@ export default function Account() {
 
                     {activeTab === "travel" &&
                         <>
-                        <Paper elevation={0} className="border border-gray-200 p-6">
+                        <section aria-labelledby="identity-information-heading">
+                        <Paper elevation={0} className="border border-teal-200 border-t-4 bg-white p-6">
                         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <Typography variant="h5" className="font-semibold">实名信息</Typography>
+                                <Typography id="identity-information-heading" variant="h5" className="font-semibold">实名信息</Typography>
                                 <Typography variant="body2" color="text.secondary">
                                     实名资料会用于机票、火车票和酒店预订时的身份核验。
                                 </Typography>
@@ -839,11 +840,13 @@ export default function Account() {
                             </div>
                         </div>
                         </Paper>
+                        </section>
 
-                        <Paper elevation={0} className="border border-gray-200 p-6">
+                        <section className="mt-6" aria-labelledby="payment-information-heading">
+                        <Paper elevation={0} className="border border-orange-200 border-t-4 bg-white p-6">
                             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                                 <div>
-                                    <Typography variant="h5" className="font-semibold">支付信息</Typography>
+                                    <Typography id="payment-information-heading" variant="h5" className="font-semibold">支付信息</Typography>
                                     <Typography variant="body2" color="text.secondary">
                                         管理钱包余额、默认支付方式、已绑定银联卡和交易记录。
                                     </Typography>
@@ -977,6 +980,7 @@ export default function Account() {
                                 </div>
                             </div>
                         </Paper>
+                        </section>
 
                     <WalletTopUpDialog
                         open={topUpDialogOpen}
