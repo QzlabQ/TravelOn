@@ -332,6 +332,37 @@ docker compose stop
 
 ---
 
+## Testing
+
+Run all local Java, Python, and frontend test suites and collect their native
+coverage reports with one command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-test-coverage.ps1
+```
+
+Prerequisites are Java 21 with Maven, a Python environment with the
+`travel-api/ai-arrange-agent-service` test dependencies installed, and Node
+dependencies installed for `travel-ui`. The runner attempts every configured
+module even if one fails, then exits nonzero when any module failed. It does
+not need application services, databases, external APIs, or CI credentials.
+
+The generated summary and per-module logs are written to:
+
+- `artifacts/test-results/latest.md`
+- `artifacts/test-results/summary.json`
+- `artifacts/test-results/logs/`
+
+Native reports remain with their modules. Run an individual suite with:
+
+```powershell
+cd travel-api/transport-service; mvn verify
+cd travel-api/ai-arrange-agent-service; python -m pytest -q
+cd travel-ui; $env:CI='true'; npm run test:coverage
+```
+
+---
+
 ## 两种模式对比
 
 | | 开发模式 Debug | 生产模式 Build 与 Serve |

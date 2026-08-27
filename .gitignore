@@ -139,3 +139,6 @@ travel-ui/logs/
 
 # Local Git worktrees
 .worktrees/
+
+# Generated consolidated test results
+artifacts/test-results/
