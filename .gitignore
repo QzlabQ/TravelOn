@@ -136,3 +136,9 @@ travel-ui/logs/
 
 # vscode settings
 .vscode/
+
+# Local Git worktrees
+.worktrees/
+
+# Generated consolidated test results
+artifacts/test-results/
