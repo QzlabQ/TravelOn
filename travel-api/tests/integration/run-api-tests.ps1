@@ -1,11 +1,17 @@
 param(
     [string]$BaseUrl = "http://localhost:58082",
     [string]$ResultsRoot = "$PSScriptRoot",
-    [int]$DateOffsetDays = 0
+    [int]$DateOffsetDays = 0,
+    [string]$ComposeFile = "",
+    [string]$PostgresUser = "admin"
 )
 
 $ErrorActionPreference = "Stop"
 $BaseUrl = $BaseUrl.TrimEnd("/")
+$apiRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+if ([string]::IsNullOrWhiteSpace($ComposeFile)) {
+    $ComposeFile = Join-Path $apiRoot "docker-compose.yml"
+}
 
 $evidenceDir = Join-Path $ResultsRoot "evidence"
 New-Item -ItemType Directory -Force -Path $evidenceDir | Out-Null
@@ -83,6 +89,113 @@ function Add-Result {
     })
 }
 
+function Invoke-Compose {
+    param([string[]]$Arguments)
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $output = & docker compose -f $ComposeFile @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($exitCode -ne 0) {
+        throw "docker compose $($Arguments -join ' ') failed: $($output | Out-String)"
+    }
+    return ($output | Out-String).Trim()
+}
+
+function Get-PaymentTransactionsFromDatabase {
+    param(
+        [string]$ReservationId,
+        [string]$EvidenceName
+    )
+
+    $query = @"
+select coalesce(json_agg(row_to_json(payment_rows))::text, '[]')
+from (
+    select id::text as id,
+           reservation_id::text as reservation_id,
+           amount,
+           card_last4,
+           approved,
+           status,
+           failure_reason,
+           created_at
+    from payment_transaction
+    where reservation_id = '$ReservationId'
+    order by created_at
+) payment_rows;
+"@
+    $json = Invoke-Compose -Arguments @(
+        "exec", "-T", "postgres", "psql",
+        "-U", $PostgresUser,
+        "-d", "reservation_db",
+        "-tAc", $query
+    )
+    Set-Content -Encoding utf8 -Path (Join-Path $evidenceDir "$EvidenceName-payment-transactions.json") -Value $json
+    return @($json | ConvertFrom-Json)
+}
+
+function Get-ReservationPaymentState {
+    param(
+        [string]$ReservationId,
+        [string]$EvidenceName
+    )
+
+    $query = "select coalesce(row_to_json(r)::text, '{}') from (select id::text as id, status, paid from reservation where id = '$ReservationId') r;"
+    $json = Invoke-Compose -Arguments @(
+        "exec", "-T", "postgres", "psql",
+        "-U", $PostgresUser,
+        "-d", "reservation_db",
+        "-tAc", $query
+    )
+    Set-Content -Encoding utf8 -Path (Join-Path $evidenceDir "$EvidenceName-reservation-state.json") -Value $json
+    return $json | ConvertFrom-Json
+}
+
+function Assert-ErrorResponse {
+    param(
+        [object]$Body,
+        [string]$ResponseText,
+        [int]$ExpectedStatus,
+        [string[]]$ExpectedTerms = @()
+    )
+
+    $serialized = if ($null -ne $Body) { $Body | ConvertTo-Json -Depth 30 -Compress } else { $ResponseText }
+    if ([string]::IsNullOrWhiteSpace($serialized)) {
+        throw "Error response body is empty."
+    }
+    if ($null -ne $Body.status -and [int]$Body.status -ne $ExpectedStatus) {
+        throw "Error payload status $($Body.status) does not match HTTP $ExpectedStatus."
+    }
+    $errorDetails = @(
+        [string]$Body.code,
+        [string]$Body.error,
+        [string]$Body.message,
+        [string]$Body.detail,
+        [string]$Body.errors,
+        $ResponseText
+    ) -join " "
+    if ([string]::IsNullOrWhiteSpace($errorDetails)) {
+        throw "Error payload lacks code, error, message, detail, or validation errors."
+    }
+    if ($ExpectedTerms.Count -gt 0) {
+        $matched = $false
+        foreach ($term in $ExpectedTerms) {
+            if ($errorDetails -match [regex]::Escape($term)) {
+                $matched = $true
+                break
+            }
+        }
+        if (-not $matched) {
+            throw "Error response did not contain any expected term: $($ExpectedTerms -join ', ')."
+        }
+    }
+}
+
 function Invoke-ApiTest {
     param(
         [string]$Id,
@@ -157,7 +270,7 @@ function Invoke-ApiTest {
     $passed = $ExpectedStatus -contains $status
     if ($passed -and $null -ne $Assert) {
         try {
-            & $Assert $parsed
+            & $Assert $parsed $responseText $status
         }
         catch {
             $passed = $false
@@ -247,14 +360,26 @@ else {
 
 Invoke-ApiTest -Id "API-USER-004" -Module "User" -Flow "exception" -Method "POST" `
     -Path "/users/auth/login" -ExpectedStatus @(401) `
-    -Body @{ email = $userEmail; password = "wrong-password" } | Out-Null
+    -Body @{ email = $userEmail; password = "wrong-password" } -Assert {
+        param($body, $responseText)
+        Assert-ErrorResponse -Body $body -ResponseText $responseText -ExpectedStatus 401 `
+            -ExpectedTerms @("Unauthorized", "credential", "password")
+    } | Out-Null
 
 Invoke-ApiTest -Id "API-USER-005" -Module "User" -Flow "exception" -Method "GET" `
-    -Path "/users/me" -ExpectedStatus @(400) | Out-Null
+    -Path "/users/me" -ExpectedStatus @(400) -Assert {
+        param($body, $responseText)
+        Assert-ErrorResponse -Body $body -ResponseText $responseText -ExpectedStatus 400 `
+            -ExpectedTerms @("Bad Request", "header", "token", "required")
+    } | Out-Null
 
 Invoke-ApiTest -Id "API-USER-006" -Module "User" -Flow "exception" -Method "POST" `
     -Path "/users/auth/register" -ExpectedStatus @(400) `
-    -Body @{ email = "invalid-email"; password = "123"; name = "" } | Out-Null
+    -Body @{ email = "invalid-email"; password = "123"; name = "" } -Assert {
+        param($body, $responseText)
+        Assert-ErrorResponse -Body $body -ResponseText $responseText -ExpectedStatus 400 `
+            -ExpectedTerms @("Bad Request", "validation", "email", "password", "name", "must")
+    } | Out-Null
 
 if ($null -ne $token) {
     $travelerBody = @{
@@ -317,7 +442,11 @@ else {
 }
 
 Invoke-ApiTest -Id "API-HOTEL-003" -Module "Hotel" -Flow "exception" -Method "GET" `
-    -Path "/hotels/search?dateFrom=$startDate&dateTo=$endDate&adults=2" -ExpectedStatus @(400) | Out-Null
+    -Path "/hotels/search?dateFrom=$startDate&dateTo=$endDate&adults=2" -ExpectedStatus @(400) -Assert {
+        param($body, $responseText)
+        Assert-ErrorResponse -Body $body -ResponseText $responseText -ExpectedStatus 400 `
+            -ExpectedTerms @("Bad Request", "destination", "required")
+    } | Out-Null
 
 Invoke-ApiTest -Id "API-TRANS-001" -Module "Transport" -Flow "main" -Method "GET" `
     -Path "/transports/tickets/options?type=TRAIN" -Assert {
@@ -347,7 +476,11 @@ Invoke-ApiTest -Id "API-TRANS-004" -Module "Transport" -Flow "alternative" -Meth
 
 Invoke-ApiTest -Id "API-TRANS-005" -Module "Transport" -Flow "exception" -Method "GET" `
     -Path "/transports/tickets?type=TRAIN&departureCity=Beijing&arrivalCity=Shanghai" `
-    -ExpectedStatus @(400) | Out-Null
+    -ExpectedStatus @(400) -Assert {
+        param($body, $responseText)
+        Assert-ErrorResponse -Body $body -ResponseText $responseText -ExpectedStatus 400 `
+            -ExpectedTerms @("Bad Request", "departureDate", "required")
+    } | Out-Null
 
 Invoke-ApiTest -Id "API-COM-001" -Module "Community" -Flow "main" -Method "GET" `
     -Path "/community/posts" -Assert {
@@ -391,6 +524,10 @@ Invoke-ApiTest -Id "API-COM-005" -Module "Community" -Flow "exception" -Method "
         title = ""
         content = ""
         category = "TRAVEL_NOTE"
+    } -Assert {
+        param($body, $responseText)
+        Assert-ErrorResponse -Body $body -ResponseText $responseText -ExpectedStatus 400 `
+            -ExpectedTerms @("Bad Request", "validation", "title", "content", "must")
     } | Out-Null
 
 if ($null -ne $userId -and $null -ne $hotelId -and $hotelRoomIds.Count -gt 0) {
@@ -422,18 +559,62 @@ if ($null -ne $userId -and $null -ne $hotelId -and $hotelRoomIds.Count -gt 0) {
             -Path "/reservations/purchase" -Headers @{ "X-User-Token" = $token } -Body @{
                 reservationId = $reservationId
                 cardNumber = "6200000000000000"
-            } -ExpectedStatus @(400) | Out-Null
+            } -ExpectedStatus @(400) -Assert {
+                param($body, $responseText)
+                Assert-ErrorResponse -Body $body -ResponseText $responseText -ExpectedStatus 400 `
+                    -ExpectedTerms @("payment", "approved", "card", "支付")
+                $transactions = @(Get-PaymentTransactionsFromDatabase -ReservationId $reservationId -EvidenceName "API-ORDER-003")
+                if ($transactions.Count -ne 1) { throw "Expected one failed payment row, found $($transactions.Count)." }
+                if ([bool]$transactions[0].approved -or [string]$transactions[0].status -ne "FAILED") {
+                    throw "First payment row is not FAILED with approved=false."
+                }
+                if ([string]::IsNullOrWhiteSpace([string]$transactions[0].failure_reason)) {
+                    throw "Failed payment row lacks failureReason."
+                }
+            } | Out-Null
         Invoke-ApiTest -Id "API-ORDER-004" -Module "Payment" -Flow "main" -Method "POST" `
             -Path "/reservations/purchase" -Headers @{ "X-User-Token" = $token } -Body @{
                 reservationId = $reservationId
                 cardNumber = "6200000000000005"
+            } -Assert {
+                param($body)
+                if ($null -eq $body) { throw "Successful payment returned no confirmation payload." }
+                $transactions = @(Get-PaymentTransactionsFromDatabase -ReservationId $reservationId -EvidenceName "API-ORDER-004")
+                if ($transactions.Count -ne 2) { throw "Expected failed and successful payment rows, found $($transactions.Count)." }
+                if (@($transactions | Where-Object { $_.status -eq "FAILED" -and -not [bool]$_.approved }).Count -ne 1) {
+                    throw "Database lacks the expected failed payment row."
+                }
+                if (@($transactions | Where-Object { $_.status -eq "SUCCESS" -and [bool]$_.approved }).Count -ne 1) {
+                    throw "Database lacks the expected successful payment row."
+                }
+                $reservationState = Get-ReservationPaymentState -ReservationId $reservationId -EvidenceName "API-ORDER-004"
+                if ([string]$reservationState.status -ne "PAID" -or -not [bool]$reservationState.paid) {
+                    throw "Reservation database state is not PAID with paid=true."
+                }
             } | Out-Null
         Invoke-ApiTest -Id "API-ORDER-005" -Module "Payment" -Flow "alternative" -Method "GET" `
-            -Path "/reservations/$reservationId/payments" -Headers @{ "X-User-Token" = $token } | Out-Null
+            -Path "/reservations/$reservationId/payments" -Headers @{ "X-User-Token" = $token } -Assert {
+                param($body)
+                $payments = @($body)
+                if ($payments.Count -ne 2) { throw "Payment history should contain two records, found $($payments.Count)." }
+                if (@($payments | Where-Object { $_.status -eq "FAILED" -and -not [bool]$_.approved -and $_.failureReason }).Count -ne 1) {
+                    throw "Payment history lacks the failed transaction details."
+                }
+                if (@($payments | Where-Object { $_.status -eq "SUCCESS" -and [bool]$_.approved -and $_.cardLast4 -eq "0005" }).Count -ne 1) {
+                    throw "Payment history lacks the approved transaction with masked card details."
+                }
+            } | Out-Null
         Invoke-ApiTest -Id "API-ORDER-006" -Module "Payment" -Flow "alternative" -Method "POST" `
             -Path "/reservations/purchase" -Headers @{ "X-User-Token" = $token } -Body @{
                 reservationId = $reservationId
                 cardNumber = "6200000000000005"
+            } -Assert {
+                param($body)
+                if ($null -eq $body) { throw "Idempotent purchase returned no confirmation payload." }
+                $transactions = @(Get-PaymentTransactionsFromDatabase -ReservationId $reservationId -EvidenceName "API-ORDER-006")
+                if ($transactions.Count -ne 2) {
+                    throw "Idempotent purchase created an extra payment row; found $($transactions.Count)."
+                }
             } | Out-Null
     }
 }
@@ -469,13 +650,23 @@ else {
 }
 
 Invoke-ApiTest -Id "API-AI-004" -Module "AI" -Flow "exception" -Method "POST" `
-    -Path "/ai-arrange/api/conversations" -ExpectedStatus @(400) -Body @{ userId = $userId } | Out-Null
+    -Path "/ai-arrange/api/conversations" -ExpectedStatus @(400) -Body @{ userId = $userId } -Assert {
+        param($body, $responseText)
+        Assert-ErrorResponse -Body $body -ResponseText $responseText -ExpectedStatus 400 `
+            -ExpectedTerms @("Bad Request", "coreSlots", "required", "must")
+    } | Out-Null
 
 $summaryFile = Join-Path $ResultsRoot "api-results.json"
 $results | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8 $summaryFile
 
 $counts = $results | Group-Object result | Sort-Object Name
+$failedCount = @($results | Where-Object { $_.result -eq "FAIL" }).Count
+$blockedCount = @($results | Where-Object { $_.result -eq "BLOCKED" }).Count
 Write-Output ""
 Write-Output "API test results:"
 $counts | ForEach-Object { Write-Output ("{0}: {1}" -f $_.Name, $_.Count) }
 Write-Output "Results: $summaryFile"
+
+if ($failedCount -gt 0 -or $blockedCount -gt 0) {
+    exit 1
+}

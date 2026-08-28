@@ -180,6 +180,74 @@ function Get-PostgresScalar {
         )).Trim()
 }
 
+function Assert-HttpErrorResponse {
+    param(
+        [object]$Response,
+        [int]$ExpectedStatus,
+        [string[]]$ExpectedTerms
+    )
+
+    if ($Response.status -ne $ExpectedStatus) {
+        throw "Expected HTTP $ExpectedStatus, received $($Response.status)."
+    }
+    $details = @(
+        [string]$Response.json.code,
+        [string]$Response.json.error,
+        [string]$Response.json.message,
+        [string]$Response.json.detail,
+        [string]$Response.json.errors,
+        [string]$Response.text
+    ) -join " "
+    if ([string]::IsNullOrWhiteSpace($details)) {
+        throw "Error response lacks code, error, message, detail, or validation errors."
+    }
+    if (@($ExpectedTerms | Where-Object { $details -match [regex]::Escape($_) }).Count -eq 0) {
+        throw "Error response did not contain any expected term: $($ExpectedTerms -join ', ')."
+    }
+}
+
+function Get-RabbitQueueSnapshot {
+    $json = Invoke-Compose -Arguments @(
+        "exec", "-T", "rabbitmq", "rabbitmqctl", "list_queues",
+        "--formatter=json", "name", "messages", "messages_ready", "messages_unacknowledged", "consumers"
+    )
+    $allQueues = ConvertFrom-Json -InputObject $json
+    return @($allQueues | Where-Object {
+        $_.name -like "hotels.events.createHotelReservation.queue.*"
+    })
+}
+
+function Assert-RabbitQueueSnapshotUnchanged {
+    param(
+        [object[]]$Before,
+        [object[]]$After
+    )
+
+    if ($Before.Count -eq 0) {
+        throw "No hotel reservation consumer queue was found before the invalid requests."
+    }
+    foreach ($beforeQueue in $Before) {
+        $afterQueue = @($After | Where-Object { $_.name -eq $beforeQueue.name } | Select-Object -First 1)
+        if ($afterQueue.Count -eq 0) {
+            throw "Hotel reservation queue $($beforeQueue.name) disappeared during the assertion window."
+        }
+        if ([int]$beforeQueue.consumers -lt 1 -or [int]$afterQueue[0].consumers -lt 1) {
+            throw "Hotel reservation queue $($beforeQueue.name) had no active consumer."
+        }
+        foreach ($field in @("messages", "messages_ready", "messages_unacknowledged")) {
+            if ([int]$beforeQueue.$field -ne [int]$afterQueue[0].$field) {
+                throw "Queue $($beforeQueue.name) field $field changed from $($beforeQueue.$field) to $($afterQueue[0].$field)."
+            }
+        }
+    }
+}
+
+function Get-ConsumerLogsSince {
+    param([string]$Since)
+
+    return Invoke-Compose -Arguments @("logs", "--no-color", "--since", $Since, "reservation", "hotel")
+}
+
 function Wait-Until {
     param(
         [string]$Description,
@@ -348,9 +416,15 @@ Invoke-Case -Id "INT-HOTEL-001" -Scenario "Missing or invalid room IDs are rejec
         roomName = "integration room"
         travelers = @()
     }
-    Invoke-Http -EvidenceName "INT-HOTEL-MISSING-ROOMS-$runId" -Method "POST" `
+    $logSince = (Get-Date).ToUniversalTime().ToString("o")
+    $queueBefore = @(Get-RabbitQueueSnapshot)
+    Write-Evidence -Name "INT-HOTEL-QUEUE-BEFORE-INVALID-$runId" -Suffix "response" -Value $queueBefore | Out-Null
+
+    $missingRoomResponse = Invoke-Http -EvidenceName "INT-HOTEL-MISSING-ROOMS-$runId" -Method "POST" `
         -Path "/reservations/hotels" -Headers @{ "X-User-Token" = $testUserToken } `
-        -Body $missingRoomPayload -ExpectedStatus @(400) | Out-Null
+        -Body $missingRoomPayload -ExpectedStatus @(400)
+    Assert-HttpErrorResponse -Response $missingRoomResponse -ExpectedStatus 400 `
+        -ExpectedTerms @("Bad Request", "roomIds", "must not be empty")
 
     $invalidRoomPayload = [ordered]@{
         userId = $testUserId
@@ -367,13 +441,23 @@ Invoke-Case -Id "INT-HOTEL-001" -Scenario "Missing or invalid room IDs are rejec
         travelers = @()
         roomIds = @(999999999)
     }
-    Invoke-Http -EvidenceName "INT-HOTEL-INVALID-ROOM-$runId" -Method "POST" `
+    $invalidRoomResponse = Invoke-Http -EvidenceName "INT-HOTEL-INVALID-ROOM-$runId" -Method "POST" `
         -Path "/reservations/hotels" -Headers @{ "X-User-Token" = $testUserToken } `
-        -Body $invalidRoomPayload -ExpectedStatus @(400) | Out-Null
+        -Body $invalidRoomPayload -ExpectedStatus @(400)
+    Assert-HttpErrorResponse -Response $invalidRoomResponse -ExpectedStatus 400 `
+        -ExpectedTerms @("Selected hotel rooms are unavailable or invalid", "Bad Request", "invalid")
 
-    $queueState = Invoke-Compose -Arguments @("exec", "-T", "rabbitmq", "rabbitmqctl", "list_queues", "name", "messages")
-    Write-Evidence -Name "INT-HOTEL-QUEUE-AFTER-INVALID-$runId" -Suffix "response" -Value $queueState | Out-Null
-    "invalid room IDs returned 400 without a consumer exception"
+    Start-Sleep -Seconds 2
+    $queueAfter = @(Get-RabbitQueueSnapshot)
+    Write-Evidence -Name "INT-HOTEL-QUEUE-AFTER-INVALID-$runId" -Suffix "response" -Value $queueAfter | Out-Null
+    Assert-RabbitQueueSnapshotUnchanged -Before $queueBefore -After $queueAfter
+
+    $consumerLogs = Get-ConsumerLogsSince -Since $logSince
+    Write-Evidence -Name "INT-HOTEL-CONSUMER-LOGS-$runId" -Suffix "response" -Value $consumerLogs | Out-Null
+    if ($consumerLogs -match "(?im)Creating hotel reservations|\bERROR\b|[A-Za-z0-9_.]+Exception(?:\s|:)|Caused by:|Optional\.orElseThrow") {
+        throw "Reservation or hotel consumer processed a create event or logged an exception while invalid requests were rejected."
+    }
+    "invalid room IDs returned 400; hotel reservation queue counters stayed unchanged; consumer logs contained no errors"
 }
 
 Invoke-Case -Id "INT-HOTEL-002" -Scenario "Real hotel room reservation is created and consumed" -Action {
