@@ -125,6 +125,8 @@ travel-ui/yarn-debug.*
 travel-ui/yarn-error.*
 
 # Ignore runtime DB and broker data
+travel-api/data/**
+!travel-api/data/historical-sample-sources.md
 travel-api/data/mongo
 travel-api/data/postgres/
 travel-api/data/postgres.failed-*/
