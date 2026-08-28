@@ -61,7 +61,6 @@ public class PlannerConversationService {
     private final PlannerConversationRepository conversationRepository;
     private final PlannerMessageRepository messageRepository;
     private final PlannerSnapshotRepository snapshotRepository;
-    private final PlannerPromptFactory promptFactory;
     private final PlannerAiClient plannerAiClient;
     private final PlannerAgentClient plannerAgentClient;
     private final PlannerSnapshotService snapshotService;
@@ -83,16 +82,6 @@ public class PlannerConversationService {
                 .updatedAt(Instant.now())
                 .build();
 
-        return PlannerConversationResponse.from(conversationRepository.save(conversation));
-    }
-
-    public PlannerConversationResponse updateCoreSlots(UUID conversationId, UUID userId, TripCoreSlots coreSlots) {
-        PlannerConversation conversation = getOwnedConversation(conversationId, userId);
-        conversation.setCoreSlots(coreSlots);
-        conversation.setStatus(PlannerConversationStatus.ACTIVE_CHAT);
-        conversation.setTitle(defaultTitle(coreSlots));
-        conversation.setNextQuestion(defaultNextQuestion());
-        conversation.setUpdatedAt(Instant.now());
         return PlannerConversationResponse.from(conversationRepository.save(conversation));
     }
 
@@ -293,14 +282,6 @@ public class PlannerConversationService {
 
     public void assertAccess(UUID conversationId, UUID userId) {
         getOwnedConversation(conversationId, userId);
-    }
-
-    private PlannerSnapshot finalizeAssistantTurn(PlannerConversation conversation, UUID userId, String assistantText) {
-        saveMessage(conversation.getId(), userId, PlannerMessageRole.ASSISTANT, assistantText, plannerAiClient.model(), Map.of("source", "ai"));
-        PlannerSnapshot snapshot = snapshotService.createSnapshot(conversation, assistantText);
-        refreshConversationFromSnapshot(conversation, snapshot);
-        conversationRepository.save(conversation);
-        return snapshot;
     }
 
     private PlannerSnapshot finalizeAgentTurnFromAgent(PlannerConversation conversation, UUID userId, AgentRunResponse response, String source) {

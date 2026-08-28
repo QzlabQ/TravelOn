@@ -32,8 +32,8 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
-    "test:coverage": "react-scripts test --runInBand --coverage",
+    "test": "react-scripts test --roots tests --testMatch \"<rootDir>/tests/**/*.{spec,test}.{js,jsx,ts,tsx}\"",
+    "test:coverage": "react-scripts test --roots tests --testMatch \"<rootDir>/tests/**/*.{spec,test}.{js,jsx,ts,tsx}\" --runInBand --coverage",
     "eject": "react-scripts eject",
     "serve": "serve -s build -l 53000"
   },

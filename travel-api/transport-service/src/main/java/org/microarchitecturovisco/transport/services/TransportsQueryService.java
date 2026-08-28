@@ -39,20 +39,6 @@ public class TransportsQueryService {
         return List.of();
     }
 
-    public LocationDto getLocationByRegionName(String region) {
-        CityCatalog.CityRecord city = cityCatalog.find(region);
-        return cityCatalog.locationFor(city.country(), city.cityName(), city.cityId());
-    }
-
-    public List<LocationDto> getAllLocations() {
-        Map<String, LocationDto> deduplicated = new LinkedHashMap<>();
-        ticketOfferTemplateRepository.findAll().forEach(offer -> {
-            addCity(deduplicated, offer.getDepartureCityId());
-            addCity(deduplicated, offer.getArrivalCityId());
-        });
-        return new ArrayList<>(deduplicated.values());
-    }
-
     public AvailableTransportsDto getAvailableTransports() {
         Map<String, LocationDto> planeDepartures = new LinkedHashMap<>();
         Map<String, LocationDto> trainDepartures = new LinkedHashMap<>();

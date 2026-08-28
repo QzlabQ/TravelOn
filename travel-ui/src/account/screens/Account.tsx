@@ -1,10 +1,11 @@
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import {
     Alert,
     Avatar,
     Button,
     Checkbox,
     Chip,
+    CircularProgress,
     Divider,
     FormControlLabel,
     InputAdornment,
@@ -13,6 +14,8 @@ import {
     Paper,
     Rating,
     Switch,
+    Tab,
+    Tabs,
     TextField,
     ToggleButton,
     ToggleButtonGroup,
@@ -20,9 +23,9 @@ import {
 } from "@mui/material";
 import {
     AccountCircle,
-    AccountBalanceWallet,
     Badge,
     Bookmarks,
+    CloudUpload,
     CreditCard,
     Delete,
     Edit,
@@ -35,46 +38,36 @@ import {
 } from "@mui/icons-material";
 import {Link, useNavigate} from "react-router-dom";
 import AuthDialog from "../components/AuthDialog";
-import BankCardEditorDialog from "../components/BankCardEditorDialog";
-import WalletTopUpDialog, {WalletTopUpDialogPayload} from "../components/WalletTopUpDialog";
 import {
     ACCOUNT_IDENTITY_EVENT,
-    addSavedBankCard,
-    BANK_CARDS_EVENT,
     clearCurrentUserSession,
-    deleteSavedBankCard,
     getAccountIdentity,
     getBookingPreferences,
     getCurrentUserSession,
-    getPaymentPreferences,
-    getSavedBankCards,
-    getWalletState,
-    PAYMENT_PREFERENCES_EVENT,
-    PaymentMethodPreference,
-    rechargeWallet,
-    SavedBankCard,
-    SavedBankCardPayload,
     setAccountIdentity,
+    getSavedBankCards,
+    removeSavedBankCard,
+    saveBankCard,
+    SAVED_BANK_CARDS_EVENT,
+    SavedBankCard,
     setBookingPreferences,
-    setDefaultSavedBankCard,
-    setPaymentPreferences,
     updateCurrentUserProfile,
     AccountIdentity,
     BookingPreferences,
     UserProfile,
-    UserSession,
-    WALLET_EVENT,
-    WalletTransactionType,
-    WalletState
+    UserSession
 } from "../../core/currentUser";
-import {ApiRequests} from "../../core/apiConfig";
+import {ApiRequests, resolveCommunityImageUrl} from "../../core/apiConfig";
 import {TravelerPayload, TravelerResponse, TravelerType} from "../../core/apiConfig";
 import {
     getChineseResidentIdInfo,
     normalizeChinaMainlandPhone,
     normalizeDocumentNumber,
     validateChinaMainlandPhone,
-    validateDocumentNumber
+    validateDocumentNumber,
+    getBankCardIssuerInfo,
+    normalizeDigits,
+    validateBankCard
 } from "../../core/validation";
 
 const emptyProfileForm = {
@@ -84,6 +77,8 @@ const emptyProfileForm = {
     phone: "",
     avatarUrl: ""
 };
+
+const isUploadedAvatarPath = (value?: string | null) => Boolean(value?.startsWith("/community/uploads/"));
 
 const emptyIdentityForm: AccountIdentity = {
     realName: "",
@@ -118,28 +113,6 @@ const maskValue = (value?: string, visibleStart = 3, visibleEnd = 4) => {
     return `${value.slice(0, visibleStart)}${"*".repeat(Math.max(3, value.length - visibleStart - visibleEnd))}${value.slice(-visibleEnd)}`;
 };
 
-const formatCurrency = (value: number) => `¥${value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-
-const parsePositiveAmount = (value: string | number) => {
-    const amount = typeof value === "number" ? value : Number(value);
-    return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;
-};
-
-const walletTransactionMeta = {
-    TOP_UP: {label: "充值", color: "success" as const},
-    PAYMENT: {label: "支付", color: "warning" as const},
-    REFUND: {label: "退款", color: "info" as const},
-};
-
-type WalletTransactionFilter = "ALL" | WalletTransactionType;
-
-const walletTransactionFilters: Array<{label: string; value: WalletTransactionFilter}> = [
-    {label: "全部", value: "ALL"},
-    {label: "充值", value: "TOP_UP"},
-    {label: "支付", value: "PAYMENT"},
-    {label: "退款", value: "REFUND"},
-];
-
 const validateTraveler = (traveler: TravelerPayload) => {
     if (!traveler.name.trim()) return "请填写出行人姓名。";
     if (traveler.name.trim().length > 80) return "姓名不能超过 80 个字符。";
@@ -170,6 +143,7 @@ export default function Account() {
     const navigate = useNavigate();
     const [session, setSession] = useState<UserSession | null>(getCurrentUserSession());
     const [profileForm, setProfileForm] = useState(emptyProfileForm);
+    const [avatarInput, setAvatarInput] = useState("");
     const [authOpen, setAuthOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -181,13 +155,12 @@ export default function Account() {
     const [travelerEditorOpen, setTravelerEditorOpen] = useState(false);
     const [bookingPreferences, setBookingPreferencesForm] = useState<BookingPreferences>(getBookingPreferences());
     const [identityForm, setIdentityForm] = useState<AccountIdentity>(() => getAccountIdentity());
-    const [wallet, setWallet] = useState<WalletState>(() => getWalletState());
     const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>(() => getSavedBankCards());
-    const [topUpAmount, setTopUpAmount] = useState("500");
-    const [topUpDialogOpen, setTopUpDialogOpen] = useState(false);
-    const [bankCardDialogOpen, setBankCardDialogOpen] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState<PaymentMethodPreference>(() => getPaymentPreferences().defaultPaymentMethod);
-    const [walletFilter, setWalletFilter] = useState<WalletTransactionFilter>("ALL");
+    const [bankCardNumber, setBankCardNumber] = useState('');
+    const [bankCardLabel, setBankCardLabel] = useState('');
+    const [activeTab, setActiveTab] = useState<"profile" | "travel">("profile");
+    const [avatarUploading, setAvatarUploading] = useState(false);
+    const avatarInputRef = useRef<HTMLInputElement>(null);
     const profilePhoneError = validateChinaMainlandPhone(profileForm.phone, false);
     const identityDocumentError = validateDocumentNumber(identityForm.documentType, identityForm.documentNumber, false);
     const travelerDocumentError = validateDocumentNumber(travelerForm.documentType, travelerForm.documentNumber, false);
@@ -197,11 +170,6 @@ export default function Account() {
 
     const profile = session?.user;
     const identityVerified = Boolean(identityForm.realName.trim() && !validateDocumentNumber(identityForm.documentType, identityForm.documentNumber, true));
-    const recentWalletTransactions = wallet.transactions
-        .filter(transaction => walletFilter === "ALL" || transaction.type === walletFilter)
-        .slice(0, 5);
-    const walletReserveTarget = 500;
-    const walletReserveGap = Math.max(0, Math.round((walletReserveTarget - wallet.balance) * 100) / 100);
 
     const initials = useMemo(() => {
         if (!profile) return "TC";
@@ -216,6 +184,7 @@ export default function Account() {
             phone: user.phone || "",
             avatarUrl: user.avatarUrl || ""
         });
+        setAvatarInput(isUploadedAvatarPath(user.avatarUrl) ? "" : user.avatarUrl || "");
     };
 
     const refreshProfile = async (currentSession = session) => {
@@ -250,18 +219,14 @@ export default function Account() {
 
     const refreshAccountAssets = () => {
         setIdentityForm(getAccountIdentity());
-        setWallet(getWalletState());
         setSavedBankCards(getSavedBankCards());
-        setPaymentMethod(getPaymentPreferences().defaultPaymentMethod);
     };
 
     useEffect(() => {
         refreshAccountAssets();
         const handleAccountAssetsChanged = () => refreshAccountAssets();
         window.addEventListener(ACCOUNT_IDENTITY_EVENT, handleAccountAssetsChanged);
-        window.addEventListener(BANK_CARDS_EVENT, handleAccountAssetsChanged);
-        window.addEventListener(WALLET_EVENT, handleAccountAssetsChanged);
-        window.addEventListener(PAYMENT_PREFERENCES_EVENT, handleAccountAssetsChanged);
+        window.addEventListener(SAVED_BANK_CARDS_EVENT, handleAccountAssetsChanged);
 
         if (profile) {
             syncProfileForm(profile);
@@ -271,9 +236,7 @@ export default function Account() {
 
         return () => {
             window.removeEventListener(ACCOUNT_IDENTITY_EVENT, handleAccountAssetsChanged);
-            window.removeEventListener(BANK_CARDS_EVENT, handleAccountAssetsChanged);
-            window.removeEventListener(WALLET_EVENT, handleAccountAssetsChanged);
-            window.removeEventListener(PAYMENT_PREFERENCES_EVENT, handleAccountAssetsChanged);
+            window.removeEventListener(SAVED_BANK_CARDS_EVENT, handleAccountAssetsChanged);
         };
     }, []);
 
@@ -283,9 +246,6 @@ export default function Account() {
         setMessage("登录成功，欢迎回来。");
         setErrorMessage("");
         setIdentityForm(getAccountIdentity(nextSession.user.id));
-        setWallet(getWalletState(nextSession.user.id));
-        setSavedBankCards(getSavedBankCards(nextSession.user.id));
-        setPaymentMethod(getPaymentPreferences(nextSession.user.id).defaultPaymentMethod);
         loadTravelers(nextSession).then(r => r);
     };
 
@@ -321,6 +281,31 @@ export default function Account() {
         }
     };
 
+    const uploadAvatar = async (file: File | undefined) => {
+        if (!file || !session) return;
+        if (!file.type.startsWith("image/")) {
+            setErrorMessage("请选择图片文件。");
+            return;
+        }
+
+        setAvatarUploading(true);
+        setMessage("");
+        setErrorMessage("");
+        try {
+            const response = await ApiRequests.uploadCommunityImage(session.token, file);
+            setProfileForm(current => ({...current, avatarUrl: response.data.url}));
+            setAvatarInput("");
+            setMessage("头像已上传，请点击保存资料完成更新。");
+        } catch (error: any) {
+            setErrorMessage(extractApiErrorMessage(error, "头像上传失败，请稍后再试。"));
+        } finally {
+            setAvatarUploading(false);
+            if (avatarInputRef.current) {
+                avatarInputRef.current.value = "";
+            }
+        }
+    };
+
     const logout = async () => {
         if (session) {
             try {
@@ -332,10 +317,8 @@ export default function Account() {
         clearCurrentUserSession();
         setSession(null);
         setProfileForm(emptyProfileForm);
+        setAvatarInput("");
         setIdentityForm(emptyIdentityForm);
-        setWallet({balance: 0, transactions: []});
-        setSavedBankCards([]);
-        setPaymentMethod("WALLET");
         navigate("/");
     };
 
@@ -446,70 +429,23 @@ export default function Account() {
         setErrorMessage("");
     };
 
-    const openTopUpDialog = (amountValue?: number) => {
-        const amount = parsePositiveAmount(amountValue ?? topUpAmount);
-        if (amount > 0) {
-            setTopUpAmount(String(amount));
-        }
-        if (savedBankCards.length === 0) {
-            setBankCardDialogOpen(true);
-            setErrorMessage("请先添加银联卡后再充值。");
+    const addBankCard = () => {
+        const normalizedNumber = normalizeDigits(bankCardNumber);
+        const cardError = validateBankCard(normalizedNumber);
+        if (cardError) {
+            setErrorMessage(cardError);
             return;
         }
-        setTopUpDialogOpen(true);
-        setErrorMessage("");
+        saveBankCard(normalizedNumber, bankCardLabel);
+        setBankCardNumber('');
+        setBankCardLabel('');
+        setMessage('\u94f6\u8054\u5361\u5df2\u4fdd\u5b58\uff0c\u652f\u4ed8\u65f6\u53ef\u4ee5\u76f4\u63a5\u9009\u62e9\u3002');
+        setErrorMessage('');
     };
 
-    const handleRecharge = async (payload: WalletTopUpDialogPayload) => {
-        const nextWallet = rechargeWallet(payload.amount, {
-            title: "银联卡快捷充值",
-            channel: "BANK_CARD",
-            accountLabel: payload.accountLabel,
-            referenceNo: payload.referenceNo,
-        });
-        setWallet(nextWallet);
-        setTopUpAmount(String(payload.amount));
-        setMessage(`已通过${payload.accountLabel}充值 ${formatCurrency(payload.amount)}，当前余额 ${formatCurrency(nextWallet.balance)}。`);
-        setErrorMessage("");
-    };
-
-    const updateDefaultPaymentMethod = (method: PaymentMethodPreference) => {
-        const preference = setPaymentPreferences({defaultPaymentMethod: method});
-        setPaymentMethod(preference.defaultPaymentMethod);
-        setMessage(`默认支付方式已设为${preference.defaultPaymentMethod === "WALLET" ? "钱包" : "银联卡"}。`);
-        setErrorMessage("");
-    };
-
-    const openBankCardDialog = () => {
-        setBankCardDialogOpen(true);
-        setErrorMessage("");
-    };
-
-    const saveBankCard = async (payload: SavedBankCardPayload) => {
-        const nextCards = addSavedBankCard(payload);
-        setSavedBankCards(nextCards);
-        setMessage(`已添加 ${payload.bankName} 尾号 ${payload.cardNumber.slice(-4)}。`);
-        setErrorMessage("");
-    };
-
-    const removeBankCard = (cardId: string) => {
-        const targetCard = savedBankCards.find(card => card.id === cardId);
-        const nextCards = deleteSavedBankCard(cardId);
-        setSavedBankCards(nextCards);
-        setMessage(
-            targetCard
-                ? `已删除 ${targetCard.bankName} 尾号 ${targetCard.cardNumber.slice(-4)}。`
-                : "银联卡已删除。"
-        );
-        setErrorMessage("");
-    };
-
-    const markDefaultBankCard = (cardId: string) => {
-        const nextCards = setDefaultSavedBankCard(cardId);
-        const targetCard = nextCards.find(card => card.id === cardId);
-        setSavedBankCards(nextCards);
-        setMessage(targetCard ? `${targetCard.bankName} 已设为默认充值银联卡。` : "默认银联卡已更新。");
-        setErrorMessage("");
+    const deleteBankCard = (cardId: string) => {
+        removeSavedBankCard(cardId);
+        setMessage('\u5df2\u5220\u9664\u4fdd\u5b58\u7684\u94f6\u8054\u5361\u3002');
     };
 
     const deleteTraveler = async (travelerId: string) => {
@@ -579,12 +515,12 @@ export default function Account() {
             <section className="mx-auto grid max-w-7xl grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
                 <Paper elevation={0} className="h-fit border border-gray-200 p-6">
                     <div className="flex items-center gap-4">
-                        <Avatar src={profile.avatarUrl || undefined} sx={{width: 72, height: 72, bgcolor: "#0f766e"}}>
+                        <Avatar src={resolveCommunityImageUrl(profile.avatarUrl) || undefined} sx={{width: 72, height: 72, bgcolor: "#0f766e"}}>
                             {initials}
                         </Avatar>
                         <div>
                             <Typography variant="h5" className="font-semibold">
-                                {[profile.name, profile.surname].filter(Boolean).join(" ")}
+                                {profile.name || "我的账户"}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 {profile.email}
@@ -595,21 +531,9 @@ export default function Account() {
                     <Divider className="my-5"/>
 
                     <div className="grid gap-3">
-                        <div className="flex items-center justify-between rounded-lg bg-[#eef7f5] px-4 py-3">
-                            <span className="text-sm text-gray-600">会员等级</span>
-                            <Chip size="small" color="success" label={profile.loyaltyTier || "Explorer"}/>
-                        </div>
-                        <div className="flex items-center justify-between rounded-lg bg-[#fff7ed] px-4 py-3">
-                            <span className="text-sm text-gray-600">钱包余额</span>
-                            <span className="text-sm font-semibold text-orange-600">{formatCurrency(wallet.balance)}</span>
-                        </div>
                         <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
                             <span className="text-sm text-gray-600">实名状态</span>
                             <Chip size="small" color={identityVerified ? "primary" : "default"} label={identityVerified ? "已实名" : "未实名"}/>
-                        </div>
-                        <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
-                            <span className="text-sm text-gray-600">账户 ID</span>
-                            <span className="max-w-[180px] truncate text-xs text-gray-500">{profile.id}</span>
                         </div>
                     </div>
 
@@ -627,7 +551,22 @@ export default function Account() {
                 </Paper>
 
                 <div className="grid gap-6">
-                    <Paper elevation={0} className="border border-gray-200 p-6">
+                    <Paper elevation={0} className="border border-gray-200 px-2">
+                        <Tabs
+                            value={activeTab}
+                            onChange={(_, value: "profile" | "travel") => setActiveTab(value)}
+                            variant="fullWidth"
+                            textColor="primary"
+                            indicatorColor="primary"
+                            aria-label="账户中心选项卡"
+                        >
+                            <Tab value="profile" label="账户资料"/>
+                            <Tab value="travel" label="实名与出行信息"/>
+                        </Tabs>
+                    </Paper>
+
+                    {activeTab === "profile" &&
+                        <Paper elevation={0} className="border border-gray-200 p-6">
                         <div className="mb-5 flex items-center justify-between">
                             <div>
                                 <Typography variant="h5" className="font-semibold">账户资料</Typography>
@@ -642,14 +581,14 @@ export default function Account() {
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <TextField
-                                label="真实姓名"
+                                label="用户昵称"
                                 value={profileForm.name}
                                 onChange={event => setProfileForm({
                                     ...profileForm,
                                     name: event.target.value,
                                     surname: ""
                                 })}
-                                helperText="请填写与证件一致的姓名"
+                                helperText="用于社区互动和账户展示"
                                 fullWidth
                             />
                             <TextField
@@ -673,13 +612,59 @@ export default function Account() {
                                     startAdornment: <InputAdornment position="start"><Phone fontSize="small"/></InputAdornment>
                                 }}
                             />
-                            <TextField
-                                className="md:col-span-2"
-                                label="头像 URL"
-                                value={profileForm.avatarUrl}
-                                onChange={event => setProfileForm({...profileForm, avatarUrl: event.target.value})}
-                                fullWidth
-                            />
+                            <div className="md:col-span-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
+                                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                                    <Avatar
+                                        src={resolveCommunityImageUrl(profileForm.avatarUrl) || undefined}
+                                        sx={{width: 76, height: 76, bgcolor: "#0f766e", flexShrink: 0}}
+                                    >
+                                        {initials}
+                                    </Avatar>
+                                    <div className="min-w-0 flex-1">
+                                        <TextField
+                                            label="头像"
+                                            value={avatarInput}
+                                            onChange={event => {
+                                                const value = event.target.value;
+                                                setAvatarInput(value);
+                                                setProfileForm(current => ({...current, avatarUrl: value}));
+                                            }}
+                                            placeholder="粘贴图片 URL，或使用本地上传"
+                                            helperText="支持从 URL 获取头像，也支持上传本地图片"
+                                            fullWidth
+                                        />
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <Button
+                                                variant="outlined"
+                                                component="label"
+                                                startIcon={avatarUploading ? <CircularProgress size={16}/> : <CloudUpload/>}
+                                                disabled={avatarUploading}
+                                            >
+                                                {avatarUploading ? "上传中..." : "本地上传"}
+                                                <input
+                                                    ref={avatarInputRef}
+                                                    hidden
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={event => uploadAvatar(event.target.files?.[0])}
+                                                />
+                                            </Button>
+                                            {profileForm.avatarUrl &&
+                                                <Button
+                                                    variant="text"
+                                                    onClick={() => {
+                                                        setAvatarInput("");
+                                                        setProfileForm(current => ({...current, avatarUrl: ""}));
+                                                    }}
+                                                    disabled={avatarUploading}
+                                                >
+                                                    清除头像
+                                                </Button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="mt-6 flex justify-end">
@@ -687,23 +672,27 @@ export default function Account() {
                                 {saving ? "保存中..." : "保存资料"}
                             </Button>
                         </div>
-                    </Paper>
+                        </Paper>
+                    }
 
-                    <Paper elevation={0} className="border border-gray-200 p-6">
+                    {activeTab === "travel" &&
+                        <>
+                        <section aria-labelledby="identity-information-heading">
+                        <Paper elevation={0} className="border border-teal-200 border-t-4 bg-white p-6">
                         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <Typography variant="h5" className="font-semibold">实名与钱包</Typography>
+                                <Typography id="identity-information-heading" variant="h5" className="font-semibold">实名信息</Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    本地模拟实名、余额充值和交易记录，让支付流程更接近真实产品。
+                                    实名资料会用于机票、火车票和酒店预订时的身份核验。
                                 </Typography>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Chip color={identityVerified ? "success" : "warning"} label={identityVerified ? "已实名" : "待完善"}/>
-                                <AccountBalanceWallet style={{fontSize: 36, color: "#f97316"}}/>
+                                <CreditCard style={{fontSize: 36, color: "#0f766e"}}/>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
+                        <div>
                             <div className="rounded-lg border border-gray-200 p-4">
                                 <div className="mb-4 flex items-center justify-between">
                                     <div>
@@ -744,155 +733,51 @@ export default function Account() {
                                     <Button variant="contained" startIcon={<Save/>} onClick={saveIdentity}>保存实名信息</Button>
                                 </div>
                             </div>
+                        </div>
+                        </Paper>
+                        </section>
 
-                            <div className="rounded-lg border border-orange-100 bg-orange-50 p-4">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <p className="text-sm text-orange-700">当前余额</p>
-                                        <p className="mt-1 text-3xl font-bold text-orange-600">{formatCurrency(wallet.balance)}</p>
-                                    </div>
-                                    <Chip
-                                        size="small"
-                                        color={paymentMethod === "WALLET" ? "success" : "default"}
-                                        label={paymentMethod === "WALLET" ? "默认钱包" : "默认银联卡"}
-                                    />
-                                </div>
-                                <div className="mt-4 rounded-lg bg-white/80 p-3">
-                                    <p className="mb-2 text-sm font-semibold text-gray-700">默认支付方式</p>
-                                    <ToggleButtonGroup
-                                        fullWidth
-                                        exclusive
-                                        size="small"
-                                        value={paymentMethod}
-                                        onChange={(_, value) => value && updateDefaultPaymentMethod(value)}
-                                    >
-                                        <ToggleButton value="WALLET">钱包</ToggleButton>
-                                        <ToggleButton value="CARD">银联卡</ToggleButton>
-                                    </ToggleButtonGroup>
-                                </div>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {[100, 500, 1000].map(amount => (
-                                        <Button key={amount} size="small" variant="outlined" onClick={() => openTopUpDialog(amount)}>
-                                            充 {formatCurrency(amount)}
-                                        </Button>
-                                    ))}
-                                    {walletReserveGap > 0 &&
-                                        <Button size="small" variant="contained" onClick={() => openTopUpDialog(walletReserveGap)}>
-                                            一键补足 {formatCurrency(walletReserveGap)}
-                                        </Button>
-                                    }
-                                </div>
-                                <div className="mt-4 flex gap-2">
-                                    <TextField
-                                        size="small"
-                                        label="自定义充值"
-                                        type="number"
-                                        value={topUpAmount}
-                                        onChange={event => setTopUpAmount(event.target.value)}
-                                        inputProps={{min: 1, step: 1}}
-                                        InputProps={{
-                                            startAdornment: <InputAdornment position="start">¥</InputAdornment>
-                                        }}
-                                    />
-                                    <Button variant="contained" onClick={() => openTopUpDialog()}>去充值</Button>
-                                </div>
-                                <p className="mt-2 text-xs text-gray-500">充值前请先绑定银联卡，充值时可直接选择已保存的银联卡。</p>
-                                <div className="mt-4 rounded-lg bg-white/80 p-3">
-                                    <div className="mb-3 flex items-center justify-between gap-2">
-                                        <p className="text-sm font-semibold text-gray-700">已绑定银联卡</p>
-                                        <Button size="small" variant="outlined" onClick={openBankCardDialog}>添加银联卡</Button>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        {savedBankCards.map(card => (
-                                            <div key={card.id} className="rounded-lg border border-gray-200 bg-white px-3 py-3">
-                                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                                    <div>
-                                                        <p className="font-semibold text-gray-900">{card.bankName} · 尾号 {card.cardNumber.slice(-4)}</p>
-                                                        <p className="mt-1 text-xs text-gray-500">
-                                                            {card.cardBrand} / {card.cardType} · 持卡人 {card.holderName} · 预留 {maskValue(card.reservedPhone, 3, 4)}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {card.defaultCard
-                                                            ? <Chip size="small" color="success" label="默认"/>
-                                                            : <Button size="small" onClick={() => markDefaultBankCard(card.id)}>设为默认</Button>}
-                                                        <Button size="small" color="error" onClick={() => removeBankCard(card.id)}>删除</Button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {savedBankCards.length === 0 &&
-                                            <p className="rounded-lg border border-dashed border-gray-300 px-3 py-4 text-center text-sm text-gray-500">
-                                                暂无已绑定银联卡，充值前请先添加。
-                                            </p>
-                                        }
-                                    </div>
-                                </div>
-                                <Divider className="my-4"/>
-                                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                    <p className="text-sm font-semibold text-gray-700">最近交易</p>
-                                    <ToggleButtonGroup
-                                        exclusive
-                                        size="small"
-                                        value={walletFilter}
-                                        onChange={(_, value) => value && setWalletFilter(value)}
-                                    >
-                                        {walletTransactionFilters.map(filter => (
-                                            <ToggleButton key={filter.value} value={filter.value}>{filter.label}</ToggleButton>
-                                        ))}
-                                    </ToggleButtonGroup>
-                                </div>
-                                <div className="grid gap-2">
-                                    {recentWalletTransactions.map(transaction => {
-                                        const meta = walletTransactionMeta[transaction.type];
-                                        const signedAmount = transaction.type === "PAYMENT" ? "-" : "+";
-                                        return (
-                                            <div key={transaction.id} className="rounded-md bg-white px-3 py-2 text-sm">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <Chip size="small" color={meta.color} label={meta.label}/>
-                                                    <span className={transaction.type === "PAYMENT" ? "font-semibold text-red-500" : "font-semibold text-emerald-600"}>
-                                                        {signedAmount}{formatCurrency(transaction.amount)}
-                                                    </span>
-                                                </div>
-                                                <p className="mt-1 truncate text-xs text-gray-500">{transaction.title}</p>
-                                                {transaction.accountLabel &&
-                                                    <p className="mt-1 truncate text-xs text-gray-400">
-                                                        {transaction.accountLabel}{transaction.referenceNo ? ` · 流水号 ${transaction.referenceNo}` : ""}
-                                                    </p>
-                                                }
-                                                <p className="mt-1 text-xs text-gray-400">
-                                                    余额 {formatCurrency(transaction.balanceAfter)} · {new Date(transaction.createdAt).toLocaleString()}
-                                                </p>
-                                            </div>
-                                        );
-                                    })}
-                                    {recentWalletTransactions.length === 0 &&
-                                        <p className="rounded-md bg-white px-3 py-4 text-center text-sm text-gray-500">暂无交易记录，先试试充值。</p>
-                                    }
-                                </div>
+                                        <Paper elevation={0} className="border border-gray-200 p-6">
+                        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <Typography variant="h5" className="font-semibold">银联卡</Typography>
+                                <Typography variant="body2" color="text.secondary">保存后支付订单时可直接选择，卡号仅显示末四位。</Typography>
                             </div>
+                            <CreditCard style={{fontSize: 36, color: "#0f766e"}}/>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_auto]">
+                            <TextField
+                                label="银联卡号"
+                                value={bankCardNumber}
+                                onChange={event => setBankCardNumber(normalizeDigits(event.target.value).slice(0, 19))}
+                                error={Boolean(bankCardNumber && validateBankCard(bankCardNumber))}
+                                helperText={bankCardNumber ? validateBankCard(bankCardNumber) || (getBankCardIssuerInfo(bankCardNumber)?.displayName || "银联卡") : "支持 16-19 位银联卡号"}
+                                fullWidth
+                            />
+                            <TextField
+                                label="卡片名称（选填）"
+                                value={bankCardLabel}
+                                onChange={event => setBankCardLabel(event.target.value.slice(0, 30))}
+                                placeholder="例如：日常支付"
+                                fullWidth
+                            />
+                            <Button variant="contained" startIcon={<CreditCard/>} onClick={addBankCard} disabled={!bankCardNumber || Boolean(validateBankCard(bankCardNumber))}>添加</Button>
+                        </div>
+                        <div className="mt-4 grid gap-3">
+                            {savedBankCards.length === 0 && <Typography variant="body2" color="text.secondary">暂未保存银联卡。</Typography>}
+                            {savedBankCards.map(card => (
+                                <div key={card.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3">
+                                    <div>
+                                        <p className="font-semibold text-gray-900">{card.label}</p>
+                                        <p className="text-sm text-gray-500">银联卡 ? **** **** **** {card.cardNumber.slice(-4)}</p>
+                                    </div>
+                                    <Button size="small" color="error" startIcon={<Delete/>} onClick={() => deleteBankCard(card.id)}>删除</Button>
+                                </div>
+                            ))}
                         </div>
                     </Paper>
 
-                    <WalletTopUpDialog
-                        open={topUpDialogOpen}
-                        defaultAmount={topUpAmount}
-                        savedCards={savedBankCards}
-                        onClose={() => setTopUpDialogOpen(false)}
-                        onConfirm={handleRecharge}
-                        onAddCard={openBankCardDialog}
-                    />
-
-                    <BankCardEditorDialog
-                        open={bankCardDialogOpen}
-                        defaultHolderName={identityForm.realName.trim() || `${profile.name || ""}${profile.surname ? ` ${profile.surname}` : ""}`.trim()}
-                        defaultPhone={profile.phone || ""}
-                        suggestDefault={savedBankCards.length === 0}
-                        onClose={() => setBankCardDialogOpen(false)}
-                        onConfirm={saveBankCard}
-                    />
-
-                    <Paper elevation={0} className="border border-gray-200 p-6">
+<Paper elevation={0} className="border border-gray-200 p-6">
                         <div className="mb-5 flex items-center justify-between">
                             <div>
                                 <Typography variant="h5" className="font-semibold">预订偏好</Typography>
@@ -1059,6 +944,8 @@ export default function Account() {
                             }
                         </div>
                     </Paper>
+                        </>
+                    }
                 </div>
             </section>
         </main>

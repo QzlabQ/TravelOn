@@ -44,10 +44,6 @@ public class TripCoreSlots {
     @Builder.Default
     private List<String> avoidKeywords = new ArrayList<>();
 
-    public boolean hasRequiredSlots() {
-        return city != null && !city.isBlank() && travelStartDate != null && peopleCount != null && peopleCount > 0;
-    }
-
     public LocalDate normalizedEndDate() {
         return travelEndDate != null ? travelEndDate : travelStartDate;
     }

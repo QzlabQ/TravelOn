@@ -221,6 +221,7 @@ const HotelDetails = () => {
                 price: totalPrice,
                 roomName: selectedRoomNames,
                 travelers: selectedTravelers,
+                roomIds: selectedConfiguration.rooms.map(room => Number(room.roomId)),
             });
             setReservationId(response.data.id);
             addNotification({
@@ -473,7 +474,7 @@ const HotelDetails = () => {
                     totalPrice={totalPrice}
                     rules={[
                         "未支付订单将在 30 分钟后自动超时。",
-                        "已支付订单取消后会直接完成退款，钱包支付退回余额。",
+                        "已支付订单取消后会直接完成退款，金额将按原支付方式退回。",
                         "房型与价格会随日期和库存变化，请以下单页展示为准。",
                     ]}
                     submitting={submitting}

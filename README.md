@@ -22,6 +22,8 @@ https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
 - [快速开始](#快速开始)
 - [开发模式 Debug](#开发模式-debug)
 - [生产模式 Build 与 Serve](#生产模式-build-与-serve)
+- [Testing](#testing)
+- [运行时扩展机票和火车票日期](#运行时扩展机票和火车票日期)
 - [两种模式对比](#两种模式对比)
 - [常见问题排查](#常见问题排查)
 - [FAQ](#faq)
@@ -338,7 +340,7 @@ Run all local Java, Python, and frontend test suites and collect their native
 coverage reports with one command:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tests\run-unit-test-coverage.ps1
+powershell -ExecutionPolicy Bypass -File .\travel-api\tests\run-unit-test-coverage.ps1
 ```
 
 Prerequisites are Java 21 with Maven, a Python environment with the
@@ -360,6 +362,43 @@ cd travel-api/transport-service; mvn verify
 cd travel-api/ai-arrange-agent-service; python -m pytest -q
 cd travel-ui; $env:CI='true'; npm run test:coverage
 ```
+
+## 运行时扩展机票和火车票日期
+
+当前日期票务数据由 `travel-api/scripts/generate_dated_ticket_offers.py`
+根据以下模板生成：
+
+- `travel-api/seed-data/transport/train/ticket_offers.csv`
+- `travel-api/seed-data/transport/plane/ticket_offers.csv`
+
+实际导入 PostgreSQL 的文件是对应目录下的 `generated_ticket_offers.csv`。
+
+如需修改数据：
+
+1. 修改 `travel-api/scripts/generate_dated_ticket_offers.py`：
+
+   ```python
+   START_DATE = datetime(year, month, day)
+   END_DATE = datetime(year, month, day)
+   ```
+
+2. 重新生成机票和火车票数据：
+
+   ```powershell
+   python generate_dated_ticket_offers.py
+   ```
+   
+3. 如果 Docker Compose 已在运行，导入现有交通数据库：
+
+   ```powershell
+   docker compose exec -T postgres psql -U admin -d transport_db -f /database/seed/transport_seed.sql
+   docker compose restart transport
+   ```
+
+   如果 `.env` 修改过数据库用户名或数据库名，请替换 `admin` 和 `transport_db`。导入脚本使用确定性 ID 和 `ON CONFLICT (id) DO NOTHING`，会保留已有数据并补充新日期。
+
+`docker compose up -d --build` 只会重新构建镜像。若 `travel-api/data/postgres` 已有数据库，它不会自动重新生成或重新导入票务
+CSV；数据库初始化脚本只会在该目录为空时执行。修改 CSV 后仍建议显式执行上面的 `psql` 导入命令。
 
 ---
 

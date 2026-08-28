@@ -430,19 +430,39 @@ const HotelBooking = () => {
         }
 
         try {
+            const guestAdults = selectedTravelers.filter(traveler => traveler.travelerType !== 'CHILD').length;
+            const guestChildren = selectedTravelers.filter(traveler => traveler.travelerType === 'CHILD').length;
+            const detailsResponse = await ApiRequests.getHotelDetails(selectedOffer.idHotel, {
+                dateFrom,
+                dateTo,
+                adults: guestAdults,
+                childrenUnder18: guestChildren,
+                childrenUnder10: 0,
+                childrenUnder3: 0,
+            });
+            const roomConfiguration = detailsResponse.data.roomsConfigurations[0];
+            const roomIds = roomConfiguration?.rooms
+                .map(room => Number(room.roomId))
+                .filter(roomId => Number.isSafeInteger(roomId) && roomId > 0) ?? [];
+
+            if (!roomConfiguration || roomIds.length === 0) {
+                throw new Error('No bookable room configuration was returned.');
+            }
+
             const response = await ApiRequests.createHotelReservation(session.token, {
                 userId: session.user.id,
                 hotelId: selectedOffer.idHotel,
                 hotelName: selectedOffer.hotelName,
                 dateFrom,
                 dateTo,
-                adultsQuantity: selectedTravelers.filter(traveler => traveler.travelerType !== 'CHILD').length,
+                adultsQuantity: guestAdults,
                 childrenUnder3Quantity: 0,
                 childrenUnder10Quantity: 0,
-                childrenUnder18Quantity: selectedTravelers.filter(traveler => traveler.travelerType === 'CHILD').length,
+                childrenUnder18Quantity: guestChildren,
                 price: selectedOffer.price * selectedTravelers.length,
-                roomName: selectedRoomName,
+                roomName: roomConfiguration.rooms.map(room => room.name).join(' + '),
                 travelers: selectedTravelers,
+                roomIds,
             });
             setReservationId(response.data.id);
             addNotification({
@@ -785,7 +805,7 @@ const HotelBooking = () => {
                     totalPrice={selectedTotalPrice}
                     rules={[
                         "未支付订单将在 30 分钟后自动超时。",
-                        "已支付订单取消后会直接完成退款，钱包支付退回余额。",
+                        "已支付订单取消后会直接完成退款，金额将按原支付方式退回。",
                         "房型和价格会随库存与日期变化，提交订单前请再次确认。",
                     ]}
                     submitting={bookingHotelId === selectedOffer.idHotel}

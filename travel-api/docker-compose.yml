@@ -98,17 +98,6 @@ services:
     networks:
       - backend
 
-  offer-provider:
-    build: ./offer-provider-service
-    volumes:
-      - ./logs/offer-provider:/logs
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-    networks:
-      - backend
-
   payment:
     build: ./payment-service
     volumes:
@@ -137,6 +126,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${RESERVATION_DB_NAME:-reservation_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      APP_PAYMENT_TIMEOUT_SECONDS: ${APP_PAYMENT_TIMEOUT_SECONDS:-1800}
     depends_on:
       postgres:
         condition: service_healthy
@@ -202,6 +192,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       APP_UPLOADS_DIR: /uploads
+    stop_grace_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -229,7 +220,7 @@ services:
       DEEPSEEK_THINKING_TYPE: "disabled"
       AGENT_MODEL_TIMEOUT_SECONDS: "180"
       AGENT_MAX_RUNTIME_SECONDS: "240"
-      DEEPSEEK_MAX_TOKENS: "12000"
+      DEEPSEEK_MAX_TOKENS: "${DEEPSEEK_MAX_TOKENS:-12000}"
       DEEPSEEK_SLOW_RESPONSE_WARNING_MS: "60000"
       TRAVEL_GATEWAY_BASE_URL: "http://gateway:8082"
       NO_PROXY: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"

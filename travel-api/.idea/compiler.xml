@@ -7,7 +7,6 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="offer-provider-service" />
         <module name="data-generator" />
         <module name="payment-service" />
         <module name="reservation-service" />
@@ -25,7 +24,6 @@
       <module name="data-generator" options="-parameters" />
       <module name="discovery-service" options="-parameters" />
       <module name="hotel-service" options="-parameters" />
-      <module name="offer-provider-service" options="-parameters" />
       <module name="payment-service" options="-parameters" />
       <module name="reservation-service" options="-parameters" />
       <module name="transport-service" options="-parameters" />

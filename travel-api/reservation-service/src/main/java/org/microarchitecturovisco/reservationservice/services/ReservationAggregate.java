@@ -19,7 +19,7 @@ import java.util.logging.Logger;
 
 @RequiredArgsConstructor
 @Component
-public class ReservationAggregate {
+public class ReservationAggregate implements ReservationCommandOperations {
     static Logger logger = Logger.getLogger("ReservationAggregate");
     private final ReservationProjector reservationProjector;
     private final ReservationRepository reservationRepository;
@@ -45,6 +45,7 @@ public class ReservationAggregate {
                 .provider(command.getProvider())
                 .bookingCode(command.getBookingCode())
                 .travelers(command.getTravelers())
+                .paymentDeadline(command.getPaymentDeadline())
                 .build();
         reservationProjector.project(List.of(event));
         return List.of(event);

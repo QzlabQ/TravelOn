@@ -15,15 +15,6 @@ export const reservationStatusMeta: Record<ReservationStatus, {
     REFUNDED: {label: "已退款", color: "success", description: "退款已经完成。"},
 };
 
-export const reservationStatusPanelClass: Record<ReservationStatus, string> = {
-    PENDING_PAYMENT: "border-amber-200 bg-amber-50 text-amber-900",
-    PAID: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    CANCELLED: "border-slate-200 bg-slate-50 text-slate-700",
-    EXPIRED: "border-red-200 bg-red-50 text-red-900",
-    REFUND_PROCESSING: "border-blue-200 bg-blue-50 text-blue-900",
-    REFUNDED: "border-emerald-200 bg-emerald-50 text-emerald-900",
-};
-
 export const parseSystemDate = (value?: string | null) => {
     if (!value) return null;
     const normalizedValue = value.trim();

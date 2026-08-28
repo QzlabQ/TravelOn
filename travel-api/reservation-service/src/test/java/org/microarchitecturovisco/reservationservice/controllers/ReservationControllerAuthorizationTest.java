@@ -1,9 +1,9 @@
 package org.microarchitecturovisco.reservationservice.controllers;
 
 import org.junit.jupiter.api.Test;
-import org.microarchitecturovisco.reservationservice.services.ReservationAggregate;
-import org.microarchitecturovisco.reservationservice.services.ReservationAuthorizationService;
-import org.microarchitecturovisco.reservationservice.services.ReservationService;
+import org.microarchitecturovisco.reservationservice.services.ReservationCommandOperations;
+import org.microarchitecturovisco.reservationservice.services.ReservationAuthorizationOperations;
+import org.microarchitecturovisco.reservationservice.services.ReservationOperations;
 
 import java.util.UUID;
 
@@ -17,11 +17,11 @@ class ReservationControllerAuthorizationTest {
     private static final UUID RESERVATION_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final String TOKEN = "session-token";
 
-    private final ReservationService reservationService = mock(ReservationService.class);
-    private final ReservationAuthorizationService authorizationService = mock(ReservationAuthorizationService.class);
+    private final ReservationOperations reservationService = mock(ReservationOperations.class);
+    private final ReservationAuthorizationOperations authorizationService = mock(ReservationAuthorizationOperations.class);
     private final ReservationController controller = new ReservationController(
             reservationService,
-            mock(ReservationAggregate.class),
+            mock(ReservationCommandOperations.class),
             authorizationService
     );
 

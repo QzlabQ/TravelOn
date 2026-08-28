@@ -1,5 +1,6 @@
 package org.microarchitecturovisco.reservationservice.services.saga;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CheckHotelAvailabilityRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateHotelReservationRequest;
@@ -13,7 +14,9 @@ import org.microarchitecturovisco.reservationservice.utils.json.JsonReader;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.logging.Logger;
+import java.util.logging.Level;
 
 @Service
 @RequiredArgsConstructor
@@ -34,26 +37,45 @@ public class BookHotelsSaga {
         logger.info("Checking hotel availability: " + availabilityRequest);
 
         try {
-            byte[] responseMessageB = (byte[]) rabbitTemplate.convertSendAndReceive(
+            Object responseMessage = rabbitTemplate.convertSendAndReceive(
                     QueuesHotelConfig.EXCHANGE_HOTEL,
                     QueuesHotelConfig.ROUTING_KEY_HOTEL_CHECK_AVAILABILITY_REQ,
                     reservationRequestJson);
 
-            if(responseMessageB != null) {
-                String responseMessage = (new String(responseMessageB)).replace("\\", "");
-                responseMessage = responseMessage.substring(1, responseMessage.length() - 1);
-                CheckHotelAvailabilityResponseDto response = JsonReader.readDtoFromJson(responseMessage, CheckHotelAvailabilityResponseDto.class);
+            if (responseMessage != null) {
+                String responseJson = normalizeAvailabilityResponse(responseMessage);
+                CheckHotelAvailabilityResponseDto response = JsonReader.readDtoFromJson(
+                        responseJson,
+                        CheckHotelAvailabilityResponseDto.class
+                );
                 return response.isIfAvailable();
             }
-            else {
-                logger.info("Null message at: checkIfHotelIsAvailable()");
-                throw new ReservationFailException();
-            }
-        } catch (ReservationFailException e) {
-            e.printStackTrace();
+            logger.warning("Null message at: checkIfHotelIsAvailable()");
+            throw new ReservationFailException();
+        } catch (Exception exception) {
+            logger.log(Level.WARNING, "Failed to read hotel availability response.", exception);
             throw new ReservationFailException();
         }
     }
+
+    private String normalizeAvailabilityResponse(Object responseMessage) throws Exception {
+        String responseJson;
+        if (responseMessage instanceof byte[] bytes) {
+            responseJson = new String(bytes, StandardCharsets.UTF_8);
+        } else if (responseMessage instanceof String string) {
+            responseJson = string;
+        } else {
+            throw new IllegalArgumentException("Unsupported hotel availability response type: "
+                    + responseMessage.getClass().getName());
+        }
+
+        responseJson = responseJson.trim();
+        if (responseJson.startsWith("\"") && responseJson.endsWith("\"")) {
+            return new ObjectMapper().readValue(responseJson, String.class);
+        }
+        return responseJson;
+    }
+
     public void createHotelReservation(ReservationRequest reservationRequest) {
         CreateHotelReservationRequest request = CreateHotelReservationRequest.builder()
                                             .hotelTimeFrom(reservationRequest.getHotelTimeFrom())
