@@ -361,6 +361,16 @@ cd travel-api/ai-arrange-agent-service; python -m pytest -q
 cd travel-ui; $env:CI='true'; npm run test:coverage
 ```
 
+### API 端到端回归
+
+执行一轮从 API 网关入口开始的完整业务流程测试：
+
+```bash
+bash ./travel-api/tests/integration/run-api-e2e.sh
+```
+
+脚本覆盖用户、酒店、机票、火车票、订单支付与退款、社区、AI 行程规划和数据库状态验证。它会自动创建并清理本次运行的临时业务数据。默认网关地址为 `http://localhost:58082`；管理员账号可通过 `ADMIN_EMAIL`、`ADMIN_PASSWORD` 环境变量提供，也可从本地 `admin_account.txt` 读取。详细前置条件、输出目录和场景清单见 [`docs/api-e2e-testing.md`](docs/api-e2e-testing.md)。
+
 ---
 
 ## 两种模式对比
