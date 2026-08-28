@@ -5,6 +5,7 @@ import org.microarchitecturovisco.communityservice.domain.CommunityPost;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -12,6 +13,10 @@ import java.util.UUID;
 
 public interface CommunityPostRepository extends JpaRepository<CommunityPost, UUID> {
     Page<CommunityPost> findByCategory(CommunityCategory category, Pageable pageable);
+
+    @Modifying
+    @Query("update CommunityPost p set p.authorName = :name where p.authorUserId = :userId")
+    int updateAuthorName(@Param("userId") UUID userId, @Param("name") String name);
 
     java.util.List<CommunityPost> findByAuthorUserIdOrderByCreatedAtDesc(UUID authorUserId);
 
