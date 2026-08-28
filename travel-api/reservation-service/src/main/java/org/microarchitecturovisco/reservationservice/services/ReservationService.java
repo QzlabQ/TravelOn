@@ -36,7 +36,6 @@ import org.microarchitecturovisco.reservationservice.services.saga.InvalidPaymen
 import org.microarchitecturovisco.reservationservice.utils.json.JsonConverter;
 import org.microarchitecturovisco.reservationservice.utils.json.JsonReader;
 import org.microarchitecturovisco.reservationservice.websockets.ReservationWebSocketHandler;
-import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -59,8 +58,6 @@ import java.util.logging.Logger;
 @Service
 @RequiredArgsConstructor
 public class ReservationService {
-
-    private static final org.slf4j.Logger log = LoggerFactory.getLogger(ReservationService.class);
 
     public static Logger logger = Logger.getLogger(ReservationService.class.getName());
 
