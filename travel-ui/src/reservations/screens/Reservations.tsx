@@ -13,7 +13,7 @@ import {
     TableHead,
     TableRow
 } from "@mui/material";
-import {Cancel, EventNote, Refresh, Replay, Visibility} from "@mui/icons-material";
+import {Cancel, EventNote, Refresh, Visibility} from "@mui/icons-material";
 import {ApiRequests, ReservationResponse} from "../../core/apiConfig";
 import {getCurrentUserId, getCurrentUserMode} from "../../core/currentUser";
 import {useAuthSession} from "../../core/useAuthSession";
@@ -22,61 +22,8 @@ import {
     canCancelReservation,
     formatTripDate,
     getEffectiveReservationStatus,
-    getReservationStatusMeta,
-    toDateInputValue
+    getReservationStatusMeta
 } from "../orderStatus";
-
-const getRebookTarget = (reservation: ReservationResponse) => {
-    if (reservation.bookingType === 'FLIGHT') {
-        return {
-            pathname: '/reservations/flights',
-            state: {
-                departureDate: toDateInputValue(reservation.hotelTimeFrom),
-                bookingCode: reservation.bookingCode,
-            },
-        };
-    }
-
-    if (reservation.bookingType === 'TRAIN') {
-        return {
-            pathname: '/reservations/trains',
-            state: {
-                departureDate: toDateInputValue(reservation.hotelTimeFrom),
-                bookingCode: reservation.bookingCode,
-            },
-        };
-    }
-
-    if (reservation.bookingType === 'HOTEL') {
-        if (reservation.hotelId) {
-            return {
-                pathname: `/reservations/hotels/${reservation.hotelId}`,
-                search: new URLSearchParams({
-                    dateFrom: toDateInputValue(reservation.hotelTimeFrom) ?? '',
-                    dateTo: toDateInputValue(reservation.hotelTimeTo) ?? '',
-                    adults: String(Math.max(1, reservation.adultsQuantity || 1)),
-                }).toString(),
-                state: {
-                    dateFrom: toDateInputValue(reservation.hotelTimeFrom),
-                    dateTo: toDateInputValue(reservation.hotelTimeTo),
-                    adults: Math.max(1, reservation.adultsQuantity || 1),
-                    back: {to: '/reservations', label: '返回我的预订'},
-                },
-            };
-        }
-
-        return {
-            pathname: '/reservations/hotels',
-            state: {
-                dateFrom: toDateInputValue(reservation.hotelTimeFrom),
-                dateTo: toDateInputValue(reservation.hotelTimeTo),
-                hotelName: reservation.title,
-            },
-        };
-    }
-
-    return {pathname: '/reservations'};
-};
 
 const Reservations = () => {
     const session = useAuthSession();
@@ -196,15 +143,6 @@ const Reservations = () => {
                                             <div className='flex justify-end gap-2'>
                                                 <Button component={Link} to={`/reservations/${reservation.id}`} variant='outlined' size='small' startIcon={<Visibility/>}>
                                                     详情
-                                                </Button>
-                                                <Button
-                                                    component={Link}
-                                                    to={getRebookTarget(reservation)}
-                                                    variant='outlined'
-                                                    size='small'
-                                                    startIcon={<Replay/>}
-                                                >
-                                                    再次预订
                                                 </Button>
                                                 {canCancelReservation(reservation) &&
                                                     <Button
