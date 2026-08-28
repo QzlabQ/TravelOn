@@ -41,6 +41,9 @@ import {
     addNotification,
     getAccountIdentity,
     getCurrentUserSession,
+    getSavedBankCards,
+    SAVED_BANK_CARDS_EVENT,
+    SavedBankCard,
     setAccountIdentity,
 } from "../../core/currentUser";
 import {
@@ -132,7 +135,8 @@ export default function ReservationDetails() {
     const [successMessage, setSuccessMessage] = useState("");
     const [payDialogOpen, setPayDialogOpen] = useState(false);
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-    const [cardNumber, setCardNumber] = useState("6222020000000056");
+    const [cardNumber, setCardNumber] = useState("");
+    const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>(() => getSavedBankCards());
     const [payerIdentity, setPayerIdentity] = useState<AccountIdentity>(() => getAccountIdentity());
     const [cancellationReason, setCancellationReason] = useState("");
     const [payments, setPayments] = useState<PaymentTransactionResponse[]>([]);
@@ -168,12 +172,15 @@ export default function ReservationDetails() {
     useEffect(() => {
         const refreshPaymentAssets = () => {
             setPayerIdentity(getAccountIdentity());
+            setSavedBankCards(getSavedBankCards());
         };
         refreshPaymentAssets();
         window.addEventListener(ACCOUNT_IDENTITY_EVENT, refreshPaymentAssets);
+        window.addEventListener(SAVED_BANK_CARDS_EVENT, refreshPaymentAssets);
 
         return () => {
             window.removeEventListener(ACCOUNT_IDENTITY_EVENT, refreshPaymentAssets);
+            window.removeEventListener(SAVED_BANK_CARDS_EVENT, refreshPaymentAssets);
         };
     }, []);
 
@@ -511,12 +518,12 @@ export default function ReservationDetails() {
 
             <Dialog open={payDialogOpen} onClose={() => setPayDialogOpen(false)} fullWidth maxWidth="sm">
                 <DialogTitle>支付订单</DialogTitle>
-                <DialogContent>
-                    <Alert severity="info" className="mb-4">
+                <DialogContent className="!pb-2">
+                    <Alert severity="info" className="mb-2">
                         请使用银联卡完成支付，支付成功后订单状态会立即更新。
                     </Alert>
 
-                    <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2">
                         <div className="flex items-center justify-between gap-3">
                             <div>
                                 <p className="text-sm text-slate-500">本次应付</p>
@@ -526,10 +533,10 @@ export default function ReservationDetails() {
                         </div>
                     </div>
 
-                    <div className="grid gap-4">
-                        <div className="rounded-lg border border-slate-200 p-4">
-                            <p className="mb-3 font-semibold text-slate-900">付款人实名信息</p>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                        <div className="rounded-lg border border-slate-200 p-3">
+                            <p className="mb-2 font-semibold text-slate-900">付款人实名信息</p>
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 <TextField
                                     label="真实姓名"
                                     value={payerIdentity.realName}
@@ -559,9 +566,26 @@ export default function ReservationDetails() {
                             </div>
                         </div>
 
-                        <div className="rounded-lg border border-slate-200 p-4">
-                            <p className="mb-3 font-semibold text-slate-900">银联卡支付</p>
+                        <div className="rounded-lg border border-slate-200 p-3">
+                            <p className="mb-2 font-semibold text-slate-900">银联卡支付</p>
+                            {savedBankCards.length > 0 && (
+                                <TextField
+                                    select
+                                    className="mb-3"
+                                    fullWidth
+                                    size="small"
+                                    label="选择已保存的银联卡"
+                                    value={savedBankCards.some(card => card.cardNumber === cardNumber) ? cardNumber : ""}
+                                    onChange={event => setCardNumber(event.target.value)}
+                                >
+                                    <MenuItem value="">手动输入新卡</MenuItem>
+                                    {savedBankCards.map(card => (
+                                        <MenuItem key={card.id} value={card.cardNumber}>{card.label} * **** {card.cardNumber.slice(-4)}</MenuItem>
+                                    ))}
+                                </TextField>
+                            )}
                             <TextField
+                                className="mt-2"
                                 fullWidth
                                 label="银联卡号"
                                 value={cardNumber}
@@ -584,7 +608,7 @@ export default function ReservationDetails() {
 
             <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)} fullWidth maxWidth="xs">
                 <DialogTitle>{effectiveStatus === "PAID" ? "申请退款" : "取消订单"}</DialogTitle>
-                <DialogContent>
+                <DialogContent className="!pb-2">
                     <TextField
                         className="mt-2"
                         fullWidth
