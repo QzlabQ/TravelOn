@@ -47,7 +47,64 @@ Main technologies include Java, TypeScript, Python, PL/pgSQL, and Docker.
 
 ## Project Structure
 
-<img width="407" height="203" alt="image" src="https://github.com/user-attachments/assets/290798fd-97da-4652-a6d7-5ef31962d1d9" />
+```mermaid
+flowchart LR
+    ui["travel-ui<br/>Frontend Application<br/>React / MUI"]
+    gateway["api-gateway<br/>API Gateway<br/>HTTP / WebSocket"]
+
+    subgraph services["Java Microservices"]
+        ai["ai-arrange-service<br/>AI Orchestration<br/>Conversations / Snapshots / WebSocket"]
+        hotel["hotel-service<br/>Hotel Service"]
+        transport["transport-service<br/>Transport Service"]
+        reservation["reservation-service<br/>Reservation Service"]
+        community["community-service<br/>Community Service"]
+        user["user-service<br/>User Service"]
+        payment["payment-service<br/>Payment Service"]
+    end
+
+    agent["ai-arrange-agent-service<br/>Python Agent"]
+
+    subgraph infrastructure["Infrastructure"]
+        eureka["discovery-service<br/>Eureka Service Discovery"]
+        postgres["PostgreSQL<br/>Business Data"]
+        mongo["MongoDB<br/>AI Conversations / Snapshots"]
+        rabbit["RabbitMQ"]
+    end
+
+    ui --> gateway
+    gateway --> ai
+    gateway --> hotel
+    gateway --> transport
+    gateway --> reservation
+    gateway --> community
+    gateway --> user
+    gateway --> payment
+    ai --> agent
+
+    gateway -.-> eureka
+    ai -.-> eureka
+    hotel -.-> eureka
+    transport -.-> eureka
+    reservation -.-> eureka
+    community -.-> eureka
+    user -.-> eureka
+    payment -.-> eureka
+
+    ai -.-> mongo
+    hotel -.-> postgres
+    transport -.-> postgres
+    reservation -.-> postgres
+    community -.-> postgres
+    user -.-> postgres
+    payment -.-> postgres
+
+    hotel -.-> rabbit
+    transport -.-> rabbit
+    reservation -.-> rabbit
+    user -.-> rabbit
+    payment -.-> rabbit
+    ai -.-> rabbit
+```
 
 ```text
 travel-on-2026NULLptr/
