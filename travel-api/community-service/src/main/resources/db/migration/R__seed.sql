@@ -1,5 +1,6 @@
 -- Seed data for this service, managed by Flyway as a repeatable migration.
--- Re-runs only when this file changes; idempotent via INSERT ... ON CONFLICT.
+-- Re-runs only when this file changes; idempotent via INSERT ... ON CONFLICT
+-- and targeted INSERT ... SELECT ... WHERE NOT EXISTS guards.
 -- Converted from database/seed: psql copy meta-command -> server-side COPY
 -- (reads CSVs from /seed-data on the postgres container; admin is superuser).
 
@@ -46,11 +47,20 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.attraction_images (attraction_id, image_url)
-VALUES
-    ('f0000000-0000-4000-a000-000000000001'::uuid, '/community/defaults/featured-1.png'),
-    ('f0000000-0000-4000-a000-000000000002'::uuid, '/community/defaults/featured-2.png'),
-    ('f0000000-0000-4000-a000-000000000003'::uuid, '/community/defaults/featured-3.png'),
-    ('f0000000-0000-4000-a000-000000000004'::uuid, '/community/defaults/featured-4.png');
+SELECT seed.attraction_id, seed.image_url
+FROM (
+    VALUES
+        ('f0000000-0000-4000-a000-000000000001'::uuid, '/community/defaults/featured-1.png'),
+        ('f0000000-0000-4000-a000-000000000002'::uuid, '/community/defaults/featured-2.png'),
+        ('f0000000-0000-4000-a000-000000000003'::uuid, '/community/defaults/featured-3.png'),
+        ('f0000000-0000-4000-a000-000000000004'::uuid, '/community/defaults/featured-4.png')
+) AS seed(attraction_id, image_url)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.attraction_images existing
+    WHERE existing.attraction_id = seed.attraction_id
+      AND existing.image_url = seed.image_url
+);
 
 CREATE TEMP TABLE seed_hotel_reviews (
     id bigint,
