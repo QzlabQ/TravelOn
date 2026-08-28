@@ -33,6 +33,13 @@ export type AccountIdentity = {
     documentNumber: string;
 };
 
+export type SavedBankCard = {
+    id: string;
+    cardNumber: string;
+    label: string;
+    createdAt: string;
+};
+
 type AppNotificationType = 'ORDER_CREATED' | 'PAYMENT_SUCCESS' | 'REFUND_COMPLETED';
 
 type AppNotification = {
@@ -50,10 +57,12 @@ const GUEST_USER_ID_KEY = 'guestUserId';
 const AUTH_SESSION_KEY = 'authSession';
 const BOOKING_PREFERENCES_KEY = 'bookingPreferences';
 const ACCOUNT_IDENTITIES_KEY = 'accountIdentities';
+const SAVED_BANK_CARDS_KEY = 'savedBankCards';
 const NOTIFICATIONS_KEY = 'notifications';
 export const AUTH_SESSION_EVENT = 'travel-ui-auth-session-changed';
 export const BOOKING_PREFERENCES_EVENT = 'travel-ui-booking-preferences-changed';
 export const ACCOUNT_IDENTITY_EVENT = 'travel-ui-account-identity-changed';
+export const SAVED_BANK_CARDS_EVENT = 'travel-ui-saved-bank-cards-changed';
 export const NOTIFICATIONS_EVENT = 'travel-ui-notifications-changed';
 
 export const DEFAULT_BOOKING_PREFERENCES: BookingPreferences = {
@@ -184,6 +193,37 @@ export const getAccountIdentity = (userId = getCurrentUserId()): AccountIdentity
         documentType: '身份证',
         documentNumber: '',
     };
+};
+
+export const getSavedBankCards = (userId = getCurrentUserId()): SavedBankCard[] => {
+    const cards = readLocalRecord<SavedBankCard[]>(SAVED_BANK_CARDS_KEY);
+    return Array.isArray(cards[userId]) ? cards[userId] : [];
+};
+
+export const saveBankCard = (cardNumber: string, label = '', userId = getCurrentUserId()) => {
+    const cards = readLocalRecord<SavedBankCard[]>(SAVED_BANK_CARDS_KEY);
+    const userCards = Array.isArray(cards[userId]) ? cards[userId] : [];
+    const normalizedCardNumber = cardNumber.replace(/\D/g, '');
+    const existingCard = userCards.find(card => card.cardNumber === normalizedCardNumber);
+    if (existingCard) return existingCard;
+    const savedCard: SavedBankCard = {
+        id: uuidv4(),
+        cardNumber: normalizedCardNumber,
+        label: label.trim() || '\u6211\u7684\u94f6\u8054\u5361',
+        createdAt: new Date().toISOString(),
+    };
+    cards[userId] = [...userCards, savedCard];
+    writeLocalRecord(SAVED_BANK_CARDS_KEY, cards);
+    window.dispatchEvent(new Event(SAVED_BANK_CARDS_EVENT));
+    return savedCard;
+};
+
+export const removeSavedBankCard = (cardId: string, userId = getCurrentUserId()) => {
+    const cards = readLocalRecord<SavedBankCard[]>(SAVED_BANK_CARDS_KEY);
+    const userCards = Array.isArray(cards[userId]) ? cards[userId] : [];
+    cards[userId] = userCards.filter(card => card.id !== cardId);
+    writeLocalRecord(SAVED_BANK_CARDS_KEY, cards);
+    window.dispatchEvent(new Event(SAVED_BANK_CARDS_EVENT));
 };
 
 export const setAccountIdentity = (identity: AccountIdentity, userId = getCurrentUserId()) => {

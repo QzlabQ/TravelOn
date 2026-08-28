@@ -85,16 +85,6 @@ public class PlannerConversationService {
         return PlannerConversationResponse.from(conversationRepository.save(conversation));
     }
 
-    public PlannerConversationResponse updateCoreSlots(UUID conversationId, UUID userId, TripCoreSlots coreSlots) {
-        PlannerConversation conversation = getOwnedConversation(conversationId, userId);
-        conversation.setCoreSlots(coreSlots);
-        conversation.setStatus(PlannerConversationStatus.ACTIVE_CHAT);
-        conversation.setTitle(defaultTitle(coreSlots));
-        conversation.setNextQuestion(defaultNextQuestion());
-        conversation.setUpdatedAt(Instant.now());
-        return PlannerConversationResponse.from(conversationRepository.save(conversation));
-    }
-
     public PlannerConversationResponse updateSelection(UUID conversationId, UUID userId, List<UUID> selectedPlaceIds) {
         PlannerConversation conversation = getOwnedConversation(conversationId, userId);
         List<UUID> safeSelectedPlaceIds = selectedPlaceIds == null ? new ArrayList<>() : new ArrayList<>(selectedPlaceIds);
@@ -292,14 +282,6 @@ public class PlannerConversationService {
 
     public void assertAccess(UUID conversationId, UUID userId) {
         getOwnedConversation(conversationId, userId);
-    }
-
-    private PlannerSnapshot finalizeAssistantTurn(PlannerConversation conversation, UUID userId, String assistantText) {
-        saveMessage(conversation.getId(), userId, PlannerMessageRole.ASSISTANT, assistantText, plannerAiClient.model(), Map.of("source", "ai"));
-        PlannerSnapshot snapshot = snapshotService.createSnapshot(conversation, assistantText);
-        refreshConversationFromSnapshot(conversation, snapshot);
-        conversationRepository.save(conversation);
-        return snapshot;
     }
 
     private PlannerSnapshot finalizeAgentTurnFromAgent(PlannerConversation conversation, UUID userId, AgentRunResponse response, String source) {
