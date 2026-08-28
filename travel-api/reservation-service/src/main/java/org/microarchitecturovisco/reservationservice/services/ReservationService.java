@@ -57,7 +57,7 @@ import java.util.logging.Logger;
 
 @Service
 @RequiredArgsConstructor
-public class ReservationService {
+public class ReservationService implements ReservationOperations {
 
     public static Logger logger = Logger.getLogger(ReservationService.class.getName());
 
