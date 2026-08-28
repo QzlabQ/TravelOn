@@ -13,7 +13,6 @@ export type UserProfile = {
     updatedAt?: string;
     lastLoginAt?: string | null;
 };
-
 export type UserSession = {
     token: string;
     user: UserProfile;
@@ -34,9 +33,9 @@ export type AccountIdentity = {
     documentNumber: string;
 };
 
-export type AppNotificationType = 'ORDER_CREATED' | 'PAYMENT_SUCCESS' | 'REFUND_COMPLETED';
+type AppNotificationType = 'ORDER_CREATED' | 'PAYMENT_SUCCESS' | 'REFUND_COMPLETED';
 
-export type AppNotification = {
+type AppNotification = {
     id: string;
     type: AppNotificationType;
     title: string;
@@ -220,22 +219,4 @@ export const addNotification = (
     writeLocalRecord(NOTIFICATIONS_KEY, notifications);
     window.dispatchEvent(new Event(NOTIFICATIONS_EVENT));
     return nextNotification;
-};
-
-export const markNotificationRead = (notificationId: string, userId = getCurrentUserId()) => {
-    const notifications = readLocalRecord<AppNotification[]>(NOTIFICATIONS_KEY);
-    notifications[userId] = getNotifications(userId).map(notification =>
-        notification.id === notificationId ? {...notification, read: true} : notification
-    );
-    writeLocalRecord(NOTIFICATIONS_KEY, notifications);
-    window.dispatchEvent(new Event(NOTIFICATIONS_EVENT));
-    return notifications[userId];
-};
-
-export const markAllNotificationsRead = (userId = getCurrentUserId()) => {
-    const notifications = readLocalRecord<AppNotification[]>(NOTIFICATIONS_KEY);
-    notifications[userId] = getNotifications(userId).map(notification => ({...notification, read: true}));
-    writeLocalRecord(NOTIFICATIONS_KEY, notifications);
-    window.dispatchEvent(new Event(NOTIFICATIONS_EVENT));
-    return notifications[userId];
 };

@@ -2,8 +2,6 @@ import {
     normalizeChinaMainlandPhone,
     normalizeDigits,
     validateBankCard,
-    validateCardExpiry,
-    validateCardSecurityCode,
     validateChinaMainlandPhone,
     validateRechargeAmount,
     validateStayDates,
@@ -32,12 +30,7 @@ describe('validation business rules', () => {
         expect(validateBankCard('6222021234567891')).not.toBe('');
     });
 
-    test('validates expiry, security code and recharge amount boundaries', () => {
-        const now = new Date(2026, 5, 15);
-        expect(validateCardExpiry('06/26', now)).toBe('');
-        expect(validateCardExpiry('05/26', now)).not.toBe('');
-        expect(validateCardSecurityCode('123')).toBe('');
-        expect(validateCardSecurityCode('12')).not.toBe('');
+    test('validates recharge amount boundaries', () => {
         expect(validateRechargeAmount('10')).toBe('');
         expect(validateRechargeAmount('9')).not.toBe('');
         expect(validateRechargeAmount('50001')).not.toBe('');

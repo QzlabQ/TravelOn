@@ -1,4 +1,4 @@
-import {CommunityCategory, ReviewTargetType, TravelStyle} from "../../core/apiConfig";
+import {ReviewTargetType, TravelStyle} from "../../core/apiConfig";
 
 export const travelStyleLabels: Record<TravelStyle, string> = {
     LEISURE: "休闲度假",
@@ -8,17 +8,6 @@ export const travelStyleLabels: Record<TravelStyle, string> = {
     FAMILY: "亲子出行",
     ADVENTURE: "户外探险",
     ROMANTIC: "浪漫之旅",
-    OTHER: "其他",
-};
-
-export const categoryLabels: Record<CommunityCategory, string> = {
-    TRAVEL_NOTE: "广场",
-    SCENIC_SPOT: "景点评价",
-    ROUTE: "路线评价",
-    MERCHANT: "商家评价",
-    HOTEL: "酒店",
-    FOOD: "美食",
-    TRANSPORT: "交通",
     OTHER: "其他",
 };
 

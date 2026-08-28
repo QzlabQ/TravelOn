@@ -248,49 +248,6 @@ export const validateBankCard = (value?: string | null) => {
     return "";
 };
 
-export const normalizeCardExpiry = (value?: string | null) => {
-    const digits = normalizeDigits(value).slice(0, 4);
-    if (digits.length <= 2) return digits;
-    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-};
-
-export const validateCardExpiry = (value?: string | null, now = new Date()) => {
-    const normalized = normalizeCardExpiry(value);
-    if (!normalized) {
-        return "请输入有效期。";
-    }
-
-    const match = normalized.match(/^(\d{2})\/(\d{2})$/);
-    if (!match) {
-        return "请输入有效的卡片有效期（MM/YY）。";
-    }
-
-    const month = Number(match[1]);
-    const year = Number(match[2]);
-    if (month < 1 || month > 12) {
-        return "请输入有效的卡片月份。";
-    }
-
-    const currentYear = now.getFullYear() % 100;
-    const currentMonth = now.getMonth() + 1;
-    if (year < currentYear || (year === currentYear && month < currentMonth)) {
-        return "该银行卡已过有效期。";
-    }
-
-    return "";
-};
-
-export const validateCardSecurityCode = (value?: string | null) => {
-    const code = normalizeDigits(value);
-    if (!code) {
-        return "请输入安全码。";
-    }
-    if (!/^\d{3,4}$/.test(code)) {
-        return "安全码需为 3-4 位数字。";
-    }
-    return "";
-};
-
 export const validateRechargeAmount = (
     value?: string | number | null,
     options: {min?: number; max?: number} = {}

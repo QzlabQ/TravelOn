@@ -61,7 +61,6 @@ public class PlannerConversationService {
     private final PlannerConversationRepository conversationRepository;
     private final PlannerMessageRepository messageRepository;
     private final PlannerSnapshotRepository snapshotRepository;
-    private final PlannerPromptFactory promptFactory;
     private final PlannerAiClient plannerAiClient;
     private final PlannerAgentClient plannerAgentClient;
     private final PlannerSnapshotService snapshotService;
