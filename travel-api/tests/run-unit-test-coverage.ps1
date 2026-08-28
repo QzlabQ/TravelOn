@@ -18,7 +18,7 @@ are warnings only and do not change a successful command into a failed suite.
 param()
 
 $ErrorActionPreference = 'Stop'
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $artifactDirectory = Join-Path $repositoryRoot 'artifacts/test-results'
 $logsDirectory = Join-Path $artifactDirectory 'logs'
 $summaryPath = Join-Path $artifactDirectory 'summary.json'

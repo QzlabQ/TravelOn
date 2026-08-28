@@ -10,10 +10,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $GatewayBaseUrl = $GatewayBaseUrl.TrimEnd("/")
-$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$apiRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$repoRoot = Split-Path $apiRoot -Parent
 
 if ([string]::IsNullOrWhiteSpace($ComposeFile)) {
-    $ComposeFile = Join-Path (Split-Path $PSScriptRoot -Parent) "docker-compose.yml"
+    $ComposeFile = Join-Path $apiRoot "docker-compose.yml"
 }
 if ([string]::IsNullOrWhiteSpace($ResultsRoot)) {
     $ResultsRoot = Join-Path (Join-Path $repoRoot "test-results") "$(Get-Date -Format 'yyyy-MM-dd')\remediation"
