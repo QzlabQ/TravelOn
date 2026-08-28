@@ -13,11 +13,9 @@ import org.microarchitecturovisco.transport.model.dto.TransportReservationDto;
 import org.microarchitecturovisco.transport.model.dto.request.CheckTransportAvailabilityRequestDto;
 import org.microarchitecturovisco.transport.model.dto.request.GetTransportsBetweenLocationsRequestDto;
 import org.microarchitecturovisco.transport.model.dto.request.GetTransportsBetweenMultipleLocationsRequestDto;
-import org.microarchitecturovisco.transport.model.dto.request.GetTransportsBySearchQueryRequestDto;
 import org.microarchitecturovisco.transport.model.dto.response.AvailableTransportsDto;
 import org.microarchitecturovisco.transport.model.dto.response.CheckTransportAvailabilityResponseDto;
 import org.microarchitecturovisco.transport.model.dto.response.GetTransportsBetweenLocationsResponseDto;
-import org.microarchitecturovisco.transport.model.dto.response.GetTransportsBySearchQueryResponseDto;
 import org.microarchitecturovisco.transport.model.dto.response.TicketOfferDto;
 import org.microarchitecturovisco.transport.model.dto.response.TicketOptionsDto;
 import org.microarchitecturovisco.transport.queues.config.QueuesConfig;
@@ -28,7 +26,6 @@ import org.microarchitecturovisco.transport.services.AdminAuthorizationService;
 import org.microarchitecturovisco.transport.utils.json.JsonConverter;
 import org.microarchitecturovisco.transport.utils.json.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -57,7 +54,6 @@ import java.util.logging.Logger;
 public class TransportsQueryController {
 
     private final TransportsQueryService transportsQueryService;
-    private final RabbitTemplate rabbitTemplate;
     public static Logger logger = Logger.getLogger(TransportsQueryController.class.getName());
 
     private final TransportCommandService transportCommandService;
@@ -181,17 +177,6 @@ public class TransportsQueryController {
     @GetMapping("/test")
     public String test() {
         return "test";
-    }
-
-    @RabbitListener(queues = "transports.requests.getTransportsBySearchQuery")
-    public String consumeGetTransportsRequest(String requestDtoJson) {
-        Logger logger = Logger.getLogger("getTransportsBySearchQuery");
-        logger.info("Request: " + requestDtoJson);
-
-        GetTransportsBySearchQueryRequestDto requestDto = JsonReader.readGetTransportsBySearchQueryRequestFromJson(requestDtoJson);
-        GetTransportsBySearchQueryResponseDto responseDto = transportsQueryService.getTransportsBySearchQuery(requestDto);
-        logger.info("Response size: " + responseDto.getTransportDtoList().size());
-        return JsonConverter.convertGetTransportsBySearchQueryResponseDto(responseDto);
     }
 
     @RabbitListener(queues = "transports.requests.getTransportsBetweenLocations")
