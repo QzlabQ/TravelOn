@@ -143,3 +143,8 @@ travel-ui/logs/
 
 # Generated consolidated test results
 artifacts/test-results/
+
+# Local learning/course outputs
+docs/microservices-course/
+docs/testing-learning/
+docs/microservices-learning.html
