@@ -92,7 +92,7 @@ corepack enable
 Both `.env` files must be in place before starting either mode.
 
 - `travel-api/.env`: not committed to the repository — create it locally.
-- `travel-ui/.env`: **committed to the repository**, so it works right after cloning. See the note in the [Frontend](#frontend-travel-uienv) section below for why.
+- `travel-ui/.env`: not committed to the repository — create it locally.
 
 > Note: use `#` for comments in `.env`, not `;`.
 
@@ -154,15 +154,15 @@ REACT_APP_AMAP_SECURITY_JS_CODE=
 | `REACT_APP_AMAP_JS_API_KEY` | AMap JS key for browser map rendering |
 | `REACT_APP_AMAP_SECURITY_JS_CODE` | AMap JS security code |
 
-> **Why the AMap key is committed to Git**
+> **AMap key guidance**
 >
-> Obtaining an AMap (Gaode) key requires real-name verification and application review, which is a slow process. To make the project easy to review and try out after cloning, `travel-ui/.env` — including `REACT_APP_AMAP_JS_API_KEY` and `REACT_APP_AMAP_SECURITY_JS_CODE` — is **committed to Git for now**, so the map works without applying for your own key.
+> Obtaining an AMap (Gaode) key requires real-name verification and application review, which is a slow process. To avoid committing credentials, `travel-ui/.env` — including `REACT_APP_AMAP_JS_API_KEY` and `REACT_APP_AMAP_SECURITY_JS_CODE` — is not tracked by Git. Create it locally from the example above and fill in your own values.
 >
-> This is a deliberate convenience trade-off for testing, not a recommended practice:
+> For local testing:
 >
-> - The key is for this project's demo only; please do not use it elsewhere.
-> - Its quota is shared across everyone who clones the repo. If the map fails to load or reports a quota error, apply for your own key and replace it.
-> - Before any real deployment, remove `travel-ui/.env` from version control (add it to `.gitignore`) and rotate the key.
+> - Apply for your own AMap JS API key and security code if you need map features.
+> - Never commit `travel-ui/.env` or any other environment file containing credentials.
+> - If a key has already been exposed, rotate it and review its quota.
 
 **Important:** `REACT_APP_*` variables are inlined at build time.
 

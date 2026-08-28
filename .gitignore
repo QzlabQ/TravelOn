@@ -148,3 +148,31 @@ artifacts/test-results/
 docs/microservices-course/
 docs/testing-learning/
 docs/microservices-learning.html
+
+# Global local-only files
+.DS_Store
+._*
+.Spotlight-V100/
+.Trashes/
+Thumbs.db
+Desktop.ini
+
+# IDE metadata
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Generated dependencies, build outputs, logs, and test results
+**/node_modules/
+**/target/
+**/build/
+**/dist/
+**/out/
+*.log
+test-results/
+
+# Local environment files
+.env
+.env.*
+!.env.example

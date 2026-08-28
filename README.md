@@ -92,7 +92,7 @@ corepack enable
 启动任何模式之前，都需要先准备好两个 `.env` 文件。
 
 - `travel-api/.env`：不会提交到仓库，请在本地自行创建。
-- `travel-ui/.env`：**已随仓库同步**，克隆后即可直接使用，原因见下方[前端](#前端travel-uienv)一节的说明。
+- `travel-ui/.env`：不会提交到仓库，请在本地自行创建。
 
 > 注意：`.env` 的注释请使用 `#`，不要用 `;`。
 
@@ -154,15 +154,15 @@ REACT_APP_AMAP_SECURITY_JS_CODE=
 | `REACT_APP_AMAP_JS_API_KEY` | 浏览器端地图渲染 Key |
 | `REACT_APP_AMAP_SECURITY_JS_CODE` | 高德 JS 安全码 |
 
-> **关于高德 Key 随仓库同步的说明**
+> **关于高德 Key 的说明**
 >
-> 高德开放平台的 Key 申请需要实名认证与应用审核，流程较为繁琐。为了方便课程评审与他人克隆后直接试用，`travel-ui/.env`（含 `REACT_APP_AMAP_JS_API_KEY` 与 `REACT_APP_AMAP_SECURITY_JS_CODE`）**暂时随 Git 一起同步**，无需自行申请即可看到地图效果。
+> 高德开放平台的 Key 申请需要实名认证与应用审核，流程较为繁琐。为避免将密钥提交到版本库，`travel-ui/.env`（含 `REACT_APP_AMAP_JS_API_KEY` 与 `REACT_APP_AMAP_SECURITY_JS_CODE`）不会随 Git 同步，请根据上方示例在本地创建并填写。
 >
-> 这是为便于测试而做的临时取舍，并非推荐做法：
+> 本地测试时：
 >
-> - 该 Key 仅供本项目演示使用，请勿用于其他用途；
-> - 配额由本项目共享，如遇地图加载失败或提示超限，请自行申请 Key 后替换；
-> - 正式部署前应将 `travel-ui/.env` 移出版本库（加入 `.gitignore`）并轮换 Key。
+> - 如果需要地图功能，请自行申请高德 JS API Key 和安全码后填写；
+> - 不要将 `travel-ui/.env` 或其他包含密钥的环境文件提交到 Git；
+> - 如果已有 Key 曾经公开，建议及时轮换并检查其配额。
 
 **重要：** `REACT_APP_*` 变量是编译期注入的。
 
