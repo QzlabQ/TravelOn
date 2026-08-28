@@ -85,6 +85,7 @@ __pycache__/
 .coverage
 .coverage.*
 htmlcov/
+coverage.xml
 pip-wheel-metadata/
 *.egg-info/
 .eggs/
@@ -142,3 +143,8 @@ travel-ui/logs/
 
 # Generated consolidated test results
 artifacts/test-results/
+
+# Local learning/course outputs
+docs/microservices-course/
+docs/testing-learning/
+docs/microservices-learning.html

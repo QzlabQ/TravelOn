@@ -17,9 +17,9 @@ import org.microarchitecturovisco.reservationservice.domain.entity.ReservationSt
 import org.microarchitecturovisco.reservationservice.domain.exceptions.ReservationFailException;
 import org.microarchitecturovisco.reservationservice.domain.model.PurchaseRequestBody;
 import org.microarchitecturovisco.reservationservice.domain.model.ReservationConfirmationResponse;
-import org.microarchitecturovisco.reservationservice.services.ReservationAggregate;
-import org.microarchitecturovisco.reservationservice.services.ReservationAuthorizationService;
-import org.microarchitecturovisco.reservationservice.services.ReservationService;
+import org.microarchitecturovisco.reservationservice.services.ReservationCommandOperations;
+import org.microarchitecturovisco.reservationservice.services.ReservationAuthorizationOperations;
+import org.microarchitecturovisco.reservationservice.services.ReservationOperations;
 import org.microarchitecturovisco.reservationservice.utils.json.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,9 +41,9 @@ import java.util.logging.Logger;
 @RequestMapping("/reservations")
 public class ReservationController {
 
-    private final ReservationService reservationService;
-    private final ReservationAggregate reservationAggregate;
-    private final ReservationAuthorizationService authorizationService;
+    private final ReservationOperations reservationService;
+    private final ReservationCommandOperations reservationAggregate;
+    private final ReservationAuthorizationOperations authorizationService;
     public static Logger logger = Logger.getLogger(ReservationController.class.getName());
 
     @GetMapping("/user/{userId}")

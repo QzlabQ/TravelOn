@@ -98,17 +98,6 @@ services:
     networks:
       - backend
 
-  offer-provider:
-    build: ./offer-provider-service
-    volumes:
-      - ./logs/offer-provider:/logs
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-    networks:
-      - backend
-
   payment:
     build: ./payment-service
     volumes:

@@ -805,7 +805,7 @@ const HotelBooking = () => {
                     totalPrice={selectedTotalPrice}
                     rules={[
                         "未支付订单将在 30 分钟后自动超时。",
-                        "已支付订单取消后会直接完成退款，钱包支付退回余额。",
+                        "已支付订单取消后会直接完成退款，金额将按原支付方式退回。",
                         "房型和价格会随库存与日期变化，提交订单前请再次确认。",
                     ]}
                     submitting={bookingHotelId === selectedOffer.idHotel}
