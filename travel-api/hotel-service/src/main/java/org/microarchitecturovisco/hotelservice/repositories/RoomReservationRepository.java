@@ -8,5 +8,6 @@ import java.util.UUID;
 
 public interface RoomReservationRepository extends JpaRepository<RoomReservation, UUID> {
     List<RoomReservation> findByMainReservationId(UUID mainReservationId);
+    boolean existsByMainReservationIdAndRoomId(UUID mainReservationId, Long roomId);
     void deleteByMainReservationId(UUID mainReservationId);
 }

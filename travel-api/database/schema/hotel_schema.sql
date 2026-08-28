@@ -70,6 +70,9 @@ ALTER TABLE ONLY public.room
 ALTER TABLE ONLY public.room_reservation
     ADD CONSTRAINT room_reservation_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.room_reservation
+    ADD CONSTRAINT uq_room_reservation_main_room UNIQUE (main_reservation_id, room_id);
+
 ALTER TABLE ONLY public.hotel
     ADD CONSTRAINT fk_hotel_city FOREIGN KEY (city_id) REFERENCES public.city(id);
 

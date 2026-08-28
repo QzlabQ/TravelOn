@@ -229,10 +229,12 @@ public class HotelsController {
         return responseJson;
     }
 
-    @RabbitListener(queues = "#{handleCreateHotelReservationQueue.name}")
+    @RabbitListener(
+            queues = "#{handleCreateHotelReservationQueue.name}",
+            containerFactory = "hotelReservationListenerContainerFactory")
     public void consumeMessageCreateHotelReservation(String requestJson) {
         CreateHotelReservationRequest request = JsonReader.readCreateHotelReservationRequestCommand(requestJson);
-        System.out.println("Creating hotel reservations: " + request);
+        validateCreateReservationRequest(request);
 
         int numberOfRoomsInReservation = request.getRoomIds().size();
 
@@ -259,6 +261,21 @@ public class HotelsController {
                     .commandTimeStamp(LocalDateTime.now())
                     .build()
             );
+        }
+    }
+
+    private static void validateCreateReservationRequest(CreateHotelReservationRequest request) {
+        if (request.getReservationId() == null
+                || request.getHotelId() == null
+                || request.getHotelTimeFrom() == null
+                || request.getHotelTimeTo() == null
+                || request.getRoomIds() == null
+                || request.getRoomIds().isEmpty()
+                || request.getRoomIds().stream().anyMatch(java.util.Objects::isNull)) {
+            throw new IllegalArgumentException("Create-hotel-reservation message is missing required fields");
+        }
+        if (!request.getHotelTimeTo().isAfter(request.getHotelTimeFrom())) {
+            throw new IllegalArgumentException("Hotel reservation end time must be after start time");
         }
     }
 

@@ -68,8 +68,7 @@ public class JsonReader {
         try {
             return mapper.readValue(json, CreateHotelReservationRequest.class);
         } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            throw new RuntimeException("Json reader failed");
+            throw new IllegalArgumentException("Invalid create-hotel-reservation message", e);
         }
     }
 

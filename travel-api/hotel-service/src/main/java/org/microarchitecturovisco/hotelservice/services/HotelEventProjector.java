@@ -7,6 +7,7 @@ import org.microarchitecturovisco.hotelservice.repositories.HotelRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomReservationRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +20,7 @@ public class HotelEventProjector {
     private final HotelRepository hotelRepository;
     private final RoomReservationRepository roomReservationRepository;
 
+    @Transactional
     public void project(List<HotelEvent> hotelEvents){
         for (HotelEvent hotelEvent : hotelEvents) {
             if (hotelEvent instanceof HotelCreatedEvent){
@@ -80,6 +82,10 @@ public class HotelEventProjector {
     }
 
     private void apply(RoomReservationCreatedEvent event){
+        if (roomReservationRepository.existsByMainReservationIdAndRoomId(
+                event.getIdRoomReservation(), event.getIdRoom())) {
+            return;
+        }
         Room room = roomRepository.findById(event.getIdRoom()).orElseThrow(RuntimeException::new);
         RoomReservation roomReservation = RoomReservation.builder()
                 .id(event.getId())
