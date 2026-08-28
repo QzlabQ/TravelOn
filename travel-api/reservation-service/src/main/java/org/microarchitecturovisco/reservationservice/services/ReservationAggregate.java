@@ -45,6 +45,7 @@ public class ReservationAggregate implements ReservationCommandOperations {
                 .provider(command.getProvider())
                 .bookingCode(command.getBookingCode())
                 .travelers(command.getTravelers())
+                .paymentDeadline(command.getPaymentDeadline())
                 .build();
         reservationProjector.project(List.of(event));
         return List.of(event);

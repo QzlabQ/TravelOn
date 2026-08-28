@@ -38,13 +38,14 @@ import org.microarchitecturovisco.reservationservice.utils.json.JsonReader;
 import org.microarchitecturovisco.reservationservice.websockets.ReservationWebSocketHandler;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -77,6 +78,9 @@ public class ReservationService implements ReservationOperations {
 
     private final InvalidPaymentHandler invalidPaymentHandler;
 
+    @Value("${app.payment.timeout-seconds:1800}")
+    private long paymentTimeoutSeconds;
+
     public Reservation createReservation(LocalDateTime hotelTimeFrom, LocalDateTime hotelTimeTo,
                                                       int infantsQuantity, int kidsQuantity, int teensQuantity, int adultsQuantity,
                                                       BigDecimal price, Integer hotelId, List<Long> roomReservationsIds,
@@ -101,6 +105,7 @@ public class ReservationService implements ReservationOperations {
                 .title("套餐预订")
                 .travelers(Collections.emptyList())
                 .build();
+        command.setPaymentDeadline(nextPaymentDeadline());
         reservationAggregate.handleCreateReservationCommand(command);
         return reservationRepository.findById(reservationId).orElseThrow(RuntimeException::new);
     }
@@ -202,6 +207,7 @@ public class ReservationService implements ReservationOperations {
                 .provider(request.provider())
                 .bookingCode(request.bookingCode())
                 .travelers(travelers)
+                .paymentDeadline(nextPaymentDeadline())
                 .build();
 
         reservationAggregate.handleCreateReservationCommand(command);
@@ -240,15 +246,7 @@ public class ReservationService implements ReservationOperations {
         LocalDateTime checkIn = request.dateFrom().atTime(14, 0);
         LocalDateTime checkOut = request.dateTo().atTime(12, 0);
 
-        // Use the actual roomId from the hotel-service when provided so the hotel-service can
-        // create a real RoomReservation record linked to the correct Room entity.
-        // Fall back to a hash-based ID when the field is absent (backwards compat).
-        long roomReservationId = request.roomId() != null
-                ? request.roomId()
-                : Math.abs(UUID.nameUUIDFromBytes(
-                        (request.hotelId() + roomName + request.dateFrom() + request.dateTo() + userId)
-                                .getBytes(StandardCharsets.UTF_8)
-                ).getMostSignificantBits());
+        List<Long> roomReservationIds = List.copyOf(request.roomIds());
 
         CreateReservationCommand command = CreateReservationCommand.builder()
                 .id(reservationId)
@@ -263,23 +261,22 @@ public class ReservationService implements ReservationOperations {
                 .status(ReservationStatus.PENDING_PAYMENT)
                 .bookingType("HOTEL")
                 .hotelId(request.hotelId())
-                .roomReservationsIds(List.of(roomReservationId))
+                .roomReservationsIds(roomReservationIds)
                 .transportReservationsIds(Collections.emptyList())
                 .userId(userId)
                 .title(request.hotelName())
                 .provider(roomName)
                 .bookingCode("HOTEL-" + reservationId.toString().substring(0, 8).toUpperCase())
                 .travelers(travelers)
+                .paymentDeadline(nextPaymentDeadline())
                 .build();
-
-        reservationAggregate.handleCreateReservationCommand(command);
 
         // Wire into the saga so hotel-service creates a real RoomReservation record
         // and rollback works on payment timeout.
         ReservationRequest rollbackRequest = ReservationRequest.builder()
                 .id(reservationId)
                 .transportReservationsIds(Collections.emptyList())
-                .roomReservationsIds(List.of(roomReservationId))
+                .roomReservationsIds(roomReservationIds)
                 .hotelId(request.hotelId())
                 .adultsQuantity(request.adultsQuantity())
                 .childrenUnder3Quantity(request.childrenUnder3Quantity())
@@ -290,6 +287,8 @@ public class ReservationService implements ReservationOperations {
                 .price(request.price())
                 .userId(userId)
                 .build();
+        assertHotelAvailability(rollbackRequest);
+        reservationAggregate.handleCreateReservationCommand(command);
         bookHotelsSaga.createHotelReservation(rollbackRequest);
         invalidPaymentHandler.schedulePaymentTimeoutCheck(rollbackRequest);
 
@@ -320,6 +319,18 @@ public class ReservationService implements ReservationOperations {
         boolean hotelIsAvailable = bookHotelsSaga.checkIfHotelIsAvailable(reservationRequest);
         System.out.println("hotelIsAvailable: "+ hotelIsAvailable);
         if(!hotelIsAvailable) { throw new ReservationFailException(); }
+    }
+
+    private void assertHotelAvailability(ReservationRequest reservationRequest) {
+        try {
+            checkHotelAvailability(reservationRequest);
+        } catch (ReservationFailException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected hotel rooms are unavailable or invalid");
+        }
+    }
+
+    private LocalDateTime nextPaymentDeadline() {
+        return LocalDateTime.now().plusSeconds(Math.max(1L, paymentTimeoutSeconds));
     }
 
     private void checkTransportAvailability(ReservationRequest reservationRequest) throws ReservationFailException {

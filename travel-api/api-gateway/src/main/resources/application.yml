@@ -5,6 +5,7 @@ eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_DEFAULT_ZONE:http://discovery:8010/eureka}
+    registry-fetch-interval-seconds: ${EUREKA_REGISTRY_FETCH_INTERVAL_SECONDS:5}
   instance:
     prefer-ip-address: true
 
@@ -19,6 +20,9 @@ spring:
   application:
     name: api-gateway
   cloud:
+    loadbalancer:
+      cache:
+        enabled: false
     gateway:
       globalcors:
         cors-configurations:

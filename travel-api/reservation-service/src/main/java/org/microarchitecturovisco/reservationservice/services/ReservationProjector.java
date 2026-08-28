@@ -57,6 +57,7 @@ public class ReservationProjector {
                 .provider(event.getProvider())
                 .bookingCode(event.getBookingCode())
                 .travelers(mutableList(event.getTravelers()))
+                .paymentDeadline(event.getPaymentDeadline())
                 .build();
         entityManager.persist(reservation);
     }

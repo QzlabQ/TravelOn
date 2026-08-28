@@ -34,4 +34,5 @@ public class ReservationCreatedEvent extends ReservationEvent {
     private String provider;
     private String bookingCode;
     private List<BookingPersonSnapshot> travelers;
+    private LocalDateTime paymentDeadline;
 }
