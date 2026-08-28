@@ -6,7 +6,6 @@ import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapsh
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.CreatePlannerConversationRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.CreatePlannerMarkdownSnapshotRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.RunPlannerAgentRequest;
-import org.microarchitecturovisco.aiarrangeservice.domain.model.request.UpdatePlannerCoreSlotsRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.UpdatePlannerSelectionRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerConversationResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerDayVersionResponse;
@@ -44,11 +43,6 @@ public class PlannerConversationController {
     @GetMapping("/{conversationId}")
     public PlannerConversationResponse get(@PathVariable UUID conversationId, @RequestParam UUID userId) {
         return plannerConversationService.getConversation(conversationId, userId);
-    }
-
-    @PutMapping("/{conversationId}/core-slots")
-    public PlannerConversationResponse updateCoreSlots(@PathVariable UUID conversationId, @Valid @RequestBody UpdatePlannerCoreSlotsRequest request) {
-        return plannerConversationService.updateCoreSlots(conversationId, request.getUserId(), request.getCoreSlots());
     }
 
     @PutMapping("/{conversationId}/selection")

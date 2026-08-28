@@ -30,10 +30,6 @@ public class UserService {
         this.userEventPublisher = userEventPublisher;
     }
 
-    public User saveUser(User user) {
-        return userRepository.save(user);
-    }
-
     public AuthResponse register(RegisterRequest request) {
         String email = normalizeEmail(request.email());
         if (userRepository.existsByEmailIgnoreCase(email)) {

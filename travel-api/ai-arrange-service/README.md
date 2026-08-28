@@ -67,7 +67,6 @@ Other endpoints:
 
 - `GET /ai-arrange/api/conversations?userId=<uuid>`
 - `GET /ai-arrange/api/conversations/{conversationId}?userId=<uuid>`
-- `PUT /ai-arrange/api/conversations/{conversationId}/core-slots`
 - `PUT /ai-arrange/api/conversations/{conversationId}/selection`
 - `GET /ai-arrange/api/conversations/{conversationId}/snapshots?userId=<uuid>`
 - `GET /ai-arrange/api/conversations/{conversationId}/snapshots/{version}?userId=<uuid>`

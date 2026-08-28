@@ -293,10 +293,6 @@ public class HotelsService {
         return true;
     }
 
-    public Room getRoomById(Long uuid) {
-        return roomRepository.findById(uuid).orElseThrow(RuntimeException::new);
-    }
-
     public Long generateNewRoomId() {
         return roomRepository.findMaxId() + 1;
     }

@@ -80,12 +80,4 @@ public class UserClient {
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed to modify this content");
     }
 
-    /** Allows the action only when the caller is the resource owner (author). */
-    public UserProfileResponse requireOwner(String token, java.util.UUID ownerUserId) {
-        UserProfileResponse user = requireUser(token);
-        if (ownerUserId != null && ownerUserId.equals(user.id())) {
-            return user;
-        }
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the author can modify this content");
-    }
 }
