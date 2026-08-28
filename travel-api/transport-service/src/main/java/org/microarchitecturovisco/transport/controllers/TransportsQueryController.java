@@ -5,9 +5,7 @@ import org.microarchitecturovisco.transport.controllers.reservations.CreateTrans
 import org.microarchitecturovisco.transport.controllers.reservations.DeleteTransportReservationRequest;
 import org.microarchitecturovisco.transport.model.cqrs.commands.CreateTransportReservationCommand;
 import org.microarchitecturovisco.transport.model.cqrs.commands.DeleteTransportReservationCommand;
-import org.microarchitecturovisco.transport.model.domain.TicketOfferTemplate;
 import org.microarchitecturovisco.transport.model.domain.TicketType;
-import org.microarchitecturovisco.transport.model.dto.LocationDto;
 import org.microarchitecturovisco.transport.model.dto.TransportDto;
 import org.microarchitecturovisco.transport.model.dto.TransportReservationDto;
 import org.microarchitecturovisco.transport.model.dto.request.CheckTransportAvailabilityRequestDto;
@@ -19,27 +17,16 @@ import org.microarchitecturovisco.transport.model.dto.response.GetTransportsBetw
 import org.microarchitecturovisco.transport.model.dto.response.TicketOfferDto;
 import org.microarchitecturovisco.transport.model.dto.response.TicketOptionsDto;
 import org.microarchitecturovisco.transport.queues.config.QueuesConfig;
-import org.microarchitecturovisco.transport.repositories.TicketOfferTemplateRepository;
 import org.microarchitecturovisco.transport.services.TransportCommandService;
 import org.microarchitecturovisco.transport.services.TransportsQueryService;
-import org.microarchitecturovisco.transport.services.AdminAuthorizationService;
 import org.microarchitecturovisco.transport.utils.json.JsonConverter;
 import org.microarchitecturovisco.transport.utils.json.JsonReader;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -57,52 +44,10 @@ public class TransportsQueryController {
     public static Logger logger = Logger.getLogger(TransportsQueryController.class.getName());
 
     private final TransportCommandService transportCommandService;
-    private final TicketOfferTemplateRepository ticketOfferTemplateRepository;
-    private final AdminAuthorizationService adminAuthorizationService;
 
     @GetMapping("/")
     public List<TransportDto> getAllTransports() {
         return transportsQueryService.getAllTransports();
-    }
-
-    @PostMapping("/admin")
-    @ResponseStatus(HttpStatus.CREATED)
-    public void createTransport(
-            @RequestHeader(value = "X-User-Token", required = false) String token,
-            @RequestBody TransportDto transportDto
-    ) {
-        adminAuthorizationService.requireAdmin(token);
-        throw new ResponseStatusException(HttpStatus.GONE, "Legacy package transport inventory was removed");
-    }
-
-    @PutMapping("/admin/{transportId}")
-    public void updateTransport(
-            @RequestHeader(value = "X-User-Token", required = false) String token,
-            @PathVariable UUID transportId,
-            @RequestBody TransportDto request
-    ) {
-        adminAuthorizationService.requireAdmin(token);
-        throw new ResponseStatusException(HttpStatus.GONE, "Legacy package transport inventory was removed");
-    }
-
-    @DeleteMapping("/admin/{transportId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteTransport(
-            @RequestHeader(value = "X-User-Token", required = false) String token,
-            @PathVariable UUID transportId
-    ) {
-        adminAuthorizationService.requireAdmin(token);
-        throw new ResponseStatusException(HttpStatus.GONE, "Legacy package transport inventory was removed");
-    }
-
-    @GetMapping("/locations")
-    public List<LocationDto> getLocations() {
-        return transportsQueryService.getAllLocations();
-    }
-
-    @GetMapping("/locations/{region}")
-    public LocationDto getLocationByRegionName(@PathVariable String region) {
-        return transportsQueryService.getLocationByRegionName(region);
     }
 
     @GetMapping("/available")
@@ -138,45 +83,6 @@ public class TransportsQueryController {
                 onlyAvailable,
                 sortBy
         );
-    }
-
-    @PostMapping("/tickets/templates")
-    @ResponseStatus(HttpStatus.CREATED)
-    public TicketOfferTemplate createTicketOfferTemplate(
-            @RequestHeader(value = "X-User-Token", required = false) String token,
-            @RequestBody TicketOfferTemplate template
-    ) {
-        adminAuthorizationService.requireAdmin(token);
-        if (template.getId() == null) {
-            template.setId(UUID.randomUUID());
-        }
-        return ticketOfferTemplateRepository.save(template);
-    }
-
-    @PutMapping("/tickets/templates/{templateId}")
-    public TicketOfferTemplate updateTicketOfferTemplate(
-            @RequestHeader(value = "X-User-Token", required = false) String token,
-            @PathVariable UUID templateId,
-            @RequestBody TicketOfferTemplate template
-    ) {
-        adminAuthorizationService.requireAdmin(token);
-        template.setId(templateId);
-        return ticketOfferTemplateRepository.save(template);
-    }
-
-    @DeleteMapping("/tickets/templates/{templateId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteTicketOfferTemplate(
-            @RequestHeader(value = "X-User-Token", required = false) String token,
-            @PathVariable UUID templateId
-    ) {
-        adminAuthorizationService.requireAdmin(token);
-        ticketOfferTemplateRepository.deleteById(templateId);
-    }
-
-    @GetMapping("/test")
-    public String test() {
-        return "test";
     }
 
     @RabbitListener(queues = "transports.requests.getTransportsBetweenLocations")

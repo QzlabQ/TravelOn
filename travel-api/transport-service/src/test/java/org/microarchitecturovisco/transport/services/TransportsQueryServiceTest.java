@@ -48,21 +48,6 @@ class TransportsQueryServiceTest {
     }
 
     @Test
-    void allLocationsDeduplicatesCitiesAndIgnoresBlankIds() {
-        when(repository.findAll()).thenReturn(List.of(
-                offer("flight-one", TicketType.FLIGHT, "SHA", "PEK", 200, 8, 9, 0),
-                offer("train-one", TicketType.TRAIN, "PEK", "", 100, 12, 10, 0),
-                offer("flight-two", TicketType.FLIGHT, "SHA", null, 180, 5, 11, 0)
-        ));
-        stubLocation("SHA", "Shanghai");
-        stubLocation("PEK", "Beijing");
-
-        List<LocationDto> result = service.getAllLocations();
-
-        assertThat(result).extracting(LocationDto::getCityId).containsExactly("SHA", "PEK");
-    }
-
-    @Test
     void availableTransportsDeduplicatesCitiesAndSeparatesFlightAndTrainDepartures() {
         when(repository.findAll()).thenReturn(List.of(
                 offer("flight-one", TicketType.FLIGHT, "SHA", "PEK", 200, 8, 9, 0),
