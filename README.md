@@ -51,7 +51,64 @@ https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
 
 ## 项目结构
 
-<img width="407" height="203" alt="image" src="https://github.com/user-attachments/assets/290798fd-97da-4652-a6d7-5ef31962d1d9" />
+```mermaid
+flowchart LR
+    ui["travel-ui<br/>前端应用<br/>React / MUI"]
+    gateway["api-gateway<br/>API 网关<br/>HTTP / WebSocket"]
+
+    subgraph services["Java 微服务"]
+        ai["ai-arrange-service<br/>AI 编排服务<br/>会话 / 快照 / WebSocket"]
+        hotel["hotel-service<br/>酒店服务"]
+        transport["transport-service<br/>交通服务"]
+        reservation["reservation-service<br/>预订服务"]
+        community["community-service<br/>社区服务"]
+        user["user-service<br/>用户服务"]
+        payment["payment-service<br/>支付服务"]
+    end
+
+    agent["ai-arrange-agent-service<br/>Python Agent"]
+
+    subgraph infrastructure["基础设施"]
+        eureka["discovery-service<br/>Eureka 服务发现"]
+        postgres["PostgreSQL<br/>业务数据"]
+        mongo["MongoDB<br/>AI 会话 / 快照"]
+        rabbit["RabbitMQ"]
+    end
+
+    ui --> gateway
+    gateway --> ai
+    gateway --> hotel
+    gateway --> transport
+    gateway --> reservation
+    gateway --> community
+    gateway --> user
+    gateway --> payment
+    ai --> agent
+
+    gateway -.-> eureka
+    ai -.-> eureka
+    hotel -.-> eureka
+    transport -.-> eureka
+    reservation -.-> eureka
+    community -.-> eureka
+    user -.-> eureka
+    payment -.-> eureka
+
+    ai -.-> mongo
+    hotel -.-> postgres
+    transport -.-> postgres
+    reservation -.-> postgres
+    community -.-> postgres
+    user -.-> postgres
+    payment -.-> postgres
+
+    hotel -.-> rabbit
+    transport -.-> rabbit
+    reservation -.-> rabbit
+    user -.-> rabbit
+    payment -.-> rabbit
+    ai -.-> rabbit
+```
 
 ```text
 travel-on-2026NULLptr/
