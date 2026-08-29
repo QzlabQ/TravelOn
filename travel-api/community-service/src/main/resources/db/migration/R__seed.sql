@@ -1,5 +1,6 @@
 -- Seed data for this service, managed by Flyway as a repeatable migration.
--- Re-runs only when this file changes; idempotent via INSERT ... ON CONFLICT.
+-- Re-runs only when this file changes; idempotent via INSERT ... ON CONFLICT
+-- and targeted INSERT ... SELECT ... WHERE NOT EXISTS guards.
 -- Converted from database/seed: psql copy meta-command -> server-side COPY
 -- (reads CSVs from /seed-data on the postgres container; admin is superuser).
 
@@ -33,24 +34,33 @@ INSERT INTO public.attraction
 VALUES
     ('f0000000-0000-4000-a000-000000000001'::uuid, '颐和园', 'C039',
      '中国清朝时期皇家园林，前身为清漪园，是利用昆明湖、万寿山为基址，以杭州西湖风景为蓝本，汲取江南园林的某些设计手法和意境而建成的一座大型天然山水园，也是保存得最完整的一座皇家行宫御苑，被誉为皇家园林博物馆。',
-     '/community/uploads/featured-1.png', 'bdda5c87-857b-30f4-a14d-81c6148ef49d'::uuid, '官方推荐', now(), now()),
+     '/community/defaults/featured-1.png', 'bdda5c87-857b-30f4-a14d-81c6148ef49d'::uuid, '官方推荐', now(), now()),
     ('f0000000-0000-4000-a000-000000000002'::uuid, '迪士尼乐园', 'C005',
      '上海迪士尼乐园，是中国内地首座迪士尼主题乐园，是一座具有纯正迪士尼风格并融汇了中国风的主题乐园，主题园区分为米奇大街、奇想花园、探险岛、宝藏湾、明日世界、梦幻世界、迪士尼·皮克斯玩具总动员。',
-     '/community/uploads/featured-2.png', 'bdda5c87-857b-30f4-a14d-81c6148ef49d'::uuid, '官方推荐', now(), now()),
+     '/community/defaults/featured-2.png', 'bdda5c87-857b-30f4-a14d-81c6148ef49d'::uuid, '官方推荐', now(), now()),
     ('f0000000-0000-4000-a000-000000000003'::uuid, '布达拉宫', 'C133',
      '布达拉宫，位于拉萨市区西北的玛布日山（红山）上，是集宫殿、灵塔殿、佛殿、行政办公机构、僧官学校、僧舍等诸多功能共计1267间房舍的大型宫堡式建筑群。',
-     '/community/uploads/featured-3.png', 'bdda5c87-857b-30f4-a14d-81c6148ef49d'::uuid, '官方推荐', now(), now()),
+     '/community/defaults/featured-3.png', 'bdda5c87-857b-30f4-a14d-81c6148ef49d'::uuid, '官方推荐', now(), now()),
     ('f0000000-0000-4000-a000-000000000004'::uuid, '维多利亚港', 'C300',
      '维多利亚港（Victoria Harbour）位于香港岛与九龙半岛之间，东起鲤鱼门，西至青衣岛海域，为天然深水港，位列世界三大天然良港。',
-     '/community/uploads/featured-4.png', 'bdda5c87-857b-30f4-a14d-81c6148ef49d'::uuid, '官方推荐', now(), now())
+     '/community/defaults/featured-4.png', 'bdda5c87-857b-30f4-a14d-81c6148ef49d'::uuid, '官方推荐', now(), now())
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.attraction_images (attraction_id, image_url)
-VALUES
-    ('f0000000-0000-4000-a000-000000000001'::uuid, '/community/uploads/featured-1.png'),
-    ('f0000000-0000-4000-a000-000000000002'::uuid, '/community/uploads/featured-2.png'),
-    ('f0000000-0000-4000-a000-000000000003'::uuid, '/community/uploads/featured-3.png'),
-    ('f0000000-0000-4000-a000-000000000004'::uuid, '/community/uploads/featured-4.png');
+SELECT seed.attraction_id, seed.image_url
+FROM (
+    VALUES
+        ('f0000000-0000-4000-a000-000000000001'::uuid, '/community/defaults/featured-1.png'),
+        ('f0000000-0000-4000-a000-000000000002'::uuid, '/community/defaults/featured-2.png'),
+        ('f0000000-0000-4000-a000-000000000003'::uuid, '/community/defaults/featured-3.png'),
+        ('f0000000-0000-4000-a000-000000000004'::uuid, '/community/defaults/featured-4.png')
+) AS seed(attraction_id, image_url)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.attraction_images existing
+    WHERE existing.attraction_id = seed.attraction_id
+      AND existing.image_url = seed.image_url
+);
 
 CREATE TEMP TABLE seed_hotel_reviews (
     id bigint,
