@@ -13,7 +13,6 @@ export type UserProfile = {
     updatedAt?: string;
     lastLoginAt?: string | null;
 };
-
 export type UserSession = {
     token: string;
     user: UserProfile;
@@ -34,9 +33,16 @@ export type AccountIdentity = {
     documentNumber: string;
 };
 
-export type AppNotificationType = 'ORDER_CREATED' | 'PAYMENT_SUCCESS' | 'REFUND_COMPLETED';
+export type SavedBankCard = {
+    id: string;
+    cardNumber: string;
+    label: string;
+    createdAt: string;
+};
 
-export type AppNotification = {
+type AppNotificationType = 'ORDER_CREATED' | 'PAYMENT_SUCCESS' | 'REFUND_COMPLETED';
+
+type AppNotification = {
     id: string;
     type: AppNotificationType;
     title: string;
@@ -51,10 +57,12 @@ const GUEST_USER_ID_KEY = 'guestUserId';
 const AUTH_SESSION_KEY = 'authSession';
 const BOOKING_PREFERENCES_KEY = 'bookingPreferences';
 const ACCOUNT_IDENTITIES_KEY = 'accountIdentities';
+const SAVED_BANK_CARDS_KEY = 'savedBankCards';
 const NOTIFICATIONS_KEY = 'notifications';
 export const AUTH_SESSION_EVENT = 'travel-ui-auth-session-changed';
 export const BOOKING_PREFERENCES_EVENT = 'travel-ui-booking-preferences-changed';
 export const ACCOUNT_IDENTITY_EVENT = 'travel-ui-account-identity-changed';
+export const SAVED_BANK_CARDS_EVENT = 'travel-ui-saved-bank-cards-changed';
 export const NOTIFICATIONS_EVENT = 'travel-ui-notifications-changed';
 
 export const DEFAULT_BOOKING_PREFERENCES: BookingPreferences = {
@@ -187,6 +195,37 @@ export const getAccountIdentity = (userId = getCurrentUserId()): AccountIdentity
     };
 };
 
+export const getSavedBankCards = (userId = getCurrentUserId()): SavedBankCard[] => {
+    const cards = readLocalRecord<SavedBankCard[]>(SAVED_BANK_CARDS_KEY);
+    return Array.isArray(cards[userId]) ? cards[userId] : [];
+};
+
+export const saveBankCard = (cardNumber: string, label = '', userId = getCurrentUserId()) => {
+    const cards = readLocalRecord<SavedBankCard[]>(SAVED_BANK_CARDS_KEY);
+    const userCards = Array.isArray(cards[userId]) ? cards[userId] : [];
+    const normalizedCardNumber = cardNumber.replace(/\D/g, '');
+    const existingCard = userCards.find(card => card.cardNumber === normalizedCardNumber);
+    if (existingCard) return existingCard;
+    const savedCard: SavedBankCard = {
+        id: uuidv4(),
+        cardNumber: normalizedCardNumber,
+        label: label.trim() || '\u6211\u7684\u94f6\u8054\u5361',
+        createdAt: new Date().toISOString(),
+    };
+    cards[userId] = [...userCards, savedCard];
+    writeLocalRecord(SAVED_BANK_CARDS_KEY, cards);
+    window.dispatchEvent(new Event(SAVED_BANK_CARDS_EVENT));
+    return savedCard;
+};
+
+export const removeSavedBankCard = (cardId: string, userId = getCurrentUserId()) => {
+    const cards = readLocalRecord<SavedBankCard[]>(SAVED_BANK_CARDS_KEY);
+    const userCards = Array.isArray(cards[userId]) ? cards[userId] : [];
+    cards[userId] = userCards.filter(card => card.id !== cardId);
+    writeLocalRecord(SAVED_BANK_CARDS_KEY, cards);
+    window.dispatchEvent(new Event(SAVED_BANK_CARDS_EVENT));
+};
+
 export const setAccountIdentity = (identity: AccountIdentity, userId = getCurrentUserId()) => {
     const identities = readLocalRecord<AccountIdentity>(ACCOUNT_IDENTITIES_KEY);
     const normalizedIdentity: AccountIdentity = {
@@ -220,22 +259,4 @@ export const addNotification = (
     writeLocalRecord(NOTIFICATIONS_KEY, notifications);
     window.dispatchEvent(new Event(NOTIFICATIONS_EVENT));
     return nextNotification;
-};
-
-export const markNotificationRead = (notificationId: string, userId = getCurrentUserId()) => {
-    const notifications = readLocalRecord<AppNotification[]>(NOTIFICATIONS_KEY);
-    notifications[userId] = getNotifications(userId).map(notification =>
-        notification.id === notificationId ? {...notification, read: true} : notification
-    );
-    writeLocalRecord(NOTIFICATIONS_KEY, notifications);
-    window.dispatchEvent(new Event(NOTIFICATIONS_EVENT));
-    return notifications[userId];
-};
-
-export const markAllNotificationsRead = (userId = getCurrentUserId()) => {
-    const notifications = readLocalRecord<AppNotification[]>(NOTIFICATIONS_KEY);
-    notifications[userId] = getNotifications(userId).map(notification => ({...notification, read: true}));
-    writeLocalRecord(NOTIFICATIONS_KEY, notifications);
-    window.dispatchEvent(new Event(NOTIFICATIONS_EVENT));
-    return notifications[userId];
 };

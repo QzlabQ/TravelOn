@@ -25,8 +25,8 @@
 
 ## 测试方法
 
-1. 通过 `travel-api/scripts/run-api-tests.ps1` 从 Gateway `http://localhost:58082` 执行 API 自动化测试，并按用例保存请求和响应。
-2. 通过 `travel-api/scripts/run-integration-remediation-tests.ps1` 执行支付超时、RabbitMQ、Eureka/Gateway 和 AI 专项回归。
+1. 通过 `travel-api/tests/integration/run-api-tests.ps1` 从 Gateway `http://localhost:58082` 执行 API 自动化测试，并按用例保存请求和响应。
+2. 通过 `travel-api/tests/integration/run-integration-remediation-tests.ps1` 执行支付超时、RabbitMQ、Eureka/Gateway 和 AI 专项回归。
 3. 使用 PostgreSQL 核验 `reservation`、`payment_transaction` 和 `room_reservation` 的最终状态；使用 MongoDB 核验 AI 规划快照；使用 Eureka 核验服务注册实例数。
 4. 测试环境将 `APP_PAYMENT_TIMEOUT_SECONDS` 配置为 `10` 秒验证超时回滚；应用默认值仍为 `1800` 秒。
 
@@ -86,8 +86,8 @@
 
 ## 测试脚本与运行记录
 
-- API 测试脚本：`travel-api/scripts/run-api-tests.ps1`
-- 专项集成回归脚本：`travel-api/scripts/run-integration-remediation-tests.ps1`
+- API 测试脚本：`travel-api/tests/integration/run-api-tests.ps1`
+- 专项集成回归脚本：`travel-api/tests/integration/run-integration-remediation-tests.ps1`
 - 本次 API 汇总：`test-results/2026-08-27/api/api-results.json`
 - 本次 API 请求/响应：`test-results/2026-08-27/api/evidence/`
 - 本次专项回归汇总：`test-results/2026-08-27/remediation/remediation-results.json`

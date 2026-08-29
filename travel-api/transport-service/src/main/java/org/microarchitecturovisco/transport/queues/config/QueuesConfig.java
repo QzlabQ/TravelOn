@@ -32,13 +32,4 @@ public class QueuesConfig {
         return BindingBuilder.bind(handleTransportReservationQueue).to(handleTransportReservationExchange).with(ROUTING_KEY_TRANSPORT_CHECK_AVAILABILITY_REQ);
     }
 
-    @Bean
-    public Queue getTransportsRequest() {
-        return new Queue("transports.requests.getTransportsBySearchQuery", false);
-    }
-
-    @Bean
-    public Queue getTransportsResponse() {
-        return new Queue("transports.responses.getTransportsBySearchQuery", false);
-    }
 }

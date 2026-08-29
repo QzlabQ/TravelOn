@@ -60,12 +60,6 @@ spring:
             - Path=/transports/**
           filters:
             - RemoveRequestHeader=Cookie
-        - id: offer-provider-service
-          uri: lb://offer-provider-service
-          predicates:
-            - Path=/offers/**
-          filters:
-            - RemoveRequestHeader=Cookie
         - id: user-service
           uri: lb://user-service
           predicates:

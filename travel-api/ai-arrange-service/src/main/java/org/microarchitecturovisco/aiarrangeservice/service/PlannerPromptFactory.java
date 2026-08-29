@@ -19,17 +19,6 @@ public class PlannerPromptFactory {
     private static final int RECENT_MESSAGE_LIMIT = 10;
     private static final int SNAPSHOT_MARKDOWN_LIMIT = 700;
 
-    public List<AiChatMessage> buildChatPrompt(PlannerConversation conversation, PlannerSnapshot latestSnapshot, List<PlannerMessage> history) {
-        List<AiChatMessage> messages = new ArrayList<>();
-        messages.add(new AiChatMessage("system", buildChatSystemPrompt(conversation, latestSnapshot)));
-
-        recentMessages(history).stream()
-                .map(this::toAiMessage)
-                .forEach(messages::add);
-
-        return messages;
-    }
-
     public List<AiChatMessage> buildExtractionPrompt(PlannerConversation conversation, PlannerSnapshot latestSnapshot, List<PlannerMessage> history, String assistantText) {
         List<AiChatMessage> messages = new ArrayList<>();
         messages.add(new AiChatMessage("system", buildExtractionSystemPrompt(conversation, latestSnapshot)));
@@ -44,36 +33,6 @@ public class PlannerPromptFactory {
 
         int start = Math.max(0, history.size() - RECENT_MESSAGE_LIMIT);
         return history.subList(start, history.size());
-    }
-
-    private AiChatMessage toAiMessage(PlannerMessage message) {
-        return new AiChatMessage(message.getRole().name().toLowerCase(), message.getContent());
-    }
-
-    private String buildChatSystemPrompt(PlannerConversation conversation, PlannerSnapshot latestSnapshot) {
-        return """
-                你是行前智能规划助手。你的目标不是一次性写出最终总计划，而是把旅行规划拆成一轮一轮的小步骤推进。
-
-                每一轮都必须同时满足：
-                1. 只推进一个规划焦点，不要一次性铺开全部天数。
-                2. 如果信息还不够，只问一个最关键的问题，同时给出 3 个可直接添加的建议，方便用户懒人选择。
-                3. 如果信息已经足够，给出本轮结论、3 到 5 个可直接添加的具体建议、以及下一步建议。
-                4. 建议必须具体、可执行、可直接加入计划；景点、餐厅、酒店尽量使用真实名称。
-                5. 如果用户已经选了点位，优先围绕已选点位继续优化。
-                6. 不要输出 JSON，不要输出最终总方案，不要把所有候选一次性铺满。
-                7. 每轮结尾都必须给出下一步建议，说明下一轮最应该做什么。
-
-                输出建议结构：
-                - 本轮结论
-                - 可直接添加建议
-                - 下一步建议
-
-                当前出行信息：
-                %s
-
-                当前规划状态：
-                %s
-                """.formatted(buildCoreSlotsSummary(conversation), buildPlanningProgressSummary(latestSnapshot));
     }
 
     private String buildExtractionSystemPrompt(PlannerConversation conversation, PlannerSnapshot latestSnapshot) {

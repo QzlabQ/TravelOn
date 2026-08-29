@@ -45,6 +45,11 @@ import {
     getBookingPreferences,
     getCurrentUserSession,
     setAccountIdentity,
+    getSavedBankCards,
+    removeSavedBankCard,
+    saveBankCard,
+    SAVED_BANK_CARDS_EVENT,
+    SavedBankCard,
     setBookingPreferences,
     updateCurrentUserProfile,
     AccountIdentity,
@@ -59,7 +64,10 @@ import {
     normalizeChinaMainlandPhone,
     normalizeDocumentNumber,
     validateChinaMainlandPhone,
-    validateDocumentNumber
+    validateDocumentNumber,
+    getBankCardIssuerInfo,
+    normalizeDigits,
+    validateBankCard
 } from "../../core/validation";
 
 const emptyProfileForm = {
@@ -147,6 +155,9 @@ export default function Account() {
     const [travelerEditorOpen, setTravelerEditorOpen] = useState(false);
     const [bookingPreferences, setBookingPreferencesForm] = useState<BookingPreferences>(getBookingPreferences());
     const [identityForm, setIdentityForm] = useState<AccountIdentity>(() => getAccountIdentity());
+    const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>(() => getSavedBankCards());
+    const [bankCardNumber, setBankCardNumber] = useState('');
+    const [bankCardLabel, setBankCardLabel] = useState('');
     const [activeTab, setActiveTab] = useState<"profile" | "travel">("profile");
     const [avatarUploading, setAvatarUploading] = useState(false);
     const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -208,12 +219,14 @@ export default function Account() {
 
     const refreshAccountAssets = () => {
         setIdentityForm(getAccountIdentity());
+        setSavedBankCards(getSavedBankCards());
     };
 
     useEffect(() => {
         refreshAccountAssets();
         const handleAccountAssetsChanged = () => refreshAccountAssets();
         window.addEventListener(ACCOUNT_IDENTITY_EVENT, handleAccountAssetsChanged);
+        window.addEventListener(SAVED_BANK_CARDS_EVENT, handleAccountAssetsChanged);
 
         if (profile) {
             syncProfileForm(profile);
@@ -223,6 +236,7 @@ export default function Account() {
 
         return () => {
             window.removeEventListener(ACCOUNT_IDENTITY_EVENT, handleAccountAssetsChanged);
+            window.removeEventListener(SAVED_BANK_CARDS_EVENT, handleAccountAssetsChanged);
         };
     }, []);
 
@@ -413,6 +427,25 @@ export default function Account() {
         setIdentityForm(savedIdentity);
         setMessage("实名信息已保存，后续支付会自动带入。");
         setErrorMessage("");
+    };
+
+    const addBankCard = () => {
+        const normalizedNumber = normalizeDigits(bankCardNumber);
+        const cardError = validateBankCard(normalizedNumber);
+        if (cardError) {
+            setErrorMessage(cardError);
+            return;
+        }
+        saveBankCard(normalizedNumber, bankCardLabel);
+        setBankCardNumber('');
+        setBankCardLabel('');
+        setMessage('\u94f6\u8054\u5361\u5df2\u4fdd\u5b58\uff0c\u652f\u4ed8\u65f6\u53ef\u4ee5\u76f4\u63a5\u9009\u62e9\u3002');
+        setErrorMessage('');
+    };
+
+    const deleteBankCard = (cardId: string) => {
+        removeSavedBankCard(cardId);
+        setMessage('\u5df2\u5220\u9664\u4fdd\u5b58\u7684\u94f6\u8054\u5361\u3002');
     };
 
     const deleteTraveler = async (travelerId: string) => {
@@ -704,7 +737,47 @@ export default function Account() {
                         </Paper>
                         </section>
 
-                    <Paper elevation={0} className="border border-gray-200 p-6">
+                                        <Paper elevation={0} className="border border-gray-200 p-6">
+                        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <Typography variant="h5" className="font-semibold">银联卡</Typography>
+                                <Typography variant="body2" color="text.secondary">保存后支付订单时可直接选择，卡号仅显示末四位。</Typography>
+                            </div>
+                            <CreditCard style={{fontSize: 36, color: "#0f766e"}}/>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_auto]">
+                            <TextField
+                                label="银联卡号"
+                                value={bankCardNumber}
+                                onChange={event => setBankCardNumber(normalizeDigits(event.target.value).slice(0, 19))}
+                                error={Boolean(bankCardNumber && validateBankCard(bankCardNumber))}
+                                helperText={bankCardNumber ? validateBankCard(bankCardNumber) || (getBankCardIssuerInfo(bankCardNumber)?.displayName || "银联卡") : "支持 16-19 位银联卡号"}
+                                fullWidth
+                            />
+                            <TextField
+                                label="卡片名称（选填）"
+                                value={bankCardLabel}
+                                onChange={event => setBankCardLabel(event.target.value.slice(0, 30))}
+                                placeholder="例如：日常支付"
+                                fullWidth
+                            />
+                            <Button variant="contained" startIcon={<CreditCard/>} onClick={addBankCard} disabled={!bankCardNumber || Boolean(validateBankCard(bankCardNumber))}>添加</Button>
+                        </div>
+                        <div className="mt-4 grid gap-3">
+                            {savedBankCards.length === 0 && <Typography variant="body2" color="text.secondary">暂未保存银联卡。</Typography>}
+                            {savedBankCards.map(card => (
+                                <div key={card.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3">
+                                    <div>
+                                        <p className="font-semibold text-gray-900">{card.label}</p>
+                                        <p className="text-sm text-gray-500">银联卡 ? **** **** **** {card.cardNumber.slice(-4)}</p>
+                                    </div>
+                                    <Button size="small" color="error" startIcon={<Delete/>} onClick={() => deleteBankCard(card.id)}>删除</Button>
+                                </div>
+                            ))}
+                        </div>
+                    </Paper>
+
+<Paper elevation={0} className="border border-gray-200 p-6">
                         <div className="mb-5 flex items-center justify-between">
                             <div>
                                 <Typography variant="h5" className="font-semibold">预订偏好</Typography>

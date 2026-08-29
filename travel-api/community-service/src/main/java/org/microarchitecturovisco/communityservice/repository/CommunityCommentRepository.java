@@ -3,6 +3,7 @@ package org.microarchitecturovisco.communityservice.repository;
 import org.microarchitecturovisco.communityservice.domain.CommunityComment;
 import org.microarchitecturovisco.communityservice.domain.FavoriteTargetType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -12,6 +13,10 @@ import java.util.UUID;
 public interface CommunityCommentRepository extends JpaRepository<CommunityComment, UUID> {
 
     List<CommunityComment> findByTargetTypeAndTargetIdOrderByCreatedAtDesc(FavoriteTargetType targetType, String targetId);
+
+    @Modifying
+    @Query("update CommunityComment c set c.authorName = :name where c.authorUserId = :userId")
+    int updateAuthorName(@Param("userId") UUID userId, @Param("name") String name);
 
     @Query("""
             select comment

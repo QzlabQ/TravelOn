@@ -35,8 +35,6 @@ import org.microarchitecturovisco.reservationservice.services.saga.BookTransport
 import org.microarchitecturovisco.reservationservice.services.saga.InvalidPaymentHandler;
 import org.microarchitecturovisco.reservationservice.utils.json.JsonConverter;
 import org.microarchitecturovisco.reservationservice.utils.json.JsonReader;
-import org.microarchitecturovisco.reservationservice.websockets.ReservationWebSocketHandler;
-import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -60,8 +58,6 @@ import java.util.logging.Logger;
 @RequiredArgsConstructor
 public class ReservationService implements ReservationOperations {
 
-    private static final org.slf4j.Logger log = LoggerFactory.getLogger(ReservationService.class);
-
     public static Logger logger = Logger.getLogger(ReservationService.class.getName());
 
     private final ReservationRepository reservationRepository;
@@ -73,8 +69,6 @@ public class ReservationService implements ReservationOperations {
     private final BookTransportsSaga bookTransportsSaga;
 
     private final RabbitTemplate rabbitTemplate;
-
-    private final ReservationWebSocketHandler reservationWebSocketHandler;
 
     private final InvalidPaymentHandler invalidPaymentHandler;
 
@@ -295,26 +289,6 @@ public class ReservationService implements ReservationOperations {
         return getReservation(reservationId);
     }
 
-    public UUID bookOrchestration(ReservationRequest reservationRequest) throws ReservationFailException {
-
-        checkHotelAvailability(reservationRequest);
-
-        checkTransportAvailability(reservationRequest);
-
-        UUID reservationId = UUID.randomUUID();
-        reservationRequest.setId(reservationId);
-        createReservationFromRequest(reservationRequest);
-
-        bookHotelsSaga.createHotelReservation(reservationRequest);
-
-        bookTransportsSaga.createTransportReservation(reservationRequest);
-
-        invalidPaymentHandler.schedulePaymentTimeoutCheck(reservationRequest);
-
-        return reservationId;
-    }
-
-
     private void checkHotelAvailability(ReservationRequest reservationRequest) throws ReservationFailException {
         boolean hotelIsAvailable = bookHotelsSaga.checkIfHotelIsAvailable(reservationRequest);
         System.out.println("hotelIsAvailable: "+ hotelIsAvailable);
@@ -331,12 +305,6 @@ public class ReservationService implements ReservationOperations {
 
     private LocalDateTime nextPaymentDeadline() {
         return LocalDateTime.now().plusSeconds(Math.max(1L, paymentTimeoutSeconds));
-    }
-
-    private void checkTransportAvailability(ReservationRequest reservationRequest) throws ReservationFailException {
-        boolean transportIsAvailable = bookTransportsSaga.checkIfTransportIsAvailable(reservationRequest);
-        System.out.println("transportIsAvailable: " + transportIsAvailable);
-        if(!transportIsAvailable) { throw new ReservationFailException(); }
     }
 
     public void createReservationFromRequest(ReservationRequest reservationRequest) {
@@ -419,12 +387,6 @@ public class ReservationService implements ReservationOperations {
 
         logger.info("Purchased reservation: " + reservation);
 
-        if (reservation.getHotelId() != null) {
-            sendBoughtOfferWebsocketMessages(
-                    "Ktoś kupił wycieczkę do aktualnie przeglądanego hotelu!",
-                    String.valueOf(reservation.getHotelId()));
-        }
-
         // Use the title already stored on the reservation (set at booking time) as the hotel name snapshot.
         String displayName = hasText(reservation.getTitle()) ? reservation.getTitle() : "订单确认";
 
@@ -488,10 +450,6 @@ public class ReservationService implements ReservationOperations {
         }
 
         return ReservationResponse.from(completeProcessingRefund(reservation));
-    }
-
-    private void sendBoughtOfferWebsocketMessages(String message, String idHotel) {
-        reservationWebSocketHandler.sendMessageToSubscribedByIdHotel(message, idHotel);
     }
 
     private TransportReservationResponse getTransportInformation(List<String> transportIds) {

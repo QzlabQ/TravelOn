@@ -11,7 +11,7 @@
 在仓库根目录执行：
 
 ```powershell
-& .\tests\run-unit-test-coverage.ps1
+powershell -ExecutionPolicy Bypass -File .\travel-api\tests\run-unit-test-coverage.ps1
 ```
 
 Python AI 服务固定在独立 Conda 环境 `travelon-tests`（Python 3.12）中运行：
@@ -66,6 +66,6 @@ conda run -n travelon-tests python -m pytest -q
 - 非失败警告：Python 测试输出一条 FastAPI/Starlette 对 `TestClient` 的第三方弃用警告，不影响 52 个 pytest 用例或统一入口的通过状态。
 - 完整日志由 `artifacts/test-results/logs/` 自动生成；该目录为生成物，不纳入版本控制。
 
-测试人员：Codex
+测试人员：CodeAstronauth
 
 测试完成时间：2026-08-27 14:16（Asia/Shanghai）
