@@ -8,4 +8,4 @@ RUN --mount=type=cache,target=/root/.m2 sh -c 'for i in 1 2 3; do mvn -B -ntp cl
 FROM eclipse-temurin:21-jre
 ARG JAR_FILE=/usr/app/target/*.jar
 COPY --from=build $JAR_FILE /app/runner.jar
-ENTRYPOINT java -jar /app/runner.jar
+ENTRYPOINT ["java", "-jar", "/app/runner.jar"]

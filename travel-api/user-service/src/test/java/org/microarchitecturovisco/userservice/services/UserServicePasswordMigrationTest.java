@@ -22,7 +22,8 @@ class UserServicePasswordMigrationTest {
     void successfulLegacyLoginUpgradesStoredHash() {
         UserRepository repository = mock(UserRepository.class);
         PasswordHasher hasher = new PasswordHasher();
-        UserService service = new UserService(repository, hasher);
+        UserEventPublisher eventPublisher = mock(UserEventPublisher.class);
+        UserService service = new UserService(repository, hasher, eventPublisher);
         User user = User.builder()
                 .id(UUID.randomUUID())
                 .email("john@example.com")

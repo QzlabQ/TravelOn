@@ -6,7 +6,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.microarchitecturovisco.hotelservice.controllers.reservations.CheckHotelAvailabilityRequest;
 import org.microarchitecturovisco.hotelservice.controllers.reservations.CreateHotelReservationRequest;
 import org.microarchitecturovisco.hotelservice.controllers.reservations.DeleteHotelReservationRequest;
-import org.microarchitecturovisco.hotelservice.model.cqrs.commands.CreateRoomReservationCommand;
 import org.microarchitecturovisco.hotelservice.model.dto.request.GetHotelDetailsRequestDto;
 import org.microarchitecturovisco.hotelservice.model.dto.request.GetHotelsBySearchQueryRequestDto;
 
@@ -43,16 +42,6 @@ public class JsonReader {
     }
 
 
-    public static CreateRoomReservationCommand readCreateRoomReservationCommand(String json) {
-        ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        try {
-            return mapper.readValue(json, CreateRoomReservationCommand.class);
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            throw new RuntimeException("Json reader failed");
-        }
-    }
-
     public static CheckHotelAvailabilityRequest readCheckHotelAvailabilityRequestCommand(String json) {
         ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
         try {
@@ -68,8 +57,7 @@ public class JsonReader {
         try {
             return mapper.readValue(json, CreateHotelReservationRequest.class);
         } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            throw new RuntimeException("Json reader failed");
+            throw new IllegalArgumentException("Invalid create-hotel-reservation message", e);
         }
     }
 

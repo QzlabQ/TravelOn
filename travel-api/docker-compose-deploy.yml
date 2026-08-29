@@ -1,7 +1,13 @@
-version: "3.9"
+x-service-defaults: &service-defaults
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
 
 services:
   rabbitmq:
+    <<: *service-defaults
     image: rabbitmq:3.13-management
     hostname: rabbitmq
     ports:
@@ -14,6 +20,7 @@ services:
       - backend
 
   mongo:
+    <<: *service-defaults
     image: mongo:7
     hostname: mongo
     ports:
@@ -24,6 +31,7 @@ services:
       - backend
 
   front:
+    <<: *service-defaults
     image: ghcr.io/microarchitecturovisco/travel-ui:dev
     hostname: front
     ports:
@@ -37,6 +45,7 @@ services:
       replicas: 1
 
   discovery:
+    <<: *service-defaults
     image: ghcr.io/microarchitecturovisco/discovery:dev
     hostname: discovery
     ports:
@@ -47,6 +56,7 @@ services:
       - backend
 
   gateway:
+    <<: *service-defaults
     image: ghcr.io/microarchitecturovisco/gateway:dev
     ports:
       - "${DEPLOY_GATEWAY_HOST_PORT:-59082}:8082"
@@ -57,6 +67,7 @@ services:
       - backend
 
   hotel:
+    <<: *service-defaults
     image: ghcr.io/microarchitecturovisco/hotel:dev
     depends_on:
       - rabbitmq
@@ -67,18 +78,8 @@ services:
     deploy:
       replicas: 2
 
-  offer-provider:
-    image: ghcr.io/microarchitecturovisco/offer-provider:dev
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-    networks:
-      - backend
-    deploy:
-      replicas: 2
-
   payment:
+    <<: *service-defaults
     image: ghcr.io/microarchitecturovisco/payment:dev
     depends_on:
       - rabbitmq
@@ -88,6 +89,7 @@ services:
       - backend
 
   reservation:
+    <<: *service-defaults
     image: ghcr.io/microarchitecturovisco/reservation:dev
     depends_on:
       - rabbitmq
@@ -97,6 +99,7 @@ services:
       - backend
 
   transport:
+    <<: *service-defaults
     image: ghcr.io/microarchitecturovisco/transport:dev
     depends_on:
       - rabbitmq
@@ -108,6 +111,7 @@ services:
       replicas: 2
 
   user:
+    <<: *service-defaults
     image: ghcr.io/microarchitecturovisco/user:latest
     depends_on:
       - rabbitmq
@@ -117,9 +121,11 @@ services:
       - backend
 
   ai-arrange:
+    <<: *service-defaults
     image: ghcr.io/microarchitecturovisco/ai-arrange:dev
     env_file:
-      - .env
+      - path: .env
+        required: false
     depends_on:
       - rabbitmq
       - mongo

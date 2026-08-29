@@ -36,8 +36,8 @@ OUTPUTS = {
 }
 
 # Inclusive booking window.
-START_DATE = datetime(2026, 6, 14)
-END_DATE = datetime(2026, 7, 24)
+START_DATE = datetime(2026, 8, 14)
+END_DATE = datetime(2026, 9, 24)
 
 
 def date_range(start: datetime, end: datetime):

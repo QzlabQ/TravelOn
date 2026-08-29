@@ -1,0 +1,71 @@
+# TravelOn 统一开发/测试工具链
+# 用法：安装 mise 后在仓库根目录执行 `mise install`，再用 `mise run test:unit` 等任务。
+# 版本口径与 tests/run_tests.py 的 preflight 校验保持一致，改这里请同步改那里。
+
+[tools]
+# tests/run_tests.py 要求 java -version 主版本号为 21
+java = "temurin-21"
+# 前端锁定 22.22.3（精确匹配，preflight 会逐字比对）
+node = "22.22.3"
+# 测试编排脚本要求 Python 3.12（注意：agent-service 运行镜像用的是 3.13，仅测试链固定 3.12）
+python = "3.12"
+
+[env]
+# corepack 首次拉取 Yarn 4.2.2 时不要弹交互确认，否则任务会卡住
+COREPACK_ENABLE_DOWNLOAD_PROMPT = "0"
+# 进入仓库即激活 .venv（不存在时自动创建），保证 pytest/httpx 来自同一环境
+_.python.venv = { path = ".venv", create = true, python = "3.12" }
+
+[tasks."setup:py"]
+description = "安装 Python 测试依赖到 .venv"
+run = "python -m pip install --upgrade pip && python -m pip install -r tests/requirements.txt"
+
+[tasks."setup:ui"]
+description = "安装前端依赖（Yarn 4.2.2 via corepack）"
+dir = "travel-ui"
+run = "corepack yarn install --immutable"
+
+[tasks."setup:e2e"]
+description = "安装 Playwright chromium 浏览器"
+dir = "travel-ui"
+depends = ["setup:ui"]
+run = "corepack yarn playwright install chromium"
+
+[tasks.setup]
+description = "一次性准备全部测试依赖"
+depends = ["setup:py", "setup:ui"]
+
+[tasks."test:unit"]
+description = "单元测试（Java + Python + 前端）"
+run = "python tests/run_tests.py unit"
+
+[tasks."test:integration"]
+description = "集成测试（需要 Docker Compose 栈）"
+run = "python tests/run_tests.py integration --manage-services"
+
+[tasks."test:e2e"]
+description = "端到端测试（Playwright chromium）"
+depends = ["setup:e2e"]
+run = "python tests/run_tests.py e2e --manage-services --browser chromium"
+
+[tasks."test:all"]
+description = "全量测试"
+run = "python tests/run_tests.py all --manage-services --browser chromium"
+
+[tasks."test:full"]
+description = "完整测试（含真实 DeepSeek、三浏览器 E2E，需有效 Key 与管理员凭据）"
+run = "python tests/run_tests.py full --manage-services --browser all"
+
+[tasks.verify]
+description = "跑单个最小模块，确认测试链路可用"
+run = "python tests/run_tests.py unit --module discovery-service"
+
+[tasks.doctor]
+description = "打印当前工具链版本，便于排查环境不一致"
+run = [
+  "java -version",
+  "node --version",
+  "cd travel-ui && corepack yarn --version",
+  "python --version",
+  "docker --version",
+]

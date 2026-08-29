@@ -2,6 +2,7 @@ package org.microarchitecturovisco.communityservice.repository;
 
 import org.microarchitecturovisco.communityservice.domain.Attraction;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -10,6 +11,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface AttractionRepository extends JpaRepository<Attraction, UUID> {
+
+    @Modifying
+    @Query("update Attraction a set a.createdByName = :name where a.createdByUserId = :userId")
+    int updateCreatedByName(@Param("userId") UUID userId, @Param("name") String name);
 
     /**
      * Filter attractions by optional city and an optional keyword that matches the

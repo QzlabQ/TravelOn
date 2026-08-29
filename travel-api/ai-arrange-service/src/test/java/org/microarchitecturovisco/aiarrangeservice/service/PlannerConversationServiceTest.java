@@ -61,9 +61,6 @@ class PlannerConversationServiceTest {
     private PlannerSnapshotRepository snapshotRepository;
 
     @Mock
-    private PlannerPromptFactory promptFactory;
-
-    @Mock
     private PlannerAiClient plannerAiClient;
 
     @Mock
@@ -130,7 +127,6 @@ class PlannerConversationServiceTest {
                 conversationRepository,
                 messageRepository,
                 snapshotRepository,
-                promptFactory,
                 plannerAiClient,
                 plannerAgentClient,
                 snapshotService,
@@ -154,7 +150,7 @@ class PlannerConversationServiceTest {
         when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.empty());
 
         PlannerConversationService service = new PlannerConversationService(
-                conversationRepository, messageRepository, snapshotRepository, promptFactory,
+                conversationRepository, messageRepository, snapshotRepository,
                 plannerAiClient, plannerAgentClient, snapshotService, webSocketSessionRegistry, plannerExecutorService
         );
 
@@ -191,7 +187,6 @@ class PlannerConversationServiceTest {
                 conversationRepository,
                 messageRepository,
                 snapshotRepository,
-                promptFactory,
                 plannerAiClient,
                 plannerAgentClient,
                 snapshotService,
@@ -255,7 +250,6 @@ class PlannerConversationServiceTest {
                 conversationRepository,
                 messageRepository,
                 snapshotRepository,
-                promptFactory,
                 plannerAiClient,
                 plannerAgentClient,
                 snapshotService,
@@ -294,8 +288,14 @@ class PlannerConversationServiceTest {
                 .thenAnswer(invocation -> CompletableFuture.completedFuture(response));
 
         PlannerConversationService service = new PlannerConversationService(
-                conversationRepository, messageRepository, snapshotRepository, promptFactory,
-                plannerAiClient, plannerAgentClient, snapshotService, webSocketSessionRegistry, executorService
+                conversationRepository,
+                messageRepository,
+                snapshotRepository,
+                plannerAiClient,
+                plannerAgentClient,
+                snapshotService,
+                webSocketSessionRegistry,
+                executorService
         );
 
         service.handleChatMessage(conversationId, userId, PlannerChatSendPayload.builder()
@@ -336,8 +336,14 @@ class PlannerConversationServiceTest {
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("agent unavailable")));
 
         PlannerConversationService service = new PlannerConversationService(
-                conversationRepository, messageRepository, snapshotRepository, promptFactory,
-                plannerAiClient, plannerAgentClient, snapshotService, webSocketSessionRegistry, executorService
+                conversationRepository,
+                messageRepository,
+                snapshotRepository,
+                plannerAiClient,
+                plannerAgentClient,
+                snapshotService,
+                webSocketSessionRegistry,
+                executorService
         );
 
         service.handleChatMessage(conversationId, userId, PlannerChatSendPayload.builder()
@@ -395,7 +401,6 @@ class PlannerConversationServiceTest {
                 conversationRepository,
                 messageRepository,
                 snapshotRepository,
-                promptFactory,
                 plannerAiClient,
                 plannerAgentClient,
                 snapshotService,
@@ -450,7 +455,6 @@ class PlannerConversationServiceTest {
                 conversationRepository,
                 messageRepository,
                 snapshotRepository,
-                promptFactory,
                 plannerAiClient,
                 plannerAgentClient,
                 snapshotService,

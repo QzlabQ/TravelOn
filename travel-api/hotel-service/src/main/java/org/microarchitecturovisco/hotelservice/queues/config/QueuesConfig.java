@@ -30,8 +30,11 @@ public class QueuesConfig {
         return BindingBuilder.bind(handleReservationQueue).to(handleReservationExchange).with(QUEUE_HOTEL_CHECK_AVAILABILITY_REQ);
     }
 
-    public static final String QUEUE_HOTEL_CREATE_RESERVATION_REQ_PREFIX = "hotels.events.createHotelReservation.queue.";
+    public static final String QUEUE_HOTEL_CREATE_RESERVATION = "hotels.events.createHotelReservation.queue";
     public static final String EXCHANGE_HOTEL_FANOUT_CREATE_RESERVATION = "hotels.createReservation.exchange";
+    public static final String EXCHANGE_HOTEL_RESERVATION_DLX = "hotels.reservations.dead-letter.exchange";
+    public static final String QUEUE_HOTEL_CREATE_RESERVATION_DLQ = "hotels.events.createHotelReservation.dlq";
+    public static final String ROUTING_KEY_HOTEL_CREATE_RESERVATION_DLQ = "hotels.events.createHotelReservation.dead";
 
     @Bean(name="fanoutExchangeCreateHotelReservation")
     public FanoutExchange fanoutExchangeCreateHotelReservation() {
@@ -40,8 +43,29 @@ public class QueuesConfig {
 
     @Bean(name="handleCreateHotelReservationQueue")
     public Queue handleCreateHotelReservationQueue() {
-        String uniqueQueueName = QUEUE_HOTEL_CREATE_RESERVATION_REQ_PREFIX + UUID.randomUUID();
-        return new Queue(uniqueQueueName, false, false, true);
+        return QueueBuilder.durable(QUEUE_HOTEL_CREATE_RESERVATION)
+                .deadLetterExchange(EXCHANGE_HOTEL_RESERVATION_DLX)
+                .deadLetterRoutingKey(ROUTING_KEY_HOTEL_CREATE_RESERVATION_DLQ)
+                .build();
+    }
+
+    @Bean
+    public DirectExchange hotelReservationDeadLetterExchange() {
+        return ExchangeBuilder.directExchange(EXCHANGE_HOTEL_RESERVATION_DLX).durable(true).build();
+    }
+
+    @Bean
+    public Queue hotelCreateReservationDeadLetterQueue() {
+        return QueueBuilder.durable(QUEUE_HOTEL_CREATE_RESERVATION_DLQ).build();
+    }
+
+    @Bean
+    public Binding hotelCreateReservationDeadLetterBinding(
+            DirectExchange hotelReservationDeadLetterExchange,
+            Queue hotelCreateReservationDeadLetterQueue) {
+        return BindingBuilder.bind(hotelCreateReservationDeadLetterQueue)
+                .to(hotelReservationDeadLetterExchange)
+                .with(ROUTING_KEY_HOTEL_CREATE_RESERVATION_DLQ);
     }
 
     @Bean

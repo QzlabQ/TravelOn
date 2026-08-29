@@ -1,9 +1,10 @@
 package org.microarchitecturovisco.reservationservice.domain.dto.requests;
 
-import jakarta.annotation.Nullable;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.Valid;
 
 import java.time.LocalDate;
@@ -25,6 +26,6 @@ public record CreateHotelOnlyReservationRequest(
         @DecimalMin("0.00") BigDecimal price,
         String roomName,
         List<@Valid BookingPersonRequest> travelers,
-        @Nullable Long roomId
+        @NotEmpty List<@NotNull @Positive Long> roomIds
 ) {
 }

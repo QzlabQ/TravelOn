@@ -1,8 +1,16 @@
 # version: "3.9"
 name: rsww_184249
 
+x-service-defaults: &service-defaults
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
 services:
   postgres:
+    <<: *service-defaults
     image: postgres:16
     hostname: postgres
     environment:
@@ -32,6 +40,7 @@ services:
       - backend
 
   rabbitmq:
+    <<: *service-defaults
     image: rabbitmq:3.13-management
     hostname: rabbitmq
     ports:
@@ -44,6 +53,7 @@ services:
       - backend
 
   mongo:
+    <<: *service-defaults
     image: mongo:7
     hostname: mongo
     ports:
@@ -54,6 +64,7 @@ services:
       - backend
 
   discovery:
+    <<: *service-defaults
     hostname: discovery
     build: ./discovery-service
     ports:
@@ -66,6 +77,7 @@ services:
       - backend
 
   gateway:
+    <<: *service-defaults
     build: ./api-gateway
     ports:
       - "${GATEWAY_HOST_PORT:-58082}:8082"
@@ -79,6 +91,7 @@ services:
 
   # custom services
   hotel:
+    <<: *service-defaults
     build: ./hotel-service
     volumes:
       - ./logs/hotel:/logs
@@ -98,18 +111,8 @@ services:
     networks:
       - backend
 
-  offer-provider:
-    build: ./offer-provider-service
-    volumes:
-      - ./logs/offer-provider:/logs
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-    networks:
-      - backend
-
   payment:
+    <<: *service-defaults
     build: ./payment-service
     volumes:
       - ./logs/payment:/logs
@@ -130,6 +133,7 @@ services:
       - backend
 
   reservation:
+    <<: *service-defaults
     build: ./reservation-service
     volumes:
       - ./logs/reservation:/logs
@@ -137,6 +141,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${RESERVATION_DB_NAME:-reservation_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      APP_PAYMENT_TIMEOUT_SECONDS: ${APP_PAYMENT_TIMEOUT_SECONDS:-1800}
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,6 +155,7 @@ services:
       - backend
 
   transport:
+    <<: *service-defaults
     build: ./transport-service
     volumes:
       - ./logs/transport:/logs
@@ -173,6 +179,7 @@ services:
       - backend
 
   user:
+    <<: *service-defaults
     build: ./user-service
     volumes:
       - ./logs/user:/logs
@@ -193,6 +200,7 @@ services:
       - backend
 
   community:
+    <<: *service-defaults
     build: ./community-service
     volumes:
       - ./logs/community:/logs
@@ -202,6 +210,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       APP_UPLOADS_DIR: /uploads
+    stop_grace_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -215,9 +224,11 @@ services:
       - backend
 
   ai-arrange-agent:
+    <<: *service-defaults
     build: ./ai-arrange-agent-service
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
@@ -229,7 +240,7 @@ services:
       DEEPSEEK_THINKING_TYPE: "disabled"
       AGENT_MODEL_TIMEOUT_SECONDS: "180"
       AGENT_MAX_RUNTIME_SECONDS: "240"
-      DEEPSEEK_MAX_TOKENS: "12000"
+      DEEPSEEK_MAX_TOKENS: "${DEEPSEEK_MAX_TOKENS:-12000}"
       DEEPSEEK_SLOW_RESPONSE_WARNING_MS: "60000"
       TRAVEL_GATEWAY_BASE_URL: "http://gateway:8082"
       NO_PROXY: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
@@ -240,9 +251,11 @@ services:
       - backend
 
   ai-arrange:
+    <<: *service-defaults
     build: ./ai-arrange-service
     env_file:
-      - .env
+      - path: .env
+        required: false
     volumes:
       - ./logs/ai-arrange:/logs
     environment:

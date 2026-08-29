@@ -1,6 +1,5 @@
 package org.microarchitecturovisco.reservationservice.services.saga;
 
-import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.HotelReservationDeleteRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.ReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.TransportReservationDeleteRequest;
@@ -9,30 +8,47 @@ import org.microarchitecturovisco.reservationservice.queues.config.QueuesReserva
 import org.microarchitecturovisco.reservationservice.repositories.ReservationRepository;
 import org.microarchitecturovisco.reservationservice.utils.json.JsonConverter;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 @Service
-@RequiredArgsConstructor
 public class InvalidPaymentHandler {
     private final BookHotelsSaga bookHotelsSaga;
     private final BookTransportsSaga bookTransportsSaga;
     private final ReservationRepository reservationRepository;
-    public static final int PAYMENT_TIMEOUT_SECONDS = 30 * 60;
+    private final ScheduledExecutorService paymentTimeoutScheduler;
+    private final long paymentTimeoutSeconds;
     public static Logger logger = Logger.getLogger(InvalidPaymentHandler.class.getName());
     private final RabbitTemplate rabbitTemplate;
 
+    public InvalidPaymentHandler(
+            BookHotelsSaga bookHotelsSaga,
+            BookTransportsSaga bookTransportsSaga,
+            ReservationRepository reservationRepository,
+            @Qualifier("paymentTimeoutScheduler") ScheduledExecutorService paymentTimeoutScheduler,
+            @Value("${app.payment.timeout-seconds:1800}") long paymentTimeoutSeconds,
+            RabbitTemplate rabbitTemplate
+    ) {
+        this.bookHotelsSaga = bookHotelsSaga;
+        this.bookTransportsSaga = bookTransportsSaga;
+        this.reservationRepository = reservationRepository;
+        this.paymentTimeoutScheduler = paymentTimeoutScheduler;
+        this.paymentTimeoutSeconds = paymentTimeoutSeconds;
+        this.rabbitTemplate = rabbitTemplate;
+    }
+
     public void schedulePaymentTimeoutCheck(ReservationRequest reservationRequest){
-        Runnable paymentTimeoutRunnable = () -> {
-            paymentTimeout(reservationRequest);
-        };
-        ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
-        executorService.schedule(paymentTimeoutRunnable, PAYMENT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        paymentTimeoutScheduler.schedule(
+                () -> paymentTimeout(reservationRequest),
+                Math.max(1L, paymentTimeoutSeconds),
+                TimeUnit.SECONDS
+        );
     }
 
     private void paymentTimeout(ReservationRequest reservationRequest) {

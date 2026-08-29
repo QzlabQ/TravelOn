@@ -22,6 +22,10 @@ https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
 - [快速开始](#快速开始)
 - [开发模式 Debug](#开发模式-debug)
 - [生产模式 Build 与 Serve](#生产模式-build-与-serve)
+- [工具链管理（mise）](#工具链管理mise)
+  - [一、环境配置（一次性）](#一环境配置一次性)
+  - [二、日常测试命令](#二日常测试命令)
+- [运行时扩展机票和火车票日期](#运行时扩展机票和火车票日期)
 - [两种模式对比](#两种模式对比)
 - [常见问题排查](#常见问题排查)
 - [FAQ](#faq)
@@ -64,7 +68,10 @@ travel-on-2026NULLptr/
 ```text
 Git
 Docker Desktop / Docker Engine
-Node.js 20+ or 22+
+Java 21
+Python 3.12
+Node.js 22.22.3
+Yarn 4.2.2（通过 Corepack）
 ```
 
 检查版本：
@@ -82,6 +89,10 @@ corepack --version
 ```cmd
 corepack enable
 ```
+
+> 提示：本项目的测试脚本一律使用 `corepack yarn ...` 子命令形式，**不依赖** `corepack enable`。若该命令因写入系统 Node 安装目录而报 `EPERM`，可直接跳过。
+
+推荐使用 mise 自动安装并锁定上述 Java/Node.js/Python 版本，见[工具链管理（mise）](#工具链管理mise)。
 
 ---
 
@@ -332,34 +343,175 @@ docker compose stop
 
 ---
 
-## Testing
+## 工具链管理（mise）
 
-Run all local Java, Python, and frontend test suites and collect their native
-coverage reports with one command:
+`tests/run_tests.py` 会校验 Java 21、Python 3.12、Node.js 22.22.3、Yarn 4.2.2，不符即报错退出。仓库根目录的 [`mise.toml`](mise.toml) 用 [mise](https://mise.jdx.dev) 锁定这些版本，Docker 需自行安装，Maven 由各模块的 `mvnw` 提供。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\tests\run-unit-test-coverage.ps1
+### 一、环境配置（一次性）
+
+| 配置项 | `unit` | `integration` | `e2e` | `full` |
+| --- | :-: | :-: | :-: | :-: |
+| 工具链（Java / Node / Yarn / Python） | ✓ | ✓ | ✓ | ✓ |
+| Python 测试依赖 | ✓ | ✓ | ✓ | ✓ |
+| 前端依赖 | ✓ | — | ✓ | ✓ |
+| Playwright 浏览器 | — | — | ✓ | ✓（三浏览器） |
+| Docker Compose V2 运行中 | — | ✓ | ✓ | ✓ |
+| 后端镜像已构建 | — | ✓ | ✓ | ✓ |
+| `travel-api/.env` | — | ✓ | ✓ | ✓ |
+| `travel-ui/.env` | ✓ | — | ✓ | ✓ |
+| 有效 `DEEPSEEK_API_KEY` + 管理员凭据 | — | — | — | ✓ |
+
+`.env` 字段见[环境变量配置](#环境变量配置)。
+
+#### 1. 安装 mise
+
+Windows:
+
+```
+winget install jdx.mise
 ```
 
-Prerequisites are Java 21 with Maven, a Python environment with the
-`travel-api/ai-arrange-agent-service` test dependencies installed, and Node
-dependencies installed for `travel-ui`. The runner attempts every configured
-module even if one fails, then exits nonzero when any module failed. It does
-not need application services, databases, external APIs, or CI credentials.
+macOS / Linux: 
 
-The generated summary and per-module logs are written to:
+```
+curl https://mise.run | sh
+```
 
-- `artifacts/test-results/latest.md`
-- `artifacts/test-results/summary.json`
-- `artifacts/test-results/logs/`
+#### 2. 加入 PATH
 
-Native reports remain with their modules. Run an individual suite with:
+先新开一个终端验证（已打开的终端读不到新 PATH）：
 
 ```powershell
-cd travel-api/transport-service; mvn verify
-cd travel-api/ai-arrange-agent-service; python -m pytest -q
-cd travel-ui; $env:CI='true'; npm run test:coverage
+Get-Command mise
 ```
+
+找不到则手动加入用户级 PATH：`Win + R` → `sysdm.cpl` → 高级 → 环境变量 → 用户变量 `Path` → 新建 → 填入 `C:\Program Files\mise`，然后**重开终端**。
+
+> Windows 上改 PATH 建议用图形界面。`setx PATH "...;%PATH%"` 会把系统 PATH 复制进用户 PATH，且超过 1024 字符静默截断；`[Environment]::SetEnvironmentVariable` 会展开原值里的 `%USERPROFILE%` 并把注册表类型从 `REG_EXPAND_SZ` 降级为 `REG_SZ`。
+
+#### 3. 授信并安装
+
+```bash
+mise trust
+mise install
+```
+
+`mise.toml` 含可执行内容，需按绝对路径授信一次；换机器或换目录要重做。`mise install` 下载 JDK 21 / Node 22.22.3 / Python 3.12（约 485 MB，装到 `%LOCALAPPDATA%\mise\installs`），并在仓库根目录创建 `.venv`。
+
+#### 4. 安装测试依赖
+
+```bash
+mise run setup        # Python + 前端依赖
+mise run setup:e2e    # 跑 e2e 时追加：Playwright Chromium
+```
+
+可拆分执行 `setup:py` / `setup:ui`。三浏览器：`mise exec -- corepack yarn --cwd travel-ui playwright install`。
+
+#### 5. 验证
+
+```bash
+mise run doctor
+```
+
+打印 mise 实际提供的 java / node / yarn / python / docker 版本，与[环境要求](#环境要求)逐条核对。
+
+```bash
+mise run verify
+```
+
+跑单个最小模块（约 3 秒），确认整条链路可用：预检通过 → Maven wrapper 能执行 → 报告写入 `artifacts/test-results/`。输出末尾为「结果：全部通过」即成功。
+
+### 二、日常测试命令
+
+#### mise 任务
+
+> 若 IDE 终端自动激活了虚拟环境（提示符带 `(.venv)`），先执行 `deactivate` 退出再跑下面的命令。已激活状态下 `VIRTUAL_ENV` 已被预设，mise 会跳过自身的 venv 激活，导致解析到错误的解释器。
+
+`mise run <任务>` 执行前自动注入本项目的工具版本，`mise tasks` 列出全部：
+
+| 任务 | 内容 | 需要服务 |
+| --- | --- | --- |
+| `mise run test:unit` | 全部单元测试与覆盖率，约 1 分钟 | 否 |
+| `mise run test:integration` | Java `*IT`、Agent 集成、API 测试；跳过真实 DeepSeek 与社区停机 | 是 |
+| `mise run test:e2e` | Playwright，Chromium | 是 |
+| `mise run test:all` | `unit + integration + Chromium E2E` | 是 |
+| `mise run test:full` | `all` 之外追加真实 DeepSeek、WebSocket、社区停机恢复、三浏览器 E2E；需有效 `DEEPSEEK_API_KEY` 与管理员凭据 | 是 |
+| `mise run verify` | 单个最小模块，确认链路可用 | 否 |
+| `mise run doctor` | 打印 java/node/yarn/python/docker 版本 | 否 |
+
+带服务的任务会自动执行 `docker compose up -d --build`，轮询 Gateway 直到就绪，结束时只停止本次新启动的服务，不影响你原有的容器。
+
+需要按模块筛选、跳过镜像构建、自定义地址端口，或想绕过运行器单独调试某个模块时，见 [tests/README.md](tests/README.md)。
+
+#### 输出与报告
+
+运行器显示预检、进度条和汇总，子进程输出只写日志文件。失败项标红并附日志路径。报告位于 `artifacts/test-results/`（不入库）：
+
+| 文件/目录 | 内容 |
+| --- | --- |
+| `summary.json` | 机器可读结果与环境版本 |
+| `latest.md` | 汇总表格 |
+| `unit/` `integration/` `e2e/` | JUnit、覆盖率、API 请求响应证据、Playwright 报告与失败截图/视频/trace |
+
+Playwright 报告：在 `travel-ui` 执行 `corepack yarn test:e2e:report`。
+
+### 常见问题与排错
+
+| 现象 | 处理 |
+| --- | --- |
+| 找不到 `mise` 命令 | 终端早于 PATH 配置打开，重开终端 |
+| `mise WARN ... is not trusted` | 执行 `mise trust`；`mise.toml` 改动后需重做 |
+| `mise-shim.exe not found` 刷屏 | `mise settings set windows_shim_mode file` |
+| `chpwd functionality requires PowerShell 7` | PowerShell 5.1 无目录切换事件，功能不受影响；设 `$env:MISE_PWSH_CHPWD_WARNING=0` 可消除 |
+| 装 Node 报 `EPERM ... C:\Program Files\nodejs\` | `corepack enable` 写系统目录失败，本项目不需要该步骤，可忽略 |
+| 预检报版本不符 | mise 未生效，`mise run doctor` 核对 |
+| 缺少 pytest / httpx | `mise run setup:py`。注意别把包装进 mise 全局解释器（`installs\python\...`），`.venv` 不会继承它 |
+| `docker compose` 失败并提示 `auth.docker.io` | Docker Hub 不可达，配置加速器或本轮用 `--no-build` |
+| 测试结果与源码不符 | 多半是 `--no-build` 跑在旧镜像上，去掉重建 |
+| 等待 Gateway 超时 | `docker compose -f travel-api/docker-compose.yml logs` 查看具体服务 |
+| `full` 报缺少管理员凭据 | 设 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 或确认 `admin_account.txt` 存在 |
+| `.venv` 突然找不到标准库 | 基础解释器已被移除；删除 `.venv` 后重跑 `mise run setup:py`（先关闭占用进程） |
+
+不用 mise 也可以：按[环境要求](#环境要求)手动装同版本工具，底层命令见 [tests/README.md](tests/README.md)。
+
+---
+
+## 运行时扩展机票和火车票日期
+
+当前日期票务数据由 `travel-api/scripts/generate_dated_ticket_offers.py`
+根据以下模板生成：
+
+- `travel-api/seed-data/transport/train/ticket_offers.csv`
+- `travel-api/seed-data/transport/plane/ticket_offers.csv`
+
+实际导入 PostgreSQL 的文件是对应目录下的 `generated_ticket_offers.csv`。
+
+如需修改数据：
+
+1. 修改 `travel-api/scripts/generate_dated_ticket_offers.py`：
+
+   ```python
+   START_DATE = datetime(year, month, day)
+   END_DATE = datetime(year, month, day)
+   ```
+
+2. 重新生成机票和火车票数据：
+
+   ```powershell
+   python generate_dated_ticket_offers.py
+   ```
+   
+3. 如果 Docker Compose 已在运行，导入现有交通数据库：
+
+   ```powershell
+   docker compose exec -T postgres psql -U admin -d transport_db -f /database/seed/transport_seed.sql
+   docker compose restart transport
+   ```
+
+   如果 `.env` 修改过数据库用户名或数据库名，请替换 `admin` 和 `transport_db`。导入脚本使用确定性 ID 和 `ON CONFLICT (id) DO NOTHING`，会保留已有数据并补充新日期。
+
+`docker compose up -d --build` 只会重新构建镜像。若 `travel-api/data/postgres` 已有数据库，它不会自动重新生成或重新导入票务
+CSV；数据库初始化脚本只会在该目录为空时执行。修改 CSV 后仍建议显式执行上面的 `psql` 导入命令。
 
 ---
 

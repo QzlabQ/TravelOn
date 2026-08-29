@@ -255,6 +255,9 @@ public class HotelsService {
 
         Integer hotelId = requestDto.getHotelId();
         List<Long> roomIds = requestDto.getRoomReservationsIds();
+        if (roomIds == null || roomIds.isEmpty()) {
+            return false;
+        }
 
         // Step 2: Retrieve the hotel from the repository
         Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId);
@@ -269,6 +272,9 @@ public class HotelsService {
                 .filter(room -> roomIds.contains(room.getId()))
                 .toList();
 
+        if (specificRooms.size() != roomIds.stream().distinct().count()) {
+            return false;
+        }
 
         // Step 4: check availability of all rooms
         for (Room specificRoom :specificRooms) {
@@ -285,10 +291,6 @@ public class HotelsService {
             }
         }
         return true;
-    }
-
-    public Room getRoomById(Long uuid) {
-        return roomRepository.findById(uuid).orElseThrow(RuntimeException::new);
     }
 
     public Long generateNewRoomId() {

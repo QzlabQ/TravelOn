@@ -67,7 +67,6 @@ Other endpoints:
 
 - `GET /ai-arrange/api/conversations?userId=<uuid>`
 - `GET /ai-arrange/api/conversations/{conversationId}?userId=<uuid>`
-- `PUT /ai-arrange/api/conversations/{conversationId}/core-slots`
 - `PUT /ai-arrange/api/conversations/{conversationId}/selection`
 - `GET /ai-arrange/api/conversations/{conversationId}/snapshots?userId=<uuid>`
 - `GET /ai-arrange/api/conversations/{conversationId}/snapshots/{version}?userId=<uuid>`
@@ -160,14 +159,11 @@ Without `DEEPSEEK_API_KEY`, the service still runs and returns a local placehold
 
 ## Smoke Test
 
-Run from the repository root in PowerShell:
+The cross-platform WebSocket smoke test lives at `travel-api/tests/smoke/test_ai_websocket.py` and is part of the external/full suite. Run it from the repository root after starting the backend and configuring `DEEPSEEK_API_KEY`:
 
-```powershell
-.\scripts\ai-arrange-smoke-test.ps1
+```text
+cd travel-api/tests
+python -m pytest -q smoke/test_ai_websocket.py
 ```
 
-To auto-select the first returned map point and verify the selection refresh:
-
-```powershell
-.\scripts\ai-arrange-smoke-test.ps1 -AutoSelectFirstPlace
-```
+See the root `README.md` Testing section for setup, markers, reports, and platform-specific virtual-environment activation.

@@ -21,15 +21,13 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordHasher passwordHasher;
+    private final UserEventPublisher userEventPublisher;
 
     @Autowired
-    public UserService(UserRepository userRepository, PasswordHasher passwordHasher) {
+    public UserService(UserRepository userRepository, PasswordHasher passwordHasher, UserEventPublisher userEventPublisher) {
         this.userRepository = userRepository;
         this.passwordHasher = passwordHasher;
-    }
-
-    public User saveUser(User user) {
-        return userRepository.save(user);
+        this.userEventPublisher = userEventPublisher;
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -106,7 +104,11 @@ public class UserService {
             user.setAvatarUrl(normalizeOptional(request.avatarUrl()));
         }
 
-        return UserProfileResponse.from(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+        // Propagate the (possibly changed) display name to services that keep a
+        // denormalized copy, e.g. community authorName snapshots.
+        userEventPublisher.publishProfileChanged(savedUser);
+        return UserProfileResponse.from(savedUser);
     }
 
     public void logout(String token) {

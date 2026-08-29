@@ -7,7 +7,6 @@
         <option value="$PROJECT_DIR$/api-gateway/pom.xml" />
         <option value="$PROJECT_DIR$/discovery-service/pom.xml" />
         <option value="$PROJECT_DIR$/hotel-service/pom.xml" />
-        <option value="$PROJECT_DIR$/offer-provider-service/pom.xml" />
         <option value="$PROJECT_DIR$/payment-service/pom.xml" />
         <option value="$PROJECT_DIR$/reservation-service/pom.xml" />
         <option value="$PROJECT_DIR$/transport-service/pom.xml" />

@@ -29,11 +29,6 @@ CREATE TABLE public.hotel_photos (
     photos character varying(255)
 );
 
-CREATE TABLE public.photo (
-    id uuid NOT NULL,
-    url oid
-);
-
 CREATE TABLE public.room (
     id bigint NOT NULL,
     description text,
@@ -61,14 +56,14 @@ ALTER TABLE ONLY public.city
 ALTER TABLE ONLY public.hotel
     ADD CONSTRAINT hotel_pkey PRIMARY KEY (id);
 
-ALTER TABLE ONLY public.photo
-    ADD CONSTRAINT photo_pkey PRIMARY KEY (id);
-
 ALTER TABLE ONLY public.room
     ADD CONSTRAINT room_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.room_reservation
     ADD CONSTRAINT room_reservation_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.room_reservation
+    ADD CONSTRAINT uq_room_reservation_main_room UNIQUE (main_reservation_id, room_id);
 
 ALTER TABLE ONLY public.hotel
     ADD CONSTRAINT fk_hotel_city FOREIGN KEY (city_id) REFERENCES public.city(id);

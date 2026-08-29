@@ -456,7 +456,7 @@ export class ApiRequests {
     }
 }
 
-export interface PageResponse<T> {
+interface PageResponse<T> {
     content: T[],
     totalElements: number,
     totalPages: number,
@@ -474,7 +474,7 @@ export interface GetOffersBySearchQueryOffer {
     imageUrl: string,
 }
 
-export interface GetOffersBySearchQueryParams {
+interface GetOffersBySearchQueryParams {
     departurePlane: string[],
     departureBus: string[],
     departureTrain: string[],
@@ -487,7 +487,7 @@ export interface GetOffersBySearchQueryParams {
     infants: number,
 }
 
-export interface GetOfferDetailsParams {
+interface GetOfferDetailsParams {
     idHotel: number,
     departurePlane: string[],
     departureBus: string[],
@@ -506,7 +506,7 @@ export enum TransportType {
     Pociag = "Pociag"
 }
 
-export interface ReservationRequestPayload {
+interface ReservationRequestPayload {
     id: string,
     hotelId: number,
     hotelTimeFrom: string,
@@ -529,7 +529,7 @@ export interface ReservationRequestPayload {
     transportType: TransportType,
 }
 
-export interface PaymentPayload {
+interface PaymentPayload {
     reservationId: string,
     cardNumber: string,
 }
@@ -578,7 +578,7 @@ export interface PaymentTransactionResponse {
     createdAt?: string | null,
 }
 
-export type RefundStatus = 'PROCESSING' | 'COMPLETED' | 'REJECTED';
+type RefundStatus = 'PROCESSING' | 'COMPLETED' | 'REJECTED';
 
 export interface RefundRecordResponse {
     id: string,
@@ -590,7 +590,7 @@ export interface RefundRecordResponse {
     completedAt?: string | null,
 }
 
-export interface CreateTicketReservationPayload {
+interface CreateTicketReservationPayload {
     userId: string,
     transportType: 'FLIGHT' | 'TRAIN',
     departureDate: string,
@@ -604,7 +604,7 @@ export interface CreateTicketReservationPayload {
     ticketOfferId?: string,
 }
 
-export interface CreateHotelReservationPayload {
+interface CreateHotelReservationPayload {
     userId: string,
     hotelId: number,
     hotelName: string,
@@ -617,6 +617,7 @@ export interface CreateHotelReservationPayload {
     price: number,
     roomName?: string,
     travelers: BookingPersonPayload[],
+    roomIds: number[],
 }
 
 export type TravelerType = 'ADULT' | 'CHILD' | 'STUDENT';
@@ -646,7 +647,7 @@ export interface BookingPersonPayload {
     phone?: string,
 }
 
-export interface BookingPersonResponse {
+interface BookingPersonResponse {
     travelerId?: string | null,
     name: string,
     travelerType: TravelerType,
@@ -655,14 +656,14 @@ export interface BookingPersonResponse {
     maskedPhone?: string | null,
 }
 
-export type TicketType = 'FLIGHT' | 'TRAIN';
+type TicketType = 'FLIGHT' | 'TRAIN';
 
 export interface TicketOptions {
     departures: string[],
     arrivals: string[],
 }
 
-export interface SearchTicketsParams {
+interface SearchTicketsParams {
     type: TicketType,
     departureCity: string,
     arrivalCity: string,
@@ -699,7 +700,7 @@ export interface TicketSearchOffer {
     totalSeats: number,
 }
 
-export interface SearchHotelsParams {
+interface SearchHotelsParams {
     destinationId: string,
     dateFrom: string,
     dateTo: string,
@@ -713,7 +714,7 @@ export interface SearchHotelsParams {
     sortBy?: 'price' | 'price_desc' | 'rating' | string,
 }
 
-export interface HotelSearchOffer {
+interface HotelSearchOffer {
     hotelId: number,
     name: string,
     rating: number,
@@ -727,7 +728,7 @@ export interface HotelSearchOffer {
     pricePerAdult: number,
 }
 
-export interface HotelDetailsParams {
+interface HotelDetailsParams {
     dateFrom: string,
     dateTo: string,
     adults?: number,
@@ -736,7 +737,7 @@ export interface HotelDetailsParams {
     childrenUnder18?: number,
 }
 
-export interface HotelRoomResponse {
+interface HotelRoomResponse {
     roomId: string,
     name: string,
     description: string,
@@ -762,12 +763,12 @@ export interface HotelDetailsResponse {
     roomsConfigurations: HotelRoomConfiguration[],
 }
 
-export interface LoginPayload {
+interface LoginPayload {
     email: string,
     password: string,
 }
 
-export interface RegisterPayload {
+interface RegisterPayload {
     email: string,
     password: string,
     name: string,
@@ -775,7 +776,7 @@ export interface RegisterPayload {
     phone?: string,
 }
 
-export interface UpdateProfilePayload {
+interface UpdateProfilePayload {
     email?: string,
     name?: string,
     surname?: string,
@@ -783,7 +784,7 @@ export interface UpdateProfilePayload {
     avatarUrl?: string,
 }
 
-export interface UserProfileResponse {
+interface UserProfileResponse {
     id: string,
     email: string,
     name: string,
@@ -797,7 +798,7 @@ export interface UserProfileResponse {
     lastLoginAt?: string | null,
 }
 
-export interface AuthResponse {
+interface AuthResponse {
     token: string,
     user: UserProfileResponse,
 }
@@ -836,7 +837,7 @@ export interface PlannerConversationResponse {
     updatedAt: string,
 }
 
-export type PlannerConversationStatus = 'COLLECTING_SLOTS' | 'ACTIVE_CHAT' | 'COMPLETED';
+type PlannerConversationStatus = 'COLLECTING_SLOTS' | 'ACTIVE_CHAT' | 'COMPLETED';
 
 export interface PlannerSocketEnvelope<TPayload = unknown> {
     type: PlannerMessageType,
@@ -845,7 +846,7 @@ export interface PlannerSocketEnvelope<TPayload = unknown> {
     payload?: TPayload,
 }
 
-export type PlannerMessageType =
+type PlannerMessageType =
     'PLANNER_CHAT_SEND'
     | 'PLANNER_CHAT_STREAM'
     | 'PLANNER_DATA_REFRESH'
@@ -890,15 +891,15 @@ export interface PlannerChatSendPayload {
     interaction?: PlannerInteractionInput,
 }
 
-export interface RunPlannerAgentPayload extends PlannerChatSendPayload {
+interface RunPlannerAgentPayload extends PlannerChatSendPayload {
     userId: string,
 }
 
 export type PlannerModelVariant = 'FLASH' | 'PRO';
 
-export type PlannerPlanningScope = 'DAY_PLAN' | 'DAY_REFINE' | 'TRIP_ASSEMBLE' | string;
+type PlannerPlanningScope = 'DAY_PLAN' | 'DAY_REFINE' | 'TRIP_ASSEMBLE' | string;
 
-export interface PlannerInteractionInput {
+interface PlannerInteractionInput {
     selectedOptionIds?: string[],
     rejectedOptionIds?: string[],
     selectedPlaceIds?: string[],
@@ -907,17 +908,13 @@ export interface PlannerInteractionInput {
     confirmCurrentPlan?: boolean,
 }
 
-export interface PlannerPlaceSelectionPayload {
-    selectedPlaceIds: string[],
-}
-
 export interface PlannerChatStreamPayload {
     delta: string,
     done: boolean,
     runId?: string,
 }
 
-export type PlannerTraceEventType =
+type PlannerTraceEventType =
     'RUN_STARTED'
     | 'TOOL_STARTED'
     | 'TOOL_FINISHED'
@@ -969,7 +966,7 @@ export interface PlannerDataRefreshPayload {
     runId?: string,
 }
 
-export interface CreatePlannerMarkdownSnapshotPayload {
+interface CreatePlannerMarkdownSnapshotPayload {
     userId: string,
     markdown: string,
     mode: 'DAY' | 'TRIP',
@@ -1009,9 +1006,9 @@ export interface PlannerBookingLink {
     price?: number,
 }
 
-export type PlannerPlaceType = 'SCENIC' | 'RESTAURANT' | 'HOTEL' | 'TRANSPORT' | 'SHOPPING' | 'OTHER';
+type PlannerPlaceType = 'SCENIC' | 'RESTAURANT' | 'HOTEL' | 'TRANSPORT' | 'SHOPPING' | 'OTHER';
 
-export type PlannerPlaceSource = 'AI' | 'AMAP' | 'INTERNAL_OFFER';
+type PlannerPlaceSource = 'AI' | 'AMAP' | 'INTERNAL_OFFER';
 
 export interface PlannerRouteSegment {
     fromPlaceId?: string,
@@ -1073,7 +1070,7 @@ export interface PlannerSnapshot {
     createdAt: string,
 }
 
-export interface PlannerSnapshotDiffItem {
+interface PlannerSnapshotDiffItem {
     field: string,
     label: string,
     type: 'ADDED' | 'REMOVED' | 'CHANGED' | string,
@@ -1102,9 +1099,9 @@ export type ReviewTargetType = 'SCENIC_SPOT' | 'ROUTE' | 'MERCHANT' | 'HOTEL';
 
 export type FavoriteTargetType = 'POST' | 'ROUTE' | 'ATTRACTION';
 
-export type PostContentFormat = 'PLAIN_TEXT' | 'MARKDOWN';
+type PostContentFormat = 'PLAIN_TEXT' | 'MARKDOWN';
 
-export interface CommunityPostsQuery {
+interface CommunityPostsQuery {
     category?: CommunityCategory,
     cityId?: string,
     keyword?: string,
@@ -1147,13 +1144,13 @@ export interface CommunityPostResponse {
     updatedAt: string,
 }
 
-export interface CommunityLikeResponse {
+interface CommunityLikeResponse {
     postId: string,
     liked: boolean,
     likeCount: number,
 }
 
-export interface CommunityReviewsQuery {
+interface CommunityReviewsQuery {
     targetType?: ReviewTargetType,
     targetId?: string,
     category?: CommunityCategory,
@@ -1161,7 +1158,7 @@ export interface CommunityReviewsQuery {
     size?: number,
 }
 
-export interface CreateCommunityReviewPayload {
+interface CreateCommunityReviewPayload {
     targetType: ReviewTargetType,
     targetId?: string,
     targetName: string,
@@ -1188,18 +1185,18 @@ export interface CommunityReviewResponse {
     updatedAt: string,
 }
 
-export interface ToggleFavoritePayload {
+interface ToggleFavoritePayload {
     type: FavoriteTargetType,
     targetId: string,
 }
 
-export interface FavoriteResponse {
+interface FavoriteResponse {
     type: FavoriteTargetType,
     targetId: string,
     favorited: boolean,
 }
 
-export interface CreateCommentPayload {
+interface CreateCommentPayload {
     content: string,
 }
 
@@ -1215,19 +1212,19 @@ export interface CommentResponse {
     likedByCurrentUser: boolean,
 }
 
-export interface CommentLikeResponse {
+interface CommentLikeResponse {
     commentId: string,
     liked: boolean,
     likeCount: number,
 }
 
-export interface ReviewLikeResponse {
+interface ReviewLikeResponse {
     reviewId: number,
     liked: boolean,
     likeCount: number,
 }
 
-export interface CommunitySummaryQuery {
+interface CommunitySummaryQuery {
     targetType?: ReviewTargetType,
     targetId?: string,
 }
@@ -1240,7 +1237,7 @@ export interface CommunitySummaryResponse {
     latestReviews: CommunityReviewResponse[],
 }
 
-export interface AttractionsQuery {
+interface AttractionsQuery {
     cityId?: string,
     keyword?: string,
     sort?: "reviewCount" | "rating" | "popular" | "latest",
@@ -1274,7 +1271,7 @@ export interface AttractionDetailResponse extends AttractionResponse {
     latestReviews: CommunityReviewResponse[],
 }
 
-export interface CreateAttractionReviewPayload {
+interface CreateAttractionReviewPayload {
     rating: number,
     content: string,
     imageUrls?: string[],
@@ -1282,7 +1279,7 @@ export interface CreateAttractionReviewPayload {
 
 export type TravelStyle = 'LEISURE' | 'CULTURE' | 'NATURE' | 'FOOD' | 'FAMILY' | 'ADVENTURE' | 'ROMANTIC' | 'OTHER';
 
-export interface TravelRoutesQuery {
+interface TravelRoutesQuery {
     style?: TravelStyle,
     cityId?: string,
     keyword?: string,
@@ -1361,11 +1358,11 @@ export interface TravelRouteDetailResponse {
     latestReviews: CommunityReviewResponse[],
 }
 
-export interface UploadResponse {
+interface UploadResponse {
     url: string,
 }
 
-export interface HotelDestination {
+interface HotelDestination {
     idLocation: string,
     cityId: string,
     country: string,

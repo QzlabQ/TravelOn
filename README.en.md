@@ -22,6 +22,10 @@ https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
 - [Quick Start](#quick-start)
 - [Development Mode (Debug)](#development-mode-debug)
 - [Production Mode (Build and Serve)](#production-mode-build-and-serve)
+- [Toolchain Management (mise)](#toolchain-management-mise)
+  - [Part 1 — Environment Setup](#part-1--environment-setup-one-time)
+  - [Part 2 — Everyday Test Commands](#part-2--everyday-test-commands)
+- [Runtime Extension of Flight and Train Ticket Dates](#runtime-extension-of-flight-and-train-ticket-dates)
 - [Mode Comparison](#mode-comparison)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
@@ -64,7 +68,10 @@ Install the following tools first:
 ```text
 Git
 Docker Desktop / Docker Engine
-Node.js 20+ or 22+
+Java 21
+Python 3.12
+Node.js 22.22.3
+Yarn 4.2.2 (via Corepack)
 ```
 
 Verify versions:
@@ -82,6 +89,10 @@ Enable Yarn (Corepack):
 ```cmd
 corepack enable
 ```
+
+> Note: the test scripts always use the `corepack yarn ...` subcommand form and do **not** depend on `corepack enable`. If that command fails with `EPERM` because it tries to write into a system-wide Node installation directory, you can skip it.
+
+Using mise to install and pin the Java/Node.js/Python versions above is recommended; see [Toolchain Management (mise)](#toolchain-management-mise).
 
 ---
 
@@ -329,6 +340,195 @@ Backend:
 cd travel-api
 docker compose stop
 ```
+
+---
+
+## Toolchain Management (mise)
+
+`tests/run_tests.py` strictly validates Java 21, Python 3.12, Node.js 22.22.3, and Yarn 4.2.2, aborting on any mismatch. The repository's [`mise.toml`](mise.toml) pins those versions with [mise](https://mise.jdx.dev) and collapses the test commands into tasks. Install Docker yourself; Maven comes from each module's `mvnw`.
+
+### Part 1 — Environment Setup (one-time)
+
+| Requirement | `unit` | `integration` | `e2e` | `full` |
+| --- | :-: | :-: | :-: | :-: |
+| Toolchain (Java / Node / Yarn / Python) | ✓ | ✓ | ✓ | ✓ |
+| Python test dependencies | ✓ | ✓ | ✓ | ✓ |
+| Frontend dependencies | ✓ | — | ✓ | ✓ |
+| Playwright browsers | — | — | ✓ | ✓ (all three) |
+| Docker Compose V2 running | — | ✓ | ✓ | ✓ |
+| Backend images built | — | ✓ | ✓ | ✓ |
+| `travel-api/.env` | — | ✓ | ✓ | ✓ |
+| `travel-ui/.env` | ✓ | — | ✓ | ✓ |
+| Valid `DEEPSEEK_API_KEY` + admin credentials | — | — | — | ✓ |
+
+`.env` fields are documented under [Environment Variables](#environment-variables).
+
+#### 1. Install mise
+
+Windows:
+
+```
+winget install jdx.mise
+```
+
+macOS / Linux: 
+
+```
+curl https://mise.run | sh
+```
+
+#### 2. Put mise on PATH
+
+Open a new terminal first and verify (existing terminals cannot see a new PATH):
+
+```powershell
+Get-Command mise
+```
+
+If it is missing, add it through the GUI: `Win + R` → `sysdm.cpl` → Advanced → Environment Variables → user `Path` → New → `C:\Program Files\mise`, then **reopen the terminal**.
+
+> Prefer the GUI for PATH edits on Windows. `setx PATH "...;%PATH%"` copies the system PATH into your user PATH and silently truncates past 1024 characters; `[Environment]::SetEnvironmentVariable` expands any `%USERPROFILE%` in the existing value and downgrades the registry type from `REG_EXPAND_SZ` to `REG_SZ`.
+
+#### 3. Trust and install
+
+```bash
+mise trust
+mise install
+```
+
+`mise.toml` contains executable content, so it needs a one-time trust recorded per absolute path; repeat it on another machine or clone directory. `mise install` downloads JDK 21 / Node 22.22.3 / Python 3.12 (about 485 MB into `%LOCALAPPDATA%\mise\installs`) and creates `.venv` at the repository root.
+
+#### 4. Install test dependencies
+
+```bash
+mise run setup        # Python + frontend dependencies
+mise run setup:e2e    # add for e2e runs: Playwright Chromium
+```
+
+`setup:py` / `setup:ui` run them separately. All three browsers: `mise exec -- corepack yarn --cwd travel-ui playwright install`.
+
+#### 5. Verify
+
+```bash
+mise run doctor
+```
+
+Prints the java / node / yarn / python / docker versions mise actually provides; check them against [Prerequisites](#prerequisites).
+
+```bash
+mise run verify
+```
+
+Runs the smallest single module (about 3 seconds) to confirm the whole chain works: preflight passes, the Maven wrapper executes, and reports are written to `artifacts/test-results/`. A trailing "全部通过" (all passed) means success.
+
+### Part 2 — Everyday Test Commands
+
+#### mise tasks
+
+> If your IDE terminal activated the virtual environment automatically (the prompt shows `(.venv)`), run `deactivate` before the commands below. While it is active `VIRTUAL_ENV` is already set, so mise skips its own venv activation and resolves to the wrong interpreter.
+
+`mise run <task>` injects this project's tool versions first; `mise tasks` lists them all:
+
+| Task | Contents | Services |
+| --- | --- | --- |
+| `mise run test:unit` | All unit tests and coverage, about a minute | No |
+| `mise run test:integration` | Java `*IT`, Agent integration, API tests; skips real DeepSeek and community downtime | Yes |
+| `mise run test:e2e` | Playwright, Chromium | Yes |
+| `mise run test:all` | `unit + integration + Chromium E2E` | Yes |
+| `mise run test:full` | `all` plus real DeepSeek, WebSocket, community stop/recovery, three-browser E2E; needs a valid `DEEPSEEK_API_KEY` and admin credentials | Yes |
+| `mise run verify` | A single minimal module, to confirm the chain works | No |
+| `mise run doctor` | Prints java/node/yarn/python/docker versions | No |
+
+Tasks that need services run `docker compose up -d --build`, poll the Gateway until ready, and on exit stop only what they started, leaving your existing containers alone.
+
+For per-module filtering, skipping the image build, custom URLs and ports, or running a single module outside the runner, see [tests/README.md](tests/README.md).
+
+#### Output and reports
+
+The runner shows preflight, progress, and a summary; subprocess output goes only to log files. Failures are highlighted with their log path. Reports land in `artifacts/test-results/` (not committed):
+
+| File/directory | Contents |
+| --- | --- |
+| `summary.json` | Machine-readable results and environment versions |
+| `latest.md` | Summary table |
+| `unit/` `integration/` `e2e/` | JUnit, coverage, API request/response evidence, Playwright reports and failure screenshots/video/traces |
+
+Playwright report: run `corepack yarn test:e2e:report` inside `travel-ui`.
+
+### Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `mise` not recognized | The terminal predates the PATH change; reopen it |
+| `mise WARN ... is not trusted` | Run `mise trust`; repeat after `mise.toml` changes |
+| Repeated `mise-shim.exe not found` | `mise settings set windows_shim_mode file` |
+| `chpwd functionality requires PowerShell 7` | PowerShell 5.1 has no directory-change event; behaviour is unaffected, silence with `$env:MISE_PWSH_CHPWD_WARNING=0` |
+| `EPERM ... C:\Program Files\nodejs\` installing Node | `corepack enable` cannot write the system directory; this project does not need it |
+| Preflight version mismatch | mise is not in effect; check with `mise run doctor` |
+| pytest / httpx missing | `mise run setup:py`. Do not install into mise's global interpreter (`installs\python\...`) — `.venv` does not inherit from it |
+| `docker compose` fails mentioning `auth.docker.io` | Docker Hub unreachable; configure a mirror or use `--no-build` |
+| Results contradict the source | Usually `--no-build` on stale images; drop it and rebuild |
+| Timeout waiting for the Gateway | `docker compose -f travel-api/docker-compose.yml logs` |
+| `full` reports missing admin credentials | Set `ADMIN_EMAIL` / `ADMIN_PASSWORD` or confirm `admin_account.txt` exists |
+| `.venv` suddenly cannot find the standard library | Its base interpreter is gone; delete `.venv` and rerun `mise run setup:py` (close anything holding it first) |
+
+mise is optional: install the same versions manually per [Prerequisites](#prerequisites); the underlying commands are documented in [tests/README.md](tests/README.md).
+
+---
+
+## Runtime Extension of Flight and Train Ticket Dates
+
+The dated ticket data is generated by
+`travel-api/scripts/generate_dated_ticket_offers.py` from these templates:
+
+- `travel-api/seed-data/transport/train/ticket_offers.csv`
+- `travel-api/seed-data/transport/plane/ticket_offers.csv`
+
+The files actually imported into PostgreSQL are the corresponding
+`generated_ticket_offers.csv` files. To extend the ticket dates to
+**2026-10-15**, for example:
+
+1. Edit `travel-api/scripts/generate_dated_ticket_offers.py`:
+
+   ```python
+   END_DATE = datetime(2026, 10, 15)
+   ```
+
+2. Regenerate the flight and train data:
+
+   ```powershell
+   cd .\travel-api\scripts
+   python .\generate_dated_ticket_offers.py
+   cd ..
+   ```
+
+3. If Docker Compose is already running, import the data into the existing
+   transport database:
+
+   ```powershell
+   docker compose exec -T postgres psql -U admin -d transport_db -f /database/seed/transport_seed.sql
+   docker compose restart transport
+   ```
+
+   Replace `admin` or `transport_db` if they were changed in `.env`. The seed
+   script uses deterministic IDs and `ON CONFLICT (id) DO NOTHING`, preserving
+   existing data while adding the new dates.
+
+`docker compose up -d --build` only rebuilds the images. If
+`travel-api/data/postgres` already contains a database, it does not
+automatically regenerate or re-import the ticket CSV files; database
+initialization scripts run automatically only when that directory is empty.
+After changing the CSV files, explicitly run the `psql` import command above.
+
+To verify the imported date range:
+
+```powershell
+cd .\travel-api
+docker compose exec postgres psql -U admin -d transport_db -c "SELECT type, MIN(departure_date_time), MAX(departure_date_time), COUNT(*) FROM ticket_offer_templates GROUP BY type;"
+```
+
+An overnight train departing on October 15 and arriving on October 16 is
+expected.
 
 ---
 
