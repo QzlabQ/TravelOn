@@ -3,9 +3,12 @@ import {
     Box,
     Button,
     Chip,
+    Checkbox,
     CircularProgress,
     Divider,
     Fab,
+    FormControlLabel,
+    FormGroup,
     IconButton,
     LinearProgress,
     Paper,
@@ -17,21 +20,18 @@ import {
 import {
     AutoAwesome,
     AutoFixHigh,
-    ChildCare,
     Close,
     ExpandMore,
     Flight,
     Hotel,
     PlaylistAdd,
-    Restaurant,
     Send,
-    SwapCalls,
     TaskAlt,
     Train,
     TravelExplore,
-    Tune
 } from "@mui/icons-material";
-import {PlannerChatSendPayload, PlannerTraceEvent} from "../../core/apiConfig";
+import {PlannerChatSendPayload, PlannerPlaceSuggestion, PlannerTraceEvent} from "../../core/apiConfig";
+import {buildPlannerContextMessage} from "../plannerInteraction";
 
 type AssistantSocketStatus = "idle" | "connecting" | "connected" | "closed" | "error";
 type AssistantStatusColor = "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning";
@@ -63,6 +63,7 @@ interface FloatingAiAssistantProps {
     generatedDayCount: number,
     tripDayCount: number,
     hasDepartureCity: boolean,
+    places: PlannerPlaceSuggestion[],
     selectedPlaceIds: string[],
     traceToolLabel: (tool?: string) => string,
     traceStatusLabel: (status?: string) => string,
@@ -96,6 +97,14 @@ const basePlanningPayload = (
         freeText,
     },
 });
+
+const SMART_PREFERENCES = [
+    {id: "slower", label: "放慢节奏", value: "放慢节奏"},
+    {id: "less-transfer", label: "减少换乘", value: "减少换乘"},
+    {id: "food", label: "增加美食", value: "增加美食"},
+    {id: "family-rain", label: "亲子/雨天备选", value: "增加亲子或雨天备选"},
+    {id: "reorder", label: "重排当天路线", value: "重排当天路线"},
+];
 
 function disabledByCommonState({
     conversationActive,
@@ -160,6 +169,7 @@ export function FloatingAiAssistant({
     generatedDayCount,
     tripDayCount,
     hasDepartureCity,
+    places,
     selectedPlaceIds,
     traceToolLabel,
     traceStatusLabel,
@@ -171,6 +181,8 @@ export function FloatingAiAssistant({
     const [open, setOpen] = useState(false);
     const [input, setInput] = useState("");
     const [showProgressDetails, setShowProgressDetails] = useState(false);
+    const [selectedPreferenceIds, setSelectedPreferenceIds] = useState<string[]>([]);
+    const [showBookingActions, setShowBookingActions] = useState(false);
     const chatHistoryRef = useRef<HTMLDivElement | null>(null);
     const compact = useMediaQuery("(max-width: 640px)");
     const commonDisabledReason = disabledByCommonState({
@@ -191,6 +203,13 @@ export function FloatingAiAssistant({
             ? "全部天数计划已生成"
             : "继续补齐每日计划";
     const chatDisabledReason = commonDisabledReason;
+    const selectedPlaceNames = places
+        .filter(place => selectedPlaceIds.includes(place.placeId))
+        .map(place => place.name);
+    const selectedPreferenceLabels = SMART_PREFERENCES
+        .filter(preference => selectedPreferenceIds.includes(preference.id))
+        .map(preference => preference.label);
+    const contextMessage = buildPlannerContextMessage(activeDayIndex, selectedPlaceNames, selectedPreferenceLabels);
     const assembleDisabledReason = !conversationActive
         ? "请先填写基础信息并开始规划"
         : isSnapshotPreview
@@ -224,6 +243,10 @@ export function FloatingAiAssistant({
         chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight;
     }, [chatMessages, open]);
 
+    useEffect(() => {
+        setSelectedPreferenceIds([]);
+    }, [activeDayIndex]);
+
     const sections = useMemo(() => {
         const generateDisabledReason = commonDisabledReason || (hasActiveDayPlan ? "当天已有计划，可使用优化当天" : undefined);
         const refineDisabledReason = commonDisabledReason || (!hasActiveDayPlan ? "请先生成当天行程" : undefined);
@@ -255,14 +278,14 @@ export function FloatingAiAssistant({
                 label: "优化当天",
                 icon: <AutoFixHigh/>,
                 disabledReason: refineDisabledReason,
-                onClick: () => sendPlannerAction(`请基于当前选中的地点和偏好，优化第 ${activeDayIndex} 天的行程。`, {
+                onClick: () => sendPlannerAction(contextMessage, {
                     planningMode: "REFINE_WITH_SELECTION",
                     planningScope: "DAY_REFINE",
                     targetDayIndex: activeDayIndex,
                     targetDate: activeDayDate,
                     interaction: {
                         selectedPlaceIds,
-                        freeText: `优化第 ${activeDayIndex} 天`,
+                        freeText: contextMessage,
                     },
                 }),
             },
@@ -338,56 +361,6 @@ export function FloatingAiAssistant({
                     scenicPayload,
                 ),
             },
-            {
-                id: "slower",
-                label: "放慢节奏",
-                icon: <Tune/>,
-                disabledReason: refineDisabledReason,
-                onClick: () => sendPlannerAction(
-                    `请将第 ${activeDayIndex} 天行程调整得更轻松，减少赶路和密集景点，增加休息缓冲。`,
-                    basePlanningPayload(activeDayIndex, activeDayDate, selectedPlaceIds, "放慢节奏"),
-                ),
-            },
-            {
-                id: "less-transfer",
-                label: "减少换乘",
-                icon: <SwapCalls/>,
-                disabledReason: refineDisabledReason,
-                onClick: () => sendPlannerAction(
-                    `请优化第 ${activeDayIndex} 天交通衔接，减少跨区移动和换乘次数。`,
-                    basePlanningPayload(activeDayIndex, activeDayDate, selectedPlaceIds, "减少换乘"),
-                ),
-            },
-            {
-                id: "food",
-                label: "增加美食",
-                icon: <Restaurant/>,
-                disabledReason: refineDisabledReason,
-                onClick: () => sendPlannerAction(
-                    `请为第 ${activeDayIndex} 天补充餐饮和本地美食停留，并控制路线绕行。`,
-                    basePlanningPayload(activeDayIndex, activeDayDate, selectedPlaceIds, "增加美食"),
-                ),
-            },
-            {
-                id: "family-rain",
-                label: "亲子/雨天备选",
-                icon: <ChildCare/>,
-                disabledReason: refineDisabledReason,
-                onClick: () => sendPlannerAction(
-                    `请为第 ${activeDayIndex} 天增加适合家庭或天气变化的备选方案。`,
-                    basePlanningPayload(activeDayIndex, activeDayDate, selectedPlaceIds, "增加亲子或雨天备选"),
-                ),
-            },
-            {
-                id: "reorder",
-                label: "重排当天",
-                icon: <AutoFixHigh/>,
-                disabledReason: refineDisabledReason,
-                onClick: () => sendPlannerAction(
-                    `请基于当前地点重新排序第 ${activeDayIndex} 天路线，让动线更顺。`,
-                    basePlanningPayload(activeDayIndex, activeDayDate, selectedPlaceIds, "重排当天路线"),
-                ),
-            },
         ];
 
         const bookingActions: AssistantAction[] = [
@@ -440,7 +413,9 @@ export function FloatingAiAssistant({
         nextDayIndex,
         onAssembleTrip,
         onPlannerAction,
+        places,
         selectedPlaceIds,
+        contextMessage,
     ]);
 
     return (
@@ -609,18 +584,76 @@ export function FloatingAiAssistant({
                             </div>
                         }
 
-                        {sections.map(section => (
-                            <div key={section.title} className="mb-4 last:mb-0">
-                                <Typography variant="caption" color="text.secondary" className="mb-2 block font-semibold">
-                                    {section.title}
-                                </Typography>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {section.actions.map(action => (
-                                        <ActionButton key={action.id} action={action}/>
-                                    ))}
+                        <Box sx={{mb: 3, p: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1.5, bgcolor: "grey.50"}}>
+                            <Typography variant="caption" color="text.secondary" className="mb-1 block font-semibold">
+                                当前上下文
+                            </Typography>
+                            <Typography variant="body2" className="mb-2">
+                                第 {activeDayIndex} 天 · {selectedPlaceNames.length > 0 ? `已选地点：${selectedPlaceNames.join("、")}` : "尚未选择地点"}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" className="mb-1 block">
+                                智能修改偏好
+                            </Typography>
+                            <FormGroup row>
+                                {SMART_PREFERENCES.map(preference => (
+                                    <FormControlLabel
+                                        key={preference.id}
+                                        control={
+                                            <Checkbox
+                                                size="small"
+                                                checked={selectedPreferenceIds.includes(preference.id)}
+                                                onChange={event => setSelectedPreferenceIds(current => event.target.checked
+                                                    ? [...current, preference.id]
+                                                    : current.filter(id => id !== preference.id))}
+                                                disabled={Boolean(commonDisabledReason) || !hasActiveDayPlan}
+                                            />
+                                        }
+                                        label={preference.label}
+                                    />
+                                ))}
+                            </FormGroup>
+                            <Button
+                                size="small"
+                                variant="contained"
+                                startIcon={<AutoFixHigh/>}
+                                disabled={Boolean(commonDisabledReason) || !hasActiveDayPlan || selectedPreferenceIds.length === 0}
+                                onClick={() => {
+                                    sendPlannerAction(contextMessage, basePlanningPayload(
+                                        activeDayIndex,
+                                        activeDayDate,
+                                        selectedPlaceIds,
+                                        contextMessage,
+                                    ));
+                                    setSelectedPreferenceIds([]);
+                                }}
+                            >
+                                应用偏好并优化
+                            </Button>
+                        </Box>
+
+                        {sections.map(section => {
+                            const isBookingSection = section.title === "票务推荐";
+                            return (
+                                <div key={section.title} className="mb-4 last:mb-0">
+                                    <Button
+                                        size="small"
+                                        variant="text"
+                                        endIcon={isBookingSection ? <ExpandMore sx={{transform: showBookingActions ? "rotate(180deg)" : "none", transition: "transform 160ms"}}/> : undefined}
+                                        onClick={isBookingSection ? () => setShowBookingActions(value => !value) : undefined}
+                                        sx={{mb: 1, minHeight: 28, px: 0, color: "text.secondary", fontWeight: 600}}
+                                    >
+                                        {section.title}
+                                    </Button>
+                                    {(!isBookingSection || showBookingActions) &&
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {section.actions.map(action => (
+                                                <ActionButton key={action.id} action={action}/>
+                                            ))}
+                                        </div>
+                                    }
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
 
                         <div className="mt-4">
                             <Typography variant="caption" color="text.secondary" className="mb-2 block font-semibold">

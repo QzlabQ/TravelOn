@@ -830,6 +830,7 @@ export interface PlannerConversationResponse {
     title: string,
     currentMarkdown: string,
     latestSnapshotVersion: number,
+    activeRun?: PlannerActiveRun,
     selectedPlaceIds: string[],
     createdAt: string,
     updatedAt: string,
@@ -852,9 +853,33 @@ export type PlannerMessageType =
     | 'PLANNER_OPTIONS_REFRESH'
     | 'PLANNER_SNAPSHOT_SAVED'
     | 'PLANNER_PLACE_SELECTION'
-    | 'PLANNER_ERROR';
+    | 'PLANNER_ERROR'
+    | 'PLANNER_SYNC'
+    | 'PLANNER_RUN_STATE';
+
+export type PlannerRunStatus = 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+
+export interface PlannerActiveRun {
+    runId: string,
+    status: PlannerRunStatus,
+    targetDayIndex?: number,
+    traceId?: string,
+    startedAt?: string,
+    updatedAt?: string,
+    errorCode?: string,
+    errorMessage?: string,
+}
+
+export interface PlannerRunStatePayload {
+    conversationId: string,
+    requestedRunId?: string,
+    activeRun?: PlannerActiveRun,
+    latestSnapshotVersion?: number,
+    status?: PlannerRunStatus,
+}
 
 export interface PlannerChatSendPayload {
+    runId?: string,
     message: string,
     selectedPlaceIds: string[],
     modelVariant?: PlannerModelVariant,
@@ -889,6 +914,7 @@ export interface PlannerPlaceSelectionPayload {
 export interface PlannerChatStreamPayload {
     delta: string,
     done: boolean,
+    runId?: string,
 }
 
 export type PlannerTraceEventType =
@@ -904,6 +930,7 @@ export type PlannerTraceEventType =
     | 'RUN_FAILED';
 
 export interface PlannerTraceEvent {
+    runId?: string,
     eventId?: string,
     traceId?: string,
     conversationId?: string,
@@ -923,6 +950,7 @@ export interface PlannerErrorPayload {
     code?: string,
     message?: string,
     detail?: string,
+    runId?: string,
 }
 
 export interface PlannerDataRefreshPayload {
@@ -938,6 +966,7 @@ export interface PlannerDataRefreshPayload {
     places: PlannerPlaceSuggestion[],
     routes: PlannerRouteSegment[],
     selectedPlaceIds: string[],
+    runId?: string,
 }
 
 export interface CreatePlannerMarkdownSnapshotPayload {

@@ -18,6 +18,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class AgentRunRequest {
 
+    private UUID runId;
     private UUID conversationId;
     private UUID userId;
 

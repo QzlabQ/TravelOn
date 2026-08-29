@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerConversation;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerConversationStatus;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerActiveRun;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
 
 import java.time.Instant;
@@ -26,6 +27,7 @@ public class PlannerConversationResponse {
     private String currentMarkdown;
     private String nextQuestion;
     private Integer latestSnapshotVersion;
+    private PlannerActiveRun activeRun;
     private List<UUID> selectedPlaceIds;
     private Instant createdAt;
     private Instant updatedAt;
@@ -40,6 +42,7 @@ public class PlannerConversationResponse {
                 .currentMarkdown(conversation.getCurrentMarkdown())
                 .nextQuestion(conversation.getNextQuestion())
                 .latestSnapshotVersion(conversation.getLatestSnapshotVersion())
+                .activeRun(conversation.getActiveRun())
                 .selectedPlaceIds(conversation.getSelectedPlaceIds())
                 .createdAt(conversation.getCreatedAt())
                 .updatedAt(conversation.getUpdatedAt())

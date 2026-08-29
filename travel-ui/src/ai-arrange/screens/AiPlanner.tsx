@@ -6,6 +6,7 @@ import {
     Box,
     Button,
     Chip,
+    Collapse,
     IconButton,
     LinearProgress,
     MenuItem,
@@ -27,6 +28,7 @@ import {
     Close,
     Code,
     EditNote,
+    ExpandMore,
     Flight,
     Group,
     History,
@@ -60,7 +62,9 @@ import {
     PlannerTraceEvent,
     PlannerSnapshot,
     PlannerSnapshotDiffResponse,
-    PlannerSocketEnvelope
+    PlannerSocketEnvelope,
+    PlannerRunStatePayload,
+    PlannerRunStatus
 } from "../../core/apiConfig";
 import {PlannerMapPanel} from "../components/PlannerMapPanel";
 import {FloatingAiAssistant} from "../components/FloatingAiAssistant";
@@ -122,6 +126,8 @@ interface PlannerStoredSession {
     viewingSnapshotVersion: SnapshotView,
     markdownMode?: PlannerMarkdownMode,
     targetDayIndex?: number,
+    activeRunId?: string,
+    activeRunStatus?: PlannerRunStatus,
 }
 
 const DEFAULT_DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -232,6 +238,10 @@ function normalizeStoredPlannerSession(value?: Partial<PlannerStoredSession> | n
             : "latest",
         markdownMode: value.markdownMode === "edit" ? "edit" : "preview",
         targetDayIndex: typeof value.targetDayIndex === "number" && value.targetDayIndex > 0 ? value.targetDayIndex : undefined,
+        activeRunId: typeof value.activeRunId === "string" ? value.activeRunId : undefined,
+        activeRunStatus: value.activeRunStatus === "RUNNING" || value.activeRunStatus === "SUCCEEDED" || value.activeRunStatus === "FAILED"
+            ? value.activeRunStatus
+            : undefined,
     };
 }
 
@@ -496,9 +506,11 @@ export default function AiPlanner() {
     const session = useAuthSession();
     const plannerWSRef = useRef<WebSocket | null>(null);
     const activeAssistantMessageIdRef = useRef<string | null>(null);
-    const pendingInitialPromptRef = useRef<{conversationId: string, prompt: string} | null>(null);
+    const pendingInitialPromptRef = useRef<{conversationId: string, prompt: string, runId: string} | null>(null);
     const viewingSnapshotVersionRef = useRef<SnapshotView>("latest");
     const selectedPlaceIdsRef = useRef<string[]>([]);
+    const activeRunIdRef = useRef<string | null>(null);
+    const activeRunStatusRef = useRef<PlannerRunStatus | null>(null);
     const activeDayIndexRef = useRef(1);
     const plannerRunInFlightRef = useRef(false);
     const lastPlannerRunCompletedRef = useRef(false);
@@ -543,6 +555,12 @@ export default function AiPlanner() {
     const [creating, setCreating] = useState(false);
     const [hydrating, setHydrating] = useState(Boolean(initialSession?.conversation));
     const [chatSending, setChatSending] = useState(false);
+    const [activeRunId, setActiveRunId] = useState<string | null>(
+        initialSession?.activeRunId || initialSession?.conversation?.activeRun?.runId || null
+    );
+    const [activeRunStatus, setActiveRunStatus] = useState<PlannerRunStatus | null>(
+        initialSession?.activeRunStatus || initialSession?.conversation?.activeRun?.status || null
+    );
     const [errorMessage, setErrorMessage] = useState("");
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>(initialSession?.chatMessages || []);
     const [liveData, setLiveData] = useState<PlannerViewData>(initialLiveData);
@@ -562,12 +580,19 @@ export default function AiPlanner() {
     const [dayVersionsLoading, setDayVersionsLoading] = useState(false);
     const [assemblingTrip, setAssemblingTrip] = useState(false);
     const [communityPublishOpen, setCommunityPublishOpen] = useState(false);
+    const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+    const [showRecommendations, setShowRecommendations] = useState(false);
     const [targetDayIndex, setTargetDayIndex] = useState(
         initialSession?.targetDayIndex
         || initialDisplayData.currentDayIndex
         || initialLiveData.currentDayIndex
         || 1
     );
+
+    useEffect(() => {
+        activeRunIdRef.current = activeRunId;
+        activeRunStatusRef.current = activeRunStatus;
+    }, [activeRunId, activeRunStatus]);
 
     const formState = useMemo<PlannerFormState>(() => ({
         departureCity,
@@ -774,6 +799,8 @@ export default function AiPlanner() {
             viewingSnapshotVersion,
             markdownMode,
             targetDayIndex,
+            activeRunId: activeRunId || undefined,
+            activeRunStatus: activeRunStatus || undefined,
         };
         localStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(session));
     }, [
@@ -788,6 +815,8 @@ export default function AiPlanner() {
         viewingSnapshotVersion,
         markdownMode,
         targetDayIndex,
+        activeRunId,
+        activeRunStatus,
     ]);
 
     const applyCoreSlotsToForm = useCallback((slots: PlannerCoreSlots) => {
@@ -858,6 +887,14 @@ export default function AiPlanner() {
             const currentView = viewingSnapshotVersionRef.current;
 
             setConversation(nextConversation);
+            const serverRun = nextConversation.activeRun;
+            if (serverRun) {
+                activeRunIdRef.current = serverRun.runId;
+                setActiveRunId(serverRun.runId);
+                setActiveRunStatus(serverRun.status);
+                plannerRunInFlightRef.current = serverRun.status === "RUNNING";
+                setChatSending(serverRun.status === "RUNNING");
+            }
             applyCoreSlotsToForm(nextConversation.coreSlots);
             setSnapshots(nextSnapshots);
             setLiveData(nextLiveData);
@@ -997,6 +1034,10 @@ export default function AiPlanner() {
             }
             setSocketStatus("connected");
             setErrorMessage(prevMessage => prevMessage === PLANNER_WS_RECONNECT_MESSAGE ? "" : prevMessage);
+            sendPlannerEnvelope(socket, conversationId, "PLANNER_SYNC", {
+                runId: activeRunIdRef.current,
+            });
+            void refreshConversationFromServer(conversationId);
             const seed = pendingInitialPromptRef.current?.conversationId === conversationId
                 ? pendingInitialPromptRef.current
                 : null;
@@ -1018,6 +1059,7 @@ export default function AiPlanner() {
                     message: seed.prompt,
                     selectedPlaceIds: selectedPlaceIdsRef.current,
                     modelVariant,
+                    runId: seed.runId,
                 });
                 setChatSending(true);
             }
@@ -1027,30 +1069,54 @@ export default function AiPlanner() {
             const envelope = JSON.parse(event.data) as PlannerSocketEnvelope;
 
             if (envelope.type === "PLANNER_CHAT_STREAM") {
-                appendAssistantDelta(envelope.payload as PlannerChatStreamPayload);
+                const payload = envelope.payload as PlannerChatStreamPayload;
+                if (!payload.runId || !activeRunIdRef.current || payload.runId === activeRunIdRef.current) {
+                    appendAssistantDelta(payload);
+                }
+                return;
+            }
+
+            if (envelope.type === "PLANNER_RUN_STATE") {
+                const payload = envelope.payload as PlannerRunStatePayload;
+                const serverRun = payload.activeRun;
+                if (serverRun && (!activeRunIdRef.current || serverRun.runId === activeRunIdRef.current)) {
+                    activeRunIdRef.current = serverRun.runId;
+                    setActiveRunId(serverRun.runId);
+                    setActiveRunStatus(serverRun.status);
+                    plannerRunInFlightRef.current = serverRun.status === "RUNNING";
+                    setChatSending(serverRun.status === "RUNNING");
+                    if (serverRun.status === "FAILED") {
+                        setErrorMessage(serverRun.errorMessage || "AI 规划任务失败，请重新提交。");
+                    }
+                }
                 return;
             }
 
             if (envelope.type === "PLANNER_TRACE_EVENT") {
                 const payload = envelope.payload as PlannerTraceEvent;
+                if (payload.runId && activeRunIdRef.current && payload.runId !== activeRunIdRef.current) return;
                 setPlannerTraceEvents(prevEvents => [...prevEvents.slice(-11), payload]);
                 if (payload.type === "RUN_FAILED") {
                     plannerRunInFlightRef.current = false;
                     lastPlannerRunCompletedRef.current = false;
                     setChatSending(false);
+                    setActiveRunStatus("FAILED");
                 }
                 if (payload.type === "RUN_FINISHED") {
                     lastPlannerRunCompletedRef.current = true;
+                    setActiveRunStatus("SUCCEEDED");
                 }
                 return;
             }
 
             if (envelope.type === "PLANNER_DATA_REFRESH") {
                 const payload = envelope.payload as PlannerDataRefreshPayload;
+                if (payload.runId && activeRunIdRef.current && payload.runId !== activeRunIdRef.current) return;
                 applyLiveData(viewDataFromRefresh(payload));
                 plannerRunInFlightRef.current = false;
                 lastPlannerRunCompletedRef.current = true;
                 setChatSending(false);
+                setActiveRunStatus("SUCCEEDED");
                 setErrorMessage(prevMessage => prevMessage === PLANNER_WS_RECONNECT_MESSAGE ? "" : prevMessage);
                 void refreshSnapshotList(conversationId);
                 void loadDayVersions(conversationId, payload.currentDayIndex || activeDayIndexRef.current);
@@ -1068,10 +1134,12 @@ export default function AiPlanner() {
 
             if (envelope.type === "PLANNER_ERROR") {
                 const payload = envelope.payload as PlannerErrorPayload;
+                if (payload.runId && activeRunIdRef.current && payload.runId !== activeRunIdRef.current) return;
                 plannerRunInFlightRef.current = false;
                 lastPlannerRunCompletedRef.current = false;
                 setErrorMessage(formatPlannerError(payload));
                 setChatSending(false);
+                setActiveRunStatus("FAILED");
             }
         };
 
@@ -1081,7 +1149,7 @@ export default function AiPlanner() {
             if (plannerRunInFlightRef.current && !lastPlannerRunCompletedRef.current) {
                 setErrorMessage(PLANNER_WS_RECONNECT_MESSAGE);
             }
-            setChatSending(false);
+            if (!plannerRunInFlightRef.current) setChatSending(false);
         };
 
         socket.onclose = () => {
@@ -1095,7 +1163,7 @@ export default function AiPlanner() {
                 plannerRunInFlightRef.current = false;
             }
             setSocketStatus(prevStatus => prevStatus === "error" && wasPlanning && !completedNormally ? "error" : "closed");
-            setChatSending(false);
+            if (!wasPlanning) setChatSending(false);
             if (completedNormally) {
                 setErrorMessage(prevMessage => prevMessage === PLANNER_WS_RECONNECT_MESSAGE ? "" : prevMessage);
                 window.setTimeout(() => refreshConversationFromServer(conversationId), 500);
@@ -1160,7 +1228,12 @@ export default function AiPlanner() {
             pendingInitialPromptRef.current = {
                 conversationId: nextConversation.id,
                 prompt: buildInitialPrompt(coreSlots),
+                runId: uuidv4(),
             };
+            activeRunIdRef.current = pendingInitialPromptRef.current.runId;
+            activeRunStatusRef.current = "RUNNING";
+            setActiveRunId(pendingInitialPromptRef.current.runId);
+            setActiveRunStatus("RUNNING");
             setConversation(nextConversation);
             setLiveData(nextData);
             setDisplayData(nextData);
@@ -1219,11 +1292,13 @@ export default function AiPlanner() {
         }
 
         const socket = plannerWSRef.current;
+        const runId = extraPayload.runId || uuidv4();
         const payload: PlannerChatSendPayload = {
             message: trimmedInput,
             selectedPlaceIds: liveData.selectedPlaceIds,
             modelVariant,
             ...extraPayload,
+            runId,
         };
         setChatMessages(prevMessages => [
             ...prevMessages,
@@ -1233,6 +1308,10 @@ export default function AiPlanner() {
         setPlannerTraceEvents([]);
         plannerRunInFlightRef.current = true;
         lastPlannerRunCompletedRef.current = false;
+        activeRunIdRef.current = runId;
+        activeRunStatusRef.current = "RUNNING";
+        setActiveRunId(runId);
+        setActiveRunStatus("RUNNING");
         setChatSending(true);
 
         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -1256,6 +1335,8 @@ export default function AiPlanner() {
             });
             applySnapshotToPlannerState(response.data, payload.targetDayIndex);
             lastPlannerRunCompletedRef.current = true;
+            activeRunStatusRef.current = "SUCCEEDED";
+            setActiveRunStatus("SUCCEEDED");
             setChatMessages(prevMessages => [
                 ...prevMessages,
                 {
@@ -1268,6 +1349,8 @@ export default function AiPlanner() {
             void loadDayVersions(conversation.id, payload.targetDayIndex || activeDayIndex);
         } catch (error) {
             console.error(error);
+            activeRunStatusRef.current = "FAILED";
+            setActiveRunStatus("FAILED");
             setErrorMessage("生成日计划失败，请确认 ai-arrange-service 与 Python Agent 可用后重试。");
         } finally {
             plannerRunInFlightRef.current = false;
@@ -1296,12 +1379,18 @@ export default function AiPlanner() {
         ]);
         setErrorMessage("");
         setPlannerTraceEvents([]);
+        const runId = uuidv4();
         plannerRunInFlightRef.current = true;
         lastPlannerRunCompletedRef.current = false;
+        activeRunIdRef.current = runId;
+        activeRunStatusRef.current = "RUNNING";
+        setActiveRunId(runId);
+        setActiveRunStatus("RUNNING");
         sendPlannerEnvelope(socket, conversation.id, "PLANNER_CHAT_SEND", {
             message: trimmedInput,
             selectedPlaceIds: liveData.selectedPlaceIds,
             modelVariant,
+            runId,
         });
         setChatSending(true);
     };
@@ -1945,29 +2034,42 @@ export default function AiPlanner() {
                         {renderModelVariantSelect(true)}
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        {renderFreeSoloInput("旅行偏好", travelStyle, setTravelStyle, TRAVEL_STYLE_QUICK_OPTIONS)}
-                        {renderFreeSoloInput("预算", budget, setBudget, BUDGET_QUICK_OPTIONS, {placeholder: "例如：人均 3000"})}
-                    </div>
+                    <Button
+                        type="button"
+                        variant="text"
+                        endIcon={<ExpandMore sx={{transform: showAdvancedOptions ? "rotate(180deg)" : "none", transition: "transform 160ms"}}/>}
+                        onClick={() => setShowAdvancedOptions(value => !value)}
+                        sx={{justifyContent: "space-between", px: 0, color: "text.primary"}}
+                    >
+                        高级偏好（可选）
+                    </Button>
+                    <Collapse in={showAdvancedOptions}>
+                        <div className="grid gap-4">
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {renderFreeSoloInput("旅行偏好", travelStyle, setTravelStyle, TRAVEL_STYLE_QUICK_OPTIONS)}
+                                {renderFreeSoloInput("预算", budget, setBudget, BUDGET_QUICK_OPTIONS, {placeholder: "例如：人均 3000"})}
+                            </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        {renderFreeSoloInput("住宿偏好", accommodationPreference, setAccommodationPreference, ACCOMMODATION_QUICK_OPTIONS, {placeholder: "例如：地铁附近、亲子酒店"})}
-                        {renderFreeSoloInput("交通偏好", transportPreference, setTransportPreference, TRANSPORT_QUICK_OPTIONS, {placeholder: "例如：少打车、公共交通优先"})}
-                    </div>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {renderFreeSoloInput("住宿偏好", accommodationPreference, setAccommodationPreference, ACCOMMODATION_QUICK_OPTIONS, {placeholder: "例如：地铁附近、亲子酒店"})}
+                                {renderFreeSoloInput("交通偏好", transportPreference, setTransportPreference, TRANSPORT_QUICK_OPTIONS, {placeholder: "例如：少打车、公共交通优先"})}
+                            </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        {renderFreeSoloInput("想去的地点/关键词", mustVisitKeywords, setMustVisitKeywords, MUST_VISIT_QUICK_OPTIONS, {placeholder: "外滩、博物馆、咖啡"})}
-                        {renderFreeSoloInput("需要避开的内容", avoidKeywords, setAvoidKeywords, AVOID_QUICK_OPTIONS, {placeholder: "夜市、排队过久"})}
-                    </div>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {renderFreeSoloInput("想去的地点/关键词", mustVisitKeywords, setMustVisitKeywords, MUST_VISIT_QUICK_OPTIONS, {placeholder: "外滩、博物馆、咖啡"})}
+                                {renderFreeSoloInput("需要避开的内容", avoidKeywords, setAvoidKeywords, AVOID_QUICK_OPTIONS, {placeholder: "夜市、排队过久"})}
+                            </div>
 
-                    <TextField
-                        label="补充说明"
-                        value={notes}
-                        fullWidth
-                        minRows={3}
-                        multiline
-                        onChange={event => setNotes(event.target.value)}
-                    />
+                            <TextField
+                                label="补充说明"
+                                value={notes}
+                                fullWidth
+                                minRows={3}
+                                multiline
+                                onChange={event => setNotes(event.target.value)}
+                            />
+                        </div>
+                    </Collapse>
                 </div>
             </div>
 
@@ -2237,7 +2339,19 @@ export default function AiPlanner() {
                 readOnly={isSnapshotPreview}
                 onTogglePlace={togglePlaceSelection}
             />
-            {renderRecommendationsPanel()}
+            <Button
+                type="button"
+                variant="outlined"
+                size="small"
+                endIcon={<ExpandMore sx={{transform: showRecommendations ? "rotate(180deg)" : "none", transition: "transform 160ms"}}/>}
+                onClick={() => setShowRecommendations(value => !value)}
+                sx={{flexShrink: 0, justifyContent: "space-between"}}
+            >
+                AI 推荐选项 {displayData.places.length > 0 ? `（${displayData.places.length}）` : ""}
+            </Button>
+            <Collapse in={showRecommendations} className="min-h-0 flex-1">
+                {renderRecommendationsPanel()}
+            </Collapse>
         </div>
     );
 
@@ -2326,6 +2440,7 @@ export default function AiPlanner() {
                 generatedDayCount={displayedDayPlans.length}
                 tripDayCount={tripDayCount}
                 hasDepartureCity={Boolean(coreSlots.departureCity)}
+                places={liveData.places}
                 selectedPlaceIds={liveData.selectedPlaceIds}
                 traceToolLabel={traceToolLabel}
                 traceStatusLabel={traceStatusLabel}
