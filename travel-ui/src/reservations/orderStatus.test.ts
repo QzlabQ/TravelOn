@@ -38,15 +38,31 @@ describe('reservation status rules', () => {
         expect(canPayReservation(item)).toBe(false);
     });
 
-    test('paid and refund state take precedence over an expired deadline', () => {
+    test('paid state takes precedence over an expired deadline', () => {
         const paid = reservation({paid: true, paidAt: '2026-06-15T10:05:00', paymentDeadline: '2026-06-15T10:01:00'});
         expect(isReservationPaymentExpired(paid, Date.parse('2026-06-15T10:30:00Z'))).toBe(false);
         expect(getEffectiveReservationStatus(paid, [])).toBe('PAID');
         expect(canCancelReservation(paid)).toBe(true);
+    });
 
-        const refunding = reservation({status: 'REFUND_PROCESSING'});
-        expect(getEffectiveReservationStatus(refunding, [{status: 'PROCESSING'} as never])).toBe('REFUNDED');
+    test('keeps a processing refund in refund processing state', () => {
+        const refunding = reservation({
+            status: 'REFUND_PROCESSING',
+            refundRequestedAt: '2026-06-15T10:10:00',
+        });
+
+        expect(getEffectiveReservationStatus(refunding, [{status: 'PROCESSING'} as never])).toBe('REFUND_PROCESSING');
         expect(canPayReservation(refunding, [])).toBe(false);
         expect(canCancelReservation(refunding, [])).toBe(false);
+    });
+
+    test('shows refunded only after the refund is completed', () => {
+        const refunding = reservation({
+            status: 'REFUND_PROCESSING',
+            refundRequestedAt: '2026-06-15T10:10:00',
+        });
+
+        expect(getEffectiveReservationStatus(refunding, [{status: 'COMPLETED'} as never])).toBe('REFUNDED');
+        expect(getEffectiveReservationStatus(reservation({refundedAt: '2026-06-15T10:20:00'}), [])).toBe('REFUNDED');
     });
 });

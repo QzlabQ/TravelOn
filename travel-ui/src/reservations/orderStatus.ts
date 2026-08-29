@@ -70,16 +70,22 @@ export const getEffectiveReservationStatus = (
     refunds: RefundRecordResponse[] = [],
     now = Date.now()
 ): ReservationStatus => {
-    const hasRefundRecord = refunds.length > 0;
     const hasCompletedRefund = refunds.some(refund => refund.status === "COMPLETED");
     if (
         reservation.status === "REFUNDED" ||
         reservation.refundedAt ||
-        reservation.refundRequestedAt ||
-        hasRefundRecord ||
         hasCompletedRefund
     ) {
         return "REFUNDED";
+    }
+
+    const hasProcessingRefund = refunds.some(refund => refund.status === "PROCESSING");
+    if (
+        reservation.status === "REFUND_PROCESSING" ||
+        reservation.refundRequestedAt ||
+        hasProcessingRefund
+    ) {
+        return "REFUND_PROCESSING";
     }
 
     if (reservation.cancelledAt || reservation.status === "CANCELLED") {
