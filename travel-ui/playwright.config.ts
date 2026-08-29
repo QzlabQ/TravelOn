@@ -7,6 +7,10 @@ const reportRoot = process.env.PLAYWRIGHT_REPORT_DIR
 
 export default defineConfig({
     testDir: './tests/e2e',
+    // 用例并行跑在同一套本地服务栈上，相互抢占资源：单独执行约 8 秒的查询用例，
+    // 5 个 worker 并行时会涨到近 30 秒，恰好卡在 Playwright 默认的用例超时上，
+    // 服务刚启动（缓存冷、连接池未预热）时更会直接超时。统一放宽到 90 秒。
+    timeout: 90_000,
     fullyParallel: false,
     forbidOnly: Boolean(process.env.CI),
     retries: process.env.CI ? 2 : 0,
