@@ -8,11 +8,6 @@ function isoDate(offsetDays: number): string {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function randomStay(): {from: string; to: string} {
-    const offset = 2 + Math.floor(Math.random() * 19); // 今天 +2 ~ +20 天
-    return {from: isoDate(offset), to: isoDate(offset + 1)};
-}
-
 test('酒店查询、下单、银联支付和订单状态形成完整闭环', async ({page}) => {
     // 本用例串起注册、下单、支付三段异步 saga，并行执行时耗时波动大，
     // Playwright 默认 30 秒的用例总超时不够，单独放宽（单条断言的超时另见下方）。
@@ -22,13 +17,11 @@ test('酒店查询、下单、银联支付和订单状态形成完整闭环', as
 
     await expect(page.getByRole('heading', {name: '酒店列表'})).toBeVisible();
 
-    // 用例始终预订第一家酒店的第一间房，若日期固定，房间被订走后（订单保持 PAID，
-    // 不会释放）之后每次运行都会得到 hotelIsAvailable=false 而失败。
-    // 每次随机选一段入住区间，使用例可以重复执行。
-    const stay = randomStay();
+    // 用例始终预订第一家酒店的第一间房，因此必须在末尾退款把房间还回去，
+    // 否则该房间在这段日期上被永久占用，之后每次运行都会 hotelIsAvailable=false。
     const dateInputs = page.locator('input[type="date"]');
-    await dateInputs.nth(0).fill(stay.from);
-    await dateInputs.nth(1).fill(stay.to);
+    await dateInputs.nth(0).fill(isoDate(3));
+    await dateInputs.nth(1).fill(isoDate(4));
 
     await page.getByRole('button', {name: '查询', exact: true}).click();
     const bookButton = page.getByRole('button', {name: '去预订'}).first();
@@ -57,4 +50,11 @@ test('酒店查询、下单、银联支付和订单状态形成完整闭环', as
     // 支付结果同样经消息投递回写订单状态，超时放宽理由同上。
     await expect(page.getByText('银联卡支付成功，订单状态已经更新。')).toBeVisible({timeout: 30_000});
     await expect(page.getByText('已支付', {exact: true}).first()).toBeVisible({timeout: 30_000});
+
+    // 退款并归还房间库存，使用例可以重复执行。
+    await page.getByRole('button', {name: '申请退款'}).click();
+    const refundDialog = page.getByRole('dialog', {name: '申请退款'});
+    await refundDialog.getByLabel('原因').fill('端到端测试清理');
+    await refundDialog.getByRole('button', {name: '确认提交'}).click();
+    await expect(page.getByText('已退款', {exact: true}).first()).toBeVisible({timeout: 30_000});
 });
