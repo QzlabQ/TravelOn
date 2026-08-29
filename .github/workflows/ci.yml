@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+  push:
+    branches: [main]
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install toolchain
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: mise run setup
+
+      - name: Run unit tests
+        run: mise run test:unit
+
+      - name: Upload test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: unit-test-results-${{ github.run_number }}
+          path: artifacts/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
