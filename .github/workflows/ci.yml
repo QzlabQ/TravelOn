@@ -17,10 +17,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  unit-tests:
-    name: Unit tests
+  build-and-test:
+    name: Build and tests
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -35,14 +35,41 @@ jobs:
       - name: Install dependencies
         run: mise run setup
 
+      - name: Compile applications
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for pom in travel-api/*/pom.xml; do
+            module="${pom%/pom.xml}"
+            echo "::group::Compile ${module##*/}"
+            (
+              cd "$module"
+              sh ./mvnw --batch-mode --no-transfer-progress -DskipTests package
+            )
+            echo "::endgroup::"
+          done
+
+          python -m compileall -q travel-api/ai-arrange-agent-service/app
+
+          cd travel-ui
+          corepack yarn build
+
       - name: Run unit tests
         run: mise run test:unit
+
+      - name: Prepare integration environment
+        shell: bash
+        run: touch travel-api/.env
+
+      - name: Run integration tests
+        run: mise run test:integration
 
       - name: Upload test reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: unit-test-results-${{ github.run_number }}
+          name: test-results-${{ github.run_number }}
           path: artifacts/test-results/
           if-no-files-found: ignore
           retention-days: 14
