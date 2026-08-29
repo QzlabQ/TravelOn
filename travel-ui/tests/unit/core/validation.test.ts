@@ -6,7 +6,7 @@ import {
     validateRechargeAmount,
     validateStayDates,
     validateTicketTravelerRules,
-} from '../../src/core/validation';
+} from '../../../src/core/validation';
 
 const residentId = (birthDate: string, sequence = '001') => {
     const body = `110105${birthDate.replace(/-/g, '')}${sequence}`;

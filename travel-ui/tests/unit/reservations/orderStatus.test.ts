@@ -4,8 +4,8 @@ import {
     getEffectiveReservationStatus,
     getPaymentDeadlineMillis,
     isReservationPaymentExpired,
-} from '../../src/reservations/orderStatus';
-import {ReservationResponse} from '../../src/core/apiConfig';
+} from '../../../src/reservations/orderStatus';
+import {ReservationResponse} from '../../../src/core/apiConfig';
 
 const reservation = (overrides: Partial<ReservationResponse> = {}): ReservationResponse => ({
     id: 'reservation-1',
