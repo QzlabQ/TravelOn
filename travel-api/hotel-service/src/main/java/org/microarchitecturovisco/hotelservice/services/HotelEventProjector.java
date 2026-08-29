@@ -7,6 +7,7 @@ import org.microarchitecturovisco.hotelservice.repositories.HotelRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomReservationRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +20,7 @@ public class HotelEventProjector {
     private final HotelRepository hotelRepository;
     private final RoomReservationRepository roomReservationRepository;
 
+    @Transactional
     public void project(List<HotelEvent> hotelEvents){
         for (HotelEvent hotelEvent : hotelEvents) {
             if (hotelEvent instanceof HotelCreatedEvent){
@@ -80,20 +82,14 @@ public class HotelEventProjector {
     }
 
     private void apply(RoomReservationCreatedEvent event){
-        Room room = roomRepository.findById(event.getIdRoom()).orElseThrow(RuntimeException::new);
-        RoomReservation roomReservation = RoomReservation.builder()
-                .id(event.getId())
-                .dateFrom(event.getDateFrom())
-                .dateTo(event.getDateTo())
-                .room(room)
-                .mainReservationId(event.getIdRoomReservation())
-                .build();
-        room.getRoomReservations().add(roomReservation);
-        roomReservationRepository.save(roomReservation);
-        roomRepository.save(room);
-
-
+        int inserted = roomReservationRepository.insertIfAbsent(
+                event.getId(), event.getDateFrom(), event.getDateTo(),
+                event.getIdRoomReservation(), event.getIdRoom());
+        if (inserted == 0) {
+            return;
+        }
     }
+
     private void apply(RoomReservationDeletedEvent event) {
         Long roomId = event.getIdRoom();
         UUID reservationId = event.getIdRoomReservation();

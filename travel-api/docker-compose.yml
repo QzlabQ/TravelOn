@@ -1,8 +1,16 @@
 # version: "3.9"
 name: rsww_184249
 
+x-service-defaults: &service-defaults
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
 services:
   postgres:
+    <<: *service-defaults
     image: postgres:16
     hostname: postgres
     environment:
@@ -32,6 +40,7 @@ services:
       - backend
 
   rabbitmq:
+    <<: *service-defaults
     image: rabbitmq:3.13-management
     hostname: rabbitmq
     ports:
@@ -44,6 +53,7 @@ services:
       - backend
 
   mongo:
+    <<: *service-defaults
     image: mongo:7
     hostname: mongo
     ports:
@@ -54,6 +64,7 @@ services:
       - backend
 
   discovery:
+    <<: *service-defaults
     hostname: discovery
     build: ./discovery-service
     ports:
@@ -66,6 +77,7 @@ services:
       - backend
 
   gateway:
+    <<: *service-defaults
     build: ./api-gateway
     ports:
       - "${GATEWAY_HOST_PORT:-58082}:8082"
@@ -79,6 +91,7 @@ services:
 
   # custom services
   hotel:
+    <<: *service-defaults
     build: ./hotel-service
     volumes:
       - ./logs/hotel:/logs
@@ -99,6 +112,7 @@ services:
       - backend
 
   payment:
+    <<: *service-defaults
     build: ./payment-service
     volumes:
       - ./logs/payment:/logs
@@ -119,6 +133,7 @@ services:
       - backend
 
   reservation:
+    <<: *service-defaults
     build: ./reservation-service
     volumes:
       - ./logs/reservation:/logs
@@ -140,6 +155,7 @@ services:
       - backend
 
   transport:
+    <<: *service-defaults
     build: ./transport-service
     volumes:
       - ./logs/transport:/logs
@@ -163,6 +179,7 @@ services:
       - backend
 
   user:
+    <<: *service-defaults
     build: ./user-service
     volumes:
       - ./logs/user:/logs
@@ -183,6 +200,7 @@ services:
       - backend
 
   community:
+    <<: *service-defaults
     build: ./community-service
     volumes:
       - ./logs/community:/logs
@@ -206,9 +224,11 @@ services:
       - backend
 
   ai-arrange-agent:
+    <<: *service-defaults
     build: ./ai-arrange-agent-service
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
@@ -231,9 +251,11 @@ services:
       - backend
 
   ai-arrange:
+    <<: *service-defaults
     build: ./ai-arrange-service
     env_file:
-      - .env
+      - path: .env
+        required: false
     volumes:
       - ./logs/ai-arrange:/logs
     environment:

@@ -1,8 +1,16 @@
 # version: "3.9"
 name: mcarchvsc
 
+x-service-defaults: &service-defaults
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
 services:
   db:
+    <<: *service-defaults
     image: postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
@@ -23,6 +31,7 @@ services:
       retries: 20
 
   userdb:
+    <<: *service-defaults
     image: postgres
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-admin}

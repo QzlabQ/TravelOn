@@ -8,6 +8,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
+@Table(uniqueConstraints = @UniqueConstraint(
+        name = "uq_room_reservation_main_room",
+        columnNames = {"main_reservation_id", "room_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
