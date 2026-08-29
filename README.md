@@ -22,6 +22,7 @@ https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
 - [快速开始](#快速开始)
 - [开发模式 Debug](#开发模式-debug)
 - [生产模式 Build 与 Serve](#生产模式-build-与-serve)
+- [数据库更新与迁移](#数据库更新与迁移)
 - [工具链管理（mise）](#工具链管理mise)
   - [一、环境配置（一次性）](#一环境配置一次性)
   - [二、日常测试命令](#二日常测试命令)
@@ -528,6 +529,40 @@ CSV；数据库初始化脚本只会在该目录为空时执行。修改 CSV 后
 | 适用场景 | 日常开发 | 演示、验收、性能测试 |
 
 ---
+
+## 数据库更新与迁移
+
+数据库结构与种子数据由各服务的 **Flyway** 管理（细节见 [`travel-api/database/README.md`](travel-api/database/README.md)）。**普通的表结构变更不再需要删库重来。**
+
+### 常规更新（改表结构 / 加字段）
+
+1. 在对应服务的 `src/main/resources/db/migration/` 下新增 `V2__xxx.sql`（依次 `V3__`、`V4__`…，从 **V2** 起，V1 是基线）。
+2. 只写纯 SQL，**不要用 psql 元命令**（`\connect` / `\copy` / `\i`）。
+3. 同步改对应 JPA 实体，让 Hibernate `validate` 通过。
+4. 重新部署，Flyway 自动增量应用、**保留数据**：
+
+```powershell
+cd travel-api
+docker compose up -d --build
+```
+
+### 改种子数据
+
+- 改 `R__seed.sql`（SQL 本身）会改变其 checksum，Flyway 下次启动自动重放（幂等，不用删库）。
+- **只改 `seed-data/` 下的 CSV 不会改变 `R__seed.sql` 的 checksum**，因此不会自动重放；要让新 CSV 行生效，请同时改一下 `R__seed.sql`（例如改个注释）以变更 checksum。
+
+### 仍需重置数据库的情况（少见）
+
+只有在改动**基线本身**（`database/init/010` 或 `database/schema/*.sql`）而不是新增 `V*` 迁移时才需要——已有数据卷不会重跑初始化脚本：
+
+```powershell
+cd travel-api
+docker compose down
+Remove-Item -Recurse -Force .\data\postgres
+docker compose up -d --build
+```
+
+> 部署后可运行 `travel-api/scripts/verify-flyway.sh` 核对 Flyway 历史、种子行数与金额列类型（记录见 [`docs/flyway-verification.md`](docs/flyway-verification.md)）。
 
 ## 常见问题排查
 

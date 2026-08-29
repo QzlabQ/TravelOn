@@ -1,5 +1,6 @@
 -- Seed data for this service, managed by Flyway as a repeatable migration.
--- Re-runs only when this file changes; idempotent via INSERT ... ON CONFLICT.
+-- Re-runs only when this file changes; idempotent via INSERT ... ON CONFLICT
+-- and, for tables without a unique key (hotel_photos), INSERT ... WHERE NOT EXISTS.
 -- Converted from database/seed: psql copy meta-command -> server-side COPY
 -- (reads CSVs from /seed-data on the postgres container; admin is superuser).
 
@@ -63,11 +64,17 @@ FROM seed_hotels h
 JOIN seed_cities c ON c.city_id = h.city_id
 ON CONFLICT (id) DO NOTHING;
 
+-- hotel_photos has no unique key, so ON CONFLICT cannot dedupe. Guard with
+-- NOT EXISTS so re-running this repeatable migration does not duplicate rows.
 INSERT INTO public.hotel_photos (hotel_id, photos)
 SELECT h.source_id, p.photo_url
 FROM seed_hotel_photos p
 JOIN seed_hotels h ON h.source_id = p.source_hotel_id
-ON CONFLICT DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.hotel_photos existing
+    WHERE existing.hotel_id = h.source_id
+      AND existing.photos = p.photo_url
+);
 
 INSERT INTO public.room (id, name, description, guest_capacity, room_type, price_per_adult, hotel_id)
 SELECT r.id,
