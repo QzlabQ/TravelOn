@@ -55,6 +55,9 @@ jobs:
           cd travel-ui
           corepack yarn build
 
+      - name: Build frontend Docker image
+        run: docker build --pull --tag travel-ui:ci travel-ui
+
       - name: Run unit tests
         run: mise run test:unit
 
