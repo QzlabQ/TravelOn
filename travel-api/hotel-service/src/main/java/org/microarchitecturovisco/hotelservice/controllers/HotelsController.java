@@ -265,7 +265,8 @@ public class HotelsController {
     }
 
     private static void validateCreateReservationRequest(CreateHotelReservationRequest request) {
-        if (request.getReservationId() == null
+        if (request == null
+                || request.getReservationId() == null
                 || request.getHotelId() == null
                 || request.getHotelTimeFrom() == null
                 || request.getHotelTimeTo() == null

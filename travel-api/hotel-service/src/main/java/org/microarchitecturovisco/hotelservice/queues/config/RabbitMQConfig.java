@@ -7,6 +7,7 @@ import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFacto
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
+import org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.amqp.support.converter.MessageConversionException;
@@ -50,6 +51,27 @@ public class RabbitMQConfig {
         Advice retry = RetryInterceptorBuilder.stateless()
                 .retryOperations(buildRetryTemplate(maxAttempts, initialInterval, multiplier, maxInterval))
                 .recoverer(recoverer)
+                .build();
+        factory.setAdviceChain(retry);
+        return factory;
+    }
+
+    @Bean(name = "rabbitListenerContainerFactory")
+    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
+            SimpleRabbitListenerContainerFactoryConfigurer configurer,
+            ConnectionFactory connectionFactory,
+            MessageConverter messageConverter,
+            @Value("${hotel.listener.retry.max-attempts:4}") int maxAttempts,
+            @Value("${hotel.listener.retry.initial-interval-ms:1000}") long initialInterval,
+            @Value("${hotel.listener.retry.multiplier:2.0}") double multiplier,
+            @Value("${hotel.listener.retry.max-interval-ms:10000}") long maxInterval) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        configurer.configure(factory, connectionFactory);
+        factory.setMessageConverter(messageConverter);
+        factory.setDefaultRequeueRejected(false);
+        Advice retry = RetryInterceptorBuilder.stateless()
+                .retryOperations(buildRetryTemplate(maxAttempts, initialInterval, multiplier, maxInterval))
+                .recoverer(new RejectAndDontRequeueRecoverer())
                 .build();
         factory.setAdviceChain(retry);
         return factory;

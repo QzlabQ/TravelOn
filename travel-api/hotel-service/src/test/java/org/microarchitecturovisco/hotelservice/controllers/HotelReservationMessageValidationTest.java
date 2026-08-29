@@ -34,4 +34,13 @@ class HotelReservationMessageValidationTest {
                 .hasMessageContaining("Invalid create-hotel-reservation message");
         verifyNoInteractions(commands);
     }
+
+    @Test
+    void jsonNullFailsAsDeterministicValidationError() {
+        HotelsController controller = new HotelsController(null, null, null);
+
+        assertThatThrownBy(() -> controller.consumeMessageCreateHotelReservation("null"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("missing required fields");
+    }
 }

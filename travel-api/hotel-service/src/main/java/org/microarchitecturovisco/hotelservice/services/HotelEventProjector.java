@@ -82,24 +82,14 @@ public class HotelEventProjector {
     }
 
     private void apply(RoomReservationCreatedEvent event){
-        if (roomReservationRepository.existsByMainReservationIdAndRoomId(
-                event.getIdRoomReservation(), event.getIdRoom())) {
+        int inserted = roomReservationRepository.insertIfAbsent(
+                event.getId(), event.getDateFrom(), event.getDateTo(),
+                event.getIdRoomReservation(), event.getIdRoom());
+        if (inserted == 0) {
             return;
         }
-        Room room = roomRepository.findById(event.getIdRoom()).orElseThrow(RuntimeException::new);
-        RoomReservation roomReservation = RoomReservation.builder()
-                .id(event.getId())
-                .dateFrom(event.getDateFrom())
-                .dateTo(event.getDateTo())
-                .room(room)
-                .mainReservationId(event.getIdRoomReservation())
-                .build();
-        room.getRoomReservations().add(roomReservation);
-        roomReservationRepository.save(roomReservation);
-        roomRepository.save(room);
-
-
     }
+
     private void apply(RoomReservationDeletedEvent event) {
         Long roomId = event.getIdRoom();
         UUID reservationId = event.getIdRoomReservation();
