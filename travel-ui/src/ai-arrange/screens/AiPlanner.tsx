@@ -427,7 +427,7 @@ function traceToolLabel(tool?: string) {
     if (tool === "search_flights") return "交通";
     if (tool === "estimate_budget") return "预算";
     if (tool === "amap_route_plan") return "路线";
-    if (tool === "deepseek_chat_completion") return "模型";
+    if (tool === "model_chat_completion" || tool === "deepseek_chat_completion") return "模型";
     if (tool === "fallback_plan_builder") return "兜底";
     return tool || "规划";
 }

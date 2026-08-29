@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.config import AgentSettings
-from app.clients.deepseek_client import DeepSeekClient
+from app.clients.openai_compatible_client import OpenAICompatibleClient
 from app.harness.policy import RuntimePolicy
 from app.services.fallback_plan_builder import FallbackPlanBuilder
 from app.services.planner_agent import PlannerAgent
@@ -18,19 +18,18 @@ def test_runtime_policy_from_settings() -> None:
     settings = AgentSettings(
         app_name="test",
         app_version="0",
-        deepseek_api_key="",
-        deepseek_base_url="https://example.test",
-        deepseek_chat_completions_path="/chat/completions",
-        deepseek_model="model",
-        deepseek_flash_model="flash-model",
-        deepseek_pro_model="pro-model",
-        deepseek_thinking_type="disabled",
-        deepseek_temperature=0.1,
-        deepseek_timeout_seconds=5,
-        deepseek_retry_count=1,
-        deepseek_retry_backoff_seconds=0.1,
-        deepseek_max_tokens=1200,
-        deepseek_slow_response_warning_ms=60000,
+        model_api_key="",
+        model_base_url="https://example.test",
+        model_chat_completions_path="/chat/completions",
+        model_name="model",
+        model_thinking_type="disabled",
+        model_json_mode=True,
+        model_temperature=0.1,
+        model_timeout_seconds=5,
+        model_retry_count=1,
+        model_retry_backoff_seconds=0.1,
+        model_max_tokens=1200,
+        model_slow_response_warning_ms=60000,
         amap_api_key="",
         amap_base_url="https://amap.test",
         amap_enabled=True,
@@ -66,19 +65,18 @@ def test_planner_model_tool_uses_dedicated_model_timeout() -> None:
     settings = AgentSettings(
         app_name="test",
         app_version="0",
-        deepseek_api_key="key",
-        deepseek_base_url="https://example.test",
-        deepseek_chat_completions_path="/chat/completions",
-        deepseek_model="model",
-        deepseek_flash_model="flash-model",
-        deepseek_pro_model="pro-model",
-        deepseek_thinking_type="disabled",
-        deepseek_temperature=0.1,
-        deepseek_timeout_seconds=75,
-        deepseek_retry_count=1,
-        deepseek_retry_backoff_seconds=0.1,
-        deepseek_max_tokens=1200,
-        deepseek_slow_response_warning_ms=60000,
+        model_api_key="key",
+        model_base_url="https://example.test",
+        model_chat_completions_path="/chat/completions",
+        model_name="model",
+        model_thinking_type="disabled",
+        model_json_mode=True,
+        model_temperature=0.1,
+        model_timeout_seconds=75,
+        model_retry_count=1,
+        model_retry_backoff_seconds=0.1,
+        model_max_tokens=1200,
+        model_slow_response_warning_ms=60000,
         amap_api_key="",
         amap_base_url="https://amap.test",
         amap_enabled=True,
@@ -99,7 +97,7 @@ def test_planner_model_tool_uses_dedicated_model_timeout() -> None:
     )
     policy = RuntimePolicy.from_settings(settings)
     agent = PlannerAgent(
-        deepseek_client=DeepSeekClient(settings),
+        model_client=OpenAICompatibleClient(settings),
         amap_tool=AmapPoiTool(settings),
         hotel_search_tool=HotelSearchTool(settings),
         route_tool=RoutePlanTool(),
@@ -113,5 +111,5 @@ def test_planner_model_tool_uses_dedicated_model_timeout() -> None:
 
     specs = {spec.name: spec for spec in agent.list_tool_specs()}
 
-    assert specs["deepseek_chat_completion"].timeout_seconds == 75
-    assert specs["deepseek_chat_completion"].timeout_seconds != policy.max_execution_time_seconds
+    assert specs["model_chat_completion"].timeout_seconds == 75
+    assert specs["model_chat_completion"].timeout_seconds != policy.max_execution_time_seconds

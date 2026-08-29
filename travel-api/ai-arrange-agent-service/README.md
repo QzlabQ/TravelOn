@@ -23,24 +23,32 @@ The streaming endpoint is:
 
 It uses SSE for Java `WebClient` consumption, emits stage-status events, and ends with a full `AgentRunResponse`. The existing `/agent/planner/run` endpoint remains compatible.
 
-Runtime defaults for Java integration should follow the documented Stage 0 settings:
+The agent calls an OpenAI-compatible Chat Completions endpoint. The provider is selected entirely through environment variables; DeepSeek is only the default for backward compatibility:
 
 ```text
-DEEPSEEK_TIMEOUT_SECONDS=90
-DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
-DEEPSEEK_PRO_MODEL=deepseek-v4-pro
-DEEPSEEK_THINKING_TYPE=disabled
+AI_BASE_URL=https://api.deepseek.com
+AI_CHAT_COMPLETIONS_PATH=/chat/completions
+AI_API_KEY=
+AI_MODEL=deepseek-v4-pro
+AI_THINKING_TYPE=omit
+AI_TEMPERATURE=0.6
+AI_MAX_TOKENS=12000
+AI_MODEL_TIMEOUT_SECONDS=90
 AGENT_MODEL_TIMEOUT_SECONDS=90
 AGENT_MAX_RUNTIME_SECONDS=120
-DEEPSEEK_MAX_TOKENS=12000
-DEEPSEEK_SLOW_RESPONSE_WARNING_MS=60000
+AI_SLOW_RESPONSE_WARNING_MS=60000
+AI_JSON_MODE=true
+AI_RETRY_COUNT=1
+AI_RETRY_BACKOFF_SECONDS=1
 ```
+
+For another provider, set `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL` to that provider's compatible endpoint, key, and model name. If the provider uses a different path, set `AI_CHAT_COMPLETIONS_PATH` as well. The endpoint must return the usual `choices[0].message.content` response shape and support the request fields used by this service. Set `AI_JSON_MODE=false` when the provider does not support `response_format.type=json_object`.
 
 Java should configure its Python Agent HTTP timeout above `AGENT_MAX_RUNTIME_SECONDS`; the current recommendation is 150 seconds.
 
 When Docker Compose overrides `AGENT_MAX_RUNTIME_SECONDS` to 240 seconds for longer model generations, Java should use `AI_ARRANGE_AGENT_TIMEOUT_SECONDS=270` or another value above the Agent runtime limit.
 
-The frontend defaults to `modelVariant=FLASH` for faster planning. Users can switch to `PRO` from the planner page. `DEEPSEEK_FLASH_MODEL` and `DEEPSEEK_PRO_MODEL` control the actual provider model names.
+The frontend still sends `modelVariant=FLASH` or `PRO` for compatibility with the planning protocol. Both variants use the single configured `AI_MODEL`; the variant no longer selects a DeepSeek-specific model.
 
 ## Java Integration
 
@@ -76,7 +84,7 @@ cd ai-arrange-agent-service
 pytest
 ```
 
-Without `DEEPSEEK_API_KEY` and `AMAP_API_KEY`, the service still returns a structured fallback plan. This keeps local development and Java integration tests deterministic.
+Without `AI_API_KEY` and `AMAP_API_KEY`, the service still returns a structured fallback plan. This keeps local development and Java integration tests deterministic. `DEEPSEEK_*` variables remain accepted as deprecated aliases during migration.
 
 ## Current Plan
 
@@ -135,7 +143,7 @@ Prompt fragments live in `app/prompts/`:
 - `tool_selection_prompt.py`
 - `repair_prompt.py`
 
-`DeepSeekClient` composes these fragments into the system prompt, and the model is instructed to return only the planner JSON payload. It must not expose hidden reasoning, raw tool JSON, API keys, trace internals, or chain-of-thought.
+`OpenAICompatibleClient` composes these fragments into the system prompt, and the configured model is instructed to return only the planner JSON payload. It must not expose hidden reasoning, raw tool JSON, API keys, trace internals, or chain-of-thought.
 
 The planner now uses a deterministic lightweight ReAct loop:
 

@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from app.clients.deepseek_client import DeepSeekClient
+from app.clients.openai_compatible_client import OpenAICompatibleClient
 from app.config import AgentSettings, load_settings
 from app.harness.tool_result import ToolStatus
 from app.models import AgentRunRequest, PlannerModelVariant
@@ -17,19 +17,18 @@ def agent_settings() -> AgentSettings:
     return AgentSettings(
         app_name="test",
         app_version="0",
-        deepseek_api_key="test-key",
-        deepseek_base_url="https://example.test",
-        deepseek_chat_completions_path="/chat/completions",
-        deepseek_model="model",
-        deepseek_flash_model="flash-model",
-        deepseek_pro_model="pro-model",
-        deepseek_thinking_type="disabled",
-        deepseek_temperature=0.1,
-        deepseek_timeout_seconds=5,
-        deepseek_retry_count=0,
-        deepseek_retry_backoff_seconds=0.1,
-        deepseek_max_tokens=1200,
-        deepseek_slow_response_warning_ms=60000,
+        model_api_key="test-key",
+        model_base_url="https://example.test",
+        model_chat_completions_path="/chat/completions",
+        model_name="model",
+        model_thinking_type="disabled",
+        model_json_mode=True,
+        model_temperature=0.1,
+        model_timeout_seconds=5,
+        model_retry_count=0,
+        model_retry_backoff_seconds=0.1,
+        model_max_tokens=1200,
+        model_slow_response_warning_ms=60000,
         amap_api_key="",
         amap_base_url="https://amap.test",
         amap_enabled=True,
@@ -51,24 +50,37 @@ def agent_settings() -> AgentSettings:
 
 
 def test_load_settings_defaults_match_documented_stage0_values(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DEEPSEEK_TIMEOUT_SECONDS", "")
-    monkeypatch.setenv("DEEPSEEK_MAX_TOKENS", "")
-    monkeypatch.setenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
-    monkeypatch.setenv("DEEPSEEK_FLASH_MODEL", "")
-    monkeypatch.setenv("DEEPSEEK_PRO_MODEL", "")
-    monkeypatch.setenv("DEEPSEEK_THINKING_TYPE", "")
+    monkeypatch.setenv("AI_MODEL_TIMEOUT_SECONDS", "")
+    monkeypatch.setenv("AI_MAX_TOKENS", "")
+    monkeypatch.setenv("AI_MODEL", "custom-model")
+    monkeypatch.setenv("AI_THINKING_TYPE", "")
     monkeypatch.setenv("AGENT_MODEL_TIMEOUT_SECONDS", "")
     monkeypatch.setenv("AGENT_MAX_RUNTIME_SECONDS", "")
 
     settings = load_settings()
 
-    assert settings.deepseek_timeout_seconds == 90
+    assert settings.model_timeout_seconds == 90
     assert settings.agent_model_timeout_seconds == 90
     assert settings.agent_max_runtime_seconds == 120
-    assert settings.deepseek_max_tokens == 12000
-    assert settings.deepseek_flash_model == "deepseek-v4-flash"
-    assert settings.deepseek_pro_model == "deepseek-v4-pro"
-    assert settings.deepseek_thinking_type == "disabled"
+    assert settings.model_max_tokens == 12000
+    assert settings.model_name == "custom-model"
+    assert settings.model_thinking_type == "omit"
+
+
+def test_load_settings_reads_provider_neutral_model_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_BASE_URL", "https://llm.example.test/v1")
+    monkeypatch.setenv("AI_CHAT_COMPLETIONS_PATH", "/responses/chat/completions")
+    monkeypatch.setenv("AI_API_KEY", "custom-key")
+    monkeypatch.setenv("AI_MODEL", "custom-model")
+    monkeypatch.setenv("AI_JSON_MODE", "false")
+
+    settings = load_settings()
+
+    assert settings.model_base_url == "https://llm.example.test/v1"
+    assert settings.model_chat_completions_path == "/responses/chat/completions"
+    assert settings.model_api_key == "custom-key"
+    assert settings.model_name == "custom-model"
+    assert settings.model_json_mode is False
 
 
 def sample_request() -> AgentRunRequest:
@@ -129,8 +141,8 @@ def test_validate_planner_output_drops_invalid_uuid_placeholders() -> None:
     assert output.routes[0].toPlaceId is None
 
 
-def test_deepseek_payload_includes_day_scope_rules() -> None:
-    client = DeepSeekClient(agent_settings())
+def test_model_payload_includes_day_scope_rules() -> None:
+    client = OpenAICompatibleClient(agent_settings())
     request = AgentRunRequest.model_validate(
         {
             "conversationId": "00000000-0000-0000-0000-000000000010",
@@ -183,11 +195,11 @@ def test_deepseek_payload_includes_day_scope_rules() -> None:
     assert "backslash" in user_payload["outputRules"]["jsonEscaping"]
     assert payload["thinking"] == {"type": "disabled"}
     assert payload["max_tokens"] == 1200
-    assert payload["model"] == "flash-model"
+    assert payload["model"] == "model"
 
 
-def test_deepseek_payload_uses_flash_model_when_requested() -> None:
-    client = DeepSeekClient(agent_settings())
+def test_model_payload_uses_configured_model_for_flash_variant() -> None:
+    client = OpenAICompatibleClient(agent_settings())
     request = sample_request().model_copy(update={"modelVariant": PlannerModelVariant.FLASH})
 
     payload = client._build_payload(  # noqa: SLF001 - regression covers provider payload contract.
@@ -200,11 +212,11 @@ def test_deepseek_payload_uses_flash_model_when_requested() -> None:
         planner_constraints={},
     )
 
-    assert payload["model"] == "flash-model"
+    assert payload["model"] == "model"
 
 
-def test_deepseek_payload_uses_pro_model_when_requested() -> None:
-    client = DeepSeekClient(agent_settings())
+def test_model_payload_uses_configured_model_for_pro_variant() -> None:
+    client = OpenAICompatibleClient(agent_settings())
     request = sample_request().model_copy(update={"modelVariant": PlannerModelVariant.PRO})
 
     payload = client._build_payload(  # noqa: SLF001 - regression covers provider payload contract.
@@ -217,11 +229,11 @@ def test_deepseek_payload_uses_pro_model_when_requested() -> None:
         planner_constraints={},
     )
 
-    assert payload["model"] == "pro-model"
+    assert payload["model"] == "model"
 
 
-def test_deepseek_payload_can_omit_thinking_field_for_provider_ab_tests() -> None:
-    client = DeepSeekClient(replace(agent_settings(), deepseek_thinking_type="omit"))
+def test_model_payload_can_omit_thinking_field_for_provider_ab_tests() -> None:
+    client = OpenAICompatibleClient(replace(agent_settings(), model_thinking_type="omit"))
 
     payload = client._build_payload(  # noqa: SLF001 - regression covers provider payload contract.
         request=sample_request(),
@@ -236,8 +248,8 @@ def test_deepseek_payload_can_omit_thinking_field_for_provider_ab_tests() -> Non
     assert "thinking" not in payload
 
 
-def test_deepseek_parser_repairs_invalid_backslash_escapes() -> None:
-    client = DeepSeekClient(agent_settings())
+def test_model_parser_repairs_invalid_backslash_escapes() -> None:
+    client = OpenAICompatibleClient(agent_settings())
 
     parsed = client._parse_json_content(  # noqa: SLF001 - regression covers provider JSON tolerance.
         r'{"assistantText":"已生成。","title":"上海行程","markdown":"路线提示：\emoji 和 \walk 标记","places":[],"routes":[],}'
@@ -247,8 +259,8 @@ def test_deepseek_parser_repairs_invalid_backslash_escapes() -> None:
 
 
 @pytest.mark.asyncio
-async def test_deepseek_success_includes_timing_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = DeepSeekClient(agent_settings())
+async def test_model_success_includes_timing_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = OpenAICompatibleClient(agent_settings())
 
     async def fake_request_content(*_: Any, **__: Any) -> str:
         return json.dumps(
@@ -270,7 +282,7 @@ async def test_deepseek_success_includes_timing_metadata(monkeypatch: pytest.Mon
 
     assert result.status == ToolStatus.SUCCESS
     assert result.metadata["payloadBytes"] > 0
-    assert result.metadata["model"] == "flash-model"
+    assert result.metadata["model"] == "model"
     assert result.metadata["thinkingType"] == "disabled"
     assert result.metadata["maxTokens"] == 1200
     assert result.metadata["responseChars"] > 0
@@ -281,8 +293,8 @@ async def test_deepseek_success_includes_timing_metadata(monkeypatch: pytest.Mon
 
 
 @pytest.mark.asyncio
-async def test_deepseek_repairs_schema_invalid_model_output(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = DeepSeekClient(agent_settings())
+async def test_model_repairs_schema_invalid_model_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = OpenAICompatibleClient(agent_settings())
     calls: list[dict[str, Any]] = []
 
     async def fake_request_content(*args: Any, **_: Any) -> str:
@@ -336,8 +348,8 @@ async def test_deepseek_repairs_schema_invalid_model_output(monkeypatch: pytest.
 
 
 @pytest.mark.asyncio
-async def test_deepseek_fails_fast_when_json_is_unrecoverable(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = DeepSeekClient(agent_settings())
+async def test_model_fails_fast_when_json_is_unrecoverable(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = OpenAICompatibleClient(agent_settings())
     calls: list[object] = []
 
     async def fake_request_content(*args: Any, **__: Any) -> str:
@@ -357,8 +369,8 @@ async def test_deepseek_fails_fast_when_json_is_unrecoverable(monkeypatch: pytes
 
 
 @pytest.mark.asyncio
-async def test_deepseek_fails_cleanly_when_repair_is_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = DeepSeekClient(agent_settings())
+async def test_model_fails_cleanly_when_repair_is_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = OpenAICompatibleClient(agent_settings())
     calls: list[object] = []
 
     async def fake_request_content(*args: Any, **__: Any) -> str:

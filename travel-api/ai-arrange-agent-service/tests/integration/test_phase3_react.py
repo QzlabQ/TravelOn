@@ -54,7 +54,7 @@ def test_react_loop_reserves_capacity_for_fallback() -> None:
     evidence_tools = [
         call["tool"]
         for call in body["toolCalls"]
-        if call["tool"] not in {"deepseek_chat_completion", "fallback_plan_builder"}
+        if call["tool"] not in {"model_chat_completion", "fallback_plan_builder"}
     ]
     warning_codes = {warning["code"] for warning in body["warnings"]}
 
@@ -68,19 +68,18 @@ def test_runtime_policy_clamps_react_limits_from_settings() -> None:
     settings = AgentSettings(
         app_name="test",
         app_version="0",
-        deepseek_api_key="",
-        deepseek_base_url="https://example.test",
-        deepseek_chat_completions_path="/chat/completions",
-        deepseek_model="model",
-        deepseek_flash_model="flash-model",
-        deepseek_pro_model="pro-model",
-        deepseek_thinking_type="disabled",
-        deepseek_temperature=0.1,
-        deepseek_timeout_seconds=5,
-        deepseek_retry_count=1,
-        deepseek_retry_backoff_seconds=0.1,
-        deepseek_max_tokens=1200,
-        deepseek_slow_response_warning_ms=60000,
+        model_api_key="",
+        model_base_url="https://example.test",
+        model_chat_completions_path="/chat/completions",
+        model_name="model",
+        model_thinking_type="disabled",
+        model_json_mode=True,
+        model_temperature=0.1,
+        model_timeout_seconds=5,
+        model_retry_count=1,
+        model_retry_backoff_seconds=0.1,
+        model_max_tokens=1200,
+        model_slow_response_warning_ms=60000,
         amap_api_key="",
         amap_base_url="https://amap.test",
         amap_enabled=True,

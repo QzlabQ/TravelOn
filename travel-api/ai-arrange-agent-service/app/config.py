@@ -32,19 +32,18 @@ def _as_float(value: str | None, default: float) -> float:
 class AgentSettings:
     app_name: str
     app_version: str
-    deepseek_api_key: str
-    deepseek_base_url: str
-    deepseek_chat_completions_path: str
-    deepseek_model: str
-    deepseek_flash_model: str
-    deepseek_pro_model: str
-    deepseek_thinking_type: str
-    deepseek_temperature: float
-    deepseek_timeout_seconds: float
-    deepseek_retry_count: int
-    deepseek_retry_backoff_seconds: float
-    deepseek_max_tokens: int
-    deepseek_slow_response_warning_ms: int
+    model_api_key: str
+    model_base_url: str
+    model_chat_completions_path: str
+    model_name: str
+    model_thinking_type: str
+    model_json_mode: bool
+    model_temperature: float
+    model_timeout_seconds: float
+    model_retry_count: int
+    model_retry_backoff_seconds: float
+    model_max_tokens: int
+    model_slow_response_warning_ms: int
     amap_api_key: str
     amap_base_url: str
     amap_enabled: bool
@@ -66,24 +65,25 @@ class AgentSettings:
 
 
 def load_settings() -> AgentSettings:
-    deepseek_timeout_seconds = _as_float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS"), 90.0)
-    deepseek_model = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
+    model_timeout_seconds = _as_float(
+        os.getenv("AI_MODEL_TIMEOUT_SECONDS") or os.getenv("DEEPSEEK_TIMEOUT_SECONDS"),
+        90.0,
+    )
     return AgentSettings(
         app_name=os.getenv("AGENT_APP_NAME", "ai-arrange-agent-service"),
         app_version=os.getenv("AGENT_APP_VERSION", "0.1.0"),
-        deepseek_api_key=os.getenv("DEEPSEEK_API_KEY", ""),
-        deepseek_base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-        deepseek_chat_completions_path=os.getenv("DEEPSEEK_CHAT_COMPLETIONS_PATH", "/chat/completions"),
-        deepseek_model=deepseek_model,
-        deepseek_flash_model=os.getenv("DEEPSEEK_FLASH_MODEL") or "deepseek-v4-flash",
-        deepseek_pro_model=os.getenv("DEEPSEEK_PRO_MODEL") or deepseek_model,
-        deepseek_thinking_type=os.getenv("DEEPSEEK_THINKING_TYPE") or "disabled",
-        deepseek_temperature=_as_float(os.getenv("DEEPSEEK_TEMPERATURE"), 0.6),
-        deepseek_timeout_seconds=deepseek_timeout_seconds,
-        deepseek_retry_count=_as_int(os.getenv("DEEPSEEK_RETRY_COUNT"), 1),
-        deepseek_retry_backoff_seconds=_as_float(os.getenv("DEEPSEEK_RETRY_BACKOFF_SECONDS"), 1.0),
-        deepseek_max_tokens=_as_int(os.getenv("DEEPSEEK_MAX_TOKENS"), 12000),
-        deepseek_slow_response_warning_ms=_as_int(os.getenv("DEEPSEEK_SLOW_RESPONSE_WARNING_MS"), 60000),
+        model_api_key=os.getenv("AI_API_KEY") or os.getenv("DEEPSEEK_API_KEY", ""),
+        model_base_url=os.getenv("AI_BASE_URL") or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        model_chat_completions_path=os.getenv("AI_CHAT_COMPLETIONS_PATH") or os.getenv("DEEPSEEK_CHAT_COMPLETIONS_PATH", "/chat/completions"),
+        model_name=os.getenv("AI_MODEL") or os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro"),
+        model_thinking_type=os.getenv("AI_THINKING_TYPE") or os.getenv("DEEPSEEK_THINKING_TYPE") or "omit",
+        model_json_mode=_as_bool(os.getenv("AI_JSON_MODE"), True),
+        model_temperature=_as_float(os.getenv("AI_TEMPERATURE") or os.getenv("DEEPSEEK_TEMPERATURE"), 0.6),
+        model_timeout_seconds=model_timeout_seconds,
+        model_retry_count=_as_int(os.getenv("AI_RETRY_COUNT") or os.getenv("DEEPSEEK_RETRY_COUNT"), 1),
+        model_retry_backoff_seconds=_as_float(os.getenv("AI_RETRY_BACKOFF_SECONDS") or os.getenv("DEEPSEEK_RETRY_BACKOFF_SECONDS"), 1.0),
+        model_max_tokens=_as_int(os.getenv("AI_MAX_TOKENS") or os.getenv("DEEPSEEK_MAX_TOKENS"), 12000),
+        model_slow_response_warning_ms=_as_int(os.getenv("AI_SLOW_RESPONSE_WARNING_MS") or os.getenv("DEEPSEEK_SLOW_RESPONSE_WARNING_MS"), 60000),
         amap_api_key=os.getenv("AMAP_API_KEY", ""),
         amap_base_url=os.getenv("AMAP_BASE_URL", "https://restapi.amap.com/v3"),
         amap_enabled=_as_bool(os.getenv("AMAP_ENABLED"), True),
@@ -98,7 +98,7 @@ def load_settings() -> AgentSettings:
         agent_max_react_steps=_as_int(os.getenv("AGENT_MAX_REACT_STEPS"), 3),
         agent_max_react_tool_calls=_as_int(os.getenv("AGENT_MAX_REACT_TOOL_CALLS"), 4),
         agent_max_runtime_seconds=_as_float(os.getenv("AGENT_MAX_RUNTIME_SECONDS"), 120.0),
-        agent_model_timeout_seconds=_as_float(os.getenv("AGENT_MODEL_TIMEOUT_SECONDS"), deepseek_timeout_seconds),
+        agent_model_timeout_seconds=_as_float(os.getenv("AGENT_MODEL_TIMEOUT_SECONDS"), model_timeout_seconds),
         agent_tool_timeout_seconds=_as_float(os.getenv("AGENT_TOOL_TIMEOUT_SECONDS"), 10.0),
         agent_trace_enabled=_as_bool(os.getenv("AGENT_TRACE_ENABLED"), True),
         travel_gateway_base_url=os.getenv("TRAVEL_GATEWAY_BASE_URL", "http://gateway:8082"),

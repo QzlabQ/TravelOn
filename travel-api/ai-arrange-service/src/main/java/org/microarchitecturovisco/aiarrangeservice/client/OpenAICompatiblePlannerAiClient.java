@@ -28,9 +28,9 @@ import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
-public class DeepSeekCompatiblePlannerAiClient implements PlannerAiClient {
+public class OpenAICompatiblePlannerAiClient implements PlannerAiClient {
 
-    private static final Logger logger = Logger.getLogger(DeepSeekCompatiblePlannerAiClient.class.getName());
+    private static final Logger logger = Logger.getLogger(OpenAICompatiblePlannerAiClient.class.getName());
 
     private final AiArrangeAiProperties properties;
     private final ObjectMapper objectMapper;
@@ -42,7 +42,7 @@ public class DeepSeekCompatiblePlannerAiClient implements PlannerAiClient {
     @Override
     public CompletableFuture<String> streamChatCompletion(List<AiChatMessage> messages, Consumer<String> onDelta) {
         if (!StringUtils.hasText(properties.getApiKey())) {
-            String fallback = "我已经收到你的出行信息。当前环境还没有配置 DeepSeek API Key，因此先生成本地占位规划草稿；配置 DEEPSEEK_API_KEY 后会启用真实流式输出。";
+            String fallback = "我已经收到你的出行信息。当前环境还没有配置 AI API Key，因此先生成本地占位规划草稿；配置 AI_API_KEY 后会启用真实流式输出。";
             onDelta.accept(fallback);
             return CompletableFuture.completedFuture(fallback);
         }
@@ -58,10 +58,10 @@ public class DeepSeekCompatiblePlannerAiClient implements PlannerAiClient {
                 }
                 return fullText.toString();
             } catch (IOException e) {
-                throw new IllegalStateException("DeepSeek stream request failed", e);
+                throw new IllegalStateException("Model stream request failed", e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IllegalStateException("DeepSeek stream request interrupted", e);
+                throw new IllegalStateException("Model stream request interrupted", e);
             }
         }, plannerExecutorService);
     }
@@ -76,17 +76,17 @@ public class DeepSeekCompatiblePlannerAiClient implements PlannerAiClient {
             HttpRequest request = buildRequest(messages, false);
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                logger.warning("DeepSeek extraction request failed with status " + response.statusCode() + ": " + response.body());
+                logger.warning("Model extraction request failed with status " + response.statusCode() + ": " + response.body());
                 return Optional.empty();
             }
             String content = responseContent(response.body());
             return parseSnapshotDraft(content);
         } catch (IOException e) {
-            logger.warning("DeepSeek extraction request failed: " + e.getMessage());
+            logger.warning("Model extraction request failed: " + e.getMessage());
             return Optional.empty();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            logger.warning("DeepSeek extraction request interrupted");
+            logger.warning("Model extraction request interrupted");
             return Optional.empty();
         }
     }
@@ -134,7 +134,7 @@ public class DeepSeekCompatiblePlannerAiClient implements PlannerAiClient {
         try (Stream<String> lines = response.body()) {
             responseBody = lines.collect(Collectors.joining("\n"));
         }
-        throw new IllegalStateException("DeepSeek stream request failed with status " + response.statusCode() + ": " + responseBody);
+        throw new IllegalStateException("Model stream request failed with status " + response.statusCode() + ": " + responseBody);
     }
 
     private void consumeStreamLine(String line, StringBuilder fullText, Consumer<String> onDelta) {
@@ -155,7 +155,7 @@ public class DeepSeekCompatiblePlannerAiClient implements PlannerAiClient {
                 onDelta.accept(delta);
             }
         } catch (JsonProcessingException e) {
-            logger.warning("Cannot parse DeepSeek stream line: " + e.getMessage());
+            logger.warning("Cannot parse model stream line: " + e.getMessage());
         }
     }
 

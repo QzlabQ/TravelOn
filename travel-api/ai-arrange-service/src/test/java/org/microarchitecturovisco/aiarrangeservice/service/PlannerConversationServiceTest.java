@@ -370,7 +370,7 @@ class PlannerConversationServiceTest {
         response.setStatus("PARTIAL_SUCCESS");
         response.setToolCalls(List.of(
                 PlannerAgentToolCall.builder()
-                        .tool("deepseek_chat_completion")
+                        .tool("model_chat_completion")
                         .status("FAILED")
                         .detail("All connection attempts failed")
                         .retryCount(1)
@@ -414,10 +414,10 @@ class PlannerConversationServiceTest {
         verify(webSocketSessionRegistry, timeout(1000)).sendError(
                 eq(conversationId),
                 eq("PLANNER_AGENT_FALLBACK_USED"),
-                eq("模型生成失败，已返回本地兜底规划。请检查 DeepSeek 网络/API 配置。"),
+                eq("模型生成失败，已返回本地兜底规划。请检查 AI 网络/API 配置。"),
                 detailCaptor.capture()
         );
-        assertThat(detailCaptor.getValue()).contains("deepseek_chat_completion 失败");
+        assertThat(detailCaptor.getValue()).contains("model_chat_completion 失败");
         assertThat(detailCaptor.getValue()).contains("All connection attempts failed");
         assertThat(detailCaptor.getValue()).contains("fallback_plan_builder");
         executorService.shutdownNow();
@@ -432,7 +432,7 @@ class PlannerConversationServiceTest {
         response.setStatus("PARTIAL_SUCCESS");
         response.setToolCalls(List.of(
                 PlannerAgentToolCall.builder()
-                        .tool("deepseek_chat_completion")
+                        .tool("model_chat_completion")
                         .status("FAILED")
                         .detail("All connection attempts failed")
                         .build(),
