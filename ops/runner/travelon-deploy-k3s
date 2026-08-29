@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+tag="${1:-}"
+[[ "$tag" =~ ^sha-[0-9a-f]{7,40}$ ]] || exit 2
+[[ "${SUDO_USER:-}" == travelon-runner ]] || exit 3
+workspace="$(pwd -P)"
+case "$workspace" in /home/travelon-runner/_work/*/*|/home/travelon-runner/actions-runner/_work/*/*) ;; *) exit 4 ;; esac
+[[ "$(stat -c %U "$workspace")" == travelon-runner ]] || exit 5
+rendered="$(mktemp /tmp/travelon-k8s.XXXXXX.yaml)"; trap 'rm -f "$rendered"' EXIT
+k3s kubectl kustomize k8s/base >"$rendered"
+sed -Ei "s#(image: travelon-[a-z0-9-]+):latest#\1:${tag}#" "$rendered"
+sed -Ei "s#image: ghcr.io/qzlabq/(travelon-[a-z0-9-]+):latest#image: \1:${tag}#" "$rendered"
+if grep -Eq 'image: ghcr.io/qzlabq/travelon-|image: travelon-[a-z0-9-]+:latest' "$rendered"; then
+  echo 'Kubernetes image is not covered by ops/cd/images.tsv' >&2
+  exit 8
+fi
+if grep -Eq '^[[:space:]]*(privileged:[[:space:]]*true|hostPath:|hostNetwork:[[:space:]]*true|hostPID:[[:space:]]*true|hostIPC:[[:space:]]*true)' "$rendered"; then exit 6; fi
+k3s kubectl get namespace travelon >/dev/null
+k3s kubectl -n travelon get secret travelon-secrets >/dev/null
+k3s kubectl label namespace travelon pod-security.kubernetes.io/enforce=baseline --overwrite
+k3s kubectl apply -f "$rendered"
+while read -r resource; do k3s kubectl -n travelon rollout status "$resource" --timeout=25m; done < <(k3s kubectl -n travelon get statefulset -o name)
+while read -r resource; do k3s kubectl -n travelon rollout status "$resource" --timeout=15m; done < <(k3s kubectl -n travelon get deployment -o name)
+if k3s kubectl -n travelon get deployment/travelon-ui >/dev/null 2>&1; then
+  k3s kubectl -n travelon exec deployment/travelon-ui -- wget -qO- http://gateway:8082/ >/dev/null || true
+fi
+k3s kubectl -n travelon get pods

@@ -1,0 +1,1 @@
+travelon-runner ALL=(root) NOPASSWD: /usr/local/sbin/travelon-build-k3s, /usr/local/sbin/travelon-deploy-k3s
