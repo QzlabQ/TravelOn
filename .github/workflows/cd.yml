@@ -1,0 +1,49 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-travelon-256
+  cancel-in-progress: false
+
+jobs:
+  deploy-256:
+    name: Build images and deploy to 256 K3s
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: [self-hosted, linux, x64, travelon-256]
+    environment: production-256
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Build and import images
+        env:
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: ./scripts/build-k3s-images.sh "sha-${DEPLOY_SHA:0:7}"
+      - name: Bootstrap application secret
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          AMAP_API_KEY: ${{ secrets.AMAP_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$POSTGRES_PASSWORD"
+          sudo -n kubectl apply -f k8s/base/namespace.yaml
+          sudo -n kubectl -n travelon create secret generic travelon-secrets \
+            --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            --from-literal=DEEPSEEK_API_KEY="$DEEPSEEK_API_KEY" \
+            --from-literal=AMAP_API_KEY="$AMAP_API_KEY" \
+            --dry-run=client -o yaml | sudo -n kubectl apply -f -
+      - name: Deploy and smoke test
+        env:
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: ./scripts/deploy-k3s.sh "sha-${DEPLOY_SHA:0:7}"

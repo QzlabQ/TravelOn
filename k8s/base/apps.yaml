@@ -1,0 +1,328 @@
+apiVersion: v1
+kind: Service
+metadata: {name: discovery}
+spec:
+  selector: {app: discovery}
+  ports: [{name: http, port: 8010, targetPort: 8010}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: discovery}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: discovery}}
+  template:
+    metadata: {labels: {app: discovery}}
+    spec:
+      containers:
+        - name: discovery
+          image: travelon-discovery
+          ports: [{containerPort: 8010}]
+          readinessProbe: {httpGet: {path: /, port: 8010}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: 8010}, initialDelaySeconds: 30, periodSeconds: 15}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 768Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: gateway}
+spec:
+  selector: {app: gateway}
+  ports: [{name: http, port: 8082, targetPort: 8082}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: gateway}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: gateway}}
+  template:
+    metadata: {labels: {app: gateway}}
+    spec:
+      containers:
+        - name: gateway
+          image: travelon-gateway
+          ports: [{containerPort: 8082}]
+          envFrom: [{configMapRef: {name: travelon-config}}]
+          startupProbe: {tcpSocket: {port: 8082}, failureThreshold: 60, periodSeconds: 5}
+          readinessProbe: {tcpSocket: {port: 8082}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: 8082}, periodSeconds: 15}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 768Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: hotel}
+spec: {selector: {app: hotel}, ports: [{name: http, port: 8083, targetPort: 8083}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: hotel}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: hotel}}
+  template:
+    metadata: {labels: {app: hotel}}
+    spec:
+      containers:
+        - name: hotel
+          image: travelon-hotel
+          ports: [{containerPort: 8083}]
+          envFrom: [{configMapRef: {name: travelon-config}}]
+          env:
+            - {name: SERVER_PORT, value: "8083"}
+            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/hotel_db"}
+            - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
+            - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
+          startupProbe: {tcpSocket: {port: 8083}, failureThreshold: 120, periodSeconds: 10}
+          readinessProbe: {tcpSocket: {port: 8083}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: 8083}, periodSeconds: 15}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: transport}
+spec: {selector: {app: transport}, ports: [{name: http, port: 8084, targetPort: 8084}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: transport}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: transport}}
+  template:
+    metadata: {labels: {app: transport}}
+    spec:
+      containers:
+        - name: transport
+          image: travelon-transport
+          ports: [{containerPort: 8084}]
+          envFrom: [{configMapRef: {name: travelon-config}}]
+          env:
+            - {name: SERVER_PORT, value: "8084"}
+            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/transport_db"}
+            - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
+            - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
+            - {name: APP_SEED_DATA_COMMON_BASE_PATH, value: "file:/seed-data/common/"}
+          startupProbe: {tcpSocket: {port: 8084}, failureThreshold: 120, periodSeconds: 10}
+          readinessProbe: {tcpSocket: {port: 8084}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: 8084}, periodSeconds: 15}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: user}
+spec: {selector: {app: user}, ports: [{name: http, port: 8081, targetPort: 8081}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: user}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: user}}
+  template:
+    metadata: {labels: {app: user}}
+    spec:
+      containers:
+        - name: user
+          image: travelon-user
+          ports: [{containerPort: 8081}]
+          envFrom: [{configMapRef: {name: travelon-config}}]
+          env:
+            - {name: SERVER_PORT, value: "8081"}
+            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/user_db"}
+            - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
+            - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
+          startupProbe: {tcpSocket: {port: 8081}, failureThreshold: 120, periodSeconds: 10}
+          readinessProbe: {tcpSocket: {port: 8081}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: 8081}, periodSeconds: 15}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: community}
+spec: {selector: {app: community}, ports: [{name: http, port: 8088, targetPort: 8088}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: community}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: community}}
+  template:
+    metadata: {labels: {app: community}}
+    spec:
+      containers:
+        - name: community
+          image: travelon-community
+          ports: [{containerPort: 8088}]
+          envFrom: [{configMapRef: {name: travelon-config}}]
+          env:
+            - {name: SERVER_PORT, value: "8088"}
+            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/community_db"}
+            - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
+            - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
+            - {name: APP_UPLOADS_DIR, value: /uploads}
+            - {name: SPRING_RABBITMQ_HOST, value: rabbitmq}
+          startupProbe: {tcpSocket: {port: 8088}, failureThreshold: 120, periodSeconds: 10}
+          readinessProbe: {tcpSocket: {port: 8088}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: 8088}, periodSeconds: 15}
+          volumeMounts: [{name: uploads, mountPath: /uploads}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+      volumes: [{name: uploads, persistentVolumeClaim: {claimName: community-uploads}}]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: community-uploads}
+spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 20Gi}}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: reservation}
+spec: {selector: {app: reservation}, ports: [{name: http, port: 8086, targetPort: 8086}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: reservation}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: reservation}}
+  template:
+    metadata: {labels: {app: reservation}}
+    spec:
+      containers:
+        - name: reservation
+          image: travelon-reservation
+          ports: [{containerPort: 8086}]
+          envFrom: [{configMapRef: {name: travelon-config}}]
+          env:
+            - {name: SERVER_PORT, value: "8086"}
+            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/reservation_db"}
+            - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
+            - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
+          startupProbe: {tcpSocket: {port: 8086}, failureThreshold: 120, periodSeconds: 10}
+          readinessProbe: {tcpSocket: {port: 8086}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: 8086}, periodSeconds: 15}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: payment}
+spec: {selector: {app: payment}, ports: [{name: http, port: 8085, targetPort: 8085}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: payment}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: payment}}
+  template:
+    metadata: {labels: {app: payment}}
+    spec:
+      containers:
+        - name: payment
+          image: travelon-payment
+          ports: [{containerPort: 8085}]
+          envFrom: [{configMapRef: {name: travelon-config}}]
+          env:
+            - {name: SERVER_PORT, value: "8085"}
+            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/payment_db"}
+            - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
+            - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
+          startupProbe: {tcpSocket: {port: 8085}, failureThreshold: 120, periodSeconds: 10}
+          readinessProbe: {tcpSocket: {port: 8085}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: 8085}, periodSeconds: 15}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: ai-arrange-agent}
+spec: {selector: {app: ai-arrange-agent}, ports: [{name: http, port: 8090, targetPort: 8090}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: ai-arrange-agent}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: ai-arrange-agent}}
+  template:
+    metadata: {labels: {app: ai-arrange-agent}}
+    spec:
+      containers:
+        - name: ai-arrange-agent
+          image: travelon-ai-arrange-agent
+          ports: [{containerPort: 8090}]
+          env:
+            - {name: DEEPSEEK_API_KEY, valueFrom: {secretKeyRef: {name: travelon-secrets, key: DEEPSEEK_API_KEY, optional: true}}}
+            - {name: AMAP_API_KEY, valueFrom: {secretKeyRef: {name: travelon-secrets, key: AMAP_API_KEY, optional: true}}}
+            - {name: TRAVEL_GATEWAY_BASE_URL, value: "http://gateway:8082"}
+            - {name: AGENT_MAX_RUNTIME_SECONDS, value: "240"}
+          startupProbe: {httpGet: {path: /agent/health, port: 8090}, failureThreshold: 30, periodSeconds: 5}
+          readinessProbe: {httpGet: {path: /agent/health, port: 8090}, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /agent/health, port: 8090}, periodSeconds: 30}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: ai-arrange}
+spec: {selector: {app: ai-arrange}, ports: [{name: http, port: 8087, targetPort: 8087}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: ai-arrange}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: ai-arrange}}
+  template:
+    metadata: {labels: {app: ai-arrange}}
+    spec:
+      containers:
+        - name: ai-arrange
+          image: travelon-ai-arrange
+          ports: [{containerPort: 8087}]
+          envFrom: [{configMapRef: {name: travelon-config}}]
+          env:
+            - {name: SERVER_PORT, value: "8087"}
+            - {name: MONGODB_URI, value: "mongodb://mongo:27017/ai-arrange-db"}
+            - {name: AI_AGENT_ENABLED, value: "true"}
+            - {name: AI_ARRANGE_AGENT_BASE_URL, value: "http://ai-arrange-agent:8090"}
+            - {name: AI_ARRANGE_AGENT_TIMEOUT_SECONDS, value: "270"}
+            - {name: DEEPSEEK_API_KEY, valueFrom: {secretKeyRef: {name: travelon-secrets, key: DEEPSEEK_API_KEY, optional: true}}}
+            - {name: AMAP_API_KEY, valueFrom: {secretKeyRef: {name: travelon-secrets, key: AMAP_API_KEY, optional: true}}}
+          startupProbe: {tcpSocket: {port: 8087}, failureThreshold: 60, periodSeconds: 10}
+          readinessProbe: {tcpSocket: {port: 8087}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: 8087}, periodSeconds: 15}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: travelon-ui}
+spec: {selector: {app: travelon-ui}, ports: [{name: http, port: 80, targetPort: 80}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: travelon-ui}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: travelon-ui}}
+  template:
+    metadata: {labels: {app: travelon-ui}}
+    spec:
+      containers:
+        - name: travelon-ui
+          image: travelon-ui
+          ports: [{containerPort: 80}]
+          readinessProbe: {httpGet: {path: /, port: 80}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /, port: 80}, periodSeconds: 15}
+          resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {memory: 256Mi}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: travelon
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: travelon-ui, port: {number: 80}}}

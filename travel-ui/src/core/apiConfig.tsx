@@ -2,9 +2,12 @@ import axios from "axios";
 
 const apiHostname = process.env.REACT_APP_API_HOSTNAME || "localhost";
 const apiPort = process.env.REACT_APP_API_PORT || "58082";
+const configuredBaseURL = process.env.REACT_APP_API_BASE_URL;
 
-export const baseAPIURL = `http://${apiHostname}:${apiPort}/`;
-export const baseWSURL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${apiHostname}:${apiPort}/`;
+export const baseAPIURL = configuredBaseURL || `http://${apiHostname}:${apiPort}/`;
+export const baseWSURL = configuredBaseURL
+    ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${configuredBaseURL}`
+    : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${apiHostname}:${apiPort}/`;
 
 /**
  * Resolves an image reference for display. Absolute URLs (seed data) and data URLs
