@@ -30,6 +30,7 @@ public final class CommunityImages {
     private static boolean isAllowed(String url) {
         return url.startsWith("http://")
                 || url.startsWith("https://")
-                || url.startsWith("/community/uploads/");
+                || url.startsWith("/community/uploads/")
+                || url.startsWith("/community/defaults/");
     }
 }
