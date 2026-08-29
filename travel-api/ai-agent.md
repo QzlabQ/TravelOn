@@ -380,7 +380,7 @@ AI_AGENT_BASE_URL=http://ai-arrange-agent:8090
 
 ### 10.4 测试与验收任务
 
-- 使用 PowerShell 烟雾脚本创建会话。
+- 使用 `travel-api/tests/smoke/test_ai_websocket.py` 跨平台 pytest 冒烟测试创建会话。
 - 发送一次 `PLANNER_CHAT_SEND`。
 - 验证 Java 服务能成功调用 Python Agent。
 - 验证返回 `PLANNER_CHAT_STREAM`。

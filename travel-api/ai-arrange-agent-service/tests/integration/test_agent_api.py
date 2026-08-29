@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 
 client = TestClient(app)
+pytestmark = pytest.mark.integration
 
 
 def _parse_sse_events(text: str) -> list[dict]:

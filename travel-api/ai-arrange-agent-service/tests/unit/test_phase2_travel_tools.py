@@ -228,7 +228,7 @@ async def test_budget_estimate_uses_hotels_and_transport() -> None:
 
 
 def test_hotel_and_transport_tools_do_not_import_travel_tool_mocks() -> None:
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     hotel_source = (root / "app" / "tools" / "hotel_search_tool.py").read_text(encoding="utf-8")
     transport_source = (root / "app" / "tools" / "transport_search_tool.py").read_text(encoding="utf-8")
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import AgentSettings
@@ -14,6 +15,7 @@ from app.prompts.tool_selection_prompt import TOOL_SELECTION_PROMPT
 
 
 client = TestClient(app)
+pytestmark = pytest.mark.integration
 
 
 def test_prompt_fragments_are_composed_into_system_prompt() -> None:
