@@ -1,0 +1,45 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: travelon
+resources:
+  - namespace.yaml
+  - config.yaml
+  - data.yaml
+  - apps.yaml
+images:
+  - name: travelon-postgres
+    newName: ghcr.io/qzlabq/travelon-postgres
+    newTag: latest
+  - name: travelon-discovery
+    newName: ghcr.io/qzlabq/travelon-discovery
+    newTag: latest
+  - name: travelon-gateway
+    newName: ghcr.io/qzlabq/travelon-gateway
+    newTag: latest
+  - name: travelon-hotel
+    newName: ghcr.io/qzlabq/travelon-hotel
+    newTag: latest
+  - name: travelon-transport
+    newName: ghcr.io/qzlabq/travelon-transport
+    newTag: latest
+  - name: travelon-user
+    newName: ghcr.io/qzlabq/travelon-user
+    newTag: latest
+  - name: travelon-community
+    newName: ghcr.io/qzlabq/travelon-community
+    newTag: latest
+  - name: travelon-reservation
+    newName: ghcr.io/qzlabq/travelon-reservation
+    newTag: latest
+  - name: travelon-payment
+    newName: ghcr.io/qzlabq/travelon-payment
+    newTag: latest
+  - name: travelon-ai-arrange
+    newName: ghcr.io/qzlabq/travelon-ai-arrange
+    newTag: latest
+  - name: travelon-ai-arrange-agent
+    newName: ghcr.io/qzlabq/travelon-ai-arrange-agent
+    newTag: latest
+  - name: travelon-ui
+    newName: ghcr.io/qzlabq/travelon-ui
+    newTag: latest

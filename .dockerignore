@@ -1,0 +1,9 @@
+.git
+**/node_modules
+**/target
+**/build
+**/.venv
+**/data
+**/logs
+**/coverage
+artifacts
