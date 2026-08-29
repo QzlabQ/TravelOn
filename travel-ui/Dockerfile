@@ -5,7 +5,7 @@ WORKDIR /usr/app
 # declaration can select the repository-pinned Yarn release.
 RUN corepack enable && corepack prepare yarn@4.2.2 --activate
 
-COPY package.json yarn.lock ./
+COPY package.json yarn.lock .yarnrc.yml ./
 RUN yarn install --immutable
 
 COPY . .
