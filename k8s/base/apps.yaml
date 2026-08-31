@@ -62,6 +62,18 @@ spec:
   template:
     metadata: {labels: {app: travel-core}}
     spec:
+      initContainers:
+        - name: travel-core-migration
+          image: travelon-postgres
+          command: ["/bin/bash", "/database/migration/migrate-existing-databases.sh"]
+          env:
+            - {name: POSTGRES_USER, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
+            - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
+            - {name: HOTEL_DB_NAME, value: "hotel_db"}
+            - {name: TRANSPORT_DB_NAME, value: "transport_db"}
+            - {name: TRAVEL_CORE_DB_NAME, value: "travel_core_db"}
+            - {name: PGHOST, value: "postgres"}
+            - {name: PGPORT, value: "5432"}
       containers:
         - name: travel-core
           image: travelon-travel-core

@@ -89,6 +89,29 @@ services:
     networks:
       - backend
 
+  # Run explicitly before the first cutover on an existing PostgreSQL volume.
+  # The service is a one-shot migration job and is not part of the steady-state
+  # application container count.
+  travel-core-migration:
+    <<: *service-defaults
+    image: postgres:16
+    entrypoint: ["/bin/bash", "/database/migration/migrate-existing-databases.sh"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      HOTEL_DB_NAME: ${HOTEL_DB_NAME:-hotel_db}
+      TRANSPORT_DB_NAME: ${TRANSPORT_DB_NAME:-transport_db}
+      TRAVEL_CORE_DB_NAME: ${TRAVEL_CORE_DB_NAME:-travel_core_db}
+      PGHOST: postgres
+      PGPORT: 5432
+    volumes:
+      - ./database:/database:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+
   # custom services
   travel-core:
     <<: *service-defaults
@@ -111,6 +134,8 @@ services:
         condition: service_started
       gateway:
         condition: service_started
+      travel-core-migration:
+        condition: service_completed_successfully
     networks:
       - backend
 

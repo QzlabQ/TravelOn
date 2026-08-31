@@ -24,3 +24,7 @@ This folder holds Flyway schema migrations for **this service's own database**.
 
 Keep `database/schema/<service>_schema.sql` in sync as the human-readable
 end-state (it is the baseline for fresh installs).
+
+`R__seed.sql` relies on database constraints for idempotency. In particular,
+`hotel_photos` has a unique constraint on `(hotel_id, photos)` so rerunning the
+repeatable migration cannot duplicate an image row.

@@ -41,6 +41,38 @@ docker compose up -d --build
 This deletes local database data. Use cleanup scripts instead when preserving
 existing data matters.
 
+## Upgrading an existing volume
+
+The Docker entrypoint does not replay `database/init` on an existing data
+volume. Before switching an existing deployment from `hotel-service` and
+`transport-service` to `travel-core-service`, stop the old application
+containers and run the migration from the `travel-api` directory:
+
+```powershell
+docker compose stop travel-core
+docker compose run --rm travel-core-migration
+docker compose up -d travel-core
+```
+
+`database/migration/migrate-existing-databases.sh` creates `travel_core_db` if
+needed, applies the merged schema, copies the hotel and transport tables from
+the old databases through staging schemas, merges `city` by `city_id`, and
+validates every migrated identifier and city foreign key before recording a
+completion marker. It is safe to run again after a successful migration.
+
+The script does not modify the old databases. Keep `hotel_db` and
+`transport_db` stopped and read-only during the cutover. They remain the
+rollback snapshot before new writes are accepted by `travel-core-service`.
+After cutover, new writes go only to `travel_core_db`; a rollback after new
+writes requires a reverse migration or an explicit decision to discard those
+writes, so the old and new databases must not be treated as automatically
+consistent.
+
+For Kubernetes or another deployment environment, execute the same script
+from a PostgreSQL client container with `/database` mounted, wait for exit code
+0, and only then roll out `travel-core-service`. Do not rely on
+`docker-entrypoint-initdb.d` for an existing PostgreSQL volume.
+
 ## Simplified schema policy
 
 The PostgreSQL schema is intentionally reduced to service-owned primary tables,

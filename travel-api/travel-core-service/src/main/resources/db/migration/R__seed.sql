@@ -95,7 +95,7 @@ INSERT INTO public.hotel_photos (hotel_id, photos)
 SELECT h.source_id, p.photo_url
 FROM seed_hotel_photos p
 JOIN seed_hotels h ON h.source_id = p.source_hotel_id
-ON CONFLICT DO NOTHING;
+ON CONFLICT (hotel_id, photos) DO NOTHING;
 
 INSERT INTO public.room (id, name, description, guest_capacity, room_type, price_per_adult, hotel_id)
 SELECT r.id,

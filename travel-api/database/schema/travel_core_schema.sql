@@ -26,7 +26,8 @@ CREATE TABLE public.hotel (
 
 CREATE TABLE public.hotel_photos (
     hotel_id integer NOT NULL,
-    photos character varying(255)
+    photos character varying(255),
+    CONSTRAINT uq_hotel_photos_hotel_photo UNIQUE (hotel_id, photos)
 );
 
 CREATE TABLE public.room (
