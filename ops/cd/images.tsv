@@ -1,5 +1,5 @@
 # image-name<TAB>build-context<TAB>dockerfile
-postgres	.	travel-api/Dockerfile.postgres
+postgres	travel-api	travel-api/Dockerfile.postgres
 discovery	travel-api/discovery-service	travel-api/discovery-service/Dockerfile
 gateway	travel-api/api-gateway	travel-api/api-gateway/Dockerfile
 hotel	travel-api/hotel-service	travel-api/hotel-service/Dockerfile
