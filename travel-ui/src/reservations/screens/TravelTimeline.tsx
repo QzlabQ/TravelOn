@@ -365,7 +365,10 @@ const TravelTimeline = () => {
         setLoading(true);
         setError(false);
         try {
-            if (!session) throw new Error("Authentication required");
+            if (!session) {
+                setReservations([]);
+                return;
+            }
             const response = await ApiRequests.getReservationsForUser(session.token, userId);
             setReservations(response.data);
         } catch (e) {
