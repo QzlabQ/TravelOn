@@ -6,6 +6,8 @@ import org.microarchitecturovisco.reservationservice.domain.commands.UpdateReser
 import org.microarchitecturovisco.reservationservice.domain.dto.PaymentRequestDto;
 import org.microarchitecturovisco.reservationservice.domain.dto.PaymentResponseDto;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateHotelOnlyReservationRequest;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.HotelReservationDeleteRequest;
+import org.microarchitecturovisco.reservationservice.domain.dto.requests.TransportReservationDeleteRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.CreateTicketReservationRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.BookingPersonRequest;
 import org.microarchitecturovisco.reservationservice.domain.dto.requests.ReservationRequest;
@@ -156,9 +158,47 @@ public class ReservationService implements ReservationOperations {
                 .refundedAt(refundRequired ? now : null)
                 .build());
 
+        releaseReservedInventory(reservation);
+
         return reservationRepository.findById(reservationId)
                 .map(ReservationResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation not found"));
+    }
+
+    /**
+     * 归还订单占用的房间和座位。
+     *
+     * 支付超时补偿（{@link InvalidPaymentHandler}）一直会做这件事，但用户主动取消/退款
+     * 之前只更新订单状态，导致库存被永久占用、房间再也卖不出去。
+     * 消息投递失败不应让取消请求失败，因此只记录告警。
+     */
+    private void releaseReservedInventory(Reservation reservation) {
+        try {
+            List<Long> roomIds = reservation.getRoomReservationsIds();
+            if (reservation.getHotelId() != null && roomIds != null && !roomIds.isEmpty()) {
+                bookHotelsSaga.deleteHotelReservation(HotelReservationDeleteRequest.builder()
+                        .hotelId(reservation.getHotelId())
+                        .reservationId(reservation.getId())
+                        .roomIds(roomIds)
+                        .build());
+            }
+
+            List<UUID> transportIds = reservation.getTransportReservationsIds();
+            if (transportIds != null && !transportIds.isEmpty()) {
+                int totalPassengers = reservation.getAdultsQuantity()
+                        + reservation.getChildrenUnder18Quantity()
+                        + reservation.getChildrenUnder10Quantity()
+                        + reservation.getChildrenUnder3Quantity();
+                bookTransportsSaga.deleteTransportReservation(TransportReservationDeleteRequest.builder()
+                        .transportReservationsIds(transportIds)
+                        .reservationId(reservation.getId())
+                        .numberOfSeats(totalPassengers)
+                        .build());
+            }
+        } catch (Exception exception) {
+            logger.warning("Failed to release inventory for reservation " + reservation.getId()
+                    + ": " + exception.getMessage());
+        }
     }
 
     public ReservationResponse createTicketReservation(CreateTicketReservationRequest request, UUID userId) {
