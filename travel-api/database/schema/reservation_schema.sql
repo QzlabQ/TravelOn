@@ -34,15 +34,15 @@ CREATE TABLE public.reservation (
     CONSTRAINT reservation_status_check CHECK (status IN ('PENDING_PAYMENT', 'PAID', 'CANCELLED', 'EXPIRED', 'REFUND_PROCESSING', 'REFUNDED'))
 );
 
--- Stores the hotel-service room.id (bigint) values included in this reservation.
--- This is the Room entity ID, NOT the RoomReservation record ID (uuid) created by hotel-service.
--- The hotel-service links back via room_reservation.main_reservation_id (uuid).
+-- Stores the travel-core-service room.id (bigint) values included in this reservation.
+-- This is the Room entity ID, NOT the RoomReservation record ID (uuid) created by travel-core-service.
+-- travel-core-service links back via room_reservation.main_reservation_id (uuid).
 CREATE TABLE public.reservation_room_reservations_ids (
     reservation_id uuid NOT NULL,
     room_reservations_ids bigint
 );
 
--- Stores the transport-service ticket_offer_templates.id (uuid) values included in this reservation.
+-- Stores the travel-core-service ticket_offer_templates.id (uuid) values included in this reservation.
 CREATE TABLE public.reservation_transport_reservations_ids (
     reservation_id uuid NOT NULL,
     transport_reservations_ids uuid

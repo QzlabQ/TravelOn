@@ -11,14 +11,14 @@ sudo -n kubectl -n travelon get secret travelon-secrets >/dev/null
 sudo -n kubectl apply -k k8s/base
 sudo -n kubectl -n travelon set image statefulset/postgres "postgres=travelon-postgres:${tag}"
 
-for deployment in discovery gateway hotel transport user community reservation payment ai-arrange ai-arrange-agent; do
+for deployment in discovery gateway travel-core user community order ai-arrange ai-arrange-agent; do
   sudo -n kubectl -n travelon set image "deployment/${deployment}" "${deployment}=travelon-${deployment}:${tag}"
 done
 sudo -n kubectl -n travelon set image deployment/travelon-ui "travelon-ui=travelon-ui:${tag}"
 
 sudo -n kubectl -n travelon rollout status statefulset/postgres --timeout=25m
 sudo -n kubectl -n travelon rollout status statefulset/mongo --timeout=10m
-for deployment in rabbitmq discovery gateway hotel transport user community reservation payment ai-arrange ai-arrange-agent travelon-ui; do
+for deployment in rabbitmq discovery gateway travel-core user community order ai-arrange ai-arrange-agent travelon-ui; do
   sudo -n kubectl -n travelon rollout status "deployment/${deployment}" --timeout=15m
 done
 

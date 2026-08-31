@@ -115,9 +115,9 @@ def test_real_hotel_reservation_is_projected_and_timeout_rolls_back(
         )
 
     wait_until(
-        "hotel room reservation projection", configured_timeout,
+        "travel-core room reservation projection", configured_timeout,
         lambda: postgres_scalar(
-            "hotel_db", f"select count(*) from room_reservation where main_reservation_id = '{reservation_id}';"
+            "travel_core_db", f"select count(*) from room_reservation where main_reservation_id = '{reservation_id}';"
         ) == len(context["room_ids"]),
     )
     wait_until(
@@ -125,7 +125,7 @@ def test_real_hotel_reservation_is_projected_and_timeout_rolls_back(
         lambda: postgres_scalar(
             "reservation_db", f"select count(*) from reservation where id = '{reservation_id}';"
         ) == 0 and postgres_scalar(
-            "hotel_db", f"select count(*) from room_reservation where main_reservation_id = '{reservation_id}';"
+            "travel_core_db", f"select count(*) from room_reservation where main_reservation_id = '{reservation_id}';"
         ) == 0,
     )
 

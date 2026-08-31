@@ -4,6 +4,9 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'hotel_db')\gexec
 SELECT 'CREATE DATABASE transport_db'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'transport_db')\gexec
 
+SELECT 'CREATE DATABASE travel_core_db'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'travel_core_db')\gexec
+
 SELECT 'CREATE DATABASE user_db'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'user_db')\gexec
 

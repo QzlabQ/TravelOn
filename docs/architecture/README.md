@@ -2,7 +2,12 @@
 
 **版本：** V2.1
 **日期：** 2026-08-28
-**状态：** 待评审
+**状态：** 已实施，待 PR 评审
+
+> 实施分支：`feat/microservices-consolidation`。阶段 1 至 4 已完成：删除
+> `offer-provider-service`，将 reservation + payment 合并为 `order-service`，将
+> hotel + transport 合并为 `travel-core-service`，并同步 Gateway、Docker Compose、
+> Kubernetes 与 CD 配置。对外 HTTP 路径保持不变。
 
 ---
 
@@ -112,16 +117,20 @@ community 单个 Controller 就有约 34 个端点，覆盖帖子、评论、评
 
 ---
 
-## 待确认事项
+## 实施决定
 
 | # | 事项 | 状态 |
 |---|------|------|
-| 1 | offer-provider 由"合并"改为"删除" | 待确认 |
-| 2 | `/reservations/**` 不改名 | 待确认 |
-| 3 | order-service 沿用 `reservation_db` 库名 | 待确认 |
-| 4 | travel-core 新建库并重建数据卷 | 待确认 |
-| 5 | **前端是否依赖 `GET /offers/`** | **需前端确认** |
-| 6 | 实施顺序改为 offer → order → travel-core | 待确认 |
-| 7 | 不新增锁表、Saga 日志表、追踪与监控 | 待确认范围 |
+| 1 | offer-provider 由"合并"改为"删除" | 已实施 |
+| 2 | `/reservations/**` 不改名 | 已实施 |
+| 3 | order-service 沿用 `reservation_db` 库名 | 已实施 |
+| 4 | travel-core 新建 `travel_core_db`，旧库保留用于回滚 | 已实施 |
+| 5 | 前端不依赖 `GET /offers/` | 已核实并移除死调用 |
+| 6 | 实施顺序改为 offer → order → travel-core | 已实施 |
+| 7 | 不新增锁表、Saga 日志表、追踪与监控 | 已按范围执行 |
 
-详见[评审清单](./review-checklist.md)。
+验证结果：travel-core 27 个单元测试和 2 个 Spring 集成测试通过；Gateway 3 个测试通过；
+AI Agent 17 个测试通过；Docker Compose 配置解析和 Kubernetes Kustomize 渲染通过。
+真实 PostgreSQL 迁移由仓库内的
+[`tests/migration/test-existing-databases.sh`](../../tests/migration/test-existing-databases.sh)
+验证，并由 CI 调用。详细决策依据见[评审清单](./review-checklist.md)。

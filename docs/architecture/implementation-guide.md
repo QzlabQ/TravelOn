@@ -7,6 +7,11 @@
 > 本指南中的包名、类名、队列名、配置项均取自仓库实际内容。
 > 命令以仓库根目录 `e:\2026spring\26NULLptr\repositories` 为基准，shell 为 bash。
 
+> **文档定位：** 本文件是微服务合并的分阶段实施记录，不是当前服务清单。阶段 1 至 4
+> 已在 `feat/microservices-consolidation` 完成；当前开发和部署请以
+> [重构方案](./README.md)、仓库根目录 README 以及现有 `docker-compose.yml` 为准。
+> 下文命令中的旧服务目录仅表示迁移前的来源目录，不能作为当前运行服务使用。
+
 ---
 
 ## 0. 实施前

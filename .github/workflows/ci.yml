@@ -126,6 +126,11 @@ jobs:
         shell: bash
         run: touch travel-api/.env
 
+      - name: Run PostgreSQL migration regression test
+        if: steps.changes.outputs.run_ci == 'true'
+        shell: bash
+        run: bash tests/migration/test-existing-databases.sh
+
       - name: Run integration tests
         if: steps.changes.outputs.run_ci == 'true'
         run: mise run test:integration

@@ -134,7 +134,7 @@ travel-api/data/postgres/
 travel-api/data/postgres.failed-*/
 travel-api/data/rabbitmq
 travel-api/data/rabbitmq/
-travel-api/data/reservation-service/
+travel-api/data/order-service/
 travel-api/data/user-service/
 travel-ui/logs/
 

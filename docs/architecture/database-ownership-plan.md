@@ -191,17 +191,23 @@ hotel 与 transport 合并进同一个库后，它们之间**在数据库层面*
 
 ## 5. 迁移与回滚
 
-### 5.1 迁移步骤（无停机要求）
+### 5.1 迁移步骤
 
-由于 `travel_core_db` 是新建库且 seed 可从 CSV 完整重建，**不需要 `pg_dump` 导数据**：
+`travel_core_db` 的 seed 可以从 CSV 重建，但已有部署可能包含已经生成的
+`room_reservation`、票务库存和图片数据，不能只依赖 seed。Docker
+`docker-entrypoint-initdb.d` 只在空数据卷首次启动时执行，因此已有卷必须
+执行仓库中的实际迁移脚本：
 
-1. 在 init 脚本中加入 `travel_core_db` 的建库与 schema
-2. 重建 postgres 数据卷（或手工执行建库 + schema）
-3. 启动 travel-core-service，Flyway 自动 seed
-4. 校验行数与旧库一致
-5. 切换 Gateway 路由，停掉 hotel / transport 容器
+1. 停止旧的 hotel、transport 运行实例，建立维护窗口并冻结旧库写入
+2. 执行 [migrate-existing-databases.sh](../../travel-api/database/migration/migrate-existing-databases.sh)
+3. 脚本创建 `travel_core_db`，应用合并 schema，从旧库 staging schema 迁移酒店、房间、房间预订、图片和交通票务数据
+4. 脚本按 `city_id` 合并城市，并校验所有迁移标识和城市外键；校验失败时返回非零状态，不记录完成标记
+5. 迁移成功后再启动 `travel-core-service`，由 Flyway 应用增量迁移和 seed
+6. 校验服务和 Gateway，确认后将旧库保持停止或只读
 
-**注意第 2 步：** 现有 init 脚本只在**空数据卷**首次启动时执行（Docker postgres 镜像的 `docker-entrypoint-initdb.d` 语义）。已有数据卷的环境需手工执行建库与 schema 脚本，或接受一次数据卷重建。开发环境推荐直接重建；若有需要保留的业务数据，走手工路径。
+本地 Compose 提供 `travel-core-migration` 一次性任务，可在启动服务前显式
+执行。部署环境应使用等价的 PostgreSQL 客户端容器执行同一脚本。脚本成功
+后会在目标库写入 `travel_core_migration` 完成标记，重复执行会直接退出。
 
 ### 5.2 校验查询
 
@@ -230,13 +236,18 @@ SELECT 'city', count(*) FROM city;
 
 ### 5.3 回滚
 
-旧库 `hotel_db` 与 `transport_db` 在验收期内不删除。回滚只需：
+旧库 `hotel_db` 与 `transport_db` 在验收期内不删除。切换前回滚只需：
 
 1. Gateway 路由改回 `lb://hotel-service` 与 `lb://transport-service`
 2. 重新启动 hotel / transport 容器
 3. 停掉 travel-core 容器
 
 因为旧库数据从未被修改，回滚**不涉及数据恢复**。
+
+迁移脚本只在全部校验成功后才会完成标记，旧库在迁移过程中不写入。切换后
+`travel-core-service` 的新写入不会自动同步回旧库，因此如果已经产生新写入，
+回滚前必须执行反向迁移，或明确丢弃切换后的新增数据，不能直接把 Gateway
+切回旧服务并宣称数据一致。
 
 `travel_core_db` 与 `payment_db` 的删除应推迟到验收通过并稳定运行之后。
 

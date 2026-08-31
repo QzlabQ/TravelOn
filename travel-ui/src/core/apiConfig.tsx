@@ -67,14 +67,6 @@ export class ApiRequests {
         return await axiosInstance.get<HotelDestination[]>('hotels/destinations');
     }
 
-    static getOffersBySearchQuery = async (params: GetOffersBySearchQueryParams) => {
-        return await axiosInstance.get(`offers/?departureBus=${params.departureBus}&departurePlane=${params.departurePlane}&departureTrain=${params.departureTrain}&arrivals=${params.arrivals}&date_from=${params.dateFrom}&date_to=${params.dateTo}&adults=${params.adults}&teens=${params.teens}&kids=${params.kids}&infants=${params.infants}`);
-    }
-
-    static getOfferDetails = async (params: GetOfferDetailsParams) => {
-        return await axiosInstance.get(`offers/${params.idHotel}?departure_buses=${params.departureBus}&departure_planes=${params.departurePlane}&departure_trains=${params.departureTrain}&date_from=${params.dateFrom}&date_to=${params.dateTo}&adults=${params.adults}&teens=${params.teens}&kids=${params.kids}&infants=${params.infants}`)
-    }
-
     static reserveOffer = async (payload: ReservationRequestPayload) => {
         return await axiosInstance.post('reservations/reservation', payload);
     }
@@ -475,32 +467,6 @@ export interface GetOffersBySearchQueryOffer {
     destination: string,
     rating: number,
     imageUrl: string,
-}
-
-interface GetOffersBySearchQueryParams {
-    departurePlane: string[],
-    departureBus: string[],
-    departureTrain: string[],
-    arrivals: string[],
-    dateFrom: string,
-    dateTo: string,
-    adults: number,
-    teens: number,
-    kids: number,
-    infants: number,
-}
-
-interface GetOfferDetailsParams {
-    idHotel: number,
-    departurePlane: string[],
-    departureBus: string[],
-    departureTrain: string[],
-    dateFrom: string,
-    dateTo: string,
-    adults: number,
-    teens: number,
-    kids: number,
-    infants: number,
 }
 
 export enum TransportType {

@@ -48,14 +48,14 @@ spring:
               - '*'
         add-to-simple-url-handler-mapping: true
       routes:
-        - id: hotel-service
-          uri: lb://hotel-service
+        - id: travel-core-hotels
+          uri: lb://travel-core-service
           predicates:
             - Path=/hotels/**
           filters:
             - RemoveRequestHeader=Cookie
-        - id: transport-service
-          uri: lb://transport-service
+        - id: travel-core-transports
+          uri: lb://travel-core-service
           predicates:
             - Path=/transports/**
           filters:
@@ -72,8 +72,8 @@ spring:
             - Path=/community/**
           filters:
             - RemoveRequestHeader=Cookie
-        - id: reservation-service
-          uri: lb://reservation-service
+        - id: order-service
+          uri: lb://order-service
           predicates:
             - Path=/reservations/**
           metadata:
@@ -81,12 +81,6 @@ spring:
               allowedOrigins: '*'
               allowedMethods: '*'
               allowedHeaders: '*'
-        - id: payment-service
-          uri: lb://payment-service
-          predicates:
-            - Path=/payments/**
-          filters:
-            - RemoveRequestHeader=Cookie
         - id: ai-arrange-websocket
           uri: lb:ws://ai-arrange-service
           predicates:

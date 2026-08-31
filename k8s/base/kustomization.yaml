@@ -16,11 +16,8 @@ images:
   - name: travelon-gateway
     newName: ghcr.io/qzlabq/travelon-gateway
     newTag: latest
-  - name: travelon-hotel
-    newName: ghcr.io/qzlabq/travelon-hotel
-    newTag: latest
-  - name: travelon-transport
-    newName: ghcr.io/qzlabq/travelon-transport
+  - name: travelon-travel-core
+    newName: ghcr.io/qzlabq/travelon-travel-core
     newTag: latest
   - name: travelon-user
     newName: ghcr.io/qzlabq/travelon-user
@@ -28,11 +25,8 @@ images:
   - name: travelon-community
     newName: ghcr.io/qzlabq/travelon-community
     newTag: latest
-  - name: travelon-reservation
-    newName: ghcr.io/qzlabq/travelon-reservation
-    newTag: latest
-  - name: travelon-payment
-    newName: ghcr.io/qzlabq/travelon-payment
+  - name: travelon-order
+    newName: ghcr.io/qzlabq/travelon-order
     newTag: latest
   - name: travelon-ai-arrange
     newName: ghcr.io/qzlabq/travelon-ai-arrange
