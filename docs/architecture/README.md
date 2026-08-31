@@ -131,5 +131,6 @@ community 单个 Controller 就有约 34 个端点，覆盖帖子、评论、评
 
 验证结果：travel-core 27 个单元测试和 2 个 Spring 集成测试通过；Gateway 3 个测试通过；
 AI Agent 17 个测试通过；Docker Compose 配置解析和 Kubernetes Kustomize 渲染通过。
-由于本机 Docker Desktop 未运行，真实 PostgreSQL seed 执行与镜像构建留给 CI 或可用的
-Docker 环境验证。详细决策依据见[评审清单](./review-checklist.md)。
+真实 PostgreSQL 迁移由仓库内的
+[`tests/migration/test-existing-databases.sh`](../../tests/migration/test-existing-databases.sh)
+验证，并由 CI 调用。详细决策依据见[评审清单](./review-checklist.md)。

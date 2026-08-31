@@ -266,6 +266,22 @@ docker compose up -d --build
 docker compose ps
 ```
 
+### 本地旧服务目录清理
+
+微服务合并后，Git 中已经删除的旧服务目录可能仍因本地 Maven 构建产物而残留。
+确认没有未提交的个人文件后，可在仓库根目录执行以下命令清理这些本地目录；该操作
+不会影响远程仓库中的当前服务：
+
+```powershell
+Remove-Item -Recurse -Force `
+  .\travel-api\offer-provider-service, `
+  .\travel-api\hotel-service, `
+  .\travel-api\transport-service, `
+  .\travel-api\reservation-service, `
+  .\travel-api\payment-service `
+  -ErrorAction SilentlyContinue
+```
+
 网关地址：
 
 ```text

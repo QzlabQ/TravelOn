@@ -168,7 +168,10 @@ Eureka 服务名从 `hotel-service` / `transport-service` 变为 `travel-core-se
 
 ### 3.5 数据库
 
-新建 `travel_core_db`，不复用 `hotel_db`。seed 由 Flyway 从 CSV 重建，**不需要 `pg_dump` 导数据**。详见[数据表归属方案 §2.2](./database-ownership-plan.md)。
+新建 `travel_core_db`，不复用 `hotel_db`。首次部署时 seed 由 Flyway 从 CSV 重建；已有
+部署卷不能只依赖 seed，必须先执行仓库中的
+[`migrate-existing-databases.sh`](../../travel-api/database/migration/migrate-existing-databases.sh)，
+通过 `pg_dump` 将旧库中的运行数据迁移到新库。详见[数据表归属方案 §2.2](./database-ownership-plan.md)。
 
 ---
 
