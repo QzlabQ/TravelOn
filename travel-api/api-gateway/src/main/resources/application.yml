@@ -81,12 +81,6 @@ spring:
               allowedOrigins: '*'
               allowedMethods: '*'
               allowedHeaders: '*'
-        - id: payment-service
-          uri: lb://payment-service
-          predicates:
-            - Path=/payments/**
-          filters:
-            - RemoveRequestHeader=Cookie
         - id: ai-arrange-websocket
           uri: lb:ws://ai-arrange-service
           predicates:
