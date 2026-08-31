@@ -31,6 +31,7 @@ import {
     Edit,
     Email,
     Logout,
+    Lock,
     Phone,
     Save,
     PersonAdd,
@@ -147,6 +148,8 @@ export default function Account() {
     const [authOpen, setAuthOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [passwordForm, setPasswordForm] = useState({currentPassword: "", newPassword: "", confirmPassword: ""});
+    const [passwordSaving, setPasswordSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const [travelers, setTravelers] = useState<TravelerResponse[]>([]);
@@ -281,6 +284,37 @@ export default function Account() {
         }
     };
 
+    const changePassword = async () => {
+        if (!session) return;
+        if (passwordForm.newPassword.length < 6) {
+            setErrorMessage("新密码不少于 6 位。");
+            return;
+        }
+        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+            setErrorMessage("两次输入的新密码不一致。");
+            return;
+        }
+
+        setPasswordSaving(true);
+        setMessage("");
+        setErrorMessage("");
+        try {
+            await ApiRequests.changePassword(session.token, {
+                currentPassword: passwordForm.currentPassword,
+                newPassword: passwordForm.newPassword,
+            });
+            setPasswordForm({currentPassword: "", newPassword: "", confirmPassword: ""});
+            setMessage("密码已修改，请使用新密码登录其他设备。");
+        } catch (error: any) {
+            if (error?.response?.status === 400) {
+                setErrorMessage(error?.response?.data?.message || "当前密码不正确，或新密码与旧密码相同。");
+            } else {
+                setErrorMessage("密码修改失败，请稍后再试。");
+            }
+        } finally {
+            setPasswordSaving(false);
+        }
+    };
     const uploadAvatar = async (file: File | undefined) => {
         if (!file || !session) return;
         if (!file.type.startsWith("image/")) {
@@ -675,6 +709,33 @@ export default function Account() {
                         </Paper>
                     }
 
+                    {activeTab === "profile" &&
+                        <Paper elevation={0} className="mt-6 border border-gray-200 p-6">
+                            <div className="mb-5 flex items-center justify-between">
+                                <div>
+                                    <Typography variant="h5" className="font-semibold">修改密码</Typography>
+                                    <Typography variant="body2" color="text.secondary">验证当前密码后设置新的登录密码。</Typography>
+                                </div>
+                                <Lock style={{fontSize: 36, color: "#0f766e"}}/>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                <TextField label="当前密码" type="password" value={passwordForm.currentPassword}
+                                           onChange={event => setPasswordForm({...passwordForm, currentPassword: event.target.value})} fullWidth/>
+                                <TextField label="新密码" type="password" value={passwordForm.newPassword}
+                                           onChange={event => setPasswordForm({...passwordForm, newPassword: event.target.value})}
+                                           helperText="不少于 6 位" fullWidth/>
+                                <TextField label="确认新密码" type="password" value={passwordForm.confirmPassword}
+                                           onChange={event => setPasswordForm({...passwordForm, confirmPassword: event.target.value})} fullWidth/>
+                            </div>
+                            <div className="mt-6 flex justify-end">
+                                <Button variant="contained" startIcon={passwordSaving ? <CircularProgress size={18}/> : <Lock/>}
+                                        disabled={passwordSaving || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                                        onClick={changePassword}>
+                                    {passwordSaving ? "修改中..." : "修改密码"}
+                                </Button>
+                            </div>
+                        </Paper>
+                    }
                     {activeTab === "travel" &&
                         <>
                         <section aria-labelledby="identity-information-heading">

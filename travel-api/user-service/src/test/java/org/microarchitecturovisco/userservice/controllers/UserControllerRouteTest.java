@@ -3,6 +3,7 @@ package org.microarchitecturovisco.userservice.controllers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.microarchitecturovisco.userservice.dto.AuthResponse;
+import org.microarchitecturovisco.userservice.dto.ChangePasswordRequest;
 import org.microarchitecturovisco.userservice.services.TravelerService;
 import org.microarchitecturovisco.userservice.services.UserService;
 import org.springframework.http.MediaType;
@@ -15,6 +16,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -66,6 +68,21 @@ class UserControllerRouteTest {
         verify(userService).register(any());
     }
 
+    @Test
+    void authenticatedPasswordRouteRemainsMapped() throws Exception {
+        mockMvc.perform(put("/users/me/password")
+                        .header("X-User-Token", "session-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "old-password",
+                                  "newPassword": "new-password"
+                                }
+                                """))
+                .andExpect(status().isNoContent());
+
+        verify(userService).changePassword(any(), any(ChangePasswordRequest.class));
+    }
     @Test
     void authenticatedProfileRouteRemainsMapped() throws Exception {
         mockMvc.perform(get("/users/me")

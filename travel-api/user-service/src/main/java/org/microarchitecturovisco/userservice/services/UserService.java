@@ -3,6 +3,7 @@ package org.microarchitecturovisco.userservice.services;
 import org.microarchitecturovisco.userservice.domain.User;
 import org.microarchitecturovisco.userservice.domain.UserRole;
 import org.microarchitecturovisco.userservice.dto.AuthResponse;
+import org.microarchitecturovisco.userservice.dto.ChangePasswordRequest;
 import org.microarchitecturovisco.userservice.dto.LoginRequest;
 import org.microarchitecturovisco.userservice.dto.RegisterRequest;
 import org.microarchitecturovisco.userservice.dto.UpdateProfileRequest;
@@ -111,6 +112,19 @@ public class UserService {
         return UserProfileResponse.from(savedUser);
     }
 
+    public void changePassword(String token, ChangePasswordRequest request) {
+        User user = requireUserByToken(token);
+
+        if (!passwordHasher.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+        if (request.currentPassword().equals(request.newPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must differ from current password");
+        }
+
+        user.setPasswordHash(passwordHasher.hash(request.newPassword()));
+        userRepository.save(user);
+    }
     public void logout(String token) {
         User user = requireUserByToken(token);
         user.setSessionToken(null);

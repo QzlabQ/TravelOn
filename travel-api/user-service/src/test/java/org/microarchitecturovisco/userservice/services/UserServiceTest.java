@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.microarchitecturovisco.userservice.domain.User;
 import org.microarchitecturovisco.userservice.domain.UserRole;
+import org.microarchitecturovisco.userservice.dto.ChangePasswordRequest;
 import org.microarchitecturovisco.userservice.dto.LoginRequest;
 import org.microarchitecturovisco.userservice.dto.RegisterRequest;
 import org.microarchitecturovisco.userservice.dto.UpdateProfileRequest;
@@ -73,6 +74,46 @@ class UserServiceTest {
         verify(userRepository, never()).save(any());
     }
 
+    @Test
+    void changePasswordVerifiesCurrentPasswordAndStoresNewHash() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder().id(userId).sessionToken("token").passwordHash("old-hash").build();
+        when(userRepository.findBySessionToken("token")).thenReturn(Optional.of(user));
+        when(passwordHasher.matches("old-password", "old-hash")).thenReturn(true);
+        when(passwordHasher.hash("new-password")).thenReturn("new-hash");
+
+        userService.changePassword("token", new ChangePasswordRequest("old-password", "new-password"));
+
+        assertThat(user.getPasswordHash()).isEqualTo("new-hash");
+        verify(userRepository).save(user);
+        verify(passwordHasher).hash("new-password");
+    }
+
+    @Test
+    void changePasswordRejectsIncorrectCurrentPassword() {
+        User user = User.builder().id(UUID.randomUUID()).sessionToken("token").passwordHash("old-hash").build();
+        when(userRepository.findBySessionToken("token")).thenReturn(Optional.of(user));
+        when(passwordHasher.matches("wrong-password", "old-hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> userService.changePassword("token", new ChangePasswordRequest("wrong-password", "new-password")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400 BAD_REQUEST");
+        verify(userRepository, never()).save(any());
+        verify(passwordHasher, never()).hash(any());
+    }
+
+    @Test
+    void changePasswordRejectsReusingCurrentPassword() {
+        User user = User.builder().id(UUID.randomUUID()).sessionToken("token").passwordHash("old-hash").build();
+        when(userRepository.findBySessionToken("token")).thenReturn(Optional.of(user));
+        when(passwordHasher.matches("same-password", "old-hash")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.changePassword("token", new ChangePasswordRequest("same-password", "same-password")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400 BAD_REQUEST");
+        verify(userRepository, never()).save(any());
+        verify(passwordHasher, never()).hash(any());
+    }
     @Test
     void requireUserByTokenRejectsMissingAndUnknownTokens() {
         assertThatThrownBy(() -> userService.requireUserByToken(" "))
