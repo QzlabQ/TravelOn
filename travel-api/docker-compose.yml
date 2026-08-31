@@ -90,15 +90,18 @@ services:
       - backend
 
   # custom services
-  hotel:
+  travel-core:
     <<: *service-defaults
-    build: ./hotel-service
+    build: ./travel-core-service
     volumes:
-      - ./logs/hotel:/logs
+      - ./logs/travel-core:/logs
+      # Runtime dependency: CityCatalog reads common/cities.csv for city lookups.
+      - ./seed-data/common:/seed-data/common:ro
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${HOTEL_DB_NAME:-hotel_db}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${TRAVEL_CORE_DB_NAME:-travel_core_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,30 +124,6 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       APP_PAYMENT_TIMEOUT_SECONDS: ${APP_PAYMENT_TIMEOUT_SECONDS:-1800}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_started
-      discovery:
-        condition: service_started
-      gateway:
-        condition: service_started
-    networks:
-      - backend
-
-  transport:
-    <<: *service-defaults
-    build: ./transport-service
-    volumes:
-      - ./logs/transport:/logs
-      # Runtime dependency: CityCatalog reads common/cities.csv for city lookups.
-      - ./seed-data/common:/seed-data/common:ro
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${TRANSPORT_DB_NAME:-transport_db}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
-      APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
     depends_on:
       postgres:
         condition: service_healthy

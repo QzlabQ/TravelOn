@@ -12,6 +12,9 @@
 \connect transport_db
 \i /database/schema/transport_schema.sql
 
+\connect travel_core_db
+\i /database/schema/travel_core_schema.sql
+
 \connect user_db
 \i /database/schema/user_schema.sql
 
@@ -20,5 +23,3 @@
 
 \connect community_db
 \i /database/schema/community_schema.sql
-
-\connect payment_db

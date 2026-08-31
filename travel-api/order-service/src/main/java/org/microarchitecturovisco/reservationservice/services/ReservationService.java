@@ -212,7 +212,7 @@ public class ReservationService implements ReservationOperations {
         List<BookingPersonSnapshot> travelers = normalizeTravelers(request.travelers(), request.passengerCount());
         UUID reservationId = UUID.randomUUID();
 
-        // Use the actual ticketOfferId when available so the transport-service can decrement inventory.
+        // Use the actual ticketOfferId when available so travel-core-service can decrement inventory.
         // Fall back to a derived UUID for backwards compatibility when the field is absent.
         UUID transportReservationId = request.ticketOfferId() != null
                 ? request.ticketOfferId()
@@ -246,7 +246,7 @@ public class ReservationService implements ReservationOperations {
 
         reservationAggregate.handleCreateReservationCommand(command);
 
-        // Wire into the saga so transport-service decrements remaining_seats and rollback works on timeout.
+        // Wire into the saga so travel-core-service decrements remaining_seats and rollback works on timeout.
         ReservationRequest rollbackRequest = ReservationRequest.builder()
                 .id(reservationId)
                 .transportReservationsIds(List.of(transportReservationId))
@@ -305,7 +305,7 @@ public class ReservationService implements ReservationOperations {
                 .paymentDeadline(nextPaymentDeadline())
                 .build();
 
-        // Wire into the saga so hotel-service creates a real RoomReservation record
+        // Wire into the saga so travel-core-service creates a real RoomReservation record
         // and rollback works on payment timeout.
         ReservationRequest rollbackRequest = ReservationRequest.builder()
                 .id(reservationId)

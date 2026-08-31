@@ -48,14 +48,14 @@ spring:
               - '*'
         add-to-simple-url-handler-mapping: true
       routes:
-        - id: hotel-service
-          uri: lb://hotel-service
+        - id: travel-core-hotels
+          uri: lb://travel-core-service
           predicates:
             - Path=/hotels/**
           filters:
             - RemoveRequestHeader=Cookie
-        - id: transport-service
-          uri: lb://transport-service
+        - id: travel-core-transports
+          uri: lb://travel-core-service
           predicates:
             - Path=/transports/**
           filters:

@@ -50,61 +50,32 @@ spec:
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: hotel}
-spec: {selector: {app: hotel}, ports: [{name: http, port: 8083, targetPort: 8083}]}
+metadata: {name: travel-core}
+spec: {selector: {app: travel-core}, ports: [{name: http, port: 8083, targetPort: 8083}]}
 ---
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: hotel}
+metadata: {name: travel-core}
 spec:
   replicas: 1
-  selector: {matchLabels: {app: hotel}}
+  selector: {matchLabels: {app: travel-core}}
   template:
-    metadata: {labels: {app: hotel}}
+    metadata: {labels: {app: travel-core}}
     spec:
       containers:
-        - name: hotel
-          image: travelon-hotel
+        - name: travel-core
+          image: travelon-travel-core
           ports: [{containerPort: 8083}]
           envFrom: [{configMapRef: {name: travelon-config}}]
           env:
             - {name: SERVER_PORT, value: "8083"}
-            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/hotel_db"}
-            - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
-            - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
-          startupProbe: {tcpSocket: {port: 8083}, failureThreshold: 120, periodSeconds: 10}
-          readinessProbe: {tcpSocket: {port: 8083}, periodSeconds: 5}
-          livenessProbe: {tcpSocket: {port: 8083}, periodSeconds: 15}
-          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
----
-apiVersion: v1
-kind: Service
-metadata: {name: transport}
-spec: {selector: {app: transport}, ports: [{name: http, port: 8084, targetPort: 8084}]}
----
-apiVersion: apps/v1
-kind: Deployment
-metadata: {name: transport}
-spec:
-  replicas: 1
-  selector: {matchLabels: {app: transport}}
-  template:
-    metadata: {labels: {app: transport}}
-    spec:
-      containers:
-        - name: transport
-          image: travelon-transport
-          ports: [{containerPort: 8084}]
-          envFrom: [{configMapRef: {name: travelon-config}}]
-          env:
-            - {name: SERVER_PORT, value: "8084"}
-            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/transport_db"}
+            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/travel_core_db"}
             - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
             - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
             - {name: APP_SEED_DATA_COMMON_BASE_PATH, value: "file:/seed-data/common/"}
-          startupProbe: {tcpSocket: {port: 8084}, failureThreshold: 120, periodSeconds: 10}
-          readinessProbe: {tcpSocket: {port: 8084}, periodSeconds: 5}
-          livenessProbe: {tcpSocket: {port: 8084}, periodSeconds: 15}
+          startupProbe: {tcpSocket: {port: 8083}, failureThreshold: 120, periodSeconds: 10}
+          readinessProbe: {tcpSocket: {port: 8083}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: 8083}, periodSeconds: 15}
           resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
 ---
 apiVersion: v1

@@ -2,8 +2,7 @@
 postgres	.	travel-api/Dockerfile.postgres
 discovery	travel-api/discovery-service	travel-api/discovery-service/Dockerfile
 gateway	travel-api/api-gateway	travel-api/api-gateway/Dockerfile
-hotel	travel-api/hotel-service	travel-api/hotel-service/Dockerfile
-transport	.	travel-api/transport-service/Dockerfile.k8s
+travel-core	.	travel-api/travel-core-service/Dockerfile.k8s
 user	travel-api/user-service	travel-api/user-service/Dockerfile
 community	travel-api/community-service	travel-api/community-service/Dockerfile
 order	travel-api/order-service	travel-api/order-service/Dockerfile

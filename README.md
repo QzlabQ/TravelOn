@@ -58,12 +58,10 @@ flowchart LR
 
     subgraph services["Java 微服务"]
         ai["ai-arrange-service<br/>AI 编排服务<br/>会话 / 快照 / WebSocket"]
-        hotel["hotel-service<br/>酒店服务"]
-        transport["transport-service<br/>交通服务"]
-        reservation["reservation-service<br/>预订服务"]
+        travelCore["travel-core-service<br/>酒店 / 交通产品服务"]
+        order["order-service<br/>订单 / 支付服务"]
         community["community-service<br/>社区服务"]
         user["user-service<br/>用户服务"]
-        payment["payment-service<br/>支付服务"]
     end
 
     agent["ai-arrange-agent-service<br/>Python Agent"]
@@ -77,36 +75,28 @@ flowchart LR
 
     ui --> gateway
     gateway --> ai
-    gateway --> hotel
-    gateway --> transport
-    gateway --> reservation
+    gateway --> travelCore
+    gateway --> order
     gateway --> community
     gateway --> user
-    gateway --> payment
     ai --> agent
 
     gateway -.-> eureka
     ai -.-> eureka
-    hotel -.-> eureka
-    transport -.-> eureka
-    reservation -.-> eureka
+    travelCore -.-> eureka
+    order -.-> eureka
     community -.-> eureka
     user -.-> eureka
-    payment -.-> eureka
 
     ai -.-> mongo
-    hotel -.-> postgres
-    transport -.-> postgres
-    reservation -.-> postgres
+    travelCore -.-> postgres
+    order -.-> postgres
     community -.-> postgres
     user -.-> postgres
-    payment -.-> postgres
 
-    hotel -.-> rabbit
-    transport -.-> rabbit
-    reservation -.-> rabbit
+    travelCore -.-> rabbit
+    order -.-> rabbit
     user -.-> rabbit
-    payment -.-> rabbit
     ai -.-> rabbit
 ```
 
@@ -558,14 +548,14 @@ Playwright 报告：在 `travel-ui` 执行 `corepack yarn test:e2e:report`。
    python generate_dated_ticket_offers.py
    ```
    
-3. 如果 Docker Compose 已在运行，导入现有交通数据库：
+3. 如果 Docker Compose 已在运行，导入现有旅行产品数据库：
 
    ```powershell
-   docker compose exec -T postgres psql -U admin -d transport_db -f /database/seed/transport_seed.sql
-   docker compose restart transport
+   docker compose exec -T postgres psql -U admin -d travel_core_db -f /database/seed/transport_seed.sql
+   docker compose restart travel-core
    ```
 
-   如果 `.env` 修改过数据库用户名或数据库名，请替换 `admin` 和 `transport_db`。导入脚本使用确定性 ID 和 `ON CONFLICT (id) DO NOTHING`，会保留已有数据并补充新日期。
+   如果 `.env` 修改过数据库用户名或 `TRAVEL_CORE_DB_NAME`，请替换 `admin` 和 `travel_core_db`。导入脚本使用确定性 ID 和 `ON CONFLICT (id) DO NOTHING`，会保留已有数据并补充新日期。
 
 `docker compose up -d --build` 只会重新构建镜像。若 `travel-api/data/postgres` 已有数据库，它不会自动重新生成或重新导入票务
 CSV；数据库初始化脚本只会在该目录为空时执行。修改 CSV 后仍建议显式执行上面的 `psql` 导入命令。

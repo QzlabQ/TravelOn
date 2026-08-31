@@ -10,10 +10,9 @@
         <module name="data-generator" />
         <module name="order-service" />
         <module name="api-gateway" />
-        <module name="transport-service" />
+        <module name="travel-core-service" />
         <module name="user-service" />
         <module name="discovery-service" />
-        <module name="hotel-service" />
       </profile>
     </annotationProcessing>
   </component>
@@ -22,9 +21,8 @@
       <module name="api-gateway" options="-parameters" />
       <module name="data-generator" options="-parameters" />
       <module name="discovery-service" options="-parameters" />
-      <module name="hotel-service" options="-parameters" />
       <module name="order-service" options="-parameters" />
-      <module name="transport-service" options="-parameters" />
+      <module name="travel-core-service" options="-parameters" />
       <module name="user-service" options="-parameters" />
     </option>
   </component>

@@ -25,7 +25,11 @@ class GatewayRouteConfigurationTest {
                 .collect(Collectors.toSet());
 
         assertThat(routeIds)
-                .doesNotContain("offer-provider-service", "payment-service");
+                .doesNotContain(
+                        "offer-provider-service",
+                        "payment-service",
+                        "hotel-service",
+                        "transport-service");
     }
 
     @Test
@@ -39,5 +43,19 @@ class GatewayRouteConfigurationTest {
         assertThat(routes).containsKey("order-service");
         assertThat(routes.get("order-service").getUri().toString()).isEqualTo("lb://order-service");
         assertThat(routes).doesNotContainKey("reservation-service");
+    }
+
+    @Test
+    void productApisAreRoutedToTravelCoreService() {
+        Map<String, org.springframework.cloud.gateway.route.RouteDefinition> routes =
+                gatewayProperties.getRoutes().stream()
+                        .collect(Collectors.toMap(
+                                org.springframework.cloud.gateway.route.RouteDefinition::getId,
+                                Function.identity()));
+
+        assertThat(routes.get("travel-core-hotels").getUri().toString())
+                .isEqualTo("lb://travel-core-service");
+        assertThat(routes.get("travel-core-transports").getUri().toString())
+                .isEqualTo("lb://travel-core-service");
     }
 }
