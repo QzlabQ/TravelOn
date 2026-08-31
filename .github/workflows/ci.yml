@@ -6,6 +6,11 @@ on:
 
   push:
     branches: [main]
+    # Documentation-only merges neither need post-merge verification nor CD.
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "README.en.md"
 
   workflow_dispatch:
 
@@ -25,17 +30,70 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          # The PR base and head are both needed to classify the complete change set.
+          fetch-depth: 0
+
+      # Keep the workflow-level check alive for branch protection. A workflow
+      # skipped with `paths-ignore` can otherwise leave a required check pending.
+      - name: Detect changes requiring CI
+        id: changes
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # Pushes to main and manual runs are post-merge/full verification.
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            echo "run_ci=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mapfile -d '' changed_files < <(
+            git diff --name-only -z "$BASE_SHA...$HEAD_SHA"
+          )
+
+          # Be conservative if GitHub reports an empty PR diff unexpectedly.
+          if (( ${#changed_files[@]} == 0 )); then
+            echo "run_ci=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          run_ci=false
+          for file in "${changed_files[@]}"; do
+            case "$file" in
+              docs/*|README.md|README.en.md)
+                ;;
+              *)
+                echo "CI-relevant change: $file"
+                run_ci=true
+                break
+                ;;
+            esac
+          done
+
+          echo "run_ci=$run_ci" >> "$GITHUB_OUTPUT"
+
+      - name: Skip CI for documentation-only change
+        if: steps.changes.outputs.run_ci == 'false'
+        run: echo "Only documentation files changed; build and tests are not required."
 
       - name: Install toolchain
+        if: steps.changes.outputs.run_ci == 'true'
         uses: jdx/mise-action@v4
         with:
           cache: true
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
+        if: steps.changes.outputs.run_ci == 'true'
         run: mise run setup
 
       - name: Compile applications
+        if: steps.changes.outputs.run_ci == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -56,20 +114,24 @@ jobs:
           corepack yarn build
 
       - name: Build frontend Docker image
+        if: steps.changes.outputs.run_ci == 'true'
         run: docker build --pull --tag travel-ui:ci travel-ui
 
       - name: Run unit tests
+        if: steps.changes.outputs.run_ci == 'true'
         run: mise run test:unit
 
       - name: Prepare integration environment
+        if: steps.changes.outputs.run_ci == 'true'
         shell: bash
         run: touch travel-api/.env
 
       - name: Run integration tests
+        if: steps.changes.outputs.run_ci == 'true'
         run: mise run test:integration
 
       - name: Upload test reports
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.changes.outputs.run_ci == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ github.run_number }}
