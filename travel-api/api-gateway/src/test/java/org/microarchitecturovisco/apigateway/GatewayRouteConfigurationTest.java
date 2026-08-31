@@ -6,6 +6,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.gateway.config.GatewayProperties;
 
 import java.util.Set;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,5 +26,18 @@ class GatewayRouteConfigurationTest {
 
         assertThat(routeIds)
                 .doesNotContain("offer-provider-service", "payment-service");
+    }
+
+    @Test
+    void reservationApiIsRoutedToOrderService() {
+        Map<String, org.springframework.cloud.gateway.route.RouteDefinition> routes =
+                gatewayProperties.getRoutes().stream()
+                        .collect(Collectors.toMap(
+                                org.springframework.cloud.gateway.route.RouteDefinition::getId,
+                                Function.identity()));
+
+        assertThat(routes).containsKey("order-service");
+        assertThat(routes.get("order-service").getUri().toString()).isEqualTo("lb://order-service");
+        assertThat(routes).doesNotContainKey("reservation-service");
     }
 }

@@ -6,8 +6,7 @@ hotel	travel-api/hotel-service	travel-api/hotel-service/Dockerfile
 transport	.	travel-api/transport-service/Dockerfile.k8s
 user	travel-api/user-service	travel-api/user-service/Dockerfile
 community	travel-api/community-service	travel-api/community-service/Dockerfile
-reservation	travel-api/reservation-service	travel-api/reservation-service/Dockerfile
-payment	travel-api/payment-service	travel-api/payment-service/Dockerfile
+order	travel-api/order-service	travel-api/order-service/Dockerfile
 ai-arrange	travel-api/ai-arrange-service	travel-api/ai-arrange-service/Dockerfile
 ai-arrange-agent	travel-api/ai-arrange-agent-service	travel-api/ai-arrange-agent-service/Dockerfile
 ui	travel-ui	travel-ui/Dockerfile

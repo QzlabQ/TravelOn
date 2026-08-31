@@ -72,8 +72,8 @@ spring:
             - Path=/community/**
           filters:
             - RemoveRequestHeader=Cookie
-        - id: reservation-service
-          uri: lb://reservation-service
+        - id: order-service
+          uri: lb://order-service
           predicates:
             - Path=/reservations/**
           metadata:

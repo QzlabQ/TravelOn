@@ -78,19 +78,9 @@ services:
     deploy:
       replicas: 2
 
-  payment:
+  order:
     <<: *service-defaults
-    image: ghcr.io/microarchitecturovisco/payment:dev
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-    networks:
-      - backend
-
-  reservation:
-    <<: *service-defaults
-    image: ghcr.io/microarchitecturovisco/reservation:dev
+    image: ghcr.io/microarchitecturovisco/order:dev
     depends_on:
       - rabbitmq
       - discovery

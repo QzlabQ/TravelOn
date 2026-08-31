@@ -21,8 +21,7 @@ build_and_import hotel travel-api/hotel-service travel-api/hotel-service/Dockerf
 build_and_import transport . travel-api/transport-service/Dockerfile.k8s
 build_and_import user travel-api/user-service travel-api/user-service/Dockerfile
 build_and_import community travel-api/community-service travel-api/community-service/Dockerfile
-build_and_import reservation travel-api/reservation-service travel-api/reservation-service/Dockerfile
-build_and_import payment travel-api/payment-service travel-api/payment-service/Dockerfile
+build_and_import order travel-api/order-service travel-api/order-service/Dockerfile
 build_and_import ai-arrange travel-api/ai-arrange-service travel-api/ai-arrange-service/Dockerfile
 build_and_import ai-arrange-agent travel-api/ai-arrange-agent-service travel-api/ai-arrange-agent-service/Dockerfile
 build_and_import ui travel-ui travel-ui/Dockerfile

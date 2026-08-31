@@ -111,34 +111,13 @@ services:
     networks:
       - backend
 
-  payment:
+  order:
     <<: *service-defaults
-    build: ./payment-service
+    build: ./order-service
     volumes:
-      - ./logs/payment:/logs
+      - ./logs/order:/logs
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${PAYMENT_DB_NAME:-payment_db}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_started
-      discovery:
-        condition: service_started
-      gateway:
-        condition: service_started
-    networks:
-      - backend
-
-  reservation:
-    <<: *service-defaults
-    build: ./reservation-service
-    volumes:
-      - ./logs/reservation:/logs
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${RESERVATION_DB_NAME:-reservation_db}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${ORDER_DB_NAME:-reservation_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       APP_PAYMENT_TIMEOUT_SECONDS: ${APP_PAYMENT_TIMEOUT_SECONDS:-1800}

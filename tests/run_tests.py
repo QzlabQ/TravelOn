@@ -284,14 +284,13 @@ def compose(
 
 # 经网关探测有 HTTP 路由的服务，判断后端是否真的可路由。网关在目标服务没有可用实例时返回 503，
 # 因此只要状态码不是 503（哪怕是 401/404）就说明该服务已注册且路由已刷新。
-# payment-service 仅消费 RabbitMQ 消息，没有 HTTP 端点，不在这里伪造就绪探针。
 # 只等 hotel-service 是不够的：Eureka 注册成功后网关仍有最长 30 秒的注册表缓存，
 # 期间下单等请求会被打到没有实例的路由上而失败。
 GATEWAY_PROBES = (
     ("hotel-service", "/hotels/destinations"),
     ("transport-service", "/transports/tickets/options?type=TRAIN"),
     ("user-service", "/users/auth/ping"),
-    ("reservation-service", "/reservations/ping"),
+    ("order-service", "/reservations/ping"),
     ("community-service", "/community/posts"),
 )
 

@@ -176,21 +176,21 @@ spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 20Gi}}}
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: reservation}
-spec: {selector: {app: reservation}, ports: [{name: http, port: 8086, targetPort: 8086}]}
+metadata: {name: order}
+spec: {selector: {app: order}, ports: [{name: http, port: 8086, targetPort: 8086}]}
 ---
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: reservation}
+metadata: {name: order}
 spec:
   replicas: 1
-  selector: {matchLabels: {app: reservation}}
+  selector: {matchLabels: {app: order}}
   template:
-    metadata: {labels: {app: reservation}}
+    metadata: {labels: {app: order}}
     spec:
       containers:
-        - name: reservation
-          image: travelon-reservation
+        - name: order
+          image: travelon-order
           ports: [{containerPort: 8086}]
           envFrom: [{configMapRef: {name: travelon-config}}]
           env:
@@ -198,38 +198,10 @@ spec:
             - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/reservation_db"}
             - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
             - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
+            - {name: APP_PAYMENT_TIMEOUT_SECONDS, value: "1800"}
           startupProbe: {tcpSocket: {port: 8086}, failureThreshold: 120, periodSeconds: 10}
           readinessProbe: {tcpSocket: {port: 8086}, periodSeconds: 5}
           livenessProbe: {tcpSocket: {port: 8086}, periodSeconds: 15}
-          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
----
-apiVersion: v1
-kind: Service
-metadata: {name: payment}
-spec: {selector: {app: payment}, ports: [{name: http, port: 8085, targetPort: 8085}]}
----
-apiVersion: apps/v1
-kind: Deployment
-metadata: {name: payment}
-spec:
-  replicas: 1
-  selector: {matchLabels: {app: payment}}
-  template:
-    metadata: {labels: {app: payment}}
-    spec:
-      containers:
-        - name: payment
-          image: travelon-payment
-          ports: [{containerPort: 8085}]
-          envFrom: [{configMapRef: {name: travelon-config}}]
-          env:
-            - {name: SERVER_PORT, value: "8085"}
-            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/payment_db"}
-            - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
-            - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
-          startupProbe: {tcpSocket: {port: 8085}, failureThreshold: 120, periodSeconds: 10}
-          readinessProbe: {tcpSocket: {port: 8085}, periodSeconds: 5}
-          livenessProbe: {tcpSocket: {port: 8085}, periodSeconds: 15}
           resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
 ---
 apiVersion: v1

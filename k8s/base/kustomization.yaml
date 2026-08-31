@@ -28,11 +28,8 @@ images:
   - name: travelon-community
     newName: ghcr.io/qzlabq/travelon-community
     newTag: latest
-  - name: travelon-reservation
-    newName: ghcr.io/qzlabq/travelon-reservation
-    newTag: latest
-  - name: travelon-payment
-    newName: ghcr.io/qzlabq/travelon-payment
+  - name: travelon-order
+    newName: ghcr.io/qzlabq/travelon-order
     newTag: latest
   - name: travelon-ai-arrange
     newName: ghcr.io/qzlabq/travelon-ai-arrange

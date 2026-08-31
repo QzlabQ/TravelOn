@@ -58,7 +58,7 @@ test('酒店查询、下单、银联支付和订单状态形成完整闭环', as
 
         await page.getByRole('button', {name: '提交订单', exact: true}).click();
         await page.getByRole('button', {name: '确认提交订单'}).click();
-        // 下单经由 RabbitMQ saga（reservation-service -> hotel-service）异步完成，
+        // 下单经由 RabbitMQ saga（order-service -> hotel-service）异步完成，
         // 并行执行时默认 5 秒断言超时不够，这里放宽到 30 秒。
         await expect(page).toHaveURL(/\/reservations\/[0-9a-f-]+/i, {timeout: 30_000});
 
