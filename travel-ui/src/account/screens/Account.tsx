@@ -528,7 +528,7 @@ export default function Account() {
                         </div>
                     </div>
 
-                    <Divider className="my-5"/>
+                    <Divider className="my-7"/>
 
                     <div className="grid gap-3">
                         <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
@@ -540,9 +540,6 @@ export default function Account() {
                     <div className="mt-6 grid gap-3">
                         <Button component={Link} to="/reservations" variant="contained" startIcon={<Bookmarks/>}>
                             查看我的预订
-                        </Button>
-                        <Button component={Link} to="/ai-planner" variant="outlined" startIcon={<TravelExplore/>}>
-                            打开 AI 规划
                         </Button>
                         <Button color="error" variant="text" startIcon={<Logout/>} onClick={logout}>
                             退出登录
