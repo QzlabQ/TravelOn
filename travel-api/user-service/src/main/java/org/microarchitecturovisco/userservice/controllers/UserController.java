@@ -2,6 +2,7 @@ package org.microarchitecturovisco.userservice.controllers;
 
 import jakarta.validation.Valid;
 import org.microarchitecturovisco.userservice.dto.AuthResponse;
+import org.microarchitecturovisco.userservice.dto.ChangePasswordRequest;
 import org.microarchitecturovisco.userservice.dto.LoginRequest;
 import org.microarchitecturovisco.userservice.dto.RegisterRequest;
 import org.microarchitecturovisco.userservice.dto.TravelerRequest;
@@ -57,6 +58,14 @@ public class UserController {
         return userService.updateProfile(token, request);
     }
 
+    @PutMapping("/me/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(
+            @RequestHeader("X-User-Token") String token,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        userService.changePassword(token, request);
+    }
     @PostMapping("/auth/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(@RequestHeader(value = "X-User-Token", required = false) String token) {

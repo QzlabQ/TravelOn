@@ -145,6 +145,12 @@ export class ApiRequests {
         });
     }
 
+    static changePassword = async (token: string, payload: ChangePasswordPayload) => {
+        return await axiosInstance.put('users/me/password', payload, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
     static logout = async (token: string) => {
         return await axiosInstance.post('users/auth/logout', {}, {
             headers: {'X-User-Token': token}
@@ -743,6 +749,11 @@ interface RegisterPayload {
     name: string,
     surname?: string,
     phone?: string,
+}
+
+interface ChangePasswordPayload {
+    currentPassword: string,
+    newPassword: string,
 }
 
 interface UpdateProfilePayload {
