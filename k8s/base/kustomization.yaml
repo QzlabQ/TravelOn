@@ -6,6 +6,7 @@ resources:
   - config.yaml
   - data.yaml
   - apps.yaml
+  - autoscaling.yaml
 images:
   - name: travelon-postgres
     newName: ghcr.io/qzlabq/travelon-postgres

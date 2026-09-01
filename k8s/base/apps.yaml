@@ -20,7 +20,7 @@ spec:
           ports: [{containerPort: 8010}]
           readinessProbe: {httpGet: {path: /, port: 8010}, periodSeconds: 5}
           livenessProbe: {tcpSocket: {port: 8010}, initialDelaySeconds: 30, periodSeconds: 15}
-          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 768Mi}}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 500m, memory: 768Mi}}
 ---
 apiVersion: v1
 kind: Service
@@ -46,7 +46,7 @@ spec:
           startupProbe: {tcpSocket: {port: 8082}, failureThreshold: 60, periodSeconds: 5}
           readinessProbe: {tcpSocket: {port: 8082}, periodSeconds: 5}
           livenessProbe: {tcpSocket: {port: 8082}, periodSeconds: 15}
-          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 768Mi}}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 1000m, memory: 768Mi}}
 ---
 apiVersion: v1
 kind: Service
@@ -88,7 +88,7 @@ spec:
           startupProbe: {tcpSocket: {port: 8083}, failureThreshold: 120, periodSeconds: 10}
           readinessProbe: {tcpSocket: {port: 8083}, periodSeconds: 5}
           livenessProbe: {tcpSocket: {port: 8083}, periodSeconds: 15}
-          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 1000m, memory: 1Gi}}
 ---
 apiVersion: v1
 kind: Service
@@ -117,7 +117,7 @@ spec:
           startupProbe: {tcpSocket: {port: 8081}, failureThreshold: 120, periodSeconds: 10}
           readinessProbe: {tcpSocket: {port: 8081}, periodSeconds: 5}
           livenessProbe: {tcpSocket: {port: 8081}, periodSeconds: 15}
-          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 1000m, memory: 1Gi}}
 ---
 apiVersion: v1
 kind: Service
@@ -149,7 +149,7 @@ spec:
           readinessProbe: {tcpSocket: {port: 8088}, periodSeconds: 5}
           livenessProbe: {tcpSocket: {port: 8088}, periodSeconds: 15}
           volumeMounts: [{name: uploads, mountPath: /uploads}]
-          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 1000m, memory: 1Gi}}
       volumes: [{name: uploads, persistentVolumeClaim: {claimName: community-uploads}}]
 ---
 apiVersion: v1
@@ -185,7 +185,7 @@ spec:
           startupProbe: {tcpSocket: {port: 8086}, failureThreshold: 120, periodSeconds: 10}
           readinessProbe: {tcpSocket: {port: 8086}, periodSeconds: 5}
           livenessProbe: {tcpSocket: {port: 8086}, periodSeconds: 15}
-          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 1000m, memory: 1Gi}}
 ---
 apiVersion: v1
 kind: Service
@@ -213,7 +213,7 @@ spec:
           startupProbe: {httpGet: {path: /agent/health, port: 8090}, failureThreshold: 30, periodSeconds: 5}
           readinessProbe: {httpGet: {path: /agent/health, port: 8090}, periodSeconds: 10}
           livenessProbe: {httpGet: {path: /agent/health, port: 8090}, periodSeconds: 30}
-          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 1000m, memory: 1Gi}}
 ---
 apiVersion: v1
 kind: Service
@@ -245,7 +245,7 @@ spec:
           startupProbe: {tcpSocket: {port: 8087}, failureThreshold: 60, periodSeconds: 10}
           readinessProbe: {tcpSocket: {port: 8087}, periodSeconds: 5}
           livenessProbe: {tcpSocket: {port: 8087}, periodSeconds: 15}
-          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 1000m, memory: 1Gi}}
 ---
 apiVersion: v1
 kind: Service
@@ -267,7 +267,7 @@ spec:
           ports: [{containerPort: 80}]
           readinessProbe: {httpGet: {path: /, port: 80}, periodSeconds: 5}
           livenessProbe: {httpGet: {path: /, port: 80}, periodSeconds: 15}
-          resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {memory: 256Mi}}
+          resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {cpu: 250m, memory: 256Mi}}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
