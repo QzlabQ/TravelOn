@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -281,6 +282,19 @@ def compose(
     return completed
 
 
+# 经网关探测有 HTTP 路由的服务，判断后端是否真的可路由。网关在目标服务没有可用实例时返回 503，
+# 因此只要状态码不是 503（哪怕是 401/404）就说明该服务已注册且路由已刷新。
+# 只等 travel-core-service 的酒店路由是不够的：Eureka 注册成功后网关仍有最长 30 秒的注册表缓存，
+# 期间下单等请求会被打到没有实例的路由上而失败。
+GATEWAY_PROBES = (
+    ("travel-core-service (hotels)", "/hotels/destinations"),
+    ("travel-core-service (transports)", "/transports/tickets/options?type=TRAIN"),
+    ("user-service", "/users/auth/ping"),
+    ("order-service", "/reservations/ping"),
+    ("community-service", "/community/posts"),
+)
+
+
 class ManagedServices:
     def __init__(
         self,
@@ -315,24 +329,23 @@ class ManagedServices:
             self.started = {line.strip() for line in after.stdout.splitlines() if line.strip()} - self.preexisting
             print(paint(f"  · 本次新启动 {len(self.started)} 个服务，此前已运行 {len(self.preexisting)} 个", DIM), flush=True)
             deadline = time.monotonic() + 1200
-            last_error = ""
             waited = 0
+            pending = [name for name, _ in GATEWAY_PROBES]
             while time.monotonic() < deadline:
-                try:
-                    with urllib.request.urlopen(f"{self.gateway_url}/hotels/destinations", timeout=10) as response:
-                        if response.status == 200:
-                            if waited:
-                                print()
-                            print(paint(f"  {MARK_PASS} Gateway 就绪，等待 {waited}s", GREEN), flush=True)
-                            return self
-                except Exception as exc:  # noqa: BLE001
-                    last_error = str(exc)
+                pending = [name for name, path in GATEWAY_PROBES if not self._routable(path)]
+                if not pending:
+                    if waited and IS_TTY:
+                        print()
+                    print(paint(f"  {MARK_PASS} 全部服务经网关可路由，等待 {waited}s", GREEN), flush=True)
+                    return self
                 time.sleep(5)
                 waited += 5
+                note = f"  · 等待服务就绪… {waited}s / 1200s（未就绪：{', '.join(pending)}）"
                 if IS_TTY:
-                    print(CR + paint(f"  · 等待 Gateway 就绪… {waited}s / 1200s", DIM), end="", flush=True)
+                    print(CR + paint(note.ljust(88)[:88], DIM), end="", flush=True)
                 elif waited % 60 == 0:
-                    print(paint(f"  · 等待 Gateway 就绪… {waited}s / 1200s", DIM), flush=True)
+                    print(paint(note, DIM), flush=True)
+            last_error = "未就绪：" + ", ".join(pending)
             if waited and IS_TTY:
                 print()
             raise RuntimeError(f"等待 Gateway 就绪超时：{last_error}")
@@ -342,6 +355,16 @@ class ManagedServices:
             if self.started:
                 compose(["stop", *sorted(self.started)], check=False)
             raise
+
+    def _routable(self, path: str) -> bool:
+        """经网关请求 path，只要不是 503（无可用实例）即视为该服务已可路由。"""
+        try:
+            with urllib.request.urlopen(f"{self.gateway_url}{path}", timeout=10) as response:
+                return response.status != 503
+        except urllib.error.HTTPError as exc:
+            return exc.code != 503
+        except Exception:  # noqa: BLE001
+            return False
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
         if self.enabled and self.started:

@@ -1,0 +1,11 @@
+# image-name<TAB>build-context<TAB>dockerfile
+postgres	travel-api	travel-api/Dockerfile.postgres
+discovery	travel-api/discovery-service	travel-api/discovery-service/Dockerfile
+gateway	travel-api/api-gateway	travel-api/api-gateway/Dockerfile
+travel-core	.	travel-api/travel-core-service/Dockerfile.k8s
+user	travel-api/user-service	travel-api/user-service/Dockerfile
+community	travel-api/community-service	travel-api/community-service/Dockerfile
+order	travel-api/order-service	travel-api/order-service/Dockerfile
+ai-arrange	travel-api/ai-arrange-service	travel-api/ai-arrange-service/Dockerfile
+ai-arrange-agent	travel-api/ai-arrange-agent-service	travel-api/ai-arrange-agent-service/Dockerfile
+ui	travel-ui	travel-ui/Dockerfile

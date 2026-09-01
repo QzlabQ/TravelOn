@@ -1174,7 +1174,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         passengerCount: selectedTravelers.length,
         price: selectedOffer.price * selectedTravelers.length,
         travelers: selectedTravelers,
-        // Pass the concrete offer id so transport-service can decrement the
+        // Pass the concrete offer id so travel-core-service can decrement the
         // remaining seats for this exact dated row.
         ticketOfferId: selectedOffer.ticketOfferId,
       });

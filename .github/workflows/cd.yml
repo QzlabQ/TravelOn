@@ -1,0 +1,35 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-travelon-256
+  cancel-in-progress: false
+
+jobs:
+  deploy-256:
+    name: Build images and deploy to 256 K3s
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: [self-hosted, linux, x64, travelon-256]
+    environment: production-256
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Build and import images
+        env:
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: sudo -n /usr/local/sbin/travelon-build-k3s "sha-${DEPLOY_SHA:0:7}"
+      - name: Deploy and smoke test
+        env:
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: sudo -n /usr/local/sbin/travelon-deploy-k3s "sha-${DEPLOY_SHA:0:7}"

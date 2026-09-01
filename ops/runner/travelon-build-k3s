@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+tag="${1:-}"
+[[ "$tag" =~ ^sha-[0-9a-f]{7,40}$ ]] || exit 2
+[[ "${SUDO_USER:-}" == travelon-runner ]] || exit 3
+workspace="$(pwd -P)"
+case "$workspace" in /home/travelon-runner/_work/*/*|/home/travelon-runner/actions-runner/_work/*/*) ;; *) exit 4 ;; esac
+[[ "$(stat -c %U "$workspace")" == travelon-runner ]] || exit 5
+build_and_import() { local name="$1" context="$2" dockerfile="$3" image="travelon-${1}:${tag}"; [[ -f "$dockerfile" ]] || exit 6; docker build --file "$dockerfile" --tag "$image" "$context"; docker save "$image" | k3s ctr images import -; }
+manifest="$workspace/ops/cd/images.tsv"; [[ -r "$manifest" ]] || exit 6
+while IFS=$'\t' read -r name context dockerfile; do
+  [[ -z "$name" || "$name" == \#* ]] && continue
+  [[ "$name" =~ ^[a-z0-9-]+$ && "$context" != /* && "$dockerfile" != /* ]] || exit 7
+  build_and_import "$name" "$context" "$dockerfile"
+done < "$manifest"
+for image in mongo:7 rabbitmq:3.13-management; do docker image inspect "$image" >/dev/null; docker save "$image" | k3s ctr images import -; done

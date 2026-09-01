@@ -89,83 +89,67 @@ services:
     networks:
       - backend
 
+  # The service provisions travel_core_db as a one-shot job. Legacy data
+  # migration is disabled by default; enable it explicitly with
+  # MIGRATE_LEGACY_DATA=true for a controlled cutover.
+  travel-core-migration:
+    <<: *service-defaults
+    image: postgres:16
+    entrypoint: ["/bin/bash", "/database/migration/migrate-existing-databases.sh"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      HOTEL_DB_NAME: ${HOTEL_DB_NAME:-hotel_db}
+      TRANSPORT_DB_NAME: ${TRANSPORT_DB_NAME:-transport_db}
+      TRAVEL_CORE_DB_NAME: ${TRAVEL_CORE_DB_NAME:-travel_core_db}
+      MIGRATE_LEGACY_DATA: ${MIGRATE_LEGACY_DATA:-false}
+      PGHOST: postgres
+      PGPORT: 5432
+    volumes:
+      - ./database:/database:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+
   # custom services
-  hotel:
+  travel-core:
     <<: *service-defaults
-    build: ./hotel-service
+    build: ./travel-core-service
     volumes:
-      - ./logs/hotel:/logs
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${HOTEL_DB_NAME:-hotel_db}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_started
-      discovery:
-        condition: service_started
-      gateway:
-        condition: service_started
-    networks:
-      - backend
-
-  payment:
-    <<: *service-defaults
-    build: ./payment-service
-    volumes:
-      - ./logs/payment:/logs
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${PAYMENT_DB_NAME:-payment_db}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_started
-      discovery:
-        condition: service_started
-      gateway:
-        condition: service_started
-    networks:
-      - backend
-
-  reservation:
-    <<: *service-defaults
-    build: ./reservation-service
-    volumes:
-      - ./logs/reservation:/logs
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${RESERVATION_DB_NAME:-reservation_db}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
-      APP_PAYMENT_TIMEOUT_SECONDS: ${APP_PAYMENT_TIMEOUT_SECONDS:-1800}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_started
-      discovery:
-        condition: service_started
-      gateway:
-        condition: service_started
-    networks:
-      - backend
-
-  transport:
-    <<: *service-defaults
-    build: ./transport-service
-    volumes:
-      - ./logs/transport:/logs
+      - ./logs/travel-core:/logs
       # Runtime dependency: CityCatalog reads common/cities.csv for city lookups.
       - ./seed-data/common:/seed-data/common:ro
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${TRANSPORT_DB_NAME:-transport_db}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${TRAVEL_CORE_DB_NAME:-travel_core_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      discovery:
+        condition: service_started
+      gateway:
+        condition: service_started
+      travel-core-migration:
+        condition: service_completed_successfully
+    networks:
+      - backend
+
+  order:
+    <<: *service-defaults
+    build: ./order-service
+    volumes:
+      - ./logs/order:/logs
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${ORDER_DB_NAME:-reservation_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      APP_PAYMENT_TIMEOUT_SECONDS: ${APP_PAYMENT_TIMEOUT_SECONDS:-1800}
     depends_on:
       postgres:
         condition: service_healthy

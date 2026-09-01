@@ -48,10 +48,24 @@ python tests/run_tests.py full
 | `--ui-url <URL>` | 默认 `http://localhost:53000` |
 | `--artifacts-dir <路径>` | 报告输出目录，默认 `artifacts/test-results`，**须在仓库目录内** |
 
+## 数据库迁移回归测试
+
+微服务合并后，`travel-core-service` 需要把已有 PostgreSQL 卷中的 `hotel_db` 和
+`transport_db` 迁移到 `travel_core_db`。仓库提供可重复执行的 PostgreSQL 16 测试：
+
+```bash
+bash tests/migration/test-existing-databases.sh
+```
+
+测试会在临时容器中构造旧数据库，执行
+`travel-api/database/migration/migrate-existing-databases.sh`，并检查城市按
+`city_id` 合并、重复图片清理、酒店/房间/房间预订/交通票务迁移、外键关系、完成标记、
+重复执行和失败后重试。测试结束后会自动删除临时容器，不会使用项目的持久化数据库目录。
+
 示例：
 
 ```text
-python tests/run_tests.py unit --module user-service --module hotel-service
+python tests/run_tests.py unit --module user-service --module travel-core-service
 python tests/run_tests.py integration --module api
 python tests/run_tests.py e2e --browser firefox
 python tests/run_tests.py all --manage-services

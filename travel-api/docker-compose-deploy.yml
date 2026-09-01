@@ -66,9 +66,9 @@ services:
     networks:
       - backend
 
-  hotel:
+  travel-core:
     <<: *service-defaults
-    image: ghcr.io/microarchitecturovisco/hotel:dev
+    image: ghcr.io/microarchitecturovisco/travel-core:dev
     depends_on:
       - rabbitmq
       - discovery
@@ -78,37 +78,15 @@ services:
     deploy:
       replicas: 2
 
-  payment:
+  order:
     <<: *service-defaults
-    image: ghcr.io/microarchitecturovisco/payment:dev
+    image: ghcr.io/microarchitecturovisco/order:dev
     depends_on:
       - rabbitmq
       - discovery
       - gateway
     networks:
       - backend
-
-  reservation:
-    <<: *service-defaults
-    image: ghcr.io/microarchitecturovisco/reservation:dev
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-    networks:
-      - backend
-
-  transport:
-    <<: *service-defaults
-    image: ghcr.io/microarchitecturovisco/transport:dev
-    depends_on:
-      - rabbitmq
-      - discovery
-      - gateway
-    networks:
-      - backend
-    deploy:
-      replicas: 2
 
   user:
     <<: *service-defaults

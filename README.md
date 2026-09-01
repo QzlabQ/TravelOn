@@ -51,7 +51,54 @@ https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
 
 ## 项目结构
 
-<img width="407" height="203" alt="image" src="https://github.com/user-attachments/assets/290798fd-97da-4652-a6d7-5ef31962d1d9" />
+```mermaid
+flowchart LR
+    ui["travel-ui<br/>前端应用<br/>React / MUI"]
+    gateway["api-gateway<br/>API 网关<br/>HTTP / WebSocket"]
+
+    subgraph services["Java 微服务"]
+        ai["ai-arrange-service<br/>AI 编排服务<br/>会话 / 快照 / WebSocket"]
+        travelCore["travel-core-service<br/>酒店 / 交通产品服务"]
+        order["order-service<br/>订单 / 支付服务"]
+        community["community-service<br/>社区服务"]
+        user["user-service<br/>用户服务"]
+    end
+
+    agent["ai-arrange-agent-service<br/>Python Agent"]
+
+    subgraph infrastructure["基础设施"]
+        eureka["discovery-service<br/>Eureka 服务发现"]
+        postgres["PostgreSQL<br/>业务数据"]
+        mongo["MongoDB<br/>AI 会话 / 快照"]
+        rabbit["RabbitMQ"]
+    end
+
+    ui --> gateway
+    gateway --> ai
+    gateway --> travelCore
+    gateway --> order
+    gateway --> community
+    gateway --> user
+    ai --> agent
+
+    gateway -.-> eureka
+    ai -.-> eureka
+    travelCore -.-> eureka
+    order -.-> eureka
+    community -.-> eureka
+    user -.-> eureka
+
+    ai -.-> mongo
+    travelCore -.-> postgres
+    order -.-> postgres
+    community -.-> postgres
+    user -.-> postgres
+
+    travelCore -.-> rabbit
+    order -.-> rabbit
+    user -.-> rabbit
+    ai -.-> rabbit
+```
 
 ```text
 travel-on-2026NULLptr/
@@ -225,6 +272,22 @@ cd travel-on-2026NULLptr
 cd travel-api
 docker compose up -d --build
 docker compose ps
+```
+
+### 本地旧服务目录清理
+
+微服务合并后，Git 中已经删除的旧服务目录可能仍因本地 Maven 构建产物而残留。
+确认没有未提交的个人文件后，可在仓库根目录执行以下命令清理这些本地目录；该操作
+不会影响远程仓库中的当前服务：
+
+```powershell
+Remove-Item -Recurse -Force `
+  .\travel-api\offer-provider-service, `
+  .\travel-api\hotel-service, `
+  .\travel-api\transport-service, `
+  .\travel-api\reservation-service, `
+  .\travel-api\payment-service `
+  -ErrorAction SilentlyContinue
 ```
 
 网关地址：
@@ -509,14 +572,14 @@ Playwright 报告：在 `travel-ui` 执行 `corepack yarn test:e2e:report`。
    python generate_dated_ticket_offers.py
    ```
    
-3. 如果 Docker Compose 已在运行，导入现有交通数据库：
+3. 如果 Docker Compose 已在运行，导入现有旅行产品数据库：
 
    ```powershell
-   docker compose exec -T postgres psql -U admin -d transport_db -f /database/seed/transport_seed.sql
-   docker compose restart transport
+   docker compose exec -T postgres psql -U admin -d travel_core_db -f /database/seed/transport_seed.sql
+   docker compose restart travel-core
    ```
 
-   如果 `.env` 修改过数据库用户名或数据库名，请替换 `admin` 和 `transport_db`。导入脚本使用确定性 ID 和 `ON CONFLICT (id) DO NOTHING`，会保留已有数据并补充新日期。
+   如果 `.env` 修改过数据库用户名或 `TRAVEL_CORE_DB_NAME`，请替换 `admin` 和 `travel_core_db`。导入脚本使用确定性 ID 和 `ON CONFLICT (id) DO NOTHING`，会保留已有数据并补充新日期。
 
 `docker compose up -d --build` 只会重新构建镜像。若 `travel-api/data/postgres` 已有数据库，它不会自动重新生成或重新导入票务
 CSV；数据库初始化脚本只会在该目录为空时执行。修改 CSV 后仍建议显式执行上面的 `psql` 导入命令。

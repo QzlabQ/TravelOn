@@ -2,9 +2,12 @@ import axios from "axios";
 
 const apiHostname = process.env.REACT_APP_API_HOSTNAME || "localhost";
 const apiPort = process.env.REACT_APP_API_PORT || "58082";
+const configuredBaseURL = process.env.REACT_APP_API_BASE_URL;
 
-export const baseAPIURL = `http://${apiHostname}:${apiPort}/`;
-export const baseWSURL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${apiHostname}:${apiPort}/`;
+export const baseAPIURL = configuredBaseURL || `http://${apiHostname}:${apiPort}/`;
+export const baseWSURL = configuredBaseURL
+    ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${configuredBaseURL}`
+    : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${apiHostname}:${apiPort}/`;
 
 /**
  * Resolves an image reference for display. Absolute URLs (seed data) and data URLs
@@ -62,14 +65,6 @@ export class ApiRequests {
 
     static getHotelDestinations = async () => {
         return await axiosInstance.get<HotelDestination[]>('hotels/destinations');
-    }
-
-    static getOffersBySearchQuery = async (params: GetOffersBySearchQueryParams) => {
-        return await axiosInstance.get(`offers/?departureBus=${params.departureBus}&departurePlane=${params.departurePlane}&departureTrain=${params.departureTrain}&arrivals=${params.arrivals}&date_from=${params.dateFrom}&date_to=${params.dateTo}&adults=${params.adults}&teens=${params.teens}&kids=${params.kids}&infants=${params.infants}`);
-    }
-
-    static getOfferDetails = async (params: GetOfferDetailsParams) => {
-        return await axiosInstance.get(`offers/${params.idHotel}?departure_buses=${params.departureBus}&departure_planes=${params.departurePlane}&departure_trains=${params.departureTrain}&date_from=${params.dateFrom}&date_to=${params.dateTo}&adults=${params.adults}&teens=${params.teens}&kids=${params.kids}&infants=${params.infants}`)
     }
 
     static reserveOffer = async (payload: ReservationRequestPayload) => {
@@ -472,32 +467,6 @@ export interface GetOffersBySearchQueryOffer {
     destination: string,
     rating: number,
     imageUrl: string,
-}
-
-interface GetOffersBySearchQueryParams {
-    departurePlane: string[],
-    departureBus: string[],
-    departureTrain: string[],
-    arrivals: string[],
-    dateFrom: string,
-    dateTo: string,
-    adults: number,
-    teens: number,
-    kids: number,
-    infants: number,
-}
-
-interface GetOfferDetailsParams {
-    idHotel: number,
-    departurePlane: string[],
-    departureBus: string[],
-    departureTrain: string[],
-    dateFrom: string,
-    dateTo: string,
-    adults: number,
-    teens: number,
-    kids: number,
-    infants: number,
 }
 
 export enum TransportType {

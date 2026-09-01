@@ -13,7 +13,9 @@ test('社区帖子可以发布、查看、点赞并删除', async ({page}) => {
     await publishDialog.getByRole('button', {name: '发布', exact: true}).click();
     await expect(page.getByText('发布成功')).toBeVisible();
 
-    const post = page.getByRole('link').filter({hasText: uniqueTitle});
+    // 同一标题会同时出现在列表卡片和侧栏「最新发布」中，取第一个即可，
+    // 否则 strict mode 会因命中多个元素而失败。
+    const post = page.getByRole('link').filter({hasText: uniqueTitle}).first();
     await expect(post).toBeVisible();
     await post.click();
     await expect(page.getByRole('heading', {name: uniqueTitle})).toBeVisible();

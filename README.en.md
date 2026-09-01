@@ -51,7 +51,54 @@ Main technologies include Java, TypeScript, Python, PL/pgSQL, and Docker.
 
 ## Project Structure
 
-<img width="407" height="203" alt="image" src="https://github.com/user-attachments/assets/290798fd-97da-4652-a6d7-5ef31962d1d9" />
+```mermaid
+flowchart LR
+    ui["travel-ui<br/>Frontend Application<br/>React / MUI"]
+    gateway["api-gateway<br/>API Gateway<br/>HTTP / WebSocket"]
+
+    subgraph services["Java Microservices"]
+        ai["ai-arrange-service<br/>AI Orchestration<br/>Conversations / Snapshots / WebSocket"]
+        travelCore["travel-core-service<br/>Hotel / Transport Products"]
+        order["order-service<br/>Orders / Payments"]
+        community["community-service<br/>Community Service"]
+        user["user-service<br/>User Service"]
+    end
+
+    agent["ai-arrange-agent-service<br/>Python Agent"]
+
+    subgraph infrastructure["Infrastructure"]
+        eureka["discovery-service<br/>Eureka Service Discovery"]
+        postgres["PostgreSQL<br/>Business Data"]
+        mongo["MongoDB<br/>AI Conversations / Snapshots"]
+        rabbit["RabbitMQ"]
+    end
+
+    ui --> gateway
+    gateway --> ai
+    gateway --> travelCore
+    gateway --> order
+    gateway --> community
+    gateway --> user
+    ai --> agent
+
+    gateway -.-> eureka
+    ai -.-> eureka
+    travelCore -.-> eureka
+    order -.-> eureka
+    community -.-> eureka
+    user -.-> eureka
+
+    ai -.-> mongo
+    travelCore -.-> postgres
+    order -.-> postgres
+    community -.-> postgres
+    user -.-> postgres
+
+    travelCore -.-> rabbit
+    order -.-> rabbit
+    user -.-> rabbit
+    ai -.-> rabbit
+```
 
 ```text
 travel-on-2026NULLptr/
@@ -225,6 +272,23 @@ Create `travel-api/.env` and `travel-ui/.env` as described in [Environment Varia
 cd travel-api
 docker compose up -d --build
 docker compose ps
+```
+
+### Local cleanup after service consolidation
+
+After the microservice consolidation, deleted services may still remain locally because
+of previous Maven build output. After confirming that these directories contain no
+personal files, run the following command from the repository root. It only removes
+local leftovers and does not affect the current services in Git:
+
+```powershell
+Remove-Item -Recurse -Force `
+  .\travel-api\offer-provider-service, `
+  .\travel-api\hotel-service, `
+  .\travel-api\transport-service, `
+  .\travel-api\reservation-service, `
+  .\travel-api\payment-service `
+  -ErrorAction SilentlyContinue
 ```
 
 Gateway URL:
@@ -514,11 +578,11 @@ The files actually imported into PostgreSQL are the corresponding
    transport database:
 
    ```powershell
-   docker compose exec -T postgres psql -U admin -d transport_db -f /database/seed/transport_seed.sql
-   docker compose restart transport
+   docker compose exec -T postgres psql -U admin -d travel_core_db -f /database/seed/transport_seed.sql
+   docker compose restart travel-core
    ```
 
-   Replace `admin` or `transport_db` if they were changed in `.env`. The seed
+   Replace `admin` or `travel_core_db` if they were changed in `.env`. The seed
    script uses deterministic IDs and `ON CONFLICT (id) DO NOTHING`, preserving
    existing data while adding the new dates.
 
@@ -532,7 +596,7 @@ To verify the imported date range:
 
 ```powershell
 cd .\travel-api
-docker compose exec postgres psql -U admin -d transport_db -c "SELECT type, MIN(departure_date_time), MAX(departure_date_time), COUNT(*) FROM ticket_offer_templates GROUP BY type;"
+docker compose exec postgres psql -U admin -d travel_core_db -c "SELECT type, MIN(departure_date_time), MAX(departure_date_time), COUNT(*) FROM ticket_offer_templates GROUP BY type;"
 ```
 
 An overnight train departing on October 15 and arriving on October 16 is

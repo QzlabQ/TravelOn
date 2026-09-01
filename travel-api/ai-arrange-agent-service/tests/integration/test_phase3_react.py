@@ -85,7 +85,7 @@ def test_runtime_policy_clamps_react_limits_from_settings() -> None:
         amap_enabled=True,
         amap_timeout_seconds=5,
         offer_provider_base_url="http://offer",
-        transport_service_base_url="http://transport",
+        transport_service_base_url="http://travel-core",
         weather_base_url="",
         weather_api_key="",
         agent_tool_mock_enabled=True,
