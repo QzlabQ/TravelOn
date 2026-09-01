@@ -107,7 +107,7 @@ class OpenAICompatibleClient:
             for attempt in range(self._settings.model_retry_count + 1):
                 request_started = time.perf_counter()
                 try:
-                    content = await self._request_content(client, url, headers, payload)
+                    content = await self._request_content_with_compatibility(client, url, headers, payload)
                     timing_metadata["requestMs"] = self._elapsed_ms(request_started)
                     timing_metadata["responseChars"] = len(content)
                     self._append_slow_response_warning(warnings, timing_metadata)
@@ -473,8 +473,35 @@ class OpenAICompatibleClient:
         response = await client.post(url, headers=headers, json=payload)
         if response.status_code == 429:
             raise ModelRateLimitError("429 Too Many Requests")
-        response.raise_for_status()
+        if response.is_error:
+            raise httpx.HTTPStatusError(
+                f"{response.status_code}: {response.text[:1000]}",
+                request=response.request,
+                response=response,
+            )
         return self._extract_content(response.json())
+
+    async def _request_content_with_compatibility(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+    ) -> str:
+        try:
+            return await self._request_content(client, url, headers, payload)
+        except httpx.HTTPStatusError as error:
+            # Some OpenAI-compatible providers reject optional OpenAI fields even
+            # though their Chat Completions endpoint is otherwise compatible.
+            if error.response is None or error.response.status_code != 400:
+                raise
+            optional_fields = {"response_format", "thinking"}
+            if not optional_fields.intersection(payload):
+                raise
+            compatible_payload = {
+                key: value for key, value in payload.items() if key not in optional_fields
+            }
+            return await self._request_content(client, url, headers, compatible_payload)
 
     async def _repair_or_fallback(
         self,
@@ -543,7 +570,7 @@ class OpenAICompatibleClient:
 
         try:
             repair_started = time.perf_counter()
-            repair_content = await self._request_content(client, url, headers, repair_payload)
+            repair_content = await self._request_content_with_compatibility(client, url, headers, repair_payload)
             metadata["repairRequestMs"] = self._elapsed_ms(repair_started)
             metadata["repairResponseChars"] = len(repair_content)
 
@@ -609,7 +636,24 @@ class OpenAICompatibleClient:
         )
 
     def _extract_content(self, data: dict[str, Any]) -> str:
-        return data["choices"][0]["message"]["content"]
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise ValueError("Model response does not contain choices")
+        message = choices[0].get("message")
+        if not isinstance(message, dict):
+            raise ValueError("Model response does not contain a message")
+        content = message.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            text_parts = [
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and isinstance(item.get("text"), str)
+            ]
+            if text_parts:
+                return "".join(text_parts)
+        raise ValueError("Model response message does not contain text content")
 
     def _thinking_payload(self) -> dict[str, str] | None:
         thinking_type = (self._settings.model_thinking_type or "omit").strip().lower()

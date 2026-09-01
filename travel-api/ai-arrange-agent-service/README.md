@@ -48,7 +48,7 @@ Java should configure its Python Agent HTTP timeout above `AGENT_MAX_RUNTIME_SEC
 
 When Docker Compose overrides `AGENT_MAX_RUNTIME_SECONDS` to 240 seconds for longer model generations, Java should use `AI_ARRANGE_AGENT_TIMEOUT_SECONDS=270` or another value above the Agent runtime limit.
 
-The frontend still sends `modelVariant=FLASH` or `PRO` for compatibility with the planning protocol. Both variants use the single configured `AI_MODEL`; the variant no longer selects a DeepSeek-specific model.
+The planning protocol still accepts the legacy `modelVariant=FLASH` or `PRO` field, but the current frontend no longer exposes or sends a model selector. All requests use the single configured `AI_MODEL`.
 
 ## Java Integration
 

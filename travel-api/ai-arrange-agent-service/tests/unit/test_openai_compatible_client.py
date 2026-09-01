@@ -4,6 +4,7 @@ import json
 from dataclasses import replace
 from typing import Any
 
+import httpx
 import pytest
 
 from app.clients.openai_compatible_client import OpenAICompatibleClient
@@ -246,6 +247,55 @@ def test_model_payload_can_omit_thinking_field_for_provider_ab_tests() -> None:
     )
 
     assert "thinking" not in payload
+
+
+@pytest.mark.asyncio
+async def test_model_retries_without_optional_fields_when_provider_rejects_them(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = OpenAICompatibleClient(agent_settings())
+    calls: list[dict[str, Any]] = []
+
+    async def fake_request_content(*args: Any, **__: Any) -> str:
+        payload = args[-1]
+        calls.append(payload)
+        if len(calls) == 1:
+            request = httpx.Request("POST", "https://example.test/chat/completions")
+            response = httpx.Response(400, request=request, text='{"error":"response_format is not supported"}')
+            raise httpx.HTTPStatusError("400", request=request, response=response)
+        return "{}"
+
+    monkeypatch.setattr(client, "_request_content", fake_request_content)
+    payload = client._build_payload(
+        request=sample_request(),
+        places=[],
+        weather=None,
+        transport_options=[],
+        budget=None,
+        react_observations=[],
+        planner_constraints={},
+    )
+
+    async with httpx.AsyncClient() as http_client:
+        result = await client._request_content_with_compatibility(
+            http_client,
+            "https://example.test/chat/completions",
+            {"Authorization": "Bearer test-key"},
+            payload,
+        )
+
+    assert result == "{}"
+    assert calls[0]["response_format"] == {"type": "json_object"}
+    assert "response_format" not in calls[1]
+    assert "thinking" not in calls[1]
+
+
+def test_model_extracts_text_parts_from_structured_message_content() -> None:
+    client = OpenAICompatibleClient(agent_settings())
+
+    content = client._extract_content({
+        "choices": [{"message": {"content": [{"type": "text", "text": "{"}, {"text": "}"}]}}]
+    })
+
+    assert content == "{}"
 
 
 def test_model_parser_repairs_invalid_backslash_escapes() -> None:
