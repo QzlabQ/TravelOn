@@ -42,6 +42,33 @@ CREATE TABLE public.travelers (
 
 
 --
+-- Name: user_identities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_identities (
+    id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    real_name character varying(80) NOT NULL,
+    document_type character varying(24) NOT NULL,
+    document_number character varying(48) NOT NULL,
+    created_at timestamp(6) with time zone,
+    updated_at timestamp(6) with time zone
+);
+
+
+--
+-- Name: saved_bank_cards; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.saved_bank_cards (
+    id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    card_number character varying(19) NOT NULL,
+    label character varying(64) NOT NULL,
+    created_at timestamp(6) with time zone
+);
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -61,6 +88,22 @@ CREATE TABLE public.users (
     updated_at timestamp(6) with time zone
 );
 
+
+--
+-- Name: user_identities user_identities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_identities
+    ADD CONSTRAINT user_identities_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.saved_bank_cards
+    ADD CONSTRAINT saved_bank_cards_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.user_identities
+    ADD CONSTRAINT uk_user_identities_user_id UNIQUE (user_id);
+
+ALTER TABLE ONLY public.saved_bank_cards
+    ADD CONSTRAINT uk_saved_bank_cards_user_card UNIQUE (user_id, card_number);
 
 --
 -- Name: travelers travelers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -96,7 +139,14 @@ ALTER TABLE ONLY public.users
 ALTER TABLE ONLY public.travelers
     ADD CONSTRAINT fk_travelers_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY public.user_identities
+    ADD CONSTRAINT fk_user_identities_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.saved_bank_cards
+    ADD CONSTRAINT fk_saved_bank_cards_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
 CREATE INDEX idx_travelers_user ON public.travelers(user_id);
+CREATE INDEX idx_saved_bank_cards_user ON public.saved_bank_cards(user_id);
 CREATE INDEX idx_travelers_user_default ON public.travelers(user_id, default_traveler);
 CREATE INDEX idx_users_email ON public.users(email);
 CREATE INDEX idx_users_session_token ON public.users(session_token);
@@ -118,6 +168,11 @@ EXECUTE FUNCTION public.set_updated_at();
 
 CREATE TRIGGER trg_travelers_set_updated_at
 BEFORE UPDATE ON public.travelers
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+CREATE TRIGGER trg_user_identities_set_updated_at
+BEFORE UPDATE ON public.user_identities
 FOR EACH ROW
 EXECUTE FUNCTION public.set_updated_at();
 

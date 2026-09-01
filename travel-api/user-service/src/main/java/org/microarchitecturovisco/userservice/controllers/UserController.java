@@ -1,17 +1,24 @@
 package org.microarchitecturovisco.userservice.controllers;
 
 import jakarta.validation.Valid;
+import org.microarchitecturovisco.userservice.dto.AccountIdentityRequest;
+import org.microarchitecturovisco.userservice.dto.AccountIdentityResponse;
 import org.microarchitecturovisco.userservice.dto.AuthResponse;
 import org.microarchitecturovisco.userservice.dto.LoginRequest;
 import org.microarchitecturovisco.userservice.dto.RegisterRequest;
+import org.microarchitecturovisco.userservice.dto.SavedBankCardRequest;
+import org.microarchitecturovisco.userservice.dto.SavedBankCardResponse;
 import org.microarchitecturovisco.userservice.dto.TravelerRequest;
 import org.microarchitecturovisco.userservice.dto.TravelerResponse;
 import org.microarchitecturovisco.userservice.dto.UpdateProfileRequest;
 import org.microarchitecturovisco.userservice.dto.UserProfileResponse;
+import org.microarchitecturovisco.userservice.services.AccountIdentityService;
+import org.microarchitecturovisco.userservice.services.SavedBankCardService;
 import org.microarchitecturovisco.userservice.services.TravelerService;
 import org.microarchitecturovisco.userservice.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -26,11 +33,20 @@ public class UserController {
 
     private final UserService userService;
     private final TravelerService travelerService;
+    private final AccountIdentityService accountIdentityService;
+    private final SavedBankCardService savedBankCardService;
 
     @Autowired
-    public UserController(UserService userService, TravelerService travelerService) {
+    public UserController(
+            UserService userService,
+            TravelerService travelerService,
+            AccountIdentityService accountIdentityService,
+            SavedBankCardService savedBankCardService
+    ) {
         this.userService = userService;
         this.travelerService = travelerService;
+        this.accountIdentityService = accountIdentityService;
+        this.savedBankCardService = savedBankCardService;
     }
 
     @PostMapping("/auth/register")
@@ -66,6 +82,43 @@ public class UserController {
         userService.logout(token);
     }
 
+    @GetMapping("/me/identity")
+    public ResponseEntity<AccountIdentityResponse> getIdentity(@RequestHeader("X-User-Token") String token) {
+        return accountIdentityService.get(token)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @PutMapping("/me/identity")
+    public AccountIdentityResponse saveIdentity(
+            @RequestHeader("X-User-Token") String token,
+            @Valid @RequestBody AccountIdentityRequest request
+    ) {
+        return accountIdentityService.save(token, request);
+    }
+
+    @GetMapping("/me/bank-cards")
+    public List<SavedBankCardResponse> listBankCards(@RequestHeader("X-User-Token") String token) {
+        return savedBankCardService.list(token);
+    }
+
+    @PostMapping("/me/bank-cards")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SavedBankCardResponse saveBankCard(
+            @RequestHeader("X-User-Token") String token,
+            @Valid @RequestBody SavedBankCardRequest request
+    ) {
+        return savedBankCardService.save(token, request);
+    }
+
+    @DeleteMapping("/me/bank-cards/{cardId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteBankCard(
+            @RequestHeader("X-User-Token") String token,
+            @PathVariable UUID cardId
+    ) {
+        savedBankCardService.delete(token, cardId);
+    }
     @GetMapping("/me/travelers")
     public List<TravelerResponse> getTravelers(@RequestHeader("X-User-Token") String token) {
         return travelerService.list(token);

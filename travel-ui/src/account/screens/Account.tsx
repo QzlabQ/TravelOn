@@ -39,26 +39,16 @@ import {
 import {Link, useNavigate} from "react-router-dom";
 import AuthDialog from "../components/AuthDialog";
 import {
-    ACCOUNT_IDENTITY_EVENT,
     clearCurrentUserSession,
-    getAccountIdentity,
     getBookingPreferences,
     getCurrentUserSession,
-    setAccountIdentity,
-    getSavedBankCards,
-    removeSavedBankCard,
-    saveBankCard,
-    SAVED_BANK_CARDS_EVENT,
-    SavedBankCard,
     setBookingPreferences,
     updateCurrentUserProfile,
-    AccountIdentity,
     BookingPreferences,
     UserProfile,
     UserSession
 } from "../../core/currentUser";
-import {ApiRequests, resolveCommunityImageUrl} from "../../core/apiConfig";
-import {TravelerPayload, TravelerResponse, TravelerType} from "../../core/apiConfig";
+import {AccountIdentity, ApiRequests, resolveCommunityImageUrl, SavedBankCard, TravelerPayload, TravelerResponse, TravelerType} from "../../core/apiConfig";
 import {
     getChineseResidentIdInfo,
     normalizeChinaMainlandPhone,
@@ -154,8 +144,10 @@ export default function Account() {
     const [editingTravelerId, setEditingTravelerId] = useState("");
     const [travelerEditorOpen, setTravelerEditorOpen] = useState(false);
     const [bookingPreferences, setBookingPreferencesForm] = useState<BookingPreferences>(getBookingPreferences());
-    const [identityForm, setIdentityForm] = useState<AccountIdentity>(() => getAccountIdentity());
-    const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>(() => getSavedBankCards());
+    const [identityForm, setIdentityForm] = useState<AccountIdentity>(emptyIdentityForm);
+    const [identityMessage, setIdentityMessage] = useState("");
+    const [identityErrorMessage, setIdentityErrorMessage] = useState("");
+    const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>([]);
     const [bankCardNumber, setBankCardNumber] = useState('');
     const [bankCardLabel, setBankCardLabel] = useState('');
     const [activeTab, setActiveTab] = useState<"profile" | "travel">("profile");
@@ -217,27 +209,31 @@ export default function Account() {
         }
     };
 
-    const refreshAccountAssets = () => {
-        setIdentityForm(getAccountIdentity());
-        setSavedBankCards(getSavedBankCards());
+    const loadAccountAssets = async (currentSession = session) => {
+        if (!currentSession) {
+            setIdentityForm(emptyIdentityForm);
+            setSavedBankCards([]);
+            return;
+        }
+        try {
+            const [identityResponse, bankCardsResponse] = await Promise.all([
+                ApiRequests.getAccountIdentity(currentSession.token),
+                ApiRequests.listSavedBankCards(currentSession.token)
+            ]);
+            setIdentityForm(identityResponse.status === 204 ? emptyIdentityForm : identityResponse.data);
+            setSavedBankCards(bankCardsResponse.data);
+        } catch {
+            setIdentityErrorMessage("实名信息或银联卡读取失败，请稍后再试。");
+        }
     };
 
     useEffect(() => {
-        refreshAccountAssets();
-        const handleAccountAssetsChanged = () => refreshAccountAssets();
-        window.addEventListener(ACCOUNT_IDENTITY_EVENT, handleAccountAssetsChanged);
-        window.addEventListener(SAVED_BANK_CARDS_EVENT, handleAccountAssetsChanged);
-
         if (profile) {
             syncProfileForm(profile);
             refreshProfile().then(r => r);
             loadTravelers().then(r => r);
+            loadAccountAssets().then(r => r);
         }
-
-        return () => {
-            window.removeEventListener(ACCOUNT_IDENTITY_EVENT, handleAccountAssetsChanged);
-            window.removeEventListener(SAVED_BANK_CARDS_EVENT, handleAccountAssetsChanged);
-        };
     }, []);
 
     const handleAuthenticated = (nextSession: UserSession) => {
@@ -245,7 +241,7 @@ export default function Account() {
         syncProfileForm(nextSession.user);
         setMessage("登录成功，欢迎回来。");
         setErrorMessage("");
-        setIdentityForm(getAccountIdentity(nextSession.user.id));
+        loadAccountAssets(nextSession).then(r => r);
         loadTravelers(nextSession).then(r => r);
     };
 
@@ -319,6 +315,8 @@ export default function Account() {
         setProfileForm(emptyProfileForm);
         setAvatarInput("");
         setIdentityForm(emptyIdentityForm);
+        setIdentityMessage("");
+        setIdentityErrorMessage("");
         navigate("/");
     };
 
@@ -406,7 +404,8 @@ export default function Account() {
         setErrorMessage("");
     };
 
-    const saveIdentity = () => {
+    const saveIdentity = async () => {
+        if (!session) return;
         const normalizedIdentity = {
             realName: identityForm.realName.trim(),
             documentType: identityForm.documentType.trim() || "身份证",
@@ -414,38 +413,66 @@ export default function Account() {
         };
 
         if (!normalizedIdentity.realName) {
-            setErrorMessage("请填写真实姓名。");
+            setIdentityErrorMessage("请填写真实姓名。");
             return;
         }
         const documentError = validateDocumentNumber(normalizedIdentity.documentType, normalizedIdentity.documentNumber, true);
         if (documentError) {
-            setErrorMessage(documentError);
+            setIdentityErrorMessage(documentError);
             return;
         }
 
-        const savedIdentity = setAccountIdentity(normalizedIdentity);
-        setIdentityForm(savedIdentity);
-        setMessage("实名信息已保存，后续支付会自动带入。");
-        setErrorMessage("");
+        setSaving(true);
+        setIdentityMessage("");
+        setIdentityErrorMessage("");
+        try {
+            const response = await ApiRequests.saveAccountIdentity(session.token, normalizedIdentity);
+            setIdentityForm(response.data);
+            setIdentityMessage("实名信息已保存，后续支付会自动带入。");
+        } catch (error: any) {
+            setIdentityErrorMessage(extractApiErrorMessage(error, "实名信息保存失败，请稍后再试。"));
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const addBankCard = () => {
+    const addBankCard = async () => {
+        if (!session) return;
         const normalizedNumber = normalizeDigits(bankCardNumber);
         const cardError = validateBankCard(normalizedNumber);
         if (cardError) {
             setErrorMessage(cardError);
             return;
         }
-        saveBankCard(normalizedNumber, bankCardLabel);
-        setBankCardNumber('');
-        setBankCardLabel('');
-        setMessage('\u94f6\u8054\u5361\u5df2\u4fdd\u5b58\uff0c\u652f\u4ed8\u65f6\u53ef\u4ee5\u76f4\u63a5\u9009\u62e9\u3002');
-        setErrorMessage('');
+
+        setSaving(true);
+        setErrorMessage("");
+        try {
+            const response = await ApiRequests.saveBankCard(session.token, {cardNumber: normalizedNumber, label: bankCardLabel});
+            setSavedBankCards(previous => previous.some(card => card.id === response.data.id) ? previous : [response.data, ...previous]);
+            setBankCardNumber('');
+            setBankCardLabel('');
+            setMessage("银联卡已保存，支付时可以直接选择。");
+        } catch {
+            setErrorMessage("银联卡保存失败，请稍后再试。");
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const deleteBankCard = (cardId: string) => {
-        removeSavedBankCard(cardId);
-        setMessage('\u5df2\u5220\u9664\u4fdd\u5b58\u7684\u94f6\u8054\u5361\u3002');
+    const deleteBankCard = async (cardId: string) => {
+        if (!session) return;
+        setSaving(true);
+        setErrorMessage("");
+        try {
+            await ApiRequests.deleteBankCard(session.token, cardId);
+            setSavedBankCards(previous => previous.filter(card => card.id !== cardId));
+            setMessage("已删除保存的银联卡。");
+        } catch {
+            setErrorMessage("银联卡删除失败，请稍后再试。");
+        } finally {
+            setSaving(false);
+        }
     };
 
     const deleteTraveler = async (travelerId: string) => {
@@ -514,7 +541,7 @@ export default function Account() {
         <main className="min-h-[calc(100vh-80px)] bg-[#f6f8fb] px-8 py-10">
             <section className="mx-auto grid max-w-7xl grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
                 <Paper elevation={0} className="h-fit border border-gray-200 p-6">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 pb-6">
                         <Avatar src={resolveCommunityImageUrl(profile.avatarUrl) || undefined} sx={{width: 72, height: 72, bgcolor: "#0f766e"}}>
                             {initials}
                         </Avatar>
@@ -528,7 +555,7 @@ export default function Account() {
                         </div>
                     </div>
 
-                    <Divider className="my-5"/>
+                    <Divider className="mb-5"/>
 
                     <div className="grid gap-3">
                         <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
@@ -540,9 +567,6 @@ export default function Account() {
                     <div className="mt-6 grid gap-3">
                         <Button component={Link} to="/reservations" variant="contained" startIcon={<Bookmarks/>}>
                             查看我的预订
-                        </Button>
-                        <Button component={Link} to="/ai-planner" variant="outlined" startIcon={<TravelExplore/>}>
-                            打开 AI 规划
                         </Button>
                         <Button color="error" variant="text" startIcon={<Logout/>} onClick={logout}>
                             退出登录
@@ -694,13 +718,9 @@ export default function Account() {
 
                         <div>
                             <div className="rounded-lg border border-gray-200 p-4">
-                                <div className="mb-4 flex items-center justify-between">
-                                    <div>
-                                        <p className="font-semibold text-gray-900">实名信息</p>
-                                        <p className="text-xs text-gray-500">支付前会要求填写付款人实名信息，证件号仅用于当前账户的出行与支付校验。</p>
-                                    </div>
-                                    <CreditCard className="text-[#0f766e]"/>
-                                </div>
+                                <p className="mb-4 text-xs text-gray-500">支付前会要求填写付款人实名信息，证件号仅用于当前账户的出行与支付校验。</p>
+                                {identityMessage && <Alert severity="success" className="mb-4">{identityMessage}</Alert>}
+                                {identityErrorMessage && <Alert severity="error" className="mb-4">{identityErrorMessage}</Alert>}
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <TextField
                                         label="真实姓名"
