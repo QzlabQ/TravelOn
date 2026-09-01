@@ -62,6 +62,9 @@ bash tests/migration/test-existing-databases.sh
 `city_id` 合并、重复图片清理、酒店/房间/房间预订/交通票务迁移、外键关系、完成标记、
 重复执行和失败后重试。测试结束后会自动删除临时容器，不会使用项目的持久化数据库目录。
 
+该测试验证的是历史数据迁移分支，因此会显式设置
+`MIGRATE_LEGACY_DATA=true`。迁移脚本在 Docker Compose 和普通启动场景下默认不迁移历史数据。
+
 示例：
 
 ```text
