@@ -335,6 +335,12 @@ class OpenAICompatibleClient:
             "userSelections": "Keep selected places and style choices unless impossible; do not use rejected places as main recommendations.",
             "snapshot": "When latestSnapshot is provided, treat it as the previous saved plan and describe only useful changes in Chinese.",
             "jsonEscaping": "Do not write backslash commands or raw escape-like markers in user-facing text. Use plain Chinese punctuation and words.",
+            "destination": (
+                f"The destination is exactly {request.coreSlots.city}. Never change the destination city during this conversation. "
+                "Every returned place and route endpoint must be located in that city. Short or ambiguous follow-ups such as "
+                "a number select or refine the current plan; they never authorize a destination change. If evidence is insufficient, "
+                "preserve the latest snapshot and candidate places instead of inventing places from another city."
+            ),
         }
         if day_scope["isDayScope"]:
             output_rules.update(
@@ -353,6 +359,14 @@ class OpenAICompatibleClient:
 
         return {
             "request": model_dump_jsonable(request),
+            "destinationGuard": {
+                "city": request.coreSlots.city,
+                "immutable": True,
+                "rule": (
+                    "Keep this destination for the entire run. A destination change is allowed only when coreSlots.city "
+                    "itself changes in a new conversation request."
+                ),
+            },
             "dayScope": day_scope,
             "candidatePlaces": places,
             "weather": weather,

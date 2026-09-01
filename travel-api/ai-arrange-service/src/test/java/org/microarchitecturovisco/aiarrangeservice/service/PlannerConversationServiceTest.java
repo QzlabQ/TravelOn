@@ -5,9 +5,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.microarchitecturovisco.aiarrangeservice.client.PlannerAgentClient;
 import org.microarchitecturovisco.aiarrangeservice.client.PlannerAiClient;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerConversation;
+import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerMessage;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapshot;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerConversationStatus;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerMessageType;
+import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerMessageRole;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerRunStatus;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerActiveRun;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerSnapshotDraft;
@@ -99,6 +101,50 @@ class PlannerConversationServiceTest {
 
         conversation.setActiveRun(null);
         assertThat(PlannerConversationResponse.from(conversation).getActiveRun()).isNull();
+    }
+
+    @Test
+    void listMessagesChecksOwnershipAndPreservesChronologicalOrder() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = conversation(conversationId, userId);
+        PlannerMessage first = PlannerMessage.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversationId)
+                .userId(userId)
+                .role(PlannerMessageRole.USER)
+                .content("请安排西安行程")
+                .createdAt(Instant.parse("2026-08-28T08:00:00Z"))
+                .build();
+        PlannerMessage second = PlannerMessage.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversationId)
+                .userId(userId)
+                .role(PlannerMessageRole.ASSISTANT)
+                .content("已生成第一版行程")
+                .createdAt(Instant.parse("2026-08-28T08:00:01Z"))
+                .build();
+
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.of(conversation));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).thenReturn(List.of(first, second));
+
+        PlannerConversationService service = new PlannerConversationService(
+                conversationRepository,
+                messageRepository,
+                snapshotRepository,
+                plannerAiClient,
+                plannerAgentClient,
+                snapshotService,
+                webSocketSessionRegistry,
+                plannerExecutorService
+        );
+
+        var messages = service.listMessages(conversationId, userId);
+
+        assertThat(messages).extracting(message -> message.getRole().name())
+                .containsExactly("USER", "ASSISTANT");
+        assertThat(messages).extracting(message -> message.getContent())
+                .containsExactly("请安排西安行程", "已生成第一版行程");
     }
 
     @Test

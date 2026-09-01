@@ -199,6 +199,46 @@ def test_model_payload_includes_day_scope_rules() -> None:
     assert payload["model"] == "model"
 
 
+def test_model_payload_keeps_destination_for_ambiguous_follow_up() -> None:
+    client = OpenAICompatibleClient(agent_settings())
+    request = AgentRunRequest.model_validate(
+        {
+            "conversationId": "00000000-0000-0000-0000-000000000010",
+            "userId": "00000000-0000-0000-0000-000000000001",
+            "coreSlots": {
+                "city": "西安",
+                "travelStartDate": "2026-06-01",
+                "travelEndDate": "2026-06-03",
+                "peopleCount": 2,
+            },
+            "userMessage": "1",
+            "latestSnapshot": {
+                "version": 1,
+                "places": [{"name": "西安城墙", "address": "陕西省西安市碑林区", "type": "SCENIC", "source": "AI"}],
+                "routes": [],
+                "dayPlans": [],
+                "completedDayIndexes": [],
+            },
+        }
+    )
+
+    payload = client._build_payload(  # noqa: SLF001 - regression covers destination contract.
+        request=request,
+        places=[],
+        weather=None,
+        transport_options=[],
+        budget=None,
+        react_observations=[],
+        planner_constraints={},
+    )
+    user_payload = json.loads(payload["messages"][-1]["content"])
+
+    assert user_payload["destinationGuard"]["city"] == "西安"
+    assert user_payload["destinationGuard"]["immutable"] is True
+    assert "ambiguous follow-ups" in user_payload["outputRules"]["destination"]
+    assert "Never change" in user_payload["outputRules"]["destination"]
+
+
 def test_model_payload_uses_configured_model_for_flash_variant() -> None:
     client = OpenAICompatibleClient(agent_settings())
     request = sample_request().model_copy(update={"modelVariant": PlannerModelVariant.FLASH})

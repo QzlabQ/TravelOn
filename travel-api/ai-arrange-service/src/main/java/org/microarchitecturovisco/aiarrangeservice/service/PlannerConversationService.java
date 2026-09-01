@@ -28,6 +28,7 @@ import org.microarchitecturovisco.aiarrangeservice.domain.model.response.Planner
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerConversationResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerDayVersionResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerDataRefreshPayload;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerMessageResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerSnapshotDiffResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerRunStatePayload;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerConversationRepository;
@@ -111,6 +112,14 @@ public class PlannerConversationService {
         return conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId)
                 .stream()
                 .map(PlannerConversationResponse::from)
+                .toList();
+    }
+
+    public List<PlannerMessageResponse> listMessages(UUID conversationId, UUID userId) {
+        getOwnedConversation(conversationId, userId);
+        return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)
+                .stream()
+                .map(PlannerMessageResponse::from)
                 .toList();
     }
 
@@ -214,6 +223,7 @@ public class PlannerConversationService {
         UUID runId = prepareRun(conversation, safePayload);
         safePayload.setRunId(runId);
         applySelectedPlaces(conversation, safePayload);
+        logRunAccepted(conversation, userId, runId, safePayload, "rest");
 
         if (StringUtils.hasText(safePayload.getMessage())) {
             saveMessage(conversationId, userId, PlannerMessageRole.USER, safePayload.getMessage(), null, Map.of("source", "planner-agent-rest"));
@@ -229,6 +239,7 @@ public class PlannerConversationService {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Planner Agent 未返回快照草稿，无法保存正式规划快照");
         }
         markRunSucceeded(conversation, runId, response, safePayload.getTargetDayIndex());
+        logRunSucceeded(conversation, userId, runId, response, snapshot);
         webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_DATA_REFRESH,
                 PlannerDataRefreshPayload.from(conversation.getStatus(), snapshot, response.getRecommendationGroups()));
         webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_SNAPSHOT_SAVED,
@@ -236,6 +247,7 @@ public class PlannerConversationService {
         return snapshot;
         } catch (RuntimeException exception) {
             markRunFailed(conversation, runId, plannerErrorCode(exception), plannerErrorMessage(exception));
+            logRunFailed(conversation, userId, runId, exception);
             throw exception;
         }
     }
@@ -255,6 +267,7 @@ public class PlannerConversationService {
         }
         UUID runId = prepareRun(conversation, safePayload);
         applySelectedPlaces(conversation, safePayload);
+        logRunAccepted(conversation, userId, runId, safePayload, "websocket");
 
         saveMessage(conversationId, userId, PlannerMessageRole.USER, safePayload.getMessage(), null, Map.of("source", "websocket", "runId", runId.toString()));
 
@@ -270,6 +283,7 @@ public class PlannerConversationService {
                 .thenApplyAsync(response -> {
                     PlannerSnapshot snapshot = finalizeAgentTurnFromAgent(activeConversation, userId, response, "planner-agent-stream");
                     markRunSucceeded(activeConversation, runId, response, safePayload.getTargetDayIndex());
+                    logRunSucceeded(activeConversation, userId, runId, response, snapshot);
                     return new AgentTurnResult(response, snapshot);
                 }, plannerExecutorService)
                 .thenAccept(result -> {
@@ -285,7 +299,7 @@ public class PlannerConversationService {
                 })
                 .exceptionally(error -> {
                     Throwable rootCause = unwrapFailure(error);
-                    logger.log(Level.WARNING, "Planner chat failed", rootCause);
+                    logRunFailed(activeConversation, userId, runId, rootCause);
                     markRunFailed(activeConversation, runId, plannerErrorCode(rootCause), plannerErrorMessage(rootCause));
                     webSocketSessionRegistry.sendError(
                             conversationId,
@@ -709,6 +723,14 @@ public class PlannerConversationService {
             event.setRunId(runId);
         }
         webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_TRACE_EVENT, event);
+        if (event != null && ("FAILED".equals(event.getStatus()) || "RUN_FAILED".equals(event.getType()))) {
+            logger.warning(() -> "planner_trace event=failed conversationId=" + conversationId
+                    + " runId=" + runId
+                    + " traceId=" + nonBlank(event.getTraceId(), "-")
+                    + " phase=" + nonBlank(event.getPhase(), "-")
+                    + " tool=" + nonBlank(event.getTool(), "-")
+                    + " detail=\"" + sanitizeLogValue(event.getMessage()) + "\"");
+        }
         if ("OPTIONS_READY".equals(event.getType())) {
             webSocketSessionRegistry.send(conversationId, PlannerMessageType.PLANNER_OPTIONS_REFRESH, event.getData());
         }
@@ -716,6 +738,61 @@ public class PlannerConversationService {
 
     private String nonBlank(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private void logRunAccepted(
+            PlannerConversation conversation,
+            UUID userId,
+            UUID runId,
+            PlannerChatSendPayload payload,
+            String transport
+    ) {
+        logger.info(() -> "planner_run event=accepted conversationId=" + conversation.getId()
+                + " runId=" + runId
+                + " userId=" + userId
+                + " city=\"" + sanitizeLogValue(conversation.getCoreSlots().getCity()) + "\""
+                + " targetDay=" + payload.getTargetDayIndex()
+                + " scope=" + nonBlank(payload.getPlanningScope(), "auto")
+                + " mode=" + nonBlank(payload.getPlanningMode(), "auto")
+                + " transport=" + transport
+                + " message=\"" + sanitizeLogValue(payload.getMessage()) + "\"");
+    }
+
+    private void logRunSucceeded(
+            PlannerConversation conversation,
+            UUID userId,
+            UUID runId,
+            AgentRunResponse response,
+            PlannerSnapshot snapshot
+    ) {
+        List<String> placeNames = snapshot == null || snapshot.getPlaces() == null
+                ? List.of()
+                : snapshot.getPlaces().stream().map(place -> place.getName()).filter(StringUtils::hasText).limit(10).toList();
+        logger.info(() -> "planner_run event=succeeded conversationId=" + conversation.getId()
+                + " runId=" + runId
+                + " userId=" + userId
+                + " traceId=" + (response == null ? "-" : nonBlank(response.getTraceId(), "-"))
+                + " city=\"" + sanitizeLogValue(conversation.getCoreSlots().getCity()) + "\""
+                + " snapshotVersion=" + (snapshot == null ? "-" : snapshot.getVersion())
+                + " placeCount=" + placeNames.size()
+                + " places=\"" + sanitizeLogValue(String.join(",", placeNames)) + "\"");
+    }
+
+    private void logRunFailed(PlannerConversation conversation, UUID userId, UUID runId, Throwable error) {
+        String logMessage = "planner_run event=failed conversationId=" + conversation.getId()
+                + " runId=" + runId
+                + " userId=" + userId
+                + " city=\"" + sanitizeLogValue(conversation.getCoreSlots().getCity()) + "\""
+                + " errorCode=" + plannerErrorCode(error)
+                + " detail=\"" + sanitizeLogValue(plannerErrorDetail(error)) + "\"";
+        logger.log(Level.WARNING, logMessage, error);
+    }
+
+    private String sanitizeLogValue(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "-";
+        }
+        return sanitizeErrorDetail(value.replaceAll("[\\r\\n\\t]+", " ").replace('"', '\''));
     }
 
     private record AgentTurnResult(AgentRunResponse response, PlannerSnapshot snapshot) {

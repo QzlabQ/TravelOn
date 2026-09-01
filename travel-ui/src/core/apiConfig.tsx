@@ -183,6 +183,18 @@ export class ApiRequests {
         return await axiosInstance.get<PlannerConversationResponse>(`ai-arrange/api/conversations/${conversationId}?userId=${userId}`);
     }
 
+    static listPlannerConversations = async (userId: string) => {
+        return await axiosInstance.get<PlannerConversationResponse[]>('ai-arrange/api/conversations', {
+            params: {userId}
+        });
+    }
+
+    static listPlannerMessages = async (conversationId: string, userId: string) => {
+        return await axiosInstance.get<PlannerMessageResponse[]>(`ai-arrange/api/conversations/${conversationId}/messages`, {
+            params: {userId}
+        });
+    }
+
     static listPlannerSnapshots = async (conversationId: string, userId: string) => {
         return await axiosInstance.get<PlannerSnapshot[]>(`ai-arrange/api/conversations/${conversationId}/snapshots?userId=${userId}`);
     }
@@ -804,6 +816,13 @@ export interface PlannerConversationResponse {
     selectedPlaceIds: string[],
     createdAt: string,
     updatedAt: string,
+}
+
+export interface PlannerMessageResponse {
+    id: string,
+    role: "USER" | "ASSISTANT" | "SYSTEM",
+    content: string,
+    createdAt: string,
 }
 
 type PlannerConversationStatus = 'COLLECTING_SLOTS' | 'ACTIVE_CHAT' | 'COMPLETED';

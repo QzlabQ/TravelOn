@@ -276,6 +276,7 @@ function AmapCanvas({
 }: PlannerMapPanelProps & {onLoadStateChange: (state: MapLoadState) => void}) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<AMapMap | null>(null);
+    const hasFitInitialViewRef = useRef(false);
     const [amapApi, setAmapApi] = useState<AMapNamespace | null>(null);
 
     useEffect(() => {
@@ -327,6 +328,10 @@ function AmapCanvas({
         const map = mapRef.current;
         if (!map || !amapApi) return;
 
+        if (places.length === 0) {
+            hasFitInitialViewRef.current = false;
+        }
+
         const placesById = new Map<string, PlannerPlaceSuggestion>();
         places.forEach(place => placesById.set(place.placeId, place));
         const overlays: unknown[] = [];
@@ -365,7 +370,10 @@ function AmapCanvas({
         map.clearMap();
         if (overlays.length > 0) {
             map.add(overlays);
-            map.setFitView(overlays, false, [64, 64, 64, 64]);
+            if (!hasFitInitialViewRef.current) {
+                map.setFitView(overlays, false, [64, 64, 64, 64]);
+                hasFitInitialViewRef.current = true;
+            }
         }
     }, [amapApi, onTogglePlace, places, readOnly, routes, selectedPlaceIds]);
 
@@ -385,7 +393,7 @@ export function PlannerMapPanel(props: PlannerMapPanelProps) {
     const mapModeLabel = showAmap && mapLoadState === "ready" ? "高德地图" : "模拟地图";
 
     return (
-        <section className="flex min-h-[420px] flex-[0.85] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <section className="flex h-[min(720px,calc(100dvh-150px))] min-h-[520px] flex-none flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
                 <div className="flex items-center gap-2">
                     <MapIcon style={{color: "#556cd6"}}/>
@@ -415,7 +423,25 @@ export function PlannerMapPanel(props: PlannerMapPanelProps) {
                 }
             </div>
 
-            <div className="max-h-32 shrink-0 overflow-y-auto border-t border-gray-200 bg-white px-4 py-3">
+            <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-200 bg-gray-50 px-4 py-2 text-xs text-gray-600">
+                {[
+                    ["#19857b", "已选择"],
+                    ["#2563eb", "景点"],
+                    ["#ef6c00", "餐饮"],
+                    ["#9c27b0", "住宿"],
+                ].map(([color, label]) => (
+                    <span key={label} className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor: color}}/>
+                        {label}
+                    </span>
+                ))}
+                <span className="inline-flex items-center gap-1.5">
+                    <span className="w-6 border-t-2 border-dashed border-[#556cd6]"/>
+                    虚线表示点位间的建议路线，选择点位后会更新路线
+                </span>
+            </div>
+
+            <div className="min-h-24 max-h-40 shrink-0 overflow-y-auto border-t border-gray-200 bg-white px-4 py-3 pb-5">
                 {routes.length === 0 &&
                     <Typography variant="body2" color="text.secondary">路线会在 AI 形成完整行程后同步。</Typography>
                 }

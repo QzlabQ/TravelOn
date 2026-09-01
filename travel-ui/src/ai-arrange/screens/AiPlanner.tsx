@@ -7,6 +7,10 @@ import {
     Button,
     Chip,
     Collapse,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     IconButton,
     LinearProgress,
     MenuItem,
@@ -148,6 +152,14 @@ const ACCOMMODATION_QUICK_OPTIONS = ["地铁附近", "景区附近", "亲子酒�
 const TRANSPORT_QUICK_OPTIONS = ["公共交通优先", "少换乘", "少步行", "打车优先", "高铁优先", "飞机优先", "自驾友好"];
 const MUST_VISIT_QUICK_OPTIONS = ["地标建筑", "博物馆", "美食街", "咖啡店", "公园", "夜景", "历史街区", "亲子乐园", "购物中心"];
 const AVOID_QUICK_OPTIONS = ["排队过久", "人流密集", "夜市", "爬山", "长距离步行", "过度商业化", "早起行程"];
+
+function socketStatusLabel(status: SocketStatus) {
+    if (status === "connected") return "已连接";
+    if (status === "connecting") return "连接中";
+    if (status === "closed") return "正在重连";
+    if (status === "error") return "连接异常";
+    return "未连接";
+}
 
 function defaultPlannerForm(): PlannerFormState {
     return {
@@ -574,6 +586,9 @@ export default function AiPlanner() {
     const [dayVersionsLoading, setDayVersionsLoading] = useState(false);
     const [assemblingTrip, setAssemblingTrip] = useState(false);
     const [communityPublishOpen, setCommunityPublishOpen] = useState(false);
+    const [historyOpen, setHistoryOpen] = useState(false);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyConversations, setHistoryConversations] = useState<PlannerConversationResponse[]>([]);
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
     const [showRecommendations, setShowRecommendations] = useState(false);
     const [targetDayIndex, setTargetDayIndex] = useState(
@@ -723,10 +738,10 @@ export default function AiPlanner() {
         ? "latest"
         : String(viewingSnapshotVersion);
     const snapshotCountLabel = dayVersionsLoading
-        ? `第 ${activeDayIndex} 天版本加载中`
+        ? "版本加载中"
         : dayVersions.length > 0
-        ? `第 ${activeDayIndex} 天 · ${dayVersions.length} 个版本`
-        : `第 ${activeDayIndex} 天暂无版本`;
+        ? `${dayVersions.length} 个历史版本`
+        : "暂无历史版本";
     const communityDraftPayload = useMemo(() => ({
         title: (displayData.title || `${coreSlots.city || "旅行"} 行程规划`).slice(0, 120),
         content: displayData.markdown || "",
@@ -920,6 +935,68 @@ export default function AiPlanner() {
         }
     }, [applyCoreSlotsToForm, setSnapshotView, userId]);
 
+    const openConversationHistory = async () => {
+        setHistoryOpen(true);
+        setHistoryLoading(true);
+        try {
+            const response = await ApiRequests.listPlannerConversations(userId);
+            setHistoryConversations(response.data);
+        } catch (error) {
+            console.error(error);
+            setErrorMessage("加载历史对话失败，请稍后重试。");
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    const loadHistoricalConversation = async (conversationId: string) => {
+        setHistoryLoading(true);
+        setErrorMessage("");
+        try {
+            const [conversationResponse, snapshotsResponse, messagesResponse] = await Promise.all([
+                ApiRequests.getPlannerConversation(conversationId, userId),
+                ApiRequests.listPlannerSnapshots(conversationId, userId),
+                ApiRequests.listPlannerMessages(conversationId, userId),
+            ]);
+            const nextConversation = conversationResponse.data;
+            const nextSnapshots = sortSnapshots(snapshotsResponse.data);
+            const nextData = nextSnapshots[0]
+                ? viewDataFromSnapshot(nextSnapshots[0])
+                : viewDataFromConversation(nextConversation);
+
+            pendingInitialPromptRef.current = null;
+            activeAssistantMessageIdRef.current = null;
+            plannerRunInFlightRef.current = nextConversation.activeRun?.status === "RUNNING";
+            lastPlannerRunCompletedRef.current = nextConversation.activeRun?.status === "SUCCEEDED";
+            activeRunIdRef.current = nextConversation.activeRun?.runId || null;
+            activeRunStatusRef.current = nextConversation.activeRun?.status || null;
+            applyCoreSlotsToForm(nextConversation.coreSlots);
+            setConversation(nextConversation);
+            setSnapshots(nextSnapshots);
+            setLiveData(nextData);
+            setDisplayData(nextData);
+            setSnapshotView("latest");
+            setPlannerTraceEvents([]);
+            setActiveRunId(nextConversation.activeRun?.runId || null);
+            setActiveRunStatus(nextConversation.activeRun?.status || null);
+            setChatSending(nextConversation.activeRun?.status === "RUNNING");
+            setTargetDayIndex(nextData.currentDayIndex || 1);
+            setChatMessages(messagesResponse.data
+                .filter(message => message.role === "USER" || message.role === "ASSISTANT")
+                .map(message => ({
+                    id: message.id,
+                    role: message.role === "USER" ? "user" as const : "assistant" as const,
+                    text: message.content,
+                })));
+            setHistoryOpen(false);
+        } catch (error) {
+            console.error(error);
+            setErrorMessage("打开历史对话失败，该会话可能已被清理。");
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
     const loadSnapshotDiff = useCallback(async (fromVersion: number) => {
         const toVersion = liveData.snapshotVersion;
         if (!conversation?.id || !toVersion || fromVersion === toVersion) {
@@ -1032,15 +1109,6 @@ export default function AiPlanner() {
             const seed = pendingInitialPromptRef.current?.conversationId === conversationId
                 ? pendingInitialPromptRef.current
                 : null;
-
-            setChatMessages(prevMessages => [
-                ...prevMessages,
-                {
-                    id: uuidv4(),
-                    role: "system",
-                    text: seed ? "已连接规划服务，AI 正在生成第一版行程。" : "已恢复规划服务连接，可以继续对话。",
-                }
-            ]);
 
             if (seed) {
                 pendingInitialPromptRef.current = null;
@@ -1916,33 +1984,29 @@ export default function AiPlanner() {
                         )}
                     </div>
 
-                    <Chip
-                        size="small"
-                        color="primary"
-                        variant="filled"
-                        label={`当前操作：第 ${activeDayIndex} 天${activeDayDate ? `（${activeDayDate}）` : ""}`}
-                    />
-
-                    <ToggleButtonGroup
-                        size="small"
-                        exclusive
-                        value={activeDayIndex}
-                        onChange={(_, value) => {
-                            if (value) setTargetDayIndex(Number(value));
-                        }}
-                        disabled={isSnapshotPreview || chatSending || assemblingTrip}
-                    >
-                        {dayOptions.map(dayIndex => {
-                            const status = completedDaySet.has(dayIndex)
-                                ? "CONFIRMED"
-                                : dayPlanByIndex.get(dayIndex)?.status;
-                            return (
-                                <ToggleButton key={dayIndex} value={dayIndex}>
-                                    第 {dayIndex} 天{status === "CONFIRMED" ? "（已确认）" : ""}
-                                </ToggleButton>
-                            );
-                        })}
-                    </ToggleButtonGroup>
+                    <div className="flex items-center gap-2">
+                        <Typography variant="caption" color="text.secondary">选择日期</Typography>
+                        <ToggleButtonGroup
+                            size="small"
+                            exclusive
+                            value={activeDayIndex}
+                            onChange={(_, value) => {
+                                if (value) setTargetDayIndex(Number(value));
+                            }}
+                            disabled={isSnapshotPreview || chatSending || assemblingTrip}
+                        >
+                            {dayOptions.map(dayIndex => {
+                                const status = completedDaySet.has(dayIndex)
+                                    ? "CONFIRMED"
+                                    : dayPlanByIndex.get(dayIndex)?.status;
+                                return (
+                                    <ToggleButton key={dayIndex} value={dayIndex} aria-label={`第 ${dayIndex} 天${status === "CONFIRMED" ? "，已确认" : ""}`}>
+                                        {dayIndex}
+                                    </ToggleButton>
+                                );
+                            })}
+                        </ToggleButtonGroup>
+                    </div>
                 </div>
             </section>
         );
@@ -1966,7 +2030,7 @@ export default function AiPlanner() {
     );
 
     const renderSlotForm = () => (
-        <form className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white" onSubmit={handleStartPlanning}>
+        <form className="flex min-h-0 flex-1 flex-col overflow-visible rounded-lg border border-gray-200 bg-white xl:overflow-hidden" onSubmit={handleStartPlanning}>
             <div className="shrink-0 border-b border-gray-200 px-5 py-4">
                 <Typography variant="h6">出行基础信息</Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -1974,7 +2038,7 @@ export default function AiPlanner() {
                 </Typography>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-visible px-5 py-4 xl:overflow-y-auto">
                 <div className="grid gap-4">
                     <div className="grid gap-4 md:grid-cols-2">
                         {renderFreeSoloInput("出发城市", departureCity, setDepartureCity, CITY_QUICK_OPTIONS, {placeholder: "例如：北京"})}
@@ -2130,21 +2194,21 @@ export default function AiPlanner() {
                     <TextField
                         select
                         size="small"
-                        label={`第 ${activeDayIndex} 天版本`}
+                        label="历史版本"
                         value={snapshotSelectorValue}
                         onChange={event => handleSnapshotChange(event.target.value)}
                         sx={{minWidth: 210}}
                     >
                         <MenuItem value="latest">
-                            当前版本{currentDayVersion ? `（v${currentDayVersion.dayVersion}）` : ""}
+                            最新版本{currentDayVersion ? `（v${currentDayVersion.dayVersion}）` : ""}
                         </MenuItem>
                         {dayVersions.map(record => (
                             <MenuItem key={`${record.dayIndex}-${record.dayVersion}`} value={String(record.dayVersion)}>
-                                第 {record.dayIndex} 天 v{record.dayVersion}{record.current ? " · 当前使用" : ""} · {dayjs(record.createdAt).isValid() ? dayjs(record.createdAt).format("MM-DD HH:mm") : "历史版本"}
+                                v{record.dayVersion}{record.current ? " · 已启用" : ""} · {dayjs(record.createdAt).isValid() ? dayjs(record.createdAt).format("MM-DD HH:mm") : "历史版本"}
                             </MenuItem>
                         ))}
                     </TextField>
-                    <Tooltip title="重新填写槽位">
+                    <Tooltip title="放弃并重新开始">
                         <IconButton onClick={resetPlanner}>
                             <RestartAlt/>
                         </IconButton>
@@ -2216,7 +2280,7 @@ export default function AiPlanner() {
     );
 
     const renderRecommendationsPanel = () => (
-        <section className="flex min-h-0 flex-[1.35] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <section className="flex h-full min-h-[260px] max-h-[420px] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
                 <Typography variant="h6">AI 推荐选项</Typography>
                 <Chip size="small" label={`已选 ${displayData.selectedPlaceIds.length}`} color="secondary" variant="outlined"/>
@@ -2295,7 +2359,7 @@ export default function AiPlanner() {
     );
 
     const renderPlanningReferencePanels = () => (
-        <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
+        <div className="flex min-h-0 flex-col gap-4 overflow-visible xl:h-full xl:overflow-hidden">
             <PlannerMapPanel
                 places={displayData.places}
                 routes={displayData.routes}
@@ -2313,41 +2377,64 @@ export default function AiPlanner() {
             >
                 AI 推荐选项 {displayData.places.length > 0 ? `（${displayData.places.length}）` : ""}
             </Button>
-            <Collapse in={showRecommendations} className="min-h-0 flex-1">
+            <Collapse
+                in={showRecommendations}
+                className="min-h-0 flex-none xl:flex-1"
+                sx={{
+                    "& .MuiCollapse-wrapper, & .MuiCollapse-wrapperInner": {
+                        height: "100%",
+                        minHeight: 0,
+                    },
+                }}
+            >
                 {renderRecommendationsPanel()}
             </Collapse>
         </div>
     );
 
     return (
-        <div className="h-[calc(100dvh+320px)] overflow-hidden bg-[#f6f7fb]">
-            <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+        <div className="min-h-screen overflow-visible bg-[#f6f7fb] xl:h-[calc(100dvh+320px)] xl:overflow-hidden">
+            <div className="flex min-h-screen flex-col gap-3 p-4 xl:h-full xl:min-h-0">
                 <section className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-5 py-4">
                     <div className="flex items-center gap-3">
                         <AutoAwesome style={{color: "#556cd6"}}/>
                         <div>
                             <Typography variant="h5">{displayData.title}</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                {conversation ? `会话 ${conversation.id.slice(0, 8)} · 用户 ${userId.slice(0, 8)}` : "固定槽位收集完成后进入自由规划"}
-                            </Typography>
+                            {!conversation &&
+                                <Typography variant="body2" color="text.secondary">填写基础信息后开始规划</Typography>
+                            }
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        {displayData.snapshotVersion &&
-                            <Chip size="small" color="secondary" variant="outlined" label={`v${displayData.snapshotVersion}`}/>
-                        }
+                        <Button size="small" variant="outlined" startIcon={<History/>} onClick={openConversationHistory}>
+                            历史对话
+                        </Button>
                         <Chip
                             size="small"
                             color={socketStatus === "connected" ? "success" : socketStatus === "error" ? "error" : "default"}
-                            label={conversation ? socketStatus : "未开始"}
+                            label={conversation ? socketStatusLabel(socketStatus) : "未开始"}
                         />
                     </div>
                 </section>
 
                 {(creating || chatSending || hydrating || assemblingTrip) &&
-                    <Box sx={{height: 4}}>
+                    <section className="shrink-0 rounded border border-[#b9d8d3] bg-[#edf7f5] px-4 py-3">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <Typography variant="body2" className="font-semibold text-[#145c56]">
+                                {creating
+                                    ? "正在创建规划任务"
+                                    : hydrating
+                                        ? "正在加载规划数据"
+                                        : assemblingTrip
+                                            ? "正在汇总完整行程"
+                                            : traceMessage(currentTraceEvent) || `正在生成第 ${activeDayIndex} 天行程`}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                已生成 {displayedDayPlans.length} / {tripDayCount} 天
+                            </Typography>
+                        </div>
                         <LinearProgress/>
-                    </Box>
+                    </section>
                 }
 
                 {errorMessage &&
@@ -2367,7 +2454,7 @@ export default function AiPlanner() {
 
                 {!conversation ? (
                     <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
-                        <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
+                        <div className="flex min-h-0 flex-col gap-4 overflow-visible xl:overflow-hidden">
                             {renderSlotForm()}
                         </div>
                         {renderPlanningReferencePanels()}
@@ -2375,7 +2462,7 @@ export default function AiPlanner() {
                 ) : (
                     <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[440px_minmax(0,1fr)]">
                         {renderPlanningReferencePanels()}
-                        <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
+                        <div className="flex min-h-0 flex-col gap-4 overflow-visible xl:overflow-hidden">
                             {renderTripBar()}
                             {renderDayPlanBar()}
                             {renderMarkdownPanel()}
@@ -2383,6 +2470,34 @@ export default function AiPlanner() {
                     </div>
                 )}
             </div>
+            <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} fullWidth maxWidth="sm">
+                <DialogTitle>历史对话</DialogTitle>
+                <DialogContent dividers>
+                    {historyLoading && <LinearProgress className="mb-3"/>}
+                    {!historyLoading && historyConversations.length === 0 &&
+                        <Typography variant="body2" color="text.secondary">暂无历史对话。</Typography>
+                    }
+                    <div className="flex flex-col gap-2">
+                        {historyConversations.map(item => (
+                            <Button
+                                key={item.id}
+                                variant={item.id === conversation?.id ? "contained" : "outlined"}
+                                disabled={historyLoading}
+                                onClick={() => loadHistoricalConversation(item.id)}
+                                sx={{justifyContent: "space-between", px: 2, py: 1.25, textAlign: "left"}}
+                            >
+                                <span className="min-w-0 truncate">{item.title || `${item.coreSlots.city}行程`}</span>
+                                <span className="ml-3 shrink-0 text-xs opacity-70">
+                                    {dayjs(item.updatedAt).isValid() ? dayjs(item.updatedAt).format("YYYY-MM-DD HH:mm") : ""}
+                                </span>
+                            </Button>
+                        ))}
+                    </div>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setHistoryOpen(false)}>关闭</Button>
+                </DialogActions>
+            </Dialog>
             <FloatingAiAssistant
                 conversationActive={Boolean(conversation)}
                 socketStatus={socketStatus}

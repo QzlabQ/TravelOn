@@ -119,6 +119,14 @@ function disabledByCommonState({
     return undefined;
 }
 
+function socketStatusLabel(status: AssistantSocketStatus) {
+    if (status === "connected") return "已连接";
+    if (status === "connecting") return "连接中";
+    if (status === "closed") return "正在重连";
+    if (status === "error") return "连接异常";
+    return "未连接";
+}
+
 function ActionButton({action}: { action: AssistantAction }) {
     const disabled = Boolean(action.disabledReason);
     return (
@@ -147,6 +155,22 @@ function ActionButton({action}: { action: AssistantAction }) {
 
 function progressEventKey(event: PlannerTraceEvent, index: number) {
     return event.eventId || `${event.type}-${event.tool || "planner"}-${event.createdAt || index}`;
+}
+
+function progressEventDetail(event: PlannerTraceEvent) {
+    const data = event.data || {};
+    const metadata = typeof data.metadata === "object" && data.metadata !== null
+        ? data.metadata as Record<string, unknown>
+        : {};
+    const detail = data.errorMessage || data.error || data.detail || data.reason
+        || metadata.errorMessage || metadata.error || metadata.detail || metadata.reason;
+    return typeof detail === "string" && detail.trim() ? detail.trim() : event.message || "";
+}
+
+function progressStageKey(event: PlannerTraceEvent) {
+    if (event.type.startsWith("RUN_")) return "planner-run";
+    if (event.type.startsWith("MODEL_")) return event.tool || "model";
+    return event.tool || event.phase || event.type.replace(/_(STARTED|FINISHED|READY|FAILED)$/, "");
 }
 
 export function FloatingAiAssistant({
@@ -192,7 +216,15 @@ export function FloatingAiAssistant({
         isSnapshotPreview,
     });
     const displayedMessages = chatMessages;
-    const visibleProgressEvents = progressEvents.slice(-5);
+    const visibleProgressEvents = useMemo(() => {
+        const latestByStage = new Map<string, PlannerTraceEvent>();
+        progressEvents.forEach(event => {
+            const key = progressStageKey(event);
+            latestByStage.delete(key);
+            latestByStage.set(key, event);
+        });
+        return Array.from(latestByStage.values()).slice(-5);
+    }, [progressEvents]);
     const showProgress = busy || progressEvents.length > 0;
     const safeTripDayCount = Math.max(1, tripDayCount || 1);
     const safeGeneratedDayCount = Math.min(safeTripDayCount, Math.max(0, generatedDayCount || 0));
@@ -465,7 +497,7 @@ export function FloatingAiAssistant({
                             <div className="min-w-0">
                                 <Typography variant="subtitle1" className="truncate">AI 旅行助手</Typography>
                                 <Typography variant="caption" color="text.secondary" className="block truncate">
-                                    {busy ? busyLabel : conversationActive ? `第 ${activeDayIndex} 天 · ${socketStatus}` : "请先开始规划"}
+                                    {busy ? busyLabel : conversationActive ? `第 ${activeDayIndex} 天 · ${socketStatusLabel(socketStatus)}` : "请先开始规划"}
                                 </Typography>
                             </div>
                         </div>
@@ -567,16 +599,27 @@ export function FloatingAiAssistant({
                                             {showProgressDetails ? "收起详情" : "查看详情"}
                                         </Button>
                                         {showProgressDetails &&
-                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                        {visibleProgressEvents.map((event, index) => (
-                                            <Chip
-                                                key={progressEventKey(event, index)}
-                                                size="small"
-                                                variant="outlined"
-                                                color={traceStatusColor(event.status)}
-                                                label={`${traceToolLabel(event.tool)} · ${traceStatusLabel(event.status)}`}
-                                            />
-                                        ))}
+                                    <div className="mt-2 flex flex-col gap-1.5">
+                                        {visibleProgressEvents.map((event, index) => {
+                                            const detail = progressEventDetail(event);
+                                            return (
+                                                <Tooltip key={progressEventKey(event, index)} title={detail} arrow disableHoverListener={!detail}>
+                                                    <div className="flex min-w-0 items-start gap-2 rounded border border-gray-200 bg-white px-2 py-1.5">
+                                                        <Chip
+                                                            size="small"
+                                                            variant="outlined"
+                                                            color={traceStatusColor(event.status)}
+                                                            label={`${traceToolLabel(event.tool)} · ${traceStatusLabel(event.status)}`}
+                                                        />
+                                                        {detail &&
+                                                            <Typography variant="caption" color={event.status === "FAILED" ? "error" : "text.secondary"} className="min-w-0 flex-1 break-words pt-0.5">
+                                                                {detail}
+                                                            </Typography>
+                                                        }
+                                                    </div>
+                                                </Tooltip>
+                                            );
+                                        })}
                                     </div>
                                         }
                                     </>
