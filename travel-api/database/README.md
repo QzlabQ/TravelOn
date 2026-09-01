@@ -41,24 +41,32 @@ docker compose up -d --build
 This deletes local database data. Use cleanup scripts instead when preserving
 existing data matters.
 
-## Upgrading an existing volume
+## Existing volumes and legacy data migration
 
 The Docker entrypoint does not replay `database/init` on an existing data
-volume. Before switching an existing deployment from `hotel-service` and
-`transport-service` to `travel-core-service`, stop the old application
-containers and run the migration from the `travel-api` directory:
+volume. During normal startup, `travel-core-migration` only creates
+`travel_core_db` if needed, applies the merged baseline schema when the target
+is empty, and checks the required tables. It does not read or copy data from
+`hotel_db` or `transport_db`. This keeps the normal startup path fast and
+prevents an unexpected large data migration.
+
+The historical migration remains available as an explicit opt-in. Stop the
+old application containers, set the flag, and run the one-shot job from the
+`travel-api` directory:
 
 ```powershell
+$env:MIGRATE_LEGACY_DATA = "true"
 docker compose stop travel-core
 docker compose run --rm travel-core-migration
 docker compose up -d travel-core
+$env:MIGRATE_LEGACY_DATA = $null
 ```
 
-`database/migration/migrate-existing-databases.sh` creates `travel_core_db` if
-needed, applies the merged schema, copies the hotel and transport tables from
-the old databases through staging schemas, merges `city` by `city_id`, and
-validates every migrated identifier and city foreign key before recording a
-completion marker. It is safe to run again after a successful migration.
+With the flag enabled, `database/migration/migrate-existing-databases.sh`
+copies the hotel and transport tables through staging schemas, merges `city`
+by `city_id`, validates migrated identifiers and foreign keys, and records a
+completion marker. Without `MIGRATE_LEGACY_DATA=true`, the script exits after
+target database provisioning and never calls `pg_dump`.
 
 The script does not modify the old databases. Keep `hotel_db` and
 `transport_db` stopped and read-only during the cutover. They remain the

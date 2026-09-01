@@ -89,9 +89,9 @@ services:
     networks:
       - backend
 
-  # Run explicitly before the first cutover on an existing PostgreSQL volume.
-  # The service is a one-shot migration job and is not part of the steady-state
-  # application container count.
+  # The service provisions travel_core_db as a one-shot job. Legacy data
+  # migration is disabled by default; enable it explicitly with
+  # MIGRATE_LEGACY_DATA=true for a controlled cutover.
   travel-core-migration:
     <<: *service-defaults
     image: postgres:16
@@ -102,6 +102,7 @@ services:
       HOTEL_DB_NAME: ${HOTEL_DB_NAME:-hotel_db}
       TRANSPORT_DB_NAME: ${TRANSPORT_DB_NAME:-transport_db}
       TRAVEL_CORE_DB_NAME: ${TRAVEL_CORE_DB_NAME:-travel_core_db}
+      MIGRATE_LEGACY_DATA: ${MIGRATE_LEGACY_DATA:-false}
       PGHOST: postgres
       PGPORT: 5432
     volumes:
