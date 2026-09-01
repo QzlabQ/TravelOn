@@ -3,6 +3,8 @@ package org.microarchitecturovisco.userservice.controllers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.microarchitecturovisco.userservice.dto.AuthResponse;
+import org.microarchitecturovisco.userservice.services.AccountIdentityService;
+import org.microarchitecturovisco.userservice.services.SavedBankCardService;
 import org.microarchitecturovisco.userservice.services.TravelerService;
 import org.microarchitecturovisco.userservice.services.UserService;
 import org.springframework.http.MediaType;
@@ -29,7 +31,9 @@ class UserControllerRouteTest {
     void setUp() {
         userService = mock(UserService.class);
         TravelerService travelerService = mock(TravelerService.class);
-        mockMvc = standaloneSetup(new UserController(userService, travelerService)).build();
+        AccountIdentityService accountIdentityService = mock(AccountIdentityService.class);
+        SavedBankCardService savedBankCardService = mock(SavedBankCardService.class);
+        mockMvc = standaloneSetup(new UserController(userService, travelerService, accountIdentityService, savedBankCardService)).build();
     }
 
     @Test
