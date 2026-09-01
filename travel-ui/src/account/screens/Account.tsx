@@ -514,7 +514,7 @@ export default function Account() {
         <main className="min-h-[calc(100vh-80px)] bg-[#f6f8fb] px-8 py-10">
             <section className="mx-auto grid max-w-7xl grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
                 <Paper elevation={0} className="h-fit border border-gray-200 p-6">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 pb-6">
                         <Avatar src={resolveCommunityImageUrl(profile.avatarUrl) || undefined} sx={{width: 72, height: 72, bgcolor: "#0f766e"}}>
                             {initials}
                         </Avatar>
@@ -528,7 +528,7 @@ export default function Account() {
                         </div>
                     </div>
 
-                    <Divider className="my-7"/>
+                    <Divider className="mb-5"/>
 
                     <div className="grid gap-3">
                         <div className="flex items-center justify-between rounded-lg bg-white px-4 py-3">
