@@ -96,6 +96,7 @@ run_migration() {
     -e HOTEL_DB_NAME=hotel_db \
     -e TRANSPORT_DB_NAME="$transport_db" \
     -e TRAVEL_CORE_DB_NAME="$target_db" \
+    -e MIGRATE_LEGACY_DATA=true \
     -e PGHOST=127.0.0.1 \
     -e PGPORT=5432 \
     -v "$database_dir:/database:ro" \
