@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Migrate an existing PostgreSQL volume before switching traffic to
-# travel-core-service. The old databases are never modified until every
-# target-table validation has passed.
+# Provision travel_core_db before starting travel-core-service.
+#
+# Legacy data migration is intentionally opt-in. Normal application startup
+# only creates the target database, applies its baseline schema when needed,
+# and validates the required tables. Set MIGRATE_LEGACY_DATA=true when a
+# controlled migration from the old databases is explicitly required.
 
 : "${POSTGRES_USER:=admin}"
 : "${POSTGRES_PASSWORD:=admin}"
@@ -12,6 +15,7 @@ set -euo pipefail
 : "${HOTEL_DB_NAME:=hotel_db}"
 : "${TRANSPORT_DB_NAME:=transport_db}"
 : "${TRAVEL_CORE_DB_NAME:=travel_core_db}"
+: "${MIGRATE_LEGACY_DATA:=false}"
 
 PGPASSWORD="$POSTGRES_PASSWORD"
  export PGPASSWORD POSTGRES_USER POSTGRES_PASSWORD PGHOST PGPORT
@@ -46,7 +50,7 @@ SQL
 
 if "${psql_target[@]}" --tuples-only --no-align --command \
   "SELECT (to_regclass('public.travel_core_migration') IS NOT NULL)::int" | grep -q '^1$'; then
-  echo "[travel-core-migration] migration already completed"
+  echo "[travel-core-migration] legacy data migration already completed"
   exit 0
 fi
 
@@ -62,6 +66,11 @@ else
       exit 1
     fi
   done
+fi
+
+if [[ "${MIGRATE_LEGACY_DATA,,}" != "true" ]]; then
+  echo "[travel-core-migration] legacy data migration disabled; target database is ready"
+  exit 0
 fi
 
 "${psql_target[@]}" <<'SQL'
