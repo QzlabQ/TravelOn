@@ -145,6 +145,35 @@ export class ApiRequests {
         });
     }
 
+    static getAccountIdentity = async (token: string) => {
+        return await axiosInstance.get<AccountIdentity>('users/me/identity', {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static saveAccountIdentity = async (token: string, payload: AccountIdentityPayload) => {
+        return await axiosInstance.put<AccountIdentity>('users/me/identity', payload, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static listSavedBankCards = async (token: string) => {
+        return await axiosInstance.get<SavedBankCard[]>('users/me/bank-cards', {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static saveBankCard = async (token: string, payload: SavedBankCardPayload) => {
+        return await axiosInstance.post<SavedBankCard>('users/me/bank-cards', payload, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static deleteBankCard = async (token: string, cardId: string) => {
+        return await axiosInstance.delete(`users/me/bank-cards/${cardId}`, {
+            headers: {'X-User-Token': token}
+        });
+    }
     static logout = async (token: string) => {
         return await axiosInstance.post('users/auth/logout', {}, {
             headers: {'X-User-Token': token}
@@ -601,6 +630,26 @@ interface CreateHotelReservationPayload {
     roomIds: number[],
 }
 
+export interface AccountIdentityPayload {
+    realName: string,
+    documentType: string,
+    documentNumber: string,
+}
+
+export interface AccountIdentity extends AccountIdentityPayload {
+    id?: string,
+    updatedAt?: string,
+}
+
+export interface SavedBankCardPayload {
+    cardNumber: string,
+    label?: string,
+}
+
+export interface SavedBankCard extends Required<SavedBankCardPayload> {
+    id: string,
+    createdAt: string,
+}
 export type TravelerType = 'ADULT' | 'CHILD' | 'STUDENT';
 
 export interface TravelerPayload {

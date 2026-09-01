@@ -30,21 +30,15 @@ import {
     Train as TrainIcon
 } from "@mui/icons-material";
 import {
+    AccountIdentity,
     ApiRequests,
     PaymentTransactionResponse,
     RefundRecordResponse,
-    ReservationResponse
+    ReservationResponse,
+    SavedBankCard
 } from "../../core/apiConfig";
 import {
-    ACCOUNT_IDENTITY_EVENT,
-    AccountIdentity,
     addNotification,
-    getAccountIdentity,
-    getCurrentUserSession,
-    getSavedBankCards,
-    SAVED_BANK_CARDS_EVENT,
-    SavedBankCard,
-    setAccountIdentity,
 } from "../../core/currentUser";
 import {
     canCancelReservation,
@@ -113,6 +107,11 @@ const TimelineItem = ({
     </div>
 );
 
+const emptyPayerIdentity: AccountIdentity = {
+    realName: "",
+    documentType: "身份证",
+    documentNumber: "",
+};
 const documentTypeOptions = ["身份证", "护照", "港澳通行证", "台胞证", "其他"];
 
 const validatePayerIdentity = (identity: AccountIdentity) => {
@@ -136,8 +135,8 @@ export default function ReservationDetails() {
     const [payDialogOpen, setPayDialogOpen] = useState(false);
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
     const [cardNumber, setCardNumber] = useState("");
-    const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>(() => getSavedBankCards());
-    const [payerIdentity, setPayerIdentity] = useState<AccountIdentity>(() => getAccountIdentity());
+    const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>([]);
+    const [payerIdentity, setPayerIdentity] = useState<AccountIdentity>(emptyPayerIdentity);
     const [cancellationReason, setCancellationReason] = useState("");
     const [payments, setPayments] = useState<PaymentTransactionResponse[]>([]);
     const [refunds, setRefunds] = useState<RefundRecordResponse[]>([]);
@@ -170,19 +169,35 @@ export default function ReservationDetails() {
     }, [reservationId, session?.token]);
 
     useEffect(() => {
-        const refreshPaymentAssets = () => {
-            setPayerIdentity(getAccountIdentity());
-            setSavedBankCards(getSavedBankCards());
+        const token = session?.token;
+        if (!token) {
+            setPayerIdentity(emptyPayerIdentity);
+            setSavedBankCards([]);
+            return;
+        }
+
+        let active = true;
+        const loadPaymentAssets = async () => {
+            try {
+                const [identityResponse, bankCardsResponse] = await Promise.all([
+                    ApiRequests.getAccountIdentity(token),
+                    ApiRequests.listSavedBankCards(token)
+                ]);
+                if (!active) return;
+                setPayerIdentity(identityResponse.status === 204 ? emptyPayerIdentity : identityResponse.data);
+                setSavedBankCards(bankCardsResponse.data);
+            } catch {
+                if (active) {
+                    setErrorMessage("实名信息或银联卡读取失败，请稍后再试。");
+                }
+            }
         };
-        refreshPaymentAssets();
-        window.addEventListener(ACCOUNT_IDENTITY_EVENT, refreshPaymentAssets);
-        window.addEventListener(SAVED_BANK_CARDS_EVENT, refreshPaymentAssets);
+        loadPaymentAssets().then(r => r);
 
         return () => {
-            window.removeEventListener(ACCOUNT_IDENTITY_EVENT, refreshPaymentAssets);
-            window.removeEventListener(SAVED_BANK_CARDS_EVENT, refreshPaymentAssets);
+            active = false;
         };
-    }, []);
+    }, [session?.token]);
 
     useEffect(() => {
         if (loading || !reservation) return;
@@ -258,12 +273,11 @@ export default function ReservationDetails() {
             return;
         }
 
-        setPayerIdentity(getAccountIdentity());
         setPayDialogOpen(true);
     };
 
     const submitPayment = async () => {
-        if (!reservation) return;
+        if (!reservation || !session) return;
         if (!isAuthenticated) {
             setErrorMessage("请先登录账户后再支付订单。");
             return;
@@ -291,13 +305,8 @@ export default function ReservationDetails() {
         setErrorMessage("");
         setSuccessMessage("");
         try {
-            const nextIdentity = setAccountIdentity(normalizedIdentity);
-            setPayerIdentity(nextIdentity);
-            const session = getCurrentUserSession();
-            if (!session) {
-                setErrorMessage("请先登录后再支付");
-                return;
-            }
+            const identityResponse = await ApiRequests.saveAccountIdentity(session.token, normalizedIdentity);
+            setPayerIdentity(identityResponse.data);
             await ApiRequests.payForReservation(session.token, {reservationId: reservation.id, cardNumber: normalizedPaymentCardNumber});
             addNotification({
                 type: "PAYMENT_SUCCESS",
