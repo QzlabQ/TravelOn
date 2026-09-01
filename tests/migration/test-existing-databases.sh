@@ -21,9 +21,19 @@ docker run -d --rm \
   -v "$database_dir:/database:ro" \
   postgres:16 >/dev/null
 
+# The postgres image briefly starts a temporary server while initializing its
+# data directory. pg_isready can report that server as ready just before it is
+# shut down, so require several consecutive successful SQL connections to the
+# final server before creating the test databases.
+stable_ready_attempts=0
 for attempt in {1..60}; do
-  if docker exec "$container" pg_isready -U admin -d postgres >/dev/null 2>&1; then
-    break
+  if docker exec "$container" psql -U admin -d postgres -Atqc 'SELECT 1' >/dev/null 2>&1; then
+    stable_ready_attempts=$((stable_ready_attempts + 1))
+    if [[ "$stable_ready_attempts" -ge 3 ]]; then
+      break
+    fi
+  else
+    stable_ready_attempts=0
   fi
   if [[ "$attempt" == 60 ]]; then
     echo "PostgreSQL test container did not become ready" >&2
