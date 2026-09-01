@@ -145,6 +145,8 @@ export default function Account() {
     const [travelerEditorOpen, setTravelerEditorOpen] = useState(false);
     const [bookingPreferences, setBookingPreferencesForm] = useState<BookingPreferences>(getBookingPreferences());
     const [identityForm, setIdentityForm] = useState<AccountIdentity>(emptyIdentityForm);
+    const [identityMessage, setIdentityMessage] = useState("");
+    const [identityErrorMessage, setIdentityErrorMessage] = useState("");
     const [savedBankCards, setSavedBankCards] = useState<SavedBankCard[]>([]);
     const [bankCardNumber, setBankCardNumber] = useState('');
     const [bankCardLabel, setBankCardLabel] = useState('');
@@ -221,7 +223,7 @@ export default function Account() {
             setIdentityForm(identityResponse.status === 204 ? emptyIdentityForm : identityResponse.data);
             setSavedBankCards(bankCardsResponse.data);
         } catch {
-            setErrorMessage("实名信息或银联卡读取失败，请稍后再试。");
+            setIdentityErrorMessage("实名信息或银联卡读取失败，请稍后再试。");
         }
     };
 
@@ -313,6 +315,8 @@ export default function Account() {
         setProfileForm(emptyProfileForm);
         setAvatarInput("");
         setIdentityForm(emptyIdentityForm);
+        setIdentityMessage("");
+        setIdentityErrorMessage("");
         navigate("/");
     };
 
@@ -409,23 +413,24 @@ export default function Account() {
         };
 
         if (!normalizedIdentity.realName) {
-            setErrorMessage("请填写真实姓名。");
+            setIdentityErrorMessage("请填写真实姓名。");
             return;
         }
         const documentError = validateDocumentNumber(normalizedIdentity.documentType, normalizedIdentity.documentNumber, true);
         if (documentError) {
-            setErrorMessage(documentError);
+            setIdentityErrorMessage(documentError);
             return;
         }
 
         setSaving(true);
-        setErrorMessage("");
+        setIdentityMessage("");
+        setIdentityErrorMessage("");
         try {
             const response = await ApiRequests.saveAccountIdentity(session.token, normalizedIdentity);
             setIdentityForm(response.data);
-            setMessage("实名信息已保存，后续支付会自动带入。");
-        } catch {
-            setErrorMessage("实名信息保存失败，请稍后再试。");
+            setIdentityMessage("实名信息已保存，后续支付会自动带入。");
+        } catch (error: any) {
+            setIdentityErrorMessage(extractApiErrorMessage(error, "实名信息保存失败，请稍后再试。"));
         } finally {
             setSaving(false);
         }
@@ -713,13 +718,9 @@ export default function Account() {
 
                         <div>
                             <div className="rounded-lg border border-gray-200 p-4">
-                                <div className="mb-4 flex items-center justify-between">
-                                    <div>
-                                        <p className="font-semibold text-gray-900">实名信息</p>
-                                        <p className="text-xs text-gray-500">支付前会要求填写付款人实名信息，证件号仅用于当前账户的出行与支付校验。</p>
-                                    </div>
-                                    <CreditCard className="text-[#0f766e]"/>
-                                </div>
+                                <p className="mb-4 text-xs text-gray-500">支付前会要求填写付款人实名信息，证件号仅用于当前账户的出行与支付校验。</p>
+                                {identityMessage && <Alert severity="success" className="mb-4">{identityMessage}</Alert>}
+                                {identityErrorMessage && <Alert severity="error" className="mb-4">{identityErrorMessage}</Alert>}
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <TextField
                                         label="真实姓名"
