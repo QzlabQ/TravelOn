@@ -1,0 +1,11 @@
+{
+  "host_role": "actual deployment host",
+  "operating_system": "Linux",
+  "logical_cpus": 24,
+  "memory_gib_approx": 244,
+  "docker_engine": "29.2.1",
+  "docker_compose": "5.0.2",
+  "production_workload_kept_running": true,
+  "experiment_stacks_ran_sequentially": true,
+  "experiment_traffic_used_production_ingress": false
+}
