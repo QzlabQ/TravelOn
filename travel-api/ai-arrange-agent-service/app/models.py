@@ -536,7 +536,7 @@ class HealthResponse(BaseModel):
     version: str
     modelProvider: str
     model: str
-    deepseekConfigured: bool
+    modelConfigured: bool
     amapConfigured: bool
 
 

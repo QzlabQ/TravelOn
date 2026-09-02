@@ -17,6 +17,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class PlannerChatSendPayload {
 
+    private UUID runId;
     private String message;
     private String planningMode;
     private String planningScope;

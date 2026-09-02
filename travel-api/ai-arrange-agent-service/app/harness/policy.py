@@ -47,14 +47,17 @@ class RuntimePolicy:
 
     @classmethod
     def from_env(cls) -> "RuntimePolicy":
-        deepseek_timeout_seconds = _as_float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS"), 90.0)
+        model_timeout_seconds = _as_float(
+            os.getenv("AI_MODEL_TIMEOUT_SECONDS") or os.getenv("DEEPSEEK_TIMEOUT_SECONDS"),
+            90.0,
+        )
         return cls(
             max_tool_calls_per_turn=_as_int(os.getenv("AGENT_MAX_TOOL_CALLS_PER_TURN"), 5),
             max_model_calls_per_turn=_clamp_int(_as_int(os.getenv("AGENT_MAX_MODEL_CALLS_PER_TURN"), 1), 1, 2),
             max_react_steps=_clamp_int(_as_int(os.getenv("AGENT_MAX_REACT_STEPS"), 3), 1, 3),
             max_react_tool_calls=_clamp_int(_as_int(os.getenv("AGENT_MAX_REACT_TOOL_CALLS"), 4), 1, 4),
             max_execution_time_seconds=_as_float(os.getenv("AGENT_MAX_RUNTIME_SECONDS"), 120.0),
-            model_timeout_seconds=_as_float(os.getenv("AGENT_MODEL_TIMEOUT_SECONDS"), deepseek_timeout_seconds),
+            model_timeout_seconds=_as_float(os.getenv("AGENT_MODEL_TIMEOUT_SECONDS"), model_timeout_seconds),
             default_tool_timeout_seconds=_as_float(os.getenv("AGENT_TOOL_TIMEOUT_SECONDS"), 10.0),
             trace_enabled=_as_bool(os.getenv("AGENT_TRACE_ENABLED"), True),
         )

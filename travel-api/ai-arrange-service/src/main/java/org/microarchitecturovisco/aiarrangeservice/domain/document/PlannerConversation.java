@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerConversationStatus;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerActiveRun;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -33,6 +34,8 @@ public class PlannerConversation {
     private String currentMarkdown;
     private String nextQuestion;
     private Integer latestSnapshotVersion;
+
+    private PlannerActiveRun activeRun;
 
     @Builder.Default
     private List<UUID> selectedPlaceIds = new ArrayList<>();

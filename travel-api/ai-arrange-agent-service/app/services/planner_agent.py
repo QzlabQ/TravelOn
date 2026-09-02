@@ -10,7 +10,7 @@ from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
-from app.clients.deepseek_client import DeepSeekClient
+from app.clients.openai_compatible_client import OpenAICompatibleClient
 from app.harness.hooks import after_agent_run, before_agent_run
 from app.harness.policy import RuntimePolicy
 from app.harness.tool_registry import ToolExecutionContext, ToolRegistry, ToolSpec
@@ -101,7 +101,7 @@ def _status_from_warnings(warnings: list[AgentWarning]) -> AgentStatus:
 class PlannerAgent:
     def __init__(
         self,
-        deepseek_client: DeepSeekClient,
+        model_client: OpenAICompatibleClient,
         amap_tool: AmapPoiTool,
         hotel_search_tool: HotelSearchTool,
         route_tool: RoutePlanTool,
@@ -112,7 +112,7 @@ class PlannerAgent:
         fallback_builder: FallbackPlanBuilder,
         policy: RuntimePolicy,
     ) -> None:
-        self._deepseek_client = deepseek_client
+        self._model_client = model_client
         self._amap_tool = amap_tool
         self._hotel_search_tool = hotel_search_tool
         self._route_tool = route_tool
@@ -186,7 +186,7 @@ class PlannerAgent:
             warnings.extend(self._warnings_from_tool(result))
 
         llm_result = await self._tool_registry.execute(
-            "deepseek_chat_completion",
+            "model_chat_completion",
             context,
             request=request,
             places=[place.model_dump(mode="json", exclude_none=True) for place in evidence.places],
@@ -791,8 +791,8 @@ class PlannerAgent:
         )
         registry.register(
             ToolSpec(
-                name="deepseek_chat_completion",
-                description="Generate a structured itinerary with DeepSeek.",
+                name="model_chat_completion",
+                description="Generate a structured itinerary with the configured model.",
                 input_schema=AgentRunRequest,
                 output_schema=PlannerModelOutput,
                 timeout_seconds=policy.model_timeout_seconds,
@@ -803,7 +803,7 @@ class PlannerAgent:
                 user_success_message="结构化旅行方案已生成。",
                 user_failure_message="模型生成失败，已切换为本地规划模板。",
             ),
-            self._deepseek_client.generate_plan,
+            self._model_client.generate_plan,
         )
         registry.register(
             ToolSpec(
