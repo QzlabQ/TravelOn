@@ -1,0 +1,8 @@
+{
+  "method": "GET",
+  "url": "http://localhost:58082/ai-arrange/api/conversations/1d9d68d1-9b4e-423f-bd61-05e4240f9907/snapshots/9999?userId=d5f22093-562a-4a20-ab6a-db94567fdef2",
+  "headers": {
+    "Accept": "application/json"
+  },
+  "body": null
+}

@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "url": "http://localhost:58082/ai-arrange/api/conversations",
+  "headers": {
+    "Accept": "application/json"
+  },
+  "body": {
+    "userId": "e0f7e5cd-29d5-4cea-ab01-e102730b7d6c",
+    "coreSlots": {
+      "city": "Shanghai",
+      "travelStartDate": "2026-10-02",
+      "travelEndDate": "2026-10-04",
+      "peopleCount": 2
+    }
+  }
+}

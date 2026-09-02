@@ -56,16 +56,41 @@
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.8.12</version>
+				<!-- discovery-service 没有单元测试（唯一的 *Test 已归入 pre 阶段或本就只有 IT），
+				     unit 阶段的覆盖率恒为 0，下限只能设为 0；真实覆盖看 java-it 一列。
+				     其余模块的下限按接入门禁时的实测值留 5 个百分点余量设定，只用于防止倒退。
+				     补齐测试后应同步上调；jacoco:check 由 tests/run_tests.py 在 unit 阶段显式调用。 -->
+				<configuration>
+					<rules>
+						<rule>
+							<element>BUNDLE</element>
+							<limits>
+								<limit><counter>INSTRUCTION</counter><value>COVEREDRATIO</value><minimum>0.0</minimum></limit>
+							</limits>
+						</rule>
+					</rules>
+				</configuration>
 				<executions>
 					<execution>
 						<id>prepare-agent</id>
-						<configuration><includes><include>org/microarchitecturovisco/*</include></includes><excludes><exclude>*MockitoMock*</exclude></excludes></configuration>
+						<configuration><append>false</append><includes><include>org/microarchitecturovisco/*</include></includes><excludes><exclude>*MockitoMock*</exclude></excludes></configuration>
 						<goals><goal>prepare-agent</goal></goals>
 					</execution>
 					<execution>
 						<id>report</id>
 						<phase>verify</phase>
 						<goals><goal>report</goal></goals>
+					</execution>
+					<!-- 集成覆盖率单独出报告：prepare-agent 默认往同一个 exec 追加，
+					     混在一起后单元覆盖率会被 Spring 启动扫过的类撑高。
+					     由 tests/run_tests.py 用 jacoco:report@report-it 显式调用。 -->
+					<execution>
+						<id>report-it</id>
+						<goals><goal>report</goal></goals>
+						<configuration>
+							<dataFile>${project.build.directory}/jacoco-it.exec</dataFile>
+							<outputDirectory>${project.reporting.outputDirectory}/jacoco-it</outputDirectory>
+						</configuration>
 					</execution>
 				</executions>
 			</plugin>

@@ -701,6 +701,8 @@ export default function Account() {
 
                     {activeTab === "travel" &&
                         <>
+                        {message && <Alert severity="success">{message}</Alert>}
+                        {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
                         <section aria-labelledby="identity-information-heading">
                         <Paper elevation={0} className="border border-teal-200 border-t-4 bg-white p-6">
                         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -921,7 +923,6 @@ export default function Account() {
                                         <FormControlLabel control={<Checkbox checked={travelerForm.defaultTraveler} onChange={event => setTravelerForm({...travelerForm, defaultTraveler: event.target.checked})}/>} label="默认出行人"/>
                                     </div>
                                 </div>
-                                {errorMessage && <Alert severity="error" className="mt-4">{errorMessage}</Alert>}
                                 <div className="mt-4 flex justify-end gap-2">
                                     <Button onClick={() => setTravelerEditorOpen(false)}>取消</Button>
                                     <Button

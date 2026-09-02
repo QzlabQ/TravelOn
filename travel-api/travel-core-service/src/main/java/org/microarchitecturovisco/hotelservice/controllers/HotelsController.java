@@ -74,13 +74,13 @@ public class HotelsController {
     }
 
     @PutMapping("/admin/{hotelId}")
-    public Hotel updateHotel(
+    public void updateHotel(
             @RequestHeader(value = "X-User-Token", required = false) String token,
             @PathVariable Integer hotelId,
             @RequestBody org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto
     ) {
         adminAuthorizationService.requireAdmin(token);
-        return hotelsService.updateHotel(hotelId, hotelDto);
+        hotelsService.updateHotel(hotelId, hotelDto);
     }
 
     @DeleteMapping("/admin/{hotelId}")

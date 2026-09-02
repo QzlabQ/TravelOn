@@ -117,23 +117,14 @@ jobs:
         if: steps.changes.outputs.run_ci == 'true'
         run: docker build --pull --tag travel-ui:ci travel-ui
 
-      - name: Run unit tests
-        if: steps.changes.outputs.run_ci == 'true'
-        run: mise run test:unit
-
       - name: Prepare integration environment
         if: steps.changes.outputs.run_ci == 'true'
         shell: bash
         run: touch travel-api/.env
 
-      - name: Run PostgreSQL migration regression test
+      - name: Run CI test suite
         if: steps.changes.outputs.run_ci == 'true'
-        shell: bash
-        run: bash tests/migration/test-existing-databases.sh
-
-      - name: Run integration tests
-        if: steps.changes.outputs.run_ci == 'true'
-        run: mise run test:integration
+        run: mise run test:ci
 
       - name: Upload test reports
         if: ${{ !cancelled() && steps.changes.outputs.run_ci == 'true' }}

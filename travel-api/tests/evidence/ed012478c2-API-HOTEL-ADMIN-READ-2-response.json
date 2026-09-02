@@ -1,0 +1,41 @@
+{
+  "hotelId": 99001,
+  "hotelName": "后台测试酒店 1788330734960-0c8884ce39 已更新",
+  "rating": 4.5,
+  "description": "由 API 集成测试创建的酒店。",
+  "location": {
+    "idLocation": "dd21c430-c85f-b420-8fa0-8ed975561e3c",
+    "cityId": "C002",
+    "country": "中国",
+    "province": "海南",
+    "region": "三亚市",
+    "normalizedName": "三亚市"
+  },
+  "photos": [],
+  "roomsConfigurations": [
+    {
+      "rooms": [
+        {
+          "roomId": 990011,
+          "name": "改名后的房型",
+          "guestCapacity": 2,
+          "roomType": "STANDARD",
+          "description": "测试房型"
+        }
+      ],
+      "pricePerAdult": 288.0
+    },
+    {
+      "rooms": [
+        {
+          "roomId": 990012,
+          "name": "新增房型",
+          "guestCapacity": 2,
+          "roomType": null,
+          "description": "测试房型"
+        }
+      ],
+      "pricePerAdult": 288.0
+    }
+  ]
+}

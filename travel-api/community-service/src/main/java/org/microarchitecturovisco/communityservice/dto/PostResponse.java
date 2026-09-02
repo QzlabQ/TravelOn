@@ -30,11 +30,22 @@ public record PostResponse(
         Instant createdAt,
         Instant updatedAt
 ) {
-    public static PostResponse from(CommunityPost post, boolean likedByCurrentUser) {
-        return from(post, likedByCurrentUser, false, 0);
+    /** 刚创建的帖子：没有任何点赞、收藏或评论。 */
+    public static PostResponse forNewPost(CommunityPost post) {
+        return from(post, 0, false, false, 0);
     }
 
-    public static PostResponse from(CommunityPost post, boolean likedByCurrentUser, boolean favoritedByCurrentUser, long commentCount) {
+    /**
+     * likeCount 必须由调用方按 post_like 明细实时统计后传入。
+     * community_post.like_count 这一列只在建帖时写入 0、之后从不维护，读它会永远得到 0。
+     */
+    public static PostResponse from(
+            CommunityPost post,
+            int likeCount,
+            boolean likedByCurrentUser,
+            boolean favoritedByCurrentUser,
+            long commentCount
+    ) {
         return new PostResponse(
                 post.getId(),
                 post.getTitle(),
@@ -49,7 +60,7 @@ public record PostResponse(
                 post.getImageUrls(),
                 post.getAuthorUserId(),
                 post.getAuthorName(),
-                post.getLikeCount(),
+                likeCount,
                 likedByCurrentUser,
                 favoritedByCurrentUser,
                 commentCount,

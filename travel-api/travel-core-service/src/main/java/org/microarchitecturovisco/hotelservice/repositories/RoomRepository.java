@@ -16,12 +16,11 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     @Query("SELECT DISTINCT r FROM Room r " +
             "JOIN r.hotel h " +
             "JOIN h.location l " +
-            "LEFT JOIN RoomReservation rr ON r = rr.room AND (:dateFrom BETWEEN rr.dateFrom AND rr.dateTo OR :dateTo BETWEEN rr.dateFrom AND rr.dateTo) " +
             "WHERE l.id IN :arrivalLocationIds " +
-            "AND (rr IS NULL OR NOT EXISTS (SELECT 1 FROM RoomReservation rrv " +
-            "                               WHERE rrv.room = rr.room " +
-            "                               AND (:dateFrom BETWEEN rrv.dateFrom AND rrv.dateTo " +
-            "                                    OR :dateTo BETWEEN rrv.dateFrom AND rrv.dateTo)))")
+            "AND NOT EXISTS (SELECT 1 FROM RoomReservation rr " +
+            "                WHERE rr.room = r " +
+            "                AND rr.dateFrom < :dateTo " +
+            "                AND rr.dateTo > :dateFrom)")
     List<Room> findAvailableRoomsByLocationAndDate(
             @Param("arrivalLocationIds") List<UUID> arrivalLocationIds,
             @Param("dateFrom") LocalDateTime dateFrom,
@@ -29,12 +28,11 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
 
     @Query("SELECT DISTINCT r FROM Room r " +
             "JOIN r.hotel h " +
-            "LEFT JOIN RoomReservation rr ON r = rr.room AND (:dateFrom BETWEEN rr.dateFrom AND rr.dateTo OR :dateTo BETWEEN rr.dateFrom AND rr.dateTo) " +
             "WHERE h.id = :hotelId " +
-            "AND (rr IS NULL OR NOT EXISTS (SELECT 1 FROM RoomReservation rrv " +
-            "                               WHERE rrv.room = rr.room " +
-            "                               AND (:dateFrom BETWEEN rrv.dateFrom AND rrv.dateTo " +
-            "                                    OR :dateTo BETWEEN rrv.dateFrom AND rrv.dateTo)))")
+            "AND NOT EXISTS (SELECT 1 FROM RoomReservation rr " +
+            "                WHERE rr.room = r " +
+            "                AND rr.dateFrom < :dateTo " +
+            "                AND rr.dateTo > :dateFrom)")
     List<Room> findAvailableRoomsByHotelAndDate(
             @Param("hotelId") Integer hotelId,
             @Param("dateFrom") LocalDateTime dateFrom,

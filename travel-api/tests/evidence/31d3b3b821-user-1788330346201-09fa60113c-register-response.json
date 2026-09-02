@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-09-02T06:25:46.209+00:00",
+  "path": "/users/auth/register",
+  "status": 503,
+  "error": "Service Unavailable",
+  "requestId": "7f0a68dd-4"
+}

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.microarchitecturovisco.hotelservice.model.domain.*;
 import org.microarchitecturovisco.hotelservice.model.events.*;
 import org.microarchitecturovisco.hotelservice.repositories.HotelRepository;
+import org.microarchitecturovisco.hotelservice.repositories.LocationRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomRepository;
 import org.microarchitecturovisco.hotelservice.repositories.RoomReservationRepository;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ public class HotelEventProjector {
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
     private final RoomReservationRepository roomReservationRepository;
+    private final LocationRepository locationRepository;
 
     @Transactional
     public void project(List<HotelEvent> hotelEvents){
@@ -44,13 +46,13 @@ public class HotelEventProjector {
     private void apply(HotelCreatedEvent event){
         Hotel hotel = new Hotel();
 
-        Location hotelLocation = Location.builder()
-                .id(event.getIdLocation())
-                .country(event.getCountry())
-                .region(event.getRegion())
-                .hotel(new ArrayList<Hotel>())
-                .build();
-        hotelLocation.getHotel().add(hotel);
+        Location hotelLocation = locationRepository.findById(event.getIdLocation())
+                .orElseGet(() -> locationRepository.save(Location.builder()
+                        .id(event.getIdLocation())
+                        .country(event.getCountry())
+                        .region(event.getRegion())
+                        .hotel(new ArrayList<>())
+                        .build()));
 
         hotel.setLocation(hotelLocation);
         hotel.setId(event.getIdHotel());

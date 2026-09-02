@@ -1,0 +1,16 @@
+{
+  "token": "13613249-4274-48bd-9874-4117fb58e42f.2be915c4-a9cf-471f-8133-ebd788b84c0c",
+  "user": {
+    "id": "e0f7e5cd-29d5-4cea-ab01-e102730b7d6c",
+    "email": "integration.1788330735503-b952d2bcbb@example.test",
+    "name": "Integration",
+    "surname": "Tester",
+    "phone": "13800138000",
+    "avatarUrl": null,
+    "loyaltyTier": "Explorer",
+    "role": "USER",
+    "createdAt": "2026-09-02T06:32:15.696351705Z",
+    "updatedAt": "2026-09-02T06:32:15.696351705Z",
+    "lastLoginAt": "2026-09-02T06:32:15.695199804Z"
+  }
+}

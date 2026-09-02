@@ -1,5 +1,6 @@
 package org.microarchitecturovisco.hotelservice.queues.config;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.amqp.core.AmqpTemplate;
@@ -14,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+@Tag("pre")  // 前置守卫：校验数据、资源与配置本身，不是业务逻辑的单元测试
 class RabbitMQConfigTest {
 
     @Test

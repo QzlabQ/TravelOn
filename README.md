@@ -494,15 +494,25 @@ mise run verify
 
 | 任务 | 内容 | 需要服务 |
 | --- | --- | --- |
-| `mise run test:unit` | 全部单元测试与覆盖率，约 1 分钟 | 否 |
-| `mise run test:integration` | Java `*IT`、Agent 集成、API 测试；跳过真实 DeepSeek 与社区停机 | 是 |
+| `mise run test:pre` | 前置守卫：种子数据、迁移脚本、classpath 资源、MQ 与网关配置，约 20 秒 | 否 |
+| `mise run test:unit` | 单元测试与覆盖率门禁，约 50 秒 | 否 |
+| `mise run test:migration` | 跨平台 PostgreSQL 旧数据库迁移回归测试 | 临时 PostgreSQL 容器 |
+| `mise run test:integration` | Java `*IT`、Agent 集成、API 测试；跳过真实 DeepSeek；resilience 用例另起一段 | 是 |
 | `mise run test:e2e` | Playwright，Chromium | 是 |
-| `mise run test:all` | `unit + integration + Chromium E2E` | 是 |
-| `mise run test:full` | `all` 之外追加真实 DeepSeek、WebSocket、社区停机恢复、三浏览器 E2E；需有效 `DEEPSEEK_API_KEY` 与管理员凭据 | 是 |
+| `mise run test:all` | `pre + unit + integration + Chromium E2E + resilience` | 是 |
+| `mise run test:ci` | 与 CI 相同的 `pre + unit + migration + integration + Chromium E2E + resilience`，失败立即停止 | 是 |
+| `mise run test:full` | `all` 之外追加真实 DeepSeek、WebSocket、三浏览器 E2E；需有效 `DEEPSEEK_API_KEY` 与管理员凭据 | 是 |
 | `mise run verify` | 单个最小模块，确认链路可用 | 否 |
 | `mise run doctor` | 打印 java/node/yarn/python/docker 版本 | 否 |
 
-带服务的任务会自动执行 `docker compose up -d --build`，轮询 Gateway 直到就绪，结束时只停止本次新启动的服务，不影响你原有的容器。
+带服务的任务会自动执行 `docker compose up -d --build`，轮询 Gateway 直到就绪，结束时只停止本次新启动的服务，不影响你原有的容器。Windows 和 Linux 都可用 `mise run test:ci` 复现 CI 测试阶段，无需在宿主机安装 Bash。
+
+阶段划分的口径：
+
+- **`pre`（17 条）**断言的是数据和配置本身——种子票务窗口有没有过期、Flyway 迁移脚本怎么写、图片资源在不在 classpath 上、MQ 队列与网关路由的声明。这些不测业务逻辑，跑在最前面，不对就没必要往下跑。用 JUnit 的 `@Tag("pre")` 标记。
+- **`unit`（143 条）**只含真正的单元测试，因此覆盖率门禁量的也只是单元测试。
+- **`integration`（Java `*IT` 49 条 + Agent 15 条 + 经网关的 API 测试 33 条）**需要服务栈或真实数据库。打 H2 的数据层测试按 `*IT` 命名归在这里，不放进 `unit`。
+- **`resilience`** 是 integration 之后追加的一小段：支付超时补偿要让 `order` 以 10 秒超时重建，社区停机恢复要中途停服务，都不能和普通用例混跑。需要 `--manage-services`。
 
 需要按模块筛选、跳过镜像构建、自定义地址端口，或想绕过运行器单独调试某个模块时，见 [tests/README.md](tests/README.md)。
 
@@ -512,9 +522,14 @@ mise run verify
 
 | 文件/目录 | 内容 |
 | --- | --- |
-| `summary.json` | 机器可读结果与环境版本 |
-| `latest.md` | 汇总表格 |
-| `unit/` `integration/` `e2e/` | JUnit、覆盖率、API 请求响应证据、Playwright 报告与失败截图/视频/trace |
+| `summary.json` | 机器可读结果、用例数、覆盖率与环境版本 |
+| `latest.md` | 汇总表格（每个任务的用例数 + 各模块覆盖率） |
+| `pre/` `unit/` `integration/` `e2e/` | JUnit、API 请求响应证据、Playwright 报告与失败截图/视频/trace |
+| `coverage/{java,java-it,python,ui}/` | JaCoCo、pytest-cov、Jest 覆盖率报告的副本 |
+
+进度条按任务计数，同时从日志实时解析已完成的用例数，任务结束显示 `✓ travel-core-service 9.2s  21 条用例`，末尾给出总用例数。
+
+覆盖率由运行器聚合后写入上面两份报告，并带门禁：各模块 `pom.xml` 的 jacoco `rules`、`travel-ui/package.json` 的 `jest.coverageThreshold`、`tests/run_tests.py` 的 `PYTHON_COVERAGE_MINIMUM`。阈值按接入时的实测值留 5 个百分点余量，**只用于防止倒退**；补齐测试后应同步上调。指标定义与当前值见 [测试文档 §14.1](docs/测试文档.md)。
 
 Playwright 报告：在 `travel-ui` 执行 `corepack yarn test:e2e:report`。
 
@@ -549,14 +564,18 @@ Playwright 报告：在 `travel-ui` 执行 `corepack yarn test:e2e:report`。
 
 实际导入 PostgreSQL 的文件是对应目录下的 `generated_ticket_offers.csv`。
 
+售票窗口以**生成当天**为基准滚动（默认为前 3 天到后 38 天），不是固定日期区间。窗口一旦落后于日历，所有交通查询都会返回空。`travel-api/tests/test_seed_window.py` 会在 `mise run test:pre` 里守住这条线：窗口不再覆盖「今天 + 30 天」时直接报错并提示重新生成。
+
 如需修改数据：
 
-1. 修改 `travel-api/scripts/generate_dated_ticket_offers.py`：
+1. 需要更长或更短的窗口时，修改 `travel-api/scripts/generate_dated_ticket_offers.py`：
 
    ```python
-   START_DATE = datetime(year, month, day)
-   END_DATE = datetime(year, month, day)
+   WINDOW_START_OFFSET = timedelta(days=-3)
+   WINDOW_END_OFFSET = timedelta(days=38)
    ```
+
+   每多一天，两个 CSV 各增大约 1 MB，扩窗前先确认仓库体积可以接受。
 
 2. 重新生成机票和火车票数据：
 

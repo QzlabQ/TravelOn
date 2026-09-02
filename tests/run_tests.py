@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 API_ROOT = ROOT / "travel-api"
 UI_ROOT = ROOT / "travel-ui"
 DEFAULT_ARTIFACTS = ROOT / "artifacts" / "test-results"
+MIGRATION_TEST = ROOT / "tests" / "migration" / "run_migration_test.py"
 JAVA_MODULES = tuple(sorted(path.parent for path in API_ROOT.glob("*/pom.xml")))
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -84,6 +85,10 @@ class Result:
     status: str
     duration_seconds: float
     log: str
+    # 任务内部真正执行的用例数。进度条本身按任务计数（一个模块一个子进程），
+    # 只看 "3/10" 无法判断跑了多少测试，这两个字段用来把粒度补到用例级。
+    cases: int = 0
+    cases_failed: int = 0
 
 
 class Progress:
@@ -93,6 +98,8 @@ class Progress:
         self.category = category
         self.total = total
         self.done = 0
+        self.cases = 0
+        self.cases_failed = 0
         self._line_open = False
         self._last_note = 0.0
         print()
@@ -101,7 +108,9 @@ class Progress:
 
     def _bar(self, width: int = 20) -> str:
         filled = round(width * self.done / self.total) if self.total else width
-        return f"[{BAR_FULL * filled}{BAR_EMPTY * (width - filled)}] {self.done}/{self.total}"
+        # 已完成任务累计的用例数：进度条按任务走，这里让读者同时看到测试量。
+        cases = f" · 累计 {self.cases} 用例" if self.cases else ""
+        return f"[{BAR_FULL * filled}{BAR_EMPTY * (width - filled)}] {self.done}/{self.total}{cases}"
 
     def _clear(self) -> None:
         if self._line_open:
@@ -129,11 +138,17 @@ class Progress:
 
     def finish(self, result: Result) -> Result:
         self.done += 1
+        self.cases += result.cases
+        self.cases_failed += result.cases_failed
         self._clear()
         passed = result.status == "passed"
         mark = paint(MARK_PASS, GREEN) if passed else paint(MARK_FAIL, RED)
         tail = "" if passed else "  " + paint(f"日志：{result.log}", DIM)
-        print(f"{self._bar()} {mark} {result.name} {result.duration_seconds}s{tail}", flush=True)
+        cases = ""
+        if result.cases:
+            failed = f"，{result.cases_failed} 失败" if result.cases_failed else ""
+            cases = paint(f"  {result.cases} 条用例{failed}", DIM)
+        print(f"{self._bar()} {mark} {result.name} {result.duration_seconds}s{cases}{tail}", flush=True)
         return result
 
     def note(self, text: str) -> None:
@@ -158,13 +173,14 @@ def preflight(category: str, browser: str) -> dict[str, str]:
     if sys.version_info[:2] != (3, 12):
         raise RuntimeError(f"需要 Python 3.12，当前为 {platform.python_version()}。请使用 Python 3.12 重新运行本脚本。")
 
-    java = require_command("java", "请安装 JDK 21 并配置 PATH。")
-    versions["java"] = command_version([java, "-version"])
-    java_match = re.search(r'"(\d+)', versions["java"])
-    if not java_match or java_match.group(1) != "21":
-        raise RuntimeError(f"需要 Java 21，当前检测结果：{versions['java']}")
+    if category != "migration":
+        java = require_command("java", "请安装 JDK 21 并配置 PATH。")
+        versions["java"] = command_version([java, "-version"])
+        java_match = re.search(r'"(\d+)', versions["java"])
+        if not java_match or java_match.group(1) != "21":
+            raise RuntimeError(f"需要 Java 21，当前检测结果：{versions['java']}")
 
-    if category in {"unit", "e2e", "all", "full"}:
+    if category in {"unit", "e2e", "all", "ci", "full"}:
         node = require_command("node", "请安装 Node.js 22.22.3。")
         versions["node"] = command_version([node, "--version"])
         if versions["node"].lstrip("v") != "22.22.3":
@@ -175,7 +191,7 @@ def preflight(category: str, browser: str) -> dict[str, str]:
         if versions["yarn"] != "4.2.2":
             raise RuntimeError(f"需要 Yarn 4.2.2，当前为 {versions['yarn']}。")
 
-    if category in {"integration", "e2e", "all", "full"}:
+    if category in {"migration", "integration", "e2e", "all", "ci", "full"}:
         docker = require_command("docker", "请安装并启动 Docker Desktop 或 Docker Engine。")
         versions["docker"] = command_version([docker, "--version"])
         compose = subprocess.run([docker, "compose", "version"], text=True, capture_output=True, check=False)
@@ -183,23 +199,24 @@ def preflight(category: str, browser: str) -> dict[str, str]:
             raise RuntimeError("需要 Docker Compose V2（docker compose）。")
         versions["compose"] = compose.stdout.strip()
 
-    try:
-        import httpx  # noqa: F401
-        import pytest  # noqa: F401
-    except ImportError as exc:
-        # 注意不要直接推荐 sys.executable：mise 首次创建 .venv 的那一次调用里，
-        # PATH 尚未包含 .venv/Scripts，sys.executable 会指向 mise 自带的解释器，
-        # 照着装会污染全局环境而 .venv 依然缺依赖。
-        venv_python = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-        hint = f"{venv_python} -m pip install -r {ROOT / 'tests' / 'requirements.txt'}"
-        if not venv_python.exists():
-            hint = f"先创建 Python 3.12 虚拟环境，再执行：{hint}"
-        raise RuntimeError(
-            "缺少 Python 测试依赖。使用 mise 时执行：mise run setup:py"
-            f"；否则执行：{hint}"
-        ) from exc
+    if category != "migration":
+        try:
+            import httpx  # noqa: F401
+            import pytest  # noqa: F401
+        except ImportError as exc:
+            # 注意不要直接推荐 sys.executable：mise 首次创建 .venv 的那一次调用里，
+            # PATH 尚未包含 .venv/Scripts，sys.executable 会指向 mise 自带的解释器，
+            # 照着装会污染全局环境而 .venv 依然缺依赖。
+            venv_python = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+            hint = f"{venv_python} -m pip install -r {ROOT / 'tests' / 'requirements.txt'}"
+            if not venv_python.exists():
+                hint = f"先创建 Python 3.12 虚拟环境，再执行：{hint}"
+            raise RuntimeError(
+                "缺少 Python 测试依赖。使用 mise 时执行：mise run setup:py"
+                f"；否则执行：{hint}"
+            ) from exc
 
-    if category in {"e2e", "all", "full"} and browser:
+    if category in {"e2e", "all", "ci", "full"} and browser:
         browser_cache = Path(os.environ.get("PLAYWRIGHT_BROWSERS_PATH", Path.home() / ".cache" / "ms-playwright"))
         if platform.system() == "Windows":
             browser_cache = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "ms-playwright"
@@ -249,7 +266,8 @@ def run_process(
             except subprocess.TimeoutExpired:
                 if progress:
                     elapsed = time.monotonic() - started
-                    progress.tick(name, elapsed, detail_fn(log_path) if detail_fn else "")
+                    progress.tick(name, elapsed, (detail_fn or case_progress)(log_path))
+    cases, cases_failed = parse_case_counts(read_log_tail(log_path)) or (0, 0)
     result = Result(
         name=name,
         category=category,
@@ -257,6 +275,8 @@ def run_process(
         status="passed" if returncode == 0 else "failed",
         duration_seconds=round(time.monotonic() - started, 2),
         log=str(log_path.relative_to(ROOT)).replace(chr(92), "/"),
+        cases=cases,
+        cases_failed=cases_failed,
     )
     return progress.finish(result) if progress else result
 
@@ -295,19 +315,28 @@ GATEWAY_PROBES = (
 )
 
 
+def routable(gateway_url: str, path: str) -> bool:
+    """经网关请求 path，只要不是 503（无可用实例）即视为该服务已可路由。"""
+    try:
+        with urllib.request.urlopen(f"{gateway_url.rstrip('/')}{path}", timeout=10) as response:
+            return response.status != 503
+    except urllib.error.HTTPError as exc:
+        return exc.code != 503
+    except Exception:  # noqa: BLE001
+        return False
+
+
 class ManagedServices:
     def __init__(
         self,
         enabled: bool,
         gateway_url: str,
-        short_payment_timeout: bool = False,
         build: bool = True,
     ) -> None:
         self.enabled = enabled
         self.gateway_url = gateway_url.rstrip("/")
         self.preexisting: set[str] = set()
         self.started: set[str] = set()
-        self.short_payment_timeout = short_payment_timeout
         self.build = build
 
     def __enter__(self) -> "ManagedServices":
@@ -316,8 +345,6 @@ class ManagedServices:
         before = compose(["ps", "--services", "--status", "running"], check=False)
         self.preexisting = {line.strip() for line in before.stdout.splitlines() if line.strip()}
         compose_env = os.environ.copy()
-        if self.short_payment_timeout and not self.preexisting:
-            compose_env["APP_PAYMENT_TIMEOUT_SECONDS"] = "10"
         try:
             print()
             print(paint("== 服务栈 ==", BOLD))
@@ -357,35 +384,97 @@ class ManagedServices:
             raise
 
     def _routable(self, path: str) -> bool:
-        """经网关请求 path，只要不是 503（无可用实例）即视为该服务已可路由。"""
-        try:
-            with urllib.request.urlopen(f"{self.gateway_url}{path}", timeout=10) as response:
-                return response.status != 503
-        except urllib.error.HTTPError as exc:
-            return exc.code != 503
-        except Exception:  # noqa: BLE001
-            return False
+        return routable(self.gateway_url, path)
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
         if self.enabled and self.started:
             compose(["stop", *sorted(self.started)], check=False)
 
 
-def playwright_progress(log_path: Path) -> str:
-    """从 Playwright list reporter 的日志解析用例进度。
-
-    并行执行时行首数字是用例序号而非完成数，因此统计匹配行数；失败详情会把日志
-    撑大，只读尾部会丢掉开头的 "Running N tests"，所以读取范围放宽到 1 MB。
-    """
+def read_log_tail(log_path: Path, limit: int = 1_000_000) -> str:
+    """读取日志尾部。失败详情会把日志撑大，但进度信息都在末尾，1 MB 足够。"""
     try:
         with log_path.open("rb") as handle:
             handle.seek(0, os.SEEK_END)
-            handle.seek(max(0, handle.tell() - 1_000_000))
-            text = handle.read().decode("utf-8", errors="replace")
+            handle.seek(max(0, handle.tell() - limit))
+            return handle.read().decode("utf-8", errors="replace")
     except OSError:
         return ""
-    # 每个用例完成时输出形如 "  ✓  3 [chromium] › file:line › title (3.2s)"
-    done = len(re.findall(r"^\s*\S{1,3}\s+\d+\s+\[", text, re.M))
+
+
+# Surefire/Failsafe 每跑完一个测试类输出一行；末尾的汇总行没有 " -- in "，
+# 只匹配带类名的行才不会把总数算两遍。
+MAVEN_CASE_LINE = re.compile(r"Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)[^\n]*? -- in ")
+# pytest -q 的进度点：连续的结果符号，可能带 [ 42%] 后缀。
+PYTEST_DOTS = re.compile(r"^(?:\S*?\.py\s+)?([.FEsxXuP]+)(?:\s+\[\s*\d+%\])?\s*$", re.M)
+PYTEST_OUTCOME = re.compile(r"(\d+) (passed|failed|errors?|skipped|xfailed|xpassed)")
+JEST_TOTAL_LINE = re.compile(r"^Tests:\s+(.+)$", re.M)
+JEST_OUTCOME = re.compile(r"(\d+) (passed|failed|skipped|todo)")
+PLAYWRIGHT_CASE_LINE = re.compile(r"^\s*\S{1,3}\s+\d+\s+\[", re.M)
+PLAYWRIGHT_SUMMARY_LINE = re.compile(r"^\s*(\d+) (passed|failed|skipped|flaky)\b", re.M)
+
+
+def parse_case_counts(text: str) -> tuple[int, int] | None:
+    """从子进程日志里解出 (已完成用例数, 失败用例数)；识别不了就返回 None。"""
+    maven = MAVEN_CASE_LINE.findall(text)
+    if maven:
+        done = sum(int(run) for run, _, _, _ in maven)
+        failed = sum(int(f) + int(e) for _, f, e, _ in maven)
+        return done, failed
+
+    jest = JEST_TOTAL_LINE.findall(text)
+    if jest:
+        counts = {outcome: int(number) for number, outcome in JEST_OUTCOME.findall(jest[-1])}
+        return sum(counts.values()), counts.get("failed", 0)
+
+    # pytest 收尾行形如 "37 passed, 1 warning in 2.58s" 或 "2 failed, 35 passed in 3s"。
+    for line in reversed([line.strip() for line in text.splitlines() if line.strip()][-8:]):
+        outcomes = PYTEST_OUTCOME.findall(line)
+        if outcomes and (" in " in line or line.startswith("=")):
+            done = failed = 0
+            for number, outcome in outcomes:
+                count = int(number)
+                done += count
+                if outcome.startswith(("failed", "error")):
+                    failed += count
+            return done, failed
+
+    # 还没跑完时退回统计进度点。
+    dots = "".join(PYTEST_DOTS.findall(text))
+    if dots:
+        return len(dots), sum(dots.count(symbol) for symbol in "FE")
+
+    playwright_summary = PLAYWRIGHT_SUMMARY_LINE.findall(text)
+    if playwright_summary:
+        counts: dict[str, int] = {}
+        for number, outcome in playwright_summary:
+            counts[outcome] = int(number)
+        return sum(counts.values()), counts.get("failed", 0)
+
+    playwright = len(PLAYWRIGHT_CASE_LINE.findall(text))
+    return (playwright, 0) if playwright else None
+
+
+def case_progress(log_path: Path) -> str:
+    """run_process 的默认 detail_fn：把进度细化到用例。
+
+    这里只报已完成数，不报 x/n：Maven 和 Jest 在跑完之前不会报出用例总数，
+    分母只能拿上一轮的结果去猜，猜错时反而误导人。
+    """
+    counts = parse_case_counts(read_log_tail(log_path))
+    if not counts:
+        return ""
+    done, failed = counts
+    return f"用例 {done}" + (f"（{failed} 失败）" if failed else "")
+
+
+def playwright_progress(log_path: Path) -> str:
+    """Playwright 自己会打印本次运行的用例总数，这里的 x/n 是实数而非估计。
+
+    并行执行时行首数字是用例序号而非完成数，因此统计匹配行数而不是取最大序号。
+    """
+    text = read_log_tail(log_path)
+    done = len(PLAYWRIGHT_CASE_LINE.findall(text))
     totals = re.findall(r"Running (\d+) test", text)
     if totals:
         return f"用例 {done}/{totals[0]}"
@@ -394,19 +483,93 @@ def playwright_progress(log_path: Path) -> str:
     return "准备中（构建并启动前端）…"
 
 
+# Agent 服务单元测试的行覆盖率下限，与各 pom 的 jacoco 规则、travel-ui 的
+# jest coverageThreshold 一样，按接入门禁时的实测值留 5 个百分点余量。
+PYTHON_COVERAGE_MINIMUM = 48
+
+
+PRE_TAG = "pre"
+
+
+def modules_with_pre_tests() -> tuple[Path, ...]:
+    """有 @Tag("pre") 测试的模块。
+
+    与其对 7 个模块都空跑一遍 Maven（每次约 3 秒的 JVM 启动），不如扫一下源码；
+    以后给别的模块加 pre 标记也不用再改这里。
+    """
+    modules = []
+    for module in JAVA_MODULES:
+        sources = (module / "src" / "test").rglob("*.java")
+        if any(f'@Tag("{PRE_TAG}")' in path.read_text(encoding="utf-8", errors="replace") for path in sources):
+            modules.append(module)
+    return tuple(modules)
+
+
+def run_pre(args: argparse.Namespace, artifacts: Path) -> list[Result]:
+    """前置守卫：校验数据、资源与配置本身，跑在所有测试之前。
+
+    这些用例断言的是种子数据窗口、迁移脚本、classpath 资源、MQ 队列声明和网关路由
+    配置——不是业务逻辑，失败时继续往下跑没有意义，所以单独成段并排在最前。
+    """
+    selected = set(args.module or [])
+    jobs: list[tuple[str, list[str], Path]] = []
+    if not selected or "seed-data" in selected:
+        # 票务种子数据是滚动窗口，过期后所有交通查询返回空。
+        junit = artifacts / "pre" / "seed-data" / "junit.xml"
+        junit.parent.mkdir(parents=True, exist_ok=True)
+        jobs.append((
+            "seed-data",
+            [sys.executable, "-m", "pytest", "-q", "tests/test_seed_window.py", f"--junitxml={junit}"],
+            API_ROOT,
+        ))
+    for module in modules_with_pre_tests():
+        if selected and module.name not in selected:
+            continue
+        jobs.append((module.name, [*maven_command(module), f"-Dgroups={PRE_TAG}", "test"], module))
+    progress = Progress("pre", len(jobs))
+    return [run_process(name, "pre", command, cwd, artifacts, progress) for name, command, cwd in jobs]
+
+
+def clear_stale_coverage(module: Path, exec_name: str, report_dir: str) -> None:
+    """删掉上一轮的 exec 与报告。
+
+    模块里一个测试都没有时 Surefire 不会 fork JVM，prepare-agent 也就不会重写 exec，
+    jacoco:report 会拿着上一轮（甚至是集成阶段）的数据出报告，于是 discovery-service
+    这种没有单元测试的模块会显示出一个看似正常的单元覆盖率。先清掉才不会张冠李戴。
+    """
+    for path in (module / "target" / exec_name, module / "target" / "site" / report_dir):
+        try:
+            shutil.rmtree(path) if path.is_dir() else path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def run_unit(args: argparse.Namespace, artifacts: Path) -> list[Result]:
     selected = set(args.module or [])
     jobs: list[tuple[str, list[str], Path]] = []
     for module in JAVA_MODULES:
         if selected and module.name not in selected:
             continue
-        jobs.append((module.name, [*maven_command(module), "test", "jacoco:report"], module))
+        clear_stale_coverage(module, "jacoco.exec", "jacoco")
+        # jacoco:check 必须显式调用：unit 阶段跑的是 test，到不了绑定 check 的 verify 阶段。
+        # 排除 pre 标记，unit 的覆盖率才只反映真正的单元测试。
+        jobs.append((
+            module.name,
+            [*maven_command(module), f"-DexcludedGroups={PRE_TAG}", "test", "jacoco:report", "jacoco:check"],
+            module,
+        ))
     if not selected or "ai-arrange-agent-service" in selected:
         junit = artifacts / "unit" / "python" / "junit.xml"
         junit.parent.mkdir(parents=True, exist_ok=True)
         jobs.append((
             "ai-arrange-agent-service",
-            [sys.executable, "-m", "pytest", "-q", "tests/unit", f"--junitxml={junit}"],
+            [
+                sys.executable, "-m", "pytest", "-q", "tests/unit",
+                # 阈值只在 unit 阶段生效：integration 阶段跑的是另一批用例，
+                # 覆盖到的代码不同，用同一个下限没有意义。
+                f"--cov-fail-under={PYTHON_COVERAGE_MINIMUM}",
+                f"--junitxml={junit}",
+            ],
             API_ROOT / "ai-arrange-agent-service",
         ))
     if not selected or "travel-ui" in selected:
@@ -421,13 +584,35 @@ def run_unit(args: argparse.Namespace, artifacts: Path) -> list[Result]:
     return [run_process(name, "unit", command, cwd, artifacts, progress) for name, command, cwd in jobs]
 
 
+def run_migration(artifacts: Path) -> list[Result]:
+    progress = Progress("migration", 1)
+    return [
+        run_process(
+            "postgresql-legacy-migration",
+            "migration",
+            [sys.executable, str(MIGRATION_TEST)],
+            ROOT,
+            artifacts,
+            progress,
+        )
+    ]
+
+
 def run_integration(args: argparse.Namespace, artifacts: Path, include_heavy: bool = False) -> list[Result]:
     selected = set(args.module or [])
     jobs: list[tuple[str, list[str], Path, dict[str, str] | None]] = []
     for module in JAVA_MODULES:
         if selected and module.name not in selected:
             continue
-        command = [*maven_command(module), "test-compile", "failsafe:integration-test", "failsafe:verify", "jacoco:report"]
+        clear_stale_coverage(module, "jacoco-it.exec", "jacoco-it")
+        # 集成覆盖率单独存放：prepare-agent 默认 append 到同一个 jacoco.exec，
+        # 混在一起后单元覆盖率会被 Spring 启动扫过的类撑高，看不出真实情况。
+        # 报告输出目录没有对应的用户属性，只能靠 pom 里的 report-it execution 指定。
+        command = [
+            *maven_command(module),
+            "-Djacoco.destFile=target/jacoco-it.exec",
+            "test-compile", "failsafe:integration-test", "failsafe:verify", "jacoco:report@report-it",
+        ]
         jobs.append((f"{module.name}-it", command, module, None))
     if not selected or "ai-arrange-agent-service" in selected:
         junit = artifacts / "integration" / "python-agent-junit.xml"
@@ -438,26 +623,92 @@ def run_integration(args: argparse.Namespace, artifacts: Path, include_heavy: bo
             None,
         ))
     if not selected or "api" in selected:
-        marker = "integration" if include_heavy else "integration and not external and not disruptive"
+        # resilience 用例（saga / disruptive）要改服务配置或重启服务，由 run_resilience 单独跑。
+        marker = "integration and not resilience"
+        if not include_heavy:
+            marker += " and not external"
         junit = artifacts / "integration" / "api-junit.xml"
-        evidence = artifacts / "integration" / "evidence"
-        env = os.environ.copy()
-        env.update({
-            "TRAVEL_TEST_GATEWAY_URL": args.gateway_url,
-            "TRAVEL_TEST_EUREKA_URL": args.eureka_url,
-            "TRAVEL_TEST_EVIDENCE_DIR": str(evidence),
-        })
         jobs.append((
             "api",
             [sys.executable, "-m", "pytest", "-q", "-m", marker, f"--junitxml={junit}"],
             API_ROOT / "tests",
-            env,
+            api_test_env(args, artifacts),
         ))
     progress = Progress("integration", len(jobs))
     return [
         run_process(name, "integration", command, cwd, artifacts, progress, env=env)
         for name, command, cwd, env in jobs
     ]
+
+
+def api_test_env(args: argparse.Namespace, artifacts: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    env.update({
+        "TRAVEL_TEST_GATEWAY_URL": args.gateway_url,
+        "TRAVEL_TEST_EUREKA_URL": args.eureka_url,
+        "TRAVEL_TEST_EVIDENCE_DIR": str(artifacts / "integration" / "evidence"),
+    })
+    return env
+
+
+PAYMENT_TIMEOUT_TEST_SECONDS = "10"
+
+
+def restart_order_service(gateway_url: str, payment_timeout: str | None) -> None:
+    """按指定支付超时重建 order 容器，并等待它经网关重新可路由。"""
+    env = os.environ.copy()
+    if payment_timeout is None:
+        env.pop("APP_PAYMENT_TIMEOUT_SECONDS", None)
+    else:
+        env["APP_PAYMENT_TIMEOUT_SECONDS"] = payment_timeout
+    compose(["up", "-d", "--no-deps", "order"], env=env)
+    deadline = time.monotonic() + 300
+    # 刚重建的容器尚未从 Eureka 摘除旧实例，网关可能仍返回旧实例的成功响应，
+    # 因此先给注册表一点时间，再开始判定就绪。
+    time.sleep(10)
+    while time.monotonic() < deadline:
+        if routable(gateway_url, "/reservations/ping"):
+            return
+        time.sleep(5)
+    raise RuntimeError("重建 order 服务后网关在 300 秒内仍无法路由 /reservations/ping")
+
+
+def run_resilience(args: argparse.Namespace, artifacts: Path) -> list[Result]:
+    """支付超时补偿与服务停机恢复用例。
+
+    支付超时用例需要 order 服务以 10 秒超时运行，但这个超时会把同一批里所有
+    未在 10 秒内付款的订单一起回滚，全链路用例根本跑不完。因此这里单独重建
+    order 容器、只跑这一组用例，跑完再恢复默认超时。
+    """
+    progress = Progress("resilience", 1)
+    if not args.manage_services:
+        print(paint("  · 跳过：需要 --manage-services 才能临时重建 order 服务", DIM), flush=True)
+        return []
+
+    junit = artifacts / "integration" / "resilience-junit.xml"
+    env = api_test_env(args, artifacts)
+    env.update({
+        "TRAVEL_TEST_PAYMENT_TIMEOUT_SECONDS": PAYMENT_TIMEOUT_TEST_SECONDS,
+        # 告诉用例：本次运行确实应用了短超时，前置条件不满足就该失败而不是静默跳过。
+        "TRAVEL_TEST_EXPECT_SHORT_PAYMENT_TIMEOUT": "1",
+    })
+    print(paint(f"  · 以 APP_PAYMENT_TIMEOUT_SECONDS={PAYMENT_TIMEOUT_TEST_SECONDS} 重建 order 服务", DIM), flush=True)
+    restart_order_service(args.gateway_url, PAYMENT_TIMEOUT_TEST_SECONDS)
+    try:
+        return [
+            run_process(
+                "api-resilience",
+                "resilience",
+                [sys.executable, "-m", "pytest", "-q", "-m", "resilience", f"--junitxml={junit}"],
+                API_ROOT / "tests",
+                artifacts,
+                progress,
+                env=env,
+            )
+        ]
+    finally:
+        print(paint("  · 恢复 order 服务的默认支付超时设置", DIM), flush=True)
+        restart_order_service(args.gateway_url, None)
 
 
 def run_e2e(args: argparse.Namespace, artifacts: Path) -> list[Result]:
@@ -478,29 +729,174 @@ def run_e2e(args: argparse.Namespace, artifacts: Path) -> list[Result]:
     ]
 
 
-def write_summary(results: list[Result], artifacts: Path, versions: dict[str, str]) -> None:
+@dataclass
+class Coverage:
+    name: str
+    kind: str          # java-unit / java-it / python / ui
+    primary: float     # 指令（Java）/ 行（Python）/ 语句（UI）覆盖率，百分比
+    branch: float | None
+    report: str
+
+
+def _ratio(covered: int, missed: int) -> float | None:
+    total = covered + missed
+    return round(covered / total * 100, 1) if total else None
+
+
+def read_jacoco(path: Path) -> tuple[float | None, float | None]:
+    instruction_covered = instruction_missed = branch_covered = branch_missed = 0
+    import csv as _csv
+
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in _csv.DictReader(handle):
+            instruction_covered += int(row["INSTRUCTION_COVERED"])
+            instruction_missed += int(row["INSTRUCTION_MISSED"])
+            branch_covered += int(row["BRANCH_COVERED"])
+            branch_missed += int(row["BRANCH_MISSED"])
+    return _ratio(instruction_covered, instruction_missed), _ratio(branch_covered, branch_missed)
+
+
+def read_cobertura(path: Path) -> tuple[float | None, float | None]:
+    import xml.etree.ElementTree as ET
+
+    root = ET.parse(path).getroot()
+    line_rate = root.get("line-rate")
+    branch_rate = root.get("branch-rate")
+    return (
+        round(float(line_rate) * 100, 1) if line_rate is not None else None,
+        round(float(branch_rate) * 100, 1) if branch_rate is not None else None,
+    )
+
+
+def read_clover(path: Path) -> tuple[float | None, float | None]:
+    import xml.etree.ElementTree as ET
+
+    metrics = ET.parse(path).getroot().find("project/metrics")
+    if metrics is None:
+        return None, None
+    statements = int(metrics.get("statements", 0))
+    conditionals = int(metrics.get("conditionals", 0))
+    return (
+        _ratio(int(metrics.get("coveredstatements", 0)), statements - int(metrics.get("coveredstatements", 0))),
+        _ratio(int(metrics.get("coveredconditionals", 0)), conditionals - int(metrics.get("coveredconditionals", 0))),
+    )
+
+
+def collect_coverage(artifacts: Path) -> list[Coverage]:
+    """把三套工具各自散落的覆盖率报告收敛到 artifacts，并算出可比较的百分比。
+
+    报告本身生成在源码目录里（且都被 .gitignore 忽略），不复制过来的话 CI 上传的
+    产物里根本没有覆盖率，也就没人会看。
+    """
+    target = artifacts / "coverage"
+    entries: list[Coverage] = []
+
+    sources: list[tuple[str, str, Path, Path, Callable[[Path], tuple[float | None, float | None]]]] = []
+    for module in JAVA_MODULES:
+        sources.append((
+            module.name, "java-unit",
+            module / "target" / "site" / "jacoco" / "jacoco.csv",
+            target / "java" / module.name, read_jacoco,
+        ))
+        sources.append((
+            module.name, "java-it",
+            module / "target" / "site" / "jacoco-it" / "jacoco.csv",
+            target / "java-it" / module.name, read_jacoco,
+        ))
+    sources.append((
+        "ai-arrange-agent-service", "python",
+        API_ROOT / "ai-arrange-agent-service" / "coverage.xml",
+        target / "python", read_cobertura,
+    ))
+    sources.append((
+        "travel-ui", "ui",
+        UI_ROOT / "coverage" / "clover.xml",
+        target / "ui", read_clover,
+    ))
+
+    for name, kind, report, destination, reader in sources:
+        if not report.exists():
+            continue
+        try:
+            primary, branch = reader(report)
+        except Exception as exc:  # noqa: BLE001
+            print(paint(f"  · 解析覆盖率报告失败 {report}：{exc}", DIM), flush=True)
+            continue
+        if primary is None:
+            continue
+        destination.mkdir(parents=True, exist_ok=True)
+        copied = destination / report.name
+        shutil.copy2(report, copied)
+        html = report.parent / "index.html"
+        if html.exists():
+            shutil.copy2(html, destination / "index.html")
+        try:
+            report_path = str(copied.resolve().relative_to(ROOT))
+        except ValueError:
+            report_path = str(copied)
+        entries.append(Coverage(name, kind, primary, branch, report_path))
+    return entries
+
+
+COVERAGE_LABELS = {
+    "java-unit": "指令 / 分支（单元）",
+    "java-it": "指令 / 分支（集成）",
+    "python": "行 / 分支",
+    "ui": "语句 / 分支",
+}
+
+
+def write_summary(
+    results: list[Result],
+    artifacts: Path,
+    versions: dict[str, str],
+    coverage: list[Coverage] | None = None,
+) -> None:
     artifacts.mkdir(parents=True, exist_ok=True)
+    coverage = coverage or []
     payload = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "overallStatus": "passed" if all(result.status == "passed" for result in results) else "failed",
         "versions": versions,
         "results": [asdict(result) for result in results],
+        "coverage": [asdict(entry) for entry in coverage],
     }
     (artifacts / "summary.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    lines = ["# 测试汇总", "", f"- 总体状态：{payload['overallStatus']}", "", "| 类别 | 模块 | 状态 | 用时（秒） | 日志 |", "| --- | --- | --- | ---: | --- |"]
+    total_cases = sum(result.cases for result in results)
+    failed_cases = sum(result.cases_failed for result in results)
+    lines = ["# 测试汇总", "", f"- 总体状态：{payload['overallStatus']}"]
+    if total_cases:
+        lines.append(f"- 用例：共 {total_cases} 条，失败 {failed_cases} 条")
+    lines += ["", "| 类别 | 模块 | 状态 | 用例 | 失败用例 | 用时（秒） | 日志 |", "| --- | --- | --- | ---: | ---: | ---: | --- |"]
     for result in results:
-        lines.append(f"| {result.category} | {result.name} | {result.status} | {result.duration_seconds} | `{result.log}` |")
+        lines.append(
+            f"| {result.category} | {result.name} | {result.status} | {result.cases} | "
+            f"{result.cases_failed} | {result.duration_seconds} | `{result.log}` |"
+        )
+    if coverage:
+        lines += ["", "## 覆盖率", "", "| 模块 | 口径 | 主指标 | 分支 | 报告 |", "| --- | --- | ---: | ---: | --- |"]
+        for entry in coverage:
+            branch = f"{entry.branch}%" if entry.branch is not None else "—"
+            lines.append(
+                f"| {entry.name} | {COVERAGE_LABELS.get(entry.kind, entry.kind)} | "
+                f"{entry.primary}% | {branch} | `{entry.report}` |"
+            )
     (artifacts / "latest.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def print_summary(results: list[Result], artifacts: Path) -> None:
     failed = [result for result in results if result.status != "passed"]
     elapsed = round(sum(result.duration_seconds for result in results), 1)
+    cases = sum(result.cases for result in results)
+    cases_failed = sum(result.cases_failed for result in results)
     print()
     print(paint("== 汇总 ==", BOLD))
     passed_text = paint(str(len(results) - len(failed)), GREEN)
     failed_text = paint(str(len(failed)), RED if failed else DIM)
-    print(f"  通过 {passed_text} / 失败 {failed_text} / 共 {len(results)}，累计耗时 {elapsed}s")
+    print(f"  通过 {passed_text} / 失败 {failed_text} / 共 {len(results)} 项，累计耗时 {elapsed}s")
+    if cases:
+        case_failed_text = paint(str(cases_failed), RED if cases_failed else DIM)
+        print(f"  用例 {paint(str(cases - cases_failed), GREEN)} 通过 / {case_failed_text} 失败 / 共 {cases} 条")
     for result in failed:
         print(f"  {paint(MARK_FAIL, RED)} {result.category}/{result.name}  日志：{result.log}")
     print(paint(f"  报告：{artifacts / 'latest.md'}", DIM))
@@ -510,7 +906,7 @@ def print_summary(results: list[Result], artifacts: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="TravelOn 跨平台测试入口")
-    parser.add_argument("category", choices=("unit", "integration", "e2e", "all", "full"))
+    parser.add_argument("category", choices=("pre", "unit", "migration", "integration", "e2e", "all", "ci", "full"))
     parser.add_argument("--module", action="append", help="只运行指定模块，可重复")
     parser.add_argument("--manage-services", action="store_true", help="自动启动并恢复 Docker 服务")
     parser.add_argument(
@@ -541,20 +937,43 @@ def main() -> int:
                 print(paint(f"  {key:<7} {versions[key]}", DIM))
         print(paint(f"  {MARK_PASS} 预检通过", GREEN), flush=True)
         results: list[Result] = []
-        needs_services = args.category in {"integration", "e2e", "all", "full"}
+
+        # pre 独立成段：test:unit 就只跑单元测试，组合类别里 pre 排在最前面先失败。
+        if args.category in {"pre", "all", "ci", "full"}:
+            results.extend(run_pre(args, artifacts))
+            if args.category == "ci" and any(result.status != "passed" for result in results):
+                write_summary(results, artifacts, versions, collect_coverage(artifacts))
+                print_summary(results, artifacts)
+                return 1
+
+        if args.category in {"unit", "all", "ci", "full"}:
+            results.extend(run_unit(args, artifacts))
+            if args.category == "ci" and any(result.status != "passed" for result in results):
+                write_summary(results, artifacts, versions, collect_coverage(artifacts))
+                print_summary(results, artifacts)
+                return 1
+
+        if args.category in {"migration", "ci"}:
+            results.extend(run_migration(artifacts))
+            if args.category == "ci" and any(result.status != "passed" for result in results):
+                write_summary(results, artifacts, versions, collect_coverage(artifacts))
+                print_summary(results, artifacts)
+                return 1
+
+        needs_services = args.category in {"integration", "e2e", "all", "ci", "full"}
         with ManagedServices(
             args.manage_services and needs_services,
             args.gateway_url,
-            short_payment_timeout=args.category == "full",
             build=not args.no_build,
         ):
-            if args.category in {"unit", "all", "full"}:
-                results.extend(run_unit(args, artifacts))
-            if args.category in {"integration", "all", "full"}:
+            if args.category in {"integration", "all", "ci", "full"}:
                 results.extend(run_integration(args, artifacts, include_heavy=args.category == "full"))
-            if args.category in {"e2e", "all", "full"}:
+            if args.category in {"e2e", "all", "ci", "full"}:
                 results.extend(run_e2e(args, artifacts))
-        write_summary(results, artifacts, versions)
+            # 放在最后：这一步会重建 order、重启 community，之前的用例不应受影响。
+            if args.category in {"integration", "all", "ci", "full"}:
+                results.extend(run_resilience(args, artifacts))
+        write_summary(results, artifacts, versions, collect_coverage(artifacts))
         print_summary(results, artifacts)
         return 0 if all(result.status == "passed" for result in results) else 1
     except RuntimeError as exc:

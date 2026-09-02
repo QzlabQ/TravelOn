@@ -1,5 +1,6 @@
 package org.microarchitecturovisco.apigateway;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,6 +13,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Tag("pre")  // 前置守卫：校验数据、资源与配置本身，不是业务逻辑的单元测试
 @SpringBootTest
 class GatewayRouteConfigurationTest {
 

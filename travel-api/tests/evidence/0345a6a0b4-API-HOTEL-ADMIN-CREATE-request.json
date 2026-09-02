@@ -1,0 +1,29 @@
+{
+  "method": "POST",
+  "url": "http://localhost:58082/hotels/admin",
+  "headers": {
+    "Accept": "application/json",
+    "X-User-Token": "<redacted>"
+  },
+  "body": {
+    "hotelId": 99001,
+    "name": "后台测试酒店 1788330381857-7aec764f17",
+    "rating": 4.5,
+    "description": "由 API 集成测试创建的酒店。",
+    "location": {
+      "idLocation": "928c6512-b3a8-a0dc-74a9-3ee63e77842a"
+    },
+    "photos": [],
+    "rooms": [
+      {
+        "roomId": 990011,
+        "hotelId": 99001,
+        "name": "初始房型",
+        "guestCapacity": 2,
+        "roomType": "STANDARD",
+        "pricePerAdult": 288.0,
+        "description": "测试房型"
+      }
+    ]
+  }
+}

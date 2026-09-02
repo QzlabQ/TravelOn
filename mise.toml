@@ -35,9 +35,17 @@ run = "corepack yarn playwright install chromium"
 description = "一次性准备全部测试依赖"
 depends = ["setup:py", "setup:ui"]
 
+[tasks."test:pre"]
+description = "前置守卫（种子数据、迁移脚本、资源与配置）"
+run = "python tests/run_tests.py pre"
+
 [tasks."test:unit"]
 description = "单元测试（Java + Python + 前端）"
 run = "python tests/run_tests.py unit"
+
+[tasks."test:migration"]
+description = "PostgreSQL 旧数据库迁移回归测试"
+run = "python tests/run_tests.py migration"
 
 [tasks."test:integration"]
 description = "集成测试（需要 Docker Compose 栈）"
@@ -50,7 +58,13 @@ run = "python tests/run_tests.py e2e --manage-services --browser chromium"
 
 [tasks."test:all"]
 description = "全量测试"
+depends = ["setup:e2e"]
 run = "python tests/run_tests.py all --manage-services --browser chromium"
+
+[tasks."test:ci"]
+description = "运行与 CI 相同的测试阶段"
+depends = ["setup:e2e"]
+run = "python tests/run_tests.py ci --manage-services"
 
 [tasks."test:full"]
 description = "完整测试（含真实 DeepSeek、三浏览器 E2E，需有效 Key 与管理员凭据）"

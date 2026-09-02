@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "url": "http://localhost:58082/users/auth/login",
+  "headers": {
+    "Accept": "application/json"
+  },
+  "body": {
+    "email": "nullptrofficial@nullptr.email",
+    "password": "aDmIn_Psw7d6%N#$"
+  }
+}

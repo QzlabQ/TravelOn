@@ -1,0 +1,8 @@
+{
+  "method": "GET",
+  "url": "http://localhost:58082/hotels/destinations",
+  "headers": {
+    "Accept": "application/json"
+  },
+  "body": null
+}

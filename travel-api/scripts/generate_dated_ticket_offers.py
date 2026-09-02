@@ -6,10 +6,16 @@ those files is treated as a recurring schedule template -- only its time-of-day,
 route, carrier, code, seat class, price and total seats matter; the date baked
 into the template is ignored.
 
-For every template we emit one row per calendar day in [START_DATE, END_DATE],
-so the booking flow can query real dates. Remaining seats are varied per
+For every template we emit one row per calendar day in the booking window, so
+the booking flow can query real dates. Remaining seats are varied per
 (code, route, seat class, date) so each day's availability differs instead of
 being identical across the whole window.
+
+The window is relative to the day this script runs, not a fixed date range: a
+hard-coded range silently expires and every transport query then returns an
+empty result, which surfaces as a pile of unrelated test failures rather than
+one clear error. tests/test_seed_window.py guards the committed CSVs and tells
+you to re-run this script before that happens.
 
 No JSON sources are used -- this script reads CSV only.
 """
@@ -35,9 +41,18 @@ OUTPUTS = {
     "TRAIN": ROOT / "seed-data" / "transport" / "train" / "generated_ticket_offers.csv",
 }
 
-# Inclusive booking window.
-START_DATE = datetime(2026, 8, 14)
-END_DATE = datetime(2026, 9, 24)
+# Inclusive booking window, expressed as offsets from the generation date.
+# A few days in the past keep already-departed trips visible in order history;
+# the future span is what the booking flow can actually query. Each extra day
+# adds roughly 1 MB to each generated CSV, so the span is deliberately modest --
+# widen it only together with a plan for the file size.
+WINDOW_START_OFFSET = timedelta(days=-3)
+WINDOW_END_OFFSET = timedelta(days=38)
+
+
+def booking_window(today: datetime | None = None) -> tuple[datetime, datetime]:
+    base = (today or datetime.now()).replace(hour=0, minute=0, second=0, microsecond=0)
+    return base + WINDOW_START_OFFSET, base + WINDOW_END_OFFSET
 
 
 def date_range(start: datetime, end: datetime):
@@ -65,7 +80,12 @@ def read_templates(path: Path) -> list[list[str]]:
     return [row for row in rows[1:] if len(row) >= len(HEADER)]
 
 
-def build_rows(ticket_type: str, templates: list[list[str]]) -> list[list[str]]:
+def build_rows(
+    ticket_type: str,
+    templates: list[list[str]],
+    start_date: datetime,
+    end_date: datetime,
+) -> list[list[str]]:
     rows: list[list[str]] = []
     for template in templates:
         (
@@ -98,7 +118,7 @@ def build_rows(ticket_type: str, templates: list[list[str]]) -> list[list[str]]:
         total = int(total_seats)
         route_key = f"{departure_city_id}-{arrival_city_id}-{seat_class}"
 
-        for day in date_range(START_DATE, END_DATE):
+        for day in date_range(start_date, end_date):
             departure = day.replace(
                 hour=template_departure.hour,
                 minute=template_departure.minute,
@@ -133,12 +153,16 @@ def build_rows(ticket_type: str, templates: list[list[str]]) -> list[list[str]]:
 
 
 def main() -> None:
-    day_count = (END_DATE - START_DATE).days + 1
+    start_date, end_date = booking_window()
+    day_count = (end_date - start_date).days + 1
+    print(
+        f"booking window: {start_date:%Y-%m-%d} .. {end_date:%Y-%m-%d} ({day_count} days)"
+    )
     for ticket_type, template_path in TEMPLATES.items():
         if not template_path.exists():
             raise FileNotFoundError(f"Missing template seed: {template_path}")
         templates = read_templates(template_path)
-        rows = build_rows(ticket_type, templates)
+        rows = build_rows(ticket_type, templates, start_date, end_date)
 
         output_path = OUTPUTS[ticket_type]
         output_path.parent.mkdir(parents=True, exist_ok=True)
