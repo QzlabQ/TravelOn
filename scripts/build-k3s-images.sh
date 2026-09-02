@@ -14,16 +14,20 @@ build_and_import() {
   sudo -n docker save "$image" | sudo -n k3s ctr images import -
 }
 
-build_and_import postgres . travel-api/Dockerfile.postgres
-build_and_import discovery travel-api/discovery-service travel-api/discovery-service/Dockerfile
-build_and_import gateway travel-api/api-gateway travel-api/api-gateway/Dockerfile
-build_and_import travel-core . travel-api/travel-core-service/Dockerfile.k8s
-build_and_import user travel-api/user-service travel-api/user-service/Dockerfile
-build_and_import community travel-api/community-service travel-api/community-service/Dockerfile
-build_and_import order travel-api/order-service travel-api/order-service/Dockerfile
-build_and_import ai-arrange travel-api/ai-arrange-service travel-api/ai-arrange-service/Dockerfile
-build_and_import ai-arrange-agent travel-api/ai-arrange-agent-service travel-api/ai-arrange-agent-service/Dockerfile
-build_and_import ui travel-ui travel-ui/Dockerfile
+manifest="ops/cd/images.tsv"
+[[ -r "$manifest" ]] || { echo "missing image manifest: $manifest" >&2; exit 3; }
+while IFS=$'\t' read -r name context dockerfile; do
+  [[ -z "$name" || "$name" == \#* ]] && continue
+  [[ "$name" =~ ^[a-z0-9-]+$ && "$context" != /* && "$dockerfile" != /* && "$context" != *..* && "$dockerfile" != *..* ]] || {
+    echo "invalid image manifest entry: $name" >&2
+    exit 4
+  }
+  [[ -d "$context" && -f "$dockerfile" ]] || {
+    echo "missing build input for $name" >&2
+    exit 5
+  }
+  build_and_import "$name" "$context" "$dockerfile"
+done < "$manifest"
 
 for image in mongo:7 rabbitmq:3.13-management; do
   sudo -n docker image inspect "$image" >/dev/null
