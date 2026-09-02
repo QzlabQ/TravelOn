@@ -44,7 +44,7 @@ type TicketBookingProps = {
 
 const modeConfig = {
   flight: {
-    title: "机票订票与比价",
+    title: "机票",
     eyebrow: "航班服务",
     icon: <Flight style={{ fontSize: 18 }} />,
     fromLabel: "出发机场/城市",
@@ -56,7 +56,7 @@ const modeConfig = {
     accent: "#2563eb",
   },
   train: {
-    title: "火车票订票与比价",
+    title: "火车票",
     eyebrow: "铁路服务",
     icon: <Train style={{ fontSize: 18 }} />,
     fromLabel: "出发站/城市",
@@ -1239,97 +1239,6 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         </Alert>
       </Snackbar>
 
-      <div className="mb-6 rounded-lg bg-white border border-slate-200 px-7 py-6 shadow-sm">
-        <Chip
-          icon={config.icon}
-          label={config.eyebrow}
-          sx={{ backgroundColor: "#eff6ff", color: config.accent }}
-        />
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-950">
-              {config.title}
-            </h1>
-            <p className="mt-2 text-slate-500">{config.hero}</p>
-          </div>
-          <div className="flex gap-2">
-            <Chip
-              icon={<ArrowForward />}
-              label={`${from || "-"} 到 ${to || "-"}`}
-            />
-            <Chip
-              icon={<Tune />}
-              label={
-                mode === "train"
-                  ? `${displayedResultCount} 趟车次`
-                  : `${displayedResultCount} 个方案`
-              }
-            />
-            {mode === "train" && (
-              <Chip
-                label={
-                  trainCodeQuery.trim()
-                    ? `车次 ${trainCodeQuery.trim()}`
-                    : allTrainTypesSelected
-                      ? "全部车次"
-                      : `${selectedTrainTypes.length} 类车次`
-                }
-              />
-            )}
-            {mode === "train" &&
-              (departureStationFilter || arrivalStationFilter) && (
-                <Chip
-                  label={`${departureStationFilter || "全部出发站"} → ${arrivalStationFilter || "全部到达站"}`}
-                />
-              )}
-            {mode === "flight" &&
-              (departureAirportFilter || arrivalAirportFilter) && (
-                <Chip
-                  label={`${departureAirportFilter ? formatAirportFilterOption(departureAirportFilter) : "全部出发机场"} → ${arrivalAirportFilter ? formatAirportFilterOption(arrivalAirportFilter) : "全部到达机场"}`}
-                />
-              )}
-          </div>
-        </div>
-      </div>
-
-      {error && (
-        <Alert severity="warning" className="mb-4">
-          后端票务数据暂时不可用，请确认交通服务已启动。
-        </Alert>
-      )}
-      {!isAuthenticated && (
-        <Alert severity="info" className="mb-4">
-          未登录时可以查询票价和查看方案；登录后才能选择班次、填写出行人并提交订单。
-        </Alert>
-      )}
-      {bookingError && (
-        <Alert severity="error" className="mb-4">
-          创建预订失败，请确认后端服务已启动。
-        </Alert>
-      )}
-      {bookingMessage && (
-        <Alert
-          severity={bookingError ? "warning" : "success"}
-          className="mb-4"
-          action={
-            reservationId ? (
-              <Button
-                component={Link}
-                to={`/reservations/${reservationId}#payment-countdown`}
-                color="inherit"
-                size="small"
-              >
-                订单详情
-              </Button>
-            ) : undefined
-          }
-        >
-          {bookingMessage}
-        </Alert>
-      )}
-
-      <div className="grid grid-cols-[360px_1fr] gap-6 items-start">
-        <aside className="sticky top-24 self-start flex max-h-[calc(100vh-7rem)] flex-col gap-5 overflow-y-auto pr-1">
           <section className="rounded-lg bg-white border border-slate-200 p-5 shadow-sm">
             <h2 className="text-lg font-bold text-slate-900 mb-4">查询行程</h2>
             <div className="grid gap-3">
@@ -1402,6 +1311,44 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
             </Button>
           </section>
 
+      {error && (
+        <Alert severity="warning" className="mb-4">
+          后端票务数据暂时不可用，请确认交通服务已启动。
+        </Alert>
+      )}
+      {!isAuthenticated && (
+        <Alert severity="info" className="mb-4">
+          未登录时可以查询票价和查看方案；登录后才能选择班次、填写出行人并提交订单。
+        </Alert>
+      )}
+      {bookingError && (
+        <Alert severity="error" className="mb-4">
+          创建预订失败，请确认后端服务已启动。
+        </Alert>
+      )}
+      {bookingMessage && (
+        <Alert
+          severity={bookingError ? "warning" : "success"}
+          className="mb-4"
+          action={
+            reservationId ? (
+              <Button
+                component={Link}
+                to={`/reservations/${reservationId}#payment-countdown`}
+                color="inherit"
+                size="small"
+              >
+                订单详情
+              </Button>
+            ) : undefined
+          }
+        >
+          {bookingMessage}
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-[360px_1fr] gap-6 items-start">
+        <aside className="sticky top-24 self-start flex max-h-[calc(100vh-7rem)] flex-col gap-5 overflow-y-auto pr-1">
           <section className="rounded-lg bg-white border border-slate-200 p-5 shadow-sm">
             <h2 className="text-lg font-bold text-slate-900 mb-4">高级筛选</h2>
             <div className="flex items-center justify-between mb-5">

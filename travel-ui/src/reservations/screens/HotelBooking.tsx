@@ -516,28 +516,6 @@ const HotelBooking = () => {
                 </Alert>
             </Snackbar>
 
-            <div className='mb-6 rounded-lg bg-white border border-slate-200 px-7 py-6 shadow-sm'>
-                <Chip icon={<Hotel/>} label='酒店服务' sx={{backgroundColor: '#eff6ff', color: '#2563eb'}}/>
-                <div className='mt-4 flex flex-wrap items-end justify-between gap-4'>
-                    <div>
-                        <h1 className='text-3xl font-bold text-slate-950'>酒店预订</h1>
-                        <p className='mt-2 text-slate-500'>按目的地、日期、评分和房型筛选可预订酒店</p>
-                    </div>
-                    <div className='flex gap-2'>
-                        <Chip icon={<Bed/>} label={`${visibleOffers.length} 家酒店`}/>
-                        <Chip icon={<Star/>} label={stars ? `${stars} 分以上` : '不限评分'}/>
-                    </div>
-                </div>
-            </div>
-
-            {error && <Alert severity='warning' className='mb-4'>后端酒店数据暂时不可用，请启动服务后重试。</Alert>}
-            {stayDateError && <Alert severity='warning' className='mb-4'>{stayDateError}</Alert>}
-            {!isAuthenticated && <Alert severity='info' className='mb-4'>未登录时可以查询酒店价格和查看详情；登录后才能选择入住人、选择酒店并提交订单。</Alert>}
-            {bookingError && <Alert severity='error' className='mb-4'>创建酒店预订失败，请检查日期或后端服务。</Alert>}
-            {bookingMessage && <Alert severity={bookingError ? 'warning' : 'success'} className='mb-4' action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}#payment-countdown`} color='inherit' size='small'>订单详情</Button> : undefined}>{bookingMessage}</Alert>}
-
-            <div className='grid grid-cols-[360px_1fr] gap-6 items-start'>
-                <aside className='sticky top-24 self-start flex max-h-[calc(100vh-7rem)] flex-col gap-5 overflow-y-auto pr-1'>
                     <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
                         <h2 className='text-lg font-bold text-slate-900 mb-4'>查询酒店</h2>
                         <TextField
@@ -591,6 +569,14 @@ const HotelBooking = () => {
                         </Button>
                     </section>
 
+            {error && <Alert severity='warning' className='mb-4'>后端酒店数据暂时不可用，请启动服务后重试。</Alert>}
+            {stayDateError && <Alert severity='warning' className='mb-4'>{stayDateError}</Alert>}
+            {!isAuthenticated && <Alert severity='info' className='mb-4'>未登录时可以查询酒店价格和查看详情；登录后才能选择入住人、选择酒店并提交订单。</Alert>}
+            {bookingError && <Alert severity='error' className='mb-4'>创建酒店预订失败，请检查日期或后端服务。</Alert>}
+            {bookingMessage && <Alert severity={bookingError ? 'warning' : 'success'} className='mb-4' action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}#payment-countdown`} color='inherit' size='small'>订单详情</Button> : undefined}>{bookingMessage}</Alert>}
+
+            <div className='grid grid-cols-[360px_1fr] gap-6 items-start'>
+                <aside className='sticky top-24 self-start flex max-h-[calc(100vh-7rem)] flex-col gap-5 overflow-y-auto pr-1'>
                     <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
                         <h2 className='text-lg font-bold text-slate-900 mb-4'>高级筛选</h2>
                         <p className='mb-2 text-sm font-semibold text-slate-700'>价格区间</p>

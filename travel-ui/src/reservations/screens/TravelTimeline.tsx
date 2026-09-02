@@ -392,7 +392,6 @@ const TravelTimeline = () => {
 
     const timelineItems = useMemo(() => buildTimelineItems(reservations, currentTime), [reservations, currentTime]);
     const timelineGroups = useMemo(() => buildTimelineGroups(timelineItems), [timelineItems]);
-    const hiddenOrderCount = reservations.length - timelineItems.length;
 
     return (
         <main className="min-h-screen bg-slate-50 px-6 py-10 lg:px-24 xl:px-48">
@@ -402,29 +401,18 @@ const TravelTimeline = () => {
                         <p className="flex items-center gap-2 text-sm font-semibold text-white/80">
                             <EventNote/> 我的行程
                         </p>
-                        <h1 className="mt-4 text-4xl font-black">已确认行程时间线</h1>
-                        <p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">
-                            自动整合已支付且尚未开始的火车票、机票，以及未离店的酒店订单；订单退款、取消或行程结束后，会从这里移除。
-                        </p>
+                        <h1 className="mt-4 text-4xl font-black">我的行程</h1>
                     </div>
                     <div className="rounded-2xl bg-white/15 px-5 py-4 backdrop-blur">
-                        <p className="text-sm text-white/75">当前展示</p>
                         <p className="mt-1 text-3xl font-bold">{timelineItems.length} 项</p>
-                        <p className="mt-1 text-xs text-white/70">
-                            {userMode === "GUEST" ? "游客行程" : "账号行程"}
-                        </p>
                     </div>
                 </div>
             </section>
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-slate-500">
-                    仅显示接下来的有效行程；待支付、已超时、已退款、已取消、票务已出发或酒店已离店的订单不会进入时间线。
-                    {hiddenOrderCount > 0 ? ` 已隐藏 ${hiddenOrderCount} 个不在当前行程中的订单。` : ""}
-                </p>
                 <div className="flex flex-wrap gap-2">
                     <Button component={Link} to="/reservations" variant="outlined">
-                        我的预订
+                        历史订单
                     </Button>
                     <Button variant="contained" startIcon={<Refresh/>} onClick={loadReservations} disabled={loading}>
                         刷新行程

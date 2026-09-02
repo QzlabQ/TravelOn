@@ -6,6 +6,11 @@ import {
     Checkbox,
     Chip,
     CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
     Divider,
     FormControlLabel,
     InputAdornment,
@@ -135,6 +140,7 @@ export default function Account() {
     const [profileForm, setProfileForm] = useState(emptyProfileForm);
     const [avatarInput, setAvatarInput] = useState("");
     const [authOpen, setAuthOpen] = useState(false);
+    const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
@@ -566,9 +572,9 @@ export default function Account() {
 
                     <div className="mt-6 grid gap-3">
                         <Button component={Link} to="/reservations" variant="contained" startIcon={<Bookmarks/>}>
-                            查看我的预订
+                            查看历史订单
                         </Button>
-                        <Button color="error" variant="text" startIcon={<Logout/>} onClick={logout}>
+                        <Button color="error" variant="text" startIcon={<Logout/>} onClick={() => setLogoutDialogOpen(true)}>
                             退出登录
                         </Button>
                     </div>
@@ -968,6 +974,17 @@ export default function Account() {
                     }
                 </div>
             </section>
+
+        <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)}>
+            <DialogTitle>确认退出登录</DialogTitle>
+            <DialogContent>
+                <DialogContentText>确定要退出当前账户吗？</DialogContentText>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => setLogoutDialogOpen(false)}>取消</Button>
+                <Button color="error" variant="contained" onClick={logout}>退出登录</Button>
+            </DialogActions>
+        </Dialog>
         </main>
     );
 }
