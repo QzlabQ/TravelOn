@@ -40,7 +40,8 @@ export default function Navbar() {
 
     const location = useLocation();
     const isActive = (path: string) =>
-        path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
+        path === "/" ? location.pathname === "/" :
+            path === "/reservations" ? location.pathname === path : location.pathname.startsWith(path);
 
     // Shared pill styling for the top-level nav items, with an active (current page) state.
     const navItemSx = (active: boolean) => ({
