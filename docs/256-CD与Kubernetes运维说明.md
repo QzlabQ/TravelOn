@@ -57,7 +57,10 @@ kubectl get pods
 5. Runner 在 256 本机构建镜像并导入 K3s containerd；
 6. CD 将资源部署到 `travelon` namespace；
 7. 等待 Deployment、StatefulSet rollout；
-8. 执行 smoke test，全部成功后 CD 结束。
+8. 执行 smoke test；成功后才清理已由仓库声明为退休的旧 Deployment、Service 或 Ingress，并白名单 prune 受 CD 管理的资源；
+9. 全部成功后 CD 结束。
+
+CD 不会删除 Secret、PVC、namespace 或数据库数据。旧服务下线必须通过仓库中的 `ops/cd/retired-resources.tsv` 声明，不能在服务器上手工删除后假定它不会再出现。
 
 镜像 tag 使用提交哈希，例如：
 

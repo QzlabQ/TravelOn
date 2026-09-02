@@ -1,0 +1,12 @@
+# apiVersion<TAB>kind<TAB>name
+# Retire only workloads superseded by the service-boundary consolidation.  CD
+# applies the current revision and verifies its smoke tests before this list is
+# acted on.  Never place Secrets, PVCs, StatefulSet data, or namespaces here.
+apps/v1	Deployment	hotel
+v1	Service	hotel
+apps/v1	Deployment	transport
+v1	Service	transport
+apps/v1	Deployment	reservation
+v1	Service	reservation
+apps/v1	Deployment	payment
+v1	Service	payment

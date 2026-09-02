@@ -19,9 +19,65 @@ k3s kubectl get namespace travelon >/dev/null
 k3s kubectl -n travelon get secret travelon-secrets >/dev/null
 k3s kubectl label namespace travelon pod-security.kubernetes.io/enforce=baseline --overwrite
 k3s kubectl apply -f "$rendered"
-while read -r resource; do k3s kubectl -n travelon rollout status "$resource" --timeout=25m; done < <(k3s kubectl -n travelon get statefulset -o name)
-while read -r resource; do k3s kubectl -n travelon rollout status "$resource" --timeout=15m; done < <(k3s kubectl -n travelon get deployment -o name)
-if k3s kubectl -n travelon get deployment/travelon-ui >/dev/null 2>&1; then
-  k3s kubectl -n travelon exec deployment/travelon-ui -- wget -qO- http://gateway:8082/ >/dev/null || true
+
+# Only wait for resources declared by this revision.  Namespace-wide discovery
+# would keep retired services alive and make a new deployment wait on them.
+desired_workload_count=0
+while IFS= read -r resource; do
+  ((desired_workload_count += 1))
+  case "$resource" in
+    statefulset/*) timeout=25m ;;
+    deployment/*) timeout=15m ;;
+    *) exit 6 ;;
+  esac
+  k3s kubectl -n travelon rollout status "$resource" --timeout="$timeout"
+done < <(
+  awk '
+    /^kind: StatefulSet$/ { kind = "statefulset"; next }
+    /^kind: Deployment$/ { kind = "deployment"; next }
+    /^metadata:$/ { read_metadata = (kind != ""); next }
+    read_metadata && /^  name: / {
+      print kind "/" $2
+      kind = ""
+      read_metadata = 0
+    }
+  ' "$rendered"
+)
+(( desired_workload_count > 0 )) || { echo 'no workloads rendered' >&2; exit 6; }
+
+k3s kubectl -n travelon exec deployment/travelon-ui -- wget -qO- http://discovery:8010/ >/dev/null
+k3s kubectl -n travelon exec deployment/travelon-ui -- wget -qO- http://ai-arrange-agent:8090/agent/health >/dev/null
+k3s kubectl -n travelon exec deployment/travelon-ui -- wget -qO- http://gateway:8082/hotels/destinations >/dev/null
+
+# Resource retirement is declarative and intentionally runs only after the
+# replacement workloads pass rollout and smoke tests.  Its schema is narrow so
+# it cannot delete Secrets, PVCs, namespaces, or arbitrary Kubernetes kinds.
+retired_resources="$workspace/ops/cd/retired-resources.tsv"
+if [[ -r "$retired_resources" ]]; then
+  while IFS=$'\t' read -r api_version kind name; do
+    [[ -z "$api_version" || "$api_version" == \#* ]] && continue
+    [[ "$name" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]] || {
+      echo "invalid retired resource name: $name" >&2
+      exit 7
+    }
+    case "$api_version:$kind" in
+      apps/v1:Deployment|v1:Service|networking.k8s.io/v1:Ingress) ;;
+      *) echo "invalid retired resource: $api_version $kind" >&2; exit 7 ;;
+    esac
+    k3s kubectl -n travelon delete --ignore-not-found "$kind/$name"
+  done < "$retired_resources"
 fi
+
+# All resources rendered from this revision carry this label.  Future removal
+# of a managed workload is therefore reconciled automatically, without broad
+# namespace pruning and without selecting Secrets or persistent volumes.
+k3s kubectl -n travelon apply --prune -l app.kubernetes.io/managed-by=travelon-cd \
+  --prune-allowlist=apps/v1/Deployment \
+  --prune-allowlist=apps/v1/StatefulSet \
+  --prune-allowlist=v1/Service \
+  --prune-allowlist=v1/ConfigMap \
+  --prune-allowlist=networking.k8s.io/v1/Ingress \
+  --prune-allowlist=autoscaling/v2/HorizontalPodAutoscaler \
+  --prune-allowlist=policy/v1/PodDisruptionBudget \
+  -f "$rendered"
 k3s kubectl -n travelon get pods

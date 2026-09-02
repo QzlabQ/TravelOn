@@ -113,10 +113,6 @@ jobs:
           cd travel-ui
           corepack yarn build
 
-      - name: Build frontend Docker image
-        if: steps.changes.outputs.run_ci == 'true'
-        run: docker build --pull --tag travel-ui:ci travel-ui
-
       - name: Run unit tests
         if: steps.changes.outputs.run_ci == 'true'
         run: mise run test:unit
@@ -134,6 +130,12 @@ jobs:
       - name: Run integration tests
         if: steps.changes.outputs.run_ci == 'true'
         run: mise run test:integration
+
+      # Build images only after every compile and test gate passes.  A failure
+      # above therefore cannot produce artifacts that a later CD might deploy.
+      - name: Build all deployment Docker images
+        if: steps.changes.outputs.run_ci == 'true'
+        run: bash scripts/verify-k3s-images.sh "ci-${{ github.sha }}"
 
       - name: Upload test reports
         if: ${{ !cancelled() && steps.changes.outputs.run_ci == 'true' }}
