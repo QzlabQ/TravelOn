@@ -157,6 +157,18 @@ export class ApiRequests {
         });
     }
 
+    static getBookingPreferences = async (token: string) => {
+        return await axiosInstance.get<BookingPreferencesResponse>('users/me/booking-preferences', {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static saveBookingPreferences = async (token: string, payload: BookingPreferencesPayload) => {
+        return await axiosInstance.put<BookingPreferencesResponse>('users/me/booking-preferences', payload, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
     static listSavedBankCards = async (token: string) => {
         return await axiosInstance.get<SavedBankCard[]>('users/me/bank-cards', {
             headers: {'X-User-Token': token}
@@ -634,6 +646,20 @@ export interface AccountIdentityPayload {
     realName: string,
     documentType: string,
     documentNumber: string,
+}
+
+export interface BookingPreferencesPayload {
+    defaultDepartureCity: string,
+    defaultArrivalCity: string,
+    preferredHotelMinRating: number,
+    preferredHotelMaxPrice: string,
+    preferredTrainTypes: string[],
+    onlyAvailableTickets: boolean,
+}
+
+export interface BookingPreferencesResponse extends BookingPreferencesPayload {
+    createdAt?: string,
+    updatedAt?: string,
 }
 
 export interface AccountIdentity extends AccountIdentityPayload {

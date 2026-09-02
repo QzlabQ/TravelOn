@@ -19,7 +19,8 @@ import {ApiRequests, GetOffersBySearchQueryOffer} from "../../core/apiConfig";
 import {BookingPersonPayload} from "../../core/apiConfig";
 import {Location} from "../../core/domain/DomainInterfaces";
 import {formatDate} from "../../core/utils";
-import {addNotification, getBookingPreferences, getCurrentUserSession} from "../../core/currentUser";
+import {addNotification, getCurrentUserSession} from "../../core/currentUser";
+import {useBookingPreferences} from "../../core/useBookingPreferences";
 import TravelerSelector from "../../account/components/TravelerSelector";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
 import {useAuthSession} from "../../core/useAuthSession";
@@ -121,7 +122,7 @@ const HotelBooking = () => {
     // While restoring a prior search, suppress the auto-search effects so the
     // saved results are shown instead of being overwritten by a fresh query.
     const restoreActiveRef = useRef(isRestore);
-    const bookingPreferences = useMemo(() => getBookingPreferences(), []);
+    const {preferences: bookingPreferences, loading: bookingPreferencesLoading} = useBookingPreferences();
     const navigateTimerRef = useRef<number | null>(null);
     const checkoutSectionRef = useRef<HTMLDivElement | null>(null);
     const checkoutSummaryRef = useRef<HTMLDivElement | null>(null);
@@ -151,6 +152,12 @@ const HotelBooking = () => {
     const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
     const [hasLoadedDestinations, setHasLoadedDestinations] = useState(false);
     const [resultPage, setResultPage] = useState(1);
+
+    useEffect(() => {
+        if (bookingPreferencesLoading) return;
+        setPriceTo(bookingPreferences.preferredHotelMaxPrice);
+        setStars(bookingPreferences.preferredHotelMinRating);
+    }, [bookingPreferencesLoading, bookingPreferences.preferredHotelMaxPrice, bookingPreferences.preferredHotelMinRating]);
 
     const normalizedPriceFrom = priceFrom.trim() === '' ? 0 : Number(priceFrom);
     const normalizedPriceTo = priceTo.trim() === '' ? Number.POSITIVE_INFINITY : Number(priceTo);
@@ -262,11 +269,13 @@ const HotelBooking = () => {
         // When returning from a hotel detail page, restore the prior search
         // instead of running a fresh one (handled by the restore effect below).
         if (isRestore && readSearchSnapshot()) return;
+        if (bookingPreferencesLoading) return;
         loadDestinations().then(r => r);
-    }, []);
+    }, [bookingPreferencesLoading]);
 
     // Restore the saved filters + results when coming back from a hotel detail.
     useEffect(() => {
+        if (bookingPreferencesLoading) return;
         if (!isRestore) return;
         const snap = readSearchSnapshot();
         if (!snap) { restoreActiveRef.current = false; return; }
@@ -296,9 +305,10 @@ const HotelBooking = () => {
 
         const scrollTimer = window.setTimeout(() => window.scrollTo({top: snap.scrollY, behavior: 'auto'}), 150);
         return () => window.clearTimeout(scrollTimer);
-    }, []);
+    }, [bookingPreferencesLoading]);
 
     useEffect(() => {
+        if (bookingPreferencesLoading) return;
         if (destinations.length === 0) return;
         if (restoreActiveRef.current) {
             // Final restore step: destination just set from the snapshot — skip
@@ -309,7 +319,7 @@ const HotelBooking = () => {
         }
         searchHotels().then(r => r);
         setHasLoadedDestinations(true);
-    }, [destination]);
+    }, [destination, bookingPreferencesLoading]);
 
     const visibleOffers = offers;
     const hotelPageCount = Math.max(1, Math.ceil(visibleOffers.length / HOTEL_PAGE_SIZE));
