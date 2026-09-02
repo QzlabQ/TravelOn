@@ -34,6 +34,7 @@ public class PlannerDataRefreshPayload {
     private List<PlannerRouteSegment> routes;
     private List<UUID> selectedPlaceIds;
     private List<PlannerOptionGroup> recommendationGroups;
+    private UUID runId;
 
     public static PlannerDataRefreshPayload from(PlannerConversationStatus status, PlannerSnapshot snapshot) {
         return PlannerDataRefreshPayload.builder()
@@ -56,6 +57,13 @@ public class PlannerDataRefreshPayload {
     public static PlannerDataRefreshPayload from(PlannerConversationStatus status, PlannerSnapshot snapshot, List<PlannerOptionGroup> recommendationGroups) {
         PlannerDataRefreshPayload payload = from(status, snapshot);
         payload.setRecommendationGroups(recommendationGroups);
+        return payload;
+    }
+
+    public static PlannerDataRefreshPayload from(PlannerConversationStatus status, PlannerSnapshot snapshot,
+                                                 List<PlannerOptionGroup> recommendationGroups, UUID runId) {
+        PlannerDataRefreshPayload payload = from(status, snapshot, recommendationGroups);
+        payload.setRunId(runId);
         return payload;
     }
 }

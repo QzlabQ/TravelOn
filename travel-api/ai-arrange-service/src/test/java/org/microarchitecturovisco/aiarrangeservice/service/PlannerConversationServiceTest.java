@@ -5,9 +5,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.microarchitecturovisco.aiarrangeservice.client.PlannerAgentClient;
 import org.microarchitecturovisco.aiarrangeservice.client.PlannerAiClient;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerConversation;
+import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerMessage;
 import org.microarchitecturovisco.aiarrangeservice.domain.document.PlannerSnapshot;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerConversationStatus;
 import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerMessageType;
+import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerMessageRole;
+import org.microarchitecturovisco.aiarrangeservice.domain.enums.PlannerRunStatus;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerActiveRun;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.PlannerSnapshotDraft;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.TripCoreSlots;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunRequest;
@@ -15,6 +19,7 @@ import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.AgentRunRe
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentToolCall;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerAgentWarning;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.agent.PlannerStreamEvent;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerConversationResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerDataRefreshPayload;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.PlannerChatSendPayload;
 import org.microarchitecturovisco.aiarrangeservice.repository.PlannerConversationRepository;
@@ -31,6 +36,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -38,6 +44,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.timeout;
@@ -69,6 +76,76 @@ class PlannerConversationServiceTest {
 
     @Mock
     private ExecutorService plannerExecutorService;
+
+    @Test
+    void conversationResponsePreservesOptionalActiveRun() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        Instant startedAt = Instant.parse("2026-08-28T08:00:00Z");
+        PlannerConversation conversation = conversation(conversationId, userId);
+        conversation.setActiveRun(PlannerActiveRun.builder()
+                .runId(runId)
+                .status(PlannerRunStatus.RUNNING)
+                .targetDayIndex(2)
+                .startedAt(startedAt)
+                .updatedAt(startedAt)
+                .build());
+
+        PlannerConversationResponse response = PlannerConversationResponse.from(conversation);
+
+        assertThat(response.getActiveRun()).isNotNull();
+        assertThat(response.getActiveRun().getRunId()).isEqualTo(runId);
+        assertThat(response.getActiveRun().getStatus()).isEqualTo(PlannerRunStatus.RUNNING);
+        assertThat(response.getActiveRun().getTargetDayIndex()).isEqualTo(2);
+
+        conversation.setActiveRun(null);
+        assertThat(PlannerConversationResponse.from(conversation).getActiveRun()).isNull();
+    }
+
+    @Test
+    void listMessagesChecksOwnershipAndPreservesChronologicalOrder() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        PlannerConversation conversation = conversation(conversationId, userId);
+        PlannerMessage first = PlannerMessage.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversationId)
+                .userId(userId)
+                .role(PlannerMessageRole.USER)
+                .content("请安排西安行程")
+                .createdAt(Instant.parse("2026-08-28T08:00:00Z"))
+                .build();
+        PlannerMessage second = PlannerMessage.builder()
+                .id(UUID.randomUUID())
+                .conversationId(conversationId)
+                .userId(userId)
+                .role(PlannerMessageRole.ASSISTANT)
+                .content("已生成第一版行程")
+                .createdAt(Instant.parse("2026-08-28T08:00:01Z"))
+                .build();
+
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.of(conversation));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).thenReturn(List.of(first, second));
+
+        PlannerConversationService service = new PlannerConversationService(
+                conversationRepository,
+                messageRepository,
+                snapshotRepository,
+                plannerAiClient,
+                plannerAgentClient,
+                snapshotService,
+                webSocketSessionRegistry,
+                plannerExecutorService
+        );
+
+        var messages = service.listMessages(conversationId, userId);
+
+        assertThat(messages).extracting(message -> message.getRole().name())
+                .containsExactly("USER", "ASSISTANT");
+        assertThat(messages).extracting(message -> message.getContent())
+                .containsExactly("请安排西安行程", "已生成第一版行程");
+    }
 
     @Test
     void updateSelectionPushesDataRefresh() {
@@ -233,6 +310,104 @@ class PlannerConversationServiceTest {
         executorService.shutdownNow();
     }
 
+    @Test
+    void handleChatMessagePersistsRunLifecycleAndForwardsRunId() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        PlannerConversation conversation = conversation(conversationId, userId);
+        AgentRunResponse response = agentResponse(null, 1, "lifecycle-checksum");
+        PlannerSnapshot savedSnapshot = agentSnapshot(conversationId, userId, 1, null, "lifecycle-checksum");
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        AtomicReference<PlannerConversation> savedConversation = new AtomicReference<>();
+
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.of(conversation));
+        when(conversationRepository.save(any(PlannerConversation.class))).thenAnswer(invocation -> {
+            PlannerConversation value = invocation.getArgument(0);
+            savedConversation.set(value);
+            return value;
+        });
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).thenReturn(List.of());
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.empty());
+        when(snapshotService.createSnapshotFromAgentResponse(any(PlannerConversation.class), eq(response))).thenReturn(savedSnapshot);
+        when(plannerAgentClient.streamPlanner(any(AgentRunRequest.class), any()))
+                .thenAnswer(invocation -> CompletableFuture.completedFuture(response));
+
+        PlannerConversationService service = new PlannerConversationService(
+                conversationRepository,
+                messageRepository,
+                snapshotRepository,
+                plannerAiClient,
+                plannerAgentClient,
+                snapshotService,
+                webSocketSessionRegistry,
+                executorService
+        );
+
+        service.handleChatMessage(conversationId, userId, PlannerChatSendPayload.builder()
+                .runId(runId)
+                .message("生成行程")
+                .targetDayIndex(1)
+                .build());
+
+        verify(plannerAgentClient, timeout(1000)).streamPlanner(
+                argThat(request -> runId.equals(request.getRunId())), any());
+        verify(conversationRepository, timeout(1000).atLeastOnce()).save(argThat(value ->
+                value.getActiveRun() != null
+                        && value.getActiveRun().getRunId().equals(runId)
+                        && value.getActiveRun().getStatus() == PlannerRunStatus.SUCCEEDED
+        ));
+        assertThat(savedConversation.get().getActiveRun().getTraceId()).isEqualTo("trace-1");
+        executorService.shutdownNow();
+    }
+
+    @Test
+    void handleChatMessagePersistsFailedRunWhenAgentFails() {
+        UUID conversationId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        PlannerConversation conversation = conversation(conversationId, userId);
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        AtomicReference<PlannerConversation> savedConversation = new AtomicReference<>();
+
+        when(conversationRepository.findByIdAndUserId(conversationId, userId)).thenReturn(Optional.of(conversation));
+        when(conversationRepository.save(any(PlannerConversation.class))).thenAnswer(invocation -> {
+            PlannerConversation value = invocation.getArgument(0);
+            savedConversation.set(value);
+            return value;
+        });
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).thenReturn(List.of());
+        when(snapshotRepository.findFirstByConversationIdOrderByVersionDesc(conversationId)).thenReturn(Optional.empty());
+        when(plannerAgentClient.streamPlanner(any(AgentRunRequest.class), any()))
+                .thenReturn(CompletableFuture.failedFuture(new RuntimeException("agent unavailable")));
+
+        PlannerConversationService service = new PlannerConversationService(
+                conversationRepository,
+                messageRepository,
+                snapshotRepository,
+                plannerAiClient,
+                plannerAgentClient,
+                snapshotService,
+                webSocketSessionRegistry,
+                executorService
+        );
+
+        service.handleChatMessage(conversationId, userId, PlannerChatSendPayload.builder()
+                .runId(runId)
+                .message("生成行程")
+                .build());
+
+        verify(webSocketSessionRegistry, timeout(1000)).sendError(eq(conversationId), eq(runId), any(), any(), any());
+        verify(conversationRepository, timeout(1000).atLeastOnce()).save(argThat(value ->
+                value.getActiveRun() != null
+                        && value.getActiveRun().getRunId().equals(runId)
+                        && value.getActiveRun().getStatus() == PlannerRunStatus.FAILED
+        ));
+        assertThat(savedConversation.get().getActiveRun().getErrorCode()).isEqualTo("PLANNER_CHAT_FAILED");
+        assertThat(savedConversation.get().getActiveRun().getErrorMessage()).isNotBlank();
+        executorService.shutdownNow();
+    }
+
     void handleChatMessageReportsAgentFallbackAsTraceEvent() {
         UUID conversationId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -241,7 +416,7 @@ class PlannerConversationServiceTest {
         response.setStatus("PARTIAL_SUCCESS");
         response.setToolCalls(List.of(
                 PlannerAgentToolCall.builder()
-                        .tool("deepseek_chat_completion")
+                        .tool("model_chat_completion")
                         .status("FAILED")
                         .detail("All connection attempts failed")
                         .retryCount(1)
@@ -285,10 +460,10 @@ class PlannerConversationServiceTest {
         verify(webSocketSessionRegistry, timeout(1000)).sendError(
                 eq(conversationId),
                 eq("PLANNER_AGENT_FALLBACK_USED"),
-                eq("模型生成失败，已返回本地兜底规划。请检查 DeepSeek 网络/API 配置。"),
+                eq("模型生成失败，已返回本地兜底规划。请检查 AI 网络/API 配置。"),
                 detailCaptor.capture()
         );
-        assertThat(detailCaptor.getValue()).contains("deepseek_chat_completion 失败");
+        assertThat(detailCaptor.getValue()).contains("model_chat_completion 失败");
         assertThat(detailCaptor.getValue()).contains("All connection attempts failed");
         assertThat(detailCaptor.getValue()).contains("fallback_plan_builder");
         executorService.shutdownNow();
@@ -303,7 +478,7 @@ class PlannerConversationServiceTest {
         response.setStatus("PARTIAL_SUCCESS");
         response.setToolCalls(List.of(
                 PlannerAgentToolCall.builder()
-                        .tool("deepseek_chat_completion")
+                        .tool("model_chat_completion")
                         .status("FAILED")
                         .detail("All connection attempts failed")
                         .build(),

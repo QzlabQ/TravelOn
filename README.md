@@ -155,26 +155,34 @@ corepack enable
 ### 后端：`travel-api/.env`
 
 ```env
-DEEPSEEK_API_KEY=
+AI_BASE_URL=https://api.deepseek.com
+AI_CHAT_COMPLETIONS_PATH=/chat/completions
+AI_API_KEY=
+AI_MODEL=deepseek-v4-pro
+AI_THINKING_TYPE=omit
+AI_JSON_MODE=true
+AI_TEMPERATURE=0.6
+AI_MAX_TOKENS=12000
+AI_MODEL_TIMEOUT_SECONDS=90
+AI_SLOW_RESPONSE_WARNING_MS=60000
 AMAP_API_KEY=
-DEEPSEEK_MODEL=
-DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
-DEEPSEEK_PRO_MODEL=deepseek-v4-pro
-DEEPSEEK_THINKING_TYPE=disabled
-DEEPSEEK_MAX_TOKENS=12000
-DEEPSEEK_SLOW_RESPONSE_WARNING_MS=60000
 ```
 
 | 变量 | 说明 |
 | --- | --- |
-| `DEEPSEEK_API_KEY` | DeepSeek API Key，AI 功能必填 |
+| `AI_BASE_URL` | OpenAI 兼容模型服务的基础 URL；服务必须实现 Chat Completions |
+| `AI_CHAT_COMPLETIONS_PATH` | Chat Completions 路径 |
+| `AI_API_KEY` | 模型服务 API Key，AI 功能必填 |
+| `AI_MODEL` | 要调用的模型名称 |
+| `AI_THINKING_TYPE` | 可选 thinking 参数；不支持时使用 `omit` |
+| `AI_JSON_MODE` | 是否发送 `response_format=json_object`，不支持时设为 `false` |
+| `AI_TEMPERATURE` | 采样温度 |
+| `AI_MAX_TOKENS` | 最大 token 数 |
+| `AI_MODEL_TIMEOUT_SECONDS` | 模型请求超时时间（秒） |
+| `AI_RETRY_COUNT` | 模型请求重试次数 |
+| `AI_RETRY_BACKOFF_SECONDS` | 重试退避时间（秒） |
+| `AI_SLOW_RESPONSE_WARNING_MS` | 慢响应告警阈值（毫秒） |
 | `AMAP_API_KEY` | 后端 POI / 路线增强使用的高德 Key |
-| `DEEPSEEK_MODEL` | 默认模型（可选） |
-| `DEEPSEEK_FLASH_MODEL` | Flash 模型名，AI 规划页默认使用 |
-| `DEEPSEEK_PRO_MODEL` | Pro 模型名，可在页面中切换 |
-| `DEEPSEEK_THINKING_TYPE` | 思考模式开关 |
-| `DEEPSEEK_MAX_TOKENS` | 最大 token 数 |
-| `DEEPSEEK_SLOW_RESPONSE_WARNING_MS` | 慢响应告警阈值（毫秒） |
 
 AI 功能需要配置 Key；只跑社区等非 AI 功能时可以留空。
 
@@ -422,7 +430,7 @@ docker compose stop
 | 后端镜像已构建 | — | ✓ | ✓ | ✓ |
 | `travel-api/.env` | — | ✓ | ✓ | ✓ |
 | `travel-ui/.env` | ✓ | — | ✓ | ✓ |
-| 有效 `DEEPSEEK_API_KEY` + 管理员凭据 | — | — | — | ✓ |
+| 有效 `AI_API_KEY` + 管理员凭据 | — | — | — | ✓ |
 
 `.env` 字段见[环境变量配置](#环境变量配置)。
 
@@ -643,8 +651,8 @@ docker compose logs
 
 检查后端 AI 配置：
 
-- `DEEPSEEK_API_KEY`
-- `DEEPSEEK_FLASH_MODEL` / `DEEPSEEK_PRO_MODEL`
+- `AI_API_KEY`
+- `AI_MODEL`
 
 并在修改 `.env` 后重启后端服务。
 

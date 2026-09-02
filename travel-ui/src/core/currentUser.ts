@@ -59,7 +59,7 @@ export const DEFAULT_BOOKING_PREFERENCES: BookingPreferences = {
 
 const normalizeBookingPreferences = (value?: Partial<BookingPreferences> | null): BookingPreferences => {
     const preferredHotelMinRating = Number(value?.preferredHotelMinRating ?? DEFAULT_BOOKING_PREFERENCES.preferredHotelMinRating);
-    const preferredTrainTypes = Array.isArray(value?.preferredTrainTypes) && value.preferredTrainTypes.length > 0
+    const preferredTrainTypes = Array.isArray(value?.preferredTrainTypes)
         ? value.preferredTrainTypes
         : DEFAULT_BOOKING_PREFERENCES.preferredTrainTypes;
 

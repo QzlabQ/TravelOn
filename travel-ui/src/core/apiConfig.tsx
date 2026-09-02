@@ -157,6 +157,18 @@ export class ApiRequests {
         });
     }
 
+    static getBookingPreferences = async (token: string) => {
+        return await axiosInstance.get<BookingPreferencesResponse>('users/me/booking-preferences', {
+            headers: {'X-User-Token': token}
+        });
+    }
+
+    static saveBookingPreferences = async (token: string, payload: BookingPreferencesPayload) => {
+        return await axiosInstance.put<BookingPreferencesResponse>('users/me/booking-preferences', payload, {
+            headers: {'X-User-Token': token}
+        });
+    }
+
     static listSavedBankCards = async (token: string) => {
         return await axiosInstance.get<SavedBankCard[]>('users/me/bank-cards', {
             headers: {'X-User-Token': token}
@@ -210,6 +222,18 @@ export class ApiRequests {
 
     static getPlannerConversation = async (conversationId: string, userId: string) => {
         return await axiosInstance.get<PlannerConversationResponse>(`ai-arrange/api/conversations/${conversationId}?userId=${userId}`);
+    }
+
+    static listPlannerConversations = async (userId: string) => {
+        return await axiosInstance.get<PlannerConversationResponse[]>('ai-arrange/api/conversations', {
+            params: {userId}
+        });
+    }
+
+    static listPlannerMessages = async (conversationId: string, userId: string) => {
+        return await axiosInstance.get<PlannerMessageResponse[]>(`ai-arrange/api/conversations/${conversationId}/messages`, {
+            params: {userId}
+        });
     }
 
     static listPlannerSnapshots = async (conversationId: string, userId: string) => {
@@ -624,6 +648,20 @@ export interface AccountIdentityPayload {
     documentNumber: string,
 }
 
+export interface BookingPreferencesPayload {
+    defaultDepartureCity: string,
+    defaultArrivalCity: string,
+    preferredHotelMinRating: number,
+    preferredHotelMaxPrice: string,
+    preferredTrainTypes: string[],
+    onlyAvailableTickets: boolean,
+}
+
+export interface BookingPreferencesResponse extends BookingPreferencesPayload {
+    createdAt?: string,
+    updatedAt?: string,
+}
+
 export interface AccountIdentity extends AccountIdentityPayload {
     id?: string,
     updatedAt?: string,
@@ -849,9 +887,17 @@ export interface PlannerConversationResponse {
     title: string,
     currentMarkdown: string,
     latestSnapshotVersion: number,
+    activeRun?: PlannerActiveRun,
     selectedPlaceIds: string[],
     createdAt: string,
     updatedAt: string,
+}
+
+export interface PlannerMessageResponse {
+    id: string,
+    role: "USER" | "ASSISTANT" | "SYSTEM",
+    content: string,
+    createdAt: string,
 }
 
 type PlannerConversationStatus = 'COLLECTING_SLOTS' | 'ACTIVE_CHAT' | 'COMPLETED';
@@ -871,9 +917,33 @@ type PlannerMessageType =
     | 'PLANNER_OPTIONS_REFRESH'
     | 'PLANNER_SNAPSHOT_SAVED'
     | 'PLANNER_PLACE_SELECTION'
-    | 'PLANNER_ERROR';
+    | 'PLANNER_ERROR'
+    | 'PLANNER_SYNC'
+    | 'PLANNER_RUN_STATE';
+
+export type PlannerRunStatus = 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+
+export interface PlannerActiveRun {
+    runId: string,
+    status: PlannerRunStatus,
+    targetDayIndex?: number,
+    traceId?: string,
+    startedAt?: string,
+    updatedAt?: string,
+    errorCode?: string,
+    errorMessage?: string,
+}
+
+export interface PlannerRunStatePayload {
+    conversationId: string,
+    requestedRunId?: string,
+    activeRun?: PlannerActiveRun,
+    latestSnapshotVersion?: number,
+    status?: PlannerRunStatus,
+}
 
 export interface PlannerChatSendPayload {
+    runId?: string,
     message: string,
     selectedPlaceIds: string[],
     modelVariant?: PlannerModelVariant,
@@ -904,6 +974,7 @@ interface PlannerInteractionInput {
 export interface PlannerChatStreamPayload {
     delta: string,
     done: boolean,
+    runId?: string,
 }
 
 type PlannerTraceEventType =
@@ -919,6 +990,7 @@ type PlannerTraceEventType =
     | 'RUN_FAILED';
 
 export interface PlannerTraceEvent {
+    runId?: string,
     eventId?: string,
     traceId?: string,
     conversationId?: string,
@@ -938,6 +1010,7 @@ export interface PlannerErrorPayload {
     code?: string,
     message?: string,
     detail?: string,
+    runId?: string,
 }
 
 export interface PlannerDataRefreshPayload {
@@ -953,6 +1026,7 @@ export interface PlannerDataRefreshPayload {
     places: PlannerPlaceSuggestion[],
     routes: PlannerRouteSegment[],
     selectedPlaceIds: string[],
+    runId?: string,
 }
 
 interface CreatePlannerMarkdownSnapshotPayload {

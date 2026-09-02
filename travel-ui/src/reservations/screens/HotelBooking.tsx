@@ -19,7 +19,8 @@ import {ApiRequests, GetOffersBySearchQueryOffer} from "../../core/apiConfig";
 import {BookingPersonPayload} from "../../core/apiConfig";
 import {Location} from "../../core/domain/DomainInterfaces";
 import {formatDate} from "../../core/utils";
-import {addNotification, getBookingPreferences, getCurrentUserSession} from "../../core/currentUser";
+import {addNotification, getCurrentUserSession} from "../../core/currentUser";
+import {useBookingPreferences} from "../../core/useBookingPreferences";
 import TravelerSelector from "../../account/components/TravelerSelector";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
 import {useAuthSession} from "../../core/useAuthSession";
@@ -42,6 +43,11 @@ const popularHotelCities = [
     '厦门市',
     '丽江市',
 ];
+
+const normalizeCityName = (value?: string | null) => {
+    const normalized = value?.trim() ?? '';
+    return normalized.endsWith('市') ? normalized.slice(0, -1) : normalized;
+};
 
 type HotelRebookState = {
     dateFrom?: string | null;
@@ -121,7 +127,7 @@ const HotelBooking = () => {
     // While restoring a prior search, suppress the auto-search effects so the
     // saved results are shown instead of being overwritten by a fresh query.
     const restoreActiveRef = useRef(isRestore);
-    const bookingPreferences = useMemo(() => getBookingPreferences(), []);
+    const {preferences: bookingPreferences, loading: bookingPreferencesLoading, error: bookingPreferencesError} = useBookingPreferences();
     const navigateTimerRef = useRef<number | null>(null);
     const checkoutSectionRef = useRef<HTMLDivElement | null>(null);
     const checkoutSummaryRef = useRef<HTMLDivElement | null>(null);
@@ -152,6 +158,12 @@ const HotelBooking = () => {
     const [hasLoadedDestinations, setHasLoadedDestinations] = useState(false);
     const [resultPage, setResultPage] = useState(1);
 
+    useEffect(() => {
+        if (bookingPreferencesLoading) return;
+        setPriceTo(bookingPreferences.preferredHotelMaxPrice);
+        setStars(bookingPreferences.preferredHotelMinRating);
+    }, [bookingPreferencesLoading, bookingPreferences.preferredHotelMaxPrice, bookingPreferences.preferredHotelMinRating]);
+
     const normalizedPriceFrom = priceFrom.trim() === '' ? 0 : Number(priceFrom);
     const normalizedPriceTo = priceTo.trim() === '' ? Number.POSITIVE_INFINITY : Number(priceTo);
     const hasInvalidPriceRange = Number.isNaN(normalizedPriceFrom) ||
@@ -168,11 +180,11 @@ const HotelBooking = () => {
             const response = await ApiRequests.getHotelDestinations();
             const arrivals = response.data ?? [];
             setDestinations(arrivals);
-            // Honor a destination passed from the home-page quick search, else default to 北京.
+            const preferred = arrivals.find((item: Location) => normalizeCityName(item.region) === normalizeCityName(bookingPreferences.defaultArrivalCity));
             const requested = rebookState.destinationId
                 ? arrivals.find((item: Location) => item.idLocation === rebookState.destinationId)
                 : undefined;
-            setDestination(requested ?? arrivals.find((item: Location) => item.region === '北京市') ?? arrivals[0]);
+            setDestination(preferred ?? requested ?? arrivals.find((item: Location) => item.region === '北京市') ?? arrivals[0]);
         } catch (e) {
             console.log(e);
             setError(true);
@@ -262,11 +274,13 @@ const HotelBooking = () => {
         // When returning from a hotel detail page, restore the prior search
         // instead of running a fresh one (handled by the restore effect below).
         if (isRestore && readSearchSnapshot()) return;
+        if (bookingPreferencesLoading) return;
         loadDestinations().then(r => r);
-    }, []);
+    }, [bookingPreferencesLoading]);
 
     // Restore the saved filters + results when coming back from a hotel detail.
     useEffect(() => {
+        if (bookingPreferencesLoading) return;
         if (!isRestore) return;
         const snap = readSearchSnapshot();
         if (!snap) { restoreActiveRef.current = false; return; }
@@ -296,9 +310,10 @@ const HotelBooking = () => {
 
         const scrollTimer = window.setTimeout(() => window.scrollTo({top: snap.scrollY, behavior: 'auto'}), 150);
         return () => window.clearTimeout(scrollTimer);
-    }, []);
+    }, [bookingPreferencesLoading]);
 
     useEffect(() => {
+        if (bookingPreferencesLoading) return;
         if (destinations.length === 0) return;
         if (restoreActiveRef.current) {
             // Final restore step: destination just set from the snapshot — skip
@@ -309,7 +324,7 @@ const HotelBooking = () => {
         }
         searchHotels().then(r => r);
         setHasLoadedDestinations(true);
-    }, [destination]);
+    }, [destination, bookingPreferencesLoading]);
 
     const visibleOffers = offers;
     const hotelPageCount = Math.max(1, Math.ceil(visibleOffers.length / HOTEL_PAGE_SIZE));
@@ -531,6 +546,7 @@ const HotelBooking = () => {
             </div>
 
             {error && <Alert severity='warning' className='mb-4'>后端酒店数据暂时不可用，请启动服务后重试。</Alert>}
+            {bookingPreferencesError && <Alert severity='warning' className='mb-4'>预订偏好读取失败，当前使用系统默认筛选条件。</Alert>}
             {stayDateError && <Alert severity='warning' className='mb-4'>{stayDateError}</Alert>}
             {!isAuthenticated && <Alert severity='info' className='mb-4'>未登录时可以查询酒店价格和查看详情；登录后才能选择入住人、选择酒店并提交订单。</Alert>}
             {bookingError && <Alert severity='error' className='mb-4'>创建酒店预订失败，请检查日期或后端服务。</Alert>}

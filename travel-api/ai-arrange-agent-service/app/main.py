@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from app.clients.deepseek_client import DeepSeekClient
+from app.clients.openai_compatible_client import OpenAICompatibleClient
 from app.config import load_settings
 from app.harness.policy import RuntimePolicy
 from app.models import AgentRunRequest, AgentRunResponse, HealthResponse, PlannerStreamEvent
@@ -47,7 +47,7 @@ settings = load_settings()
 runtime_policy = RuntimePolicy.from_settings(settings)
 
 agent = PlannerAgent(
-    deepseek_client=DeepSeekClient(settings),
+    model_client=OpenAICompatibleClient(settings),
     amap_tool=AmapPoiTool(settings),
     hotel_search_tool=HotelSearchTool(settings),
     route_tool=RoutePlanTool(),
@@ -72,9 +72,9 @@ async def health() -> HealthResponse:
         status="UP",
         service=settings.app_name,
         version=settings.app_version,
-        modelProvider="deepseek",
-        model=settings.deepseek_model,
-        deepseekConfigured=bool(settings.deepseek_api_key),
+        modelProvider="openai-compatible",
+        model=settings.model_name,
+        modelConfigured=bool(settings.model_api_key),
         amapConfigured=bool(settings.amap_api_key) and settings.amap_enabled,
     )
 

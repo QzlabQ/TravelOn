@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from "react";
 import {
     Alert,
     Avatar,
+    Autocomplete,
     Button,
     Checkbox,
     Chip,
@@ -144,6 +145,8 @@ export default function Account() {
     const [editingTravelerId, setEditingTravelerId] = useState("");
     const [travelerEditorOpen, setTravelerEditorOpen] = useState(false);
     const [bookingPreferences, setBookingPreferencesForm] = useState<BookingPreferences>(getBookingPreferences());
+    const [bookingCityOptions, setBookingCityOptions] = useState<string[]>([]);
+    const [bookingPreferencesLoading, setBookingPreferencesLoading] = useState(false);
     const [identityForm, setIdentityForm] = useState<AccountIdentity>(emptyIdentityForm);
     const [identityMessage, setIdentityMessage] = useState("");
     const [identityErrorMessage, setIdentityErrorMessage] = useState("");
@@ -227,13 +230,53 @@ export default function Account() {
         }
     };
 
+    const loadBookingPreferences = async (currentSession = session) => {
+        if (!currentSession) {
+            setBookingPreferencesForm(getBookingPreferences());
+            return;
+        }
+        setBookingPreferencesLoading(true);
+        try {
+            const response = await ApiRequests.getBookingPreferences(currentSession.token);
+            const hasSavedPreferences = response.status !== 204;
+            const nextPreferences = hasSavedPreferences ? response.data : getBookingPreferences();
+            setBookingPreferencesForm(nextPreferences);
+            if (hasSavedPreferences) {
+                setBookingCityOptions(current => Array.from(new Set([
+                    ...current,
+                    nextPreferences.defaultDepartureCity,
+                    nextPreferences.defaultArrivalCity,
+                ].filter(Boolean))));
+            }
+        } catch {
+            setErrorMessage("预订偏好读取失败，请稍后再试。");
+        } finally {
+            setBookingPreferencesLoading(false);
+        }
+    };
+
+    const loadBookingCities = async () => {
+        try {
+            const response = await ApiRequests.getTicketOptions("TRAIN");
+            const cities = Array.from(new Set([
+                ...(response.data.departures ?? []),
+                ...(response.data.arrivals ?? []),
+            ].filter(Boolean)));
+            setBookingCityOptions(cities);
+        } catch {
+            setErrorMessage("城市列表读取失败，请稍后再试。");
+        }
+    };
+
     useEffect(() => {
         if (profile) {
             syncProfileForm(profile);
             refreshProfile().then(r => r);
             loadTravelers().then(r => r);
             loadAccountAssets().then(r => r);
+            loadBookingPreferences().then(r => r);
         }
+        loadBookingCities().then(r => r);
     }, []);
 
     const handleAuthenticated = (nextSession: UserSession) => {
@@ -243,6 +286,7 @@ export default function Account() {
         setErrorMessage("");
         loadAccountAssets(nextSession).then(r => r);
         loadTravelers(nextSession).then(r => r);
+        loadBookingPreferences(nextSession).then(r => r);
     };
 
     const saveProfile = async () => {
@@ -397,11 +441,33 @@ export default function Account() {
         });
     };
 
-    const savePreferences = () => {
-        const normalizedPreferences = setBookingPreferences(bookingPreferences);
-        setBookingPreferencesForm(normalizedPreferences);
-        setMessage("预订偏好已保存，下次查询会自动应用。");
+    const savePreferences = async () => {
+        if (!session) {
+            setErrorMessage("请先登录后保存预订偏好。");
+            return;
+        }
+        if (!bookingCityOptions.includes(bookingPreferences.defaultDepartureCity) ||
+            !bookingCityOptions.includes(bookingPreferences.defaultArrivalCity)) {
+            setErrorMessage("请从城市列表中选择默认出发城市和到达城市。");
+            return;
+        }
+        if (bookingPreferences.defaultDepartureCity === bookingPreferences.defaultArrivalCity) {
+            setErrorMessage("默认出发城市与到达城市不能相同。");
+            return;
+        }
+        setSaving(true);
+        setMessage("");
         setErrorMessage("");
+        try {
+            const response = await ApiRequests.saveBookingPreferences(session.token, bookingPreferences);
+            const normalizedPreferences = setBookingPreferences(response.data);
+            setBookingPreferencesForm(normalizedPreferences);
+            setMessage("预订偏好已保存，下次查询会自动应用。");
+        } catch (error: any) {
+            setErrorMessage(extractApiErrorMessage(error, "预订偏好保存失败，请稍后再试。"));
+        } finally {
+            setSaving(false);
+        }
     };
 
     const saveIdentity = async () => {
@@ -809,16 +875,24 @@ export default function Account() {
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <TextField
-                                label="默认出发城市"
-                                value={bookingPreferences.defaultDepartureCity}
-                                onChange={event => updateBookingPreference("defaultDepartureCity", event.target.value)}
+                            <Autocomplete
+                                options={bookingCityOptions}
+                                value={bookingCityOptions.includes(bookingPreferences.defaultDepartureCity)
+                                    ? bookingPreferences.defaultDepartureCity
+                                    : null}
+                                loading={bookingPreferencesLoading || bookingCityOptions.length === 0}
+                                onChange={(_, value) => updateBookingPreference("defaultDepartureCity", value || "")}
+                                renderInput={params => <TextField {...params} label="默认出发城市" required />}
                                 fullWidth
                             />
-                            <TextField
-                                label="默认到达城市"
-                                value={bookingPreferences.defaultArrivalCity}
-                                onChange={event => updateBookingPreference("defaultArrivalCity", event.target.value)}
+                            <Autocomplete
+                                options={bookingCityOptions}
+                                value={bookingCityOptions.includes(bookingPreferences.defaultArrivalCity)
+                                    ? bookingPreferences.defaultArrivalCity
+                                    : null}
+                                loading={bookingPreferencesLoading || bookingCityOptions.length === 0}
+                                onChange={(_, value) => updateBookingPreference("defaultArrivalCity", value || "")}
+                                renderInput={params => <TextField {...params} label="默认到达城市" required />}
                                 fullWidth
                             />
                             <TextField
@@ -863,6 +937,18 @@ export default function Account() {
                                             value={option.value}
                                             selected={bookingPreferences.preferredTrainTypes.includes(option.value)}
                                             onClick={() => togglePreferredTrainType(option.value)}
+                                            sx={{
+                                                "&.Mui-selected": {
+                                                    color: "#fff",
+                                                    backgroundColor: "#2563eb",
+                                                    borderColor: "#2563eb",
+                                                },
+                                                "&.Mui-selected:hover": {
+                                                    color: "#fff",
+                                                    backgroundColor: "#1d4ed8",
+                                                    borderColor: "#1d4ed8",
+                                                },
+                                            }}
                                         >
                                             {option.label}
                                         </ToggleButton>
@@ -872,7 +958,7 @@ export default function Account() {
                         </div>
 
                         <div className="mt-6 flex justify-end">
-                            <Button variant="contained" startIcon={<Save/>} onClick={savePreferences}>
+                            <Button variant="contained" startIcon={<Save/>} onClick={savePreferences} disabled={saving || bookingPreferencesLoading || bookingCityOptions.length === 0}>
                                 保存偏好
                             </Button>
                         </div>

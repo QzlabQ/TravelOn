@@ -47,7 +47,8 @@ def test_health_returns_configuration_flags() -> None:
     body = response.json()
     assert body["status"] == "UP"
     assert body["service"] == "ai-arrange-agent-service"
-    assert "deepseekConfigured" in body
+    assert body["modelProvider"] == "openai-compatible"
+    assert "modelConfigured" in body
     assert "amapConfigured" in body
 
 
@@ -122,7 +123,7 @@ def test_run_planner_without_external_keys_returns_structured_fallback() -> None
     assert "## 第 2 天" not in body["markdown"]
     assert isinstance(body["userFacingEvents"], list)
     assert body["userFacingEvents"]
-    assert any(call["tool"] == "deepseek_chat_completion" for call in body["toolCalls"])
+    assert any(call["tool"] == "model_chat_completion" for call in body["toolCalls"])
     assert any(call["tool"] == "search_hotels" for call in body["toolCalls"])
     assert any(call["tool"] == "get_weather" for call in body["toolCalls"])
     assert any(call["tool"] == "search_flights" for call in body["toolCalls"])
