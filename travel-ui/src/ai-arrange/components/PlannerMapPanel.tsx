@@ -30,7 +30,6 @@ interface AMapMap {
     addControl: (control: unknown) => void,
     clearMap: () => void,
     destroy: () => void,
-    setFitView: (overlays?: unknown[], immediately?: boolean, avoid?: number[]) => void,
 }
 
 interface AMapMarker {
@@ -276,7 +275,6 @@ function AmapCanvas({
 }: PlannerMapPanelProps & {onLoadStateChange: (state: MapLoadState) => void}) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<AMapMap | null>(null);
-    const hasFitInitialViewRef = useRef(false);
     const [amapApi, setAmapApi] = useState<AMapNamespace | null>(null);
 
     useEffect(() => {
@@ -328,10 +326,6 @@ function AmapCanvas({
         const map = mapRef.current;
         if (!map || !amapApi) return;
 
-        if (places.length === 0) {
-            hasFitInitialViewRef.current = false;
-        }
-
         const placesById = new Map<string, PlannerPlaceSuggestion>();
         places.forEach(place => placesById.set(place.placeId, place));
         const overlays: unknown[] = [];
@@ -370,10 +364,6 @@ function AmapCanvas({
         map.clearMap();
         if (overlays.length > 0) {
             map.add(overlays);
-            if (!hasFitInitialViewRef.current) {
-                map.setFitView(overlays, false, [64, 64, 64, 64]);
-                hasFitInitialViewRef.current = true;
-            }
         }
     }, [amapApi, onTogglePlace, places, readOnly, routes, selectedPlaceIds]);
 
