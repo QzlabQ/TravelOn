@@ -44,6 +44,11 @@ const popularHotelCities = [
     '丽江市',
 ];
 
+const normalizeCityName = (value?: string | null) => {
+    const normalized = value?.trim() ?? '';
+    return normalized.endsWith('市') ? normalized.slice(0, -1) : normalized;
+};
+
 type HotelRebookState = {
     dateFrom?: string | null;
     dateTo?: string | null;
@@ -122,7 +127,7 @@ const HotelBooking = () => {
     // While restoring a prior search, suppress the auto-search effects so the
     // saved results are shown instead of being overwritten by a fresh query.
     const restoreActiveRef = useRef(isRestore);
-    const {preferences: bookingPreferences, loading: bookingPreferencesLoading} = useBookingPreferences();
+    const {preferences: bookingPreferences, loading: bookingPreferencesLoading, error: bookingPreferencesError} = useBookingPreferences();
     const navigateTimerRef = useRef<number | null>(null);
     const checkoutSectionRef = useRef<HTMLDivElement | null>(null);
     const checkoutSummaryRef = useRef<HTMLDivElement | null>(null);
@@ -175,11 +180,11 @@ const HotelBooking = () => {
             const response = await ApiRequests.getHotelDestinations();
             const arrivals = response.data ?? [];
             setDestinations(arrivals);
-            // Honor a destination passed from the home-page quick search, else default to 北京.
+            const preferred = arrivals.find((item: Location) => normalizeCityName(item.region) === normalizeCityName(bookingPreferences.defaultArrivalCity));
             const requested = rebookState.destinationId
                 ? arrivals.find((item: Location) => item.idLocation === rebookState.destinationId)
                 : undefined;
-            setDestination(requested ?? arrivals.find((item: Location) => item.region === '北京市') ?? arrivals[0]);
+            setDestination(preferred ?? requested ?? arrivals.find((item: Location) => item.region === '北京市') ?? arrivals[0]);
         } catch (e) {
             console.log(e);
             setError(true);
@@ -541,6 +546,7 @@ const HotelBooking = () => {
             </div>
 
             {error && <Alert severity='warning' className='mb-4'>后端酒店数据暂时不可用，请启动服务后重试。</Alert>}
+            {bookingPreferencesError && <Alert severity='warning' className='mb-4'>预订偏好读取失败，当前使用系统默认筛选条件。</Alert>}
             {stayDateError && <Alert severity='warning' className='mb-4'>{stayDateError}</Alert>}
             {!isAuthenticated && <Alert severity='info' className='mb-4'>未登录时可以查询酒店价格和查看详情；登录后才能选择入住人、选择酒店并提交订单。</Alert>}
             {bookingError && <Alert severity='error' className='mb-4'>创建酒店预订失败，请检查日期或后端服务。</Alert>}

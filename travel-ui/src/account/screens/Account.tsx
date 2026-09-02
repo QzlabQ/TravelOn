@@ -241,6 +241,13 @@ export default function Account() {
             const hasSavedPreferences = response.status !== 204;
             const nextPreferences = hasSavedPreferences ? response.data : getBookingPreferences();
             setBookingPreferencesForm(nextPreferences);
+            if (hasSavedPreferences) {
+                setBookingCityOptions(current => Array.from(new Set([
+                    ...current,
+                    nextPreferences.defaultDepartureCity,
+                    nextPreferences.defaultArrivalCity,
+                ].filter(Boolean))));
+            }
         } catch {
             setErrorMessage("预订偏好读取失败，请稍后再试。");
         } finally {

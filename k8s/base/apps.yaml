@@ -114,6 +114,7 @@ spec:
             - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/user_db"}
             - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
             - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
+            - {name: APP_SEED_DATA_COMMON_BASE_PATH, value: "file:/seed-data/common/"}
           startupProbe: {tcpSocket: {port: 8081}, failureThreshold: 120, periodSeconds: 10}
           readinessProbe: {tcpSocket: {port: 8081}, periodSeconds: 5}
           livenessProbe: {tcpSocket: {port: 8081}, periodSeconds: 15}

@@ -13,23 +13,29 @@ export const useBookingPreferences = () => {
     const session = useAuthSession();
     const [preferences, setPreferences] = useState<BookingPreferences>(getBookingPreferences());
     const [loading, setLoading] = useState(Boolean(session));
+    const [error, setError] = useState(false);
 
     useEffect(() => {
         let active = true;
         if (!session) {
             setPreferences(getBookingPreferences());
             setLoading(false);
+            setError(false);
             return () => { active = false; };
         }
 
         setLoading(true);
+        setError(false);
         ApiRequests.getBookingPreferences(session.token)
             .then(response => {
                 if (!active) return;
                 setPreferences(response.status === 204 ? DEFAULT_BOOKING_PREFERENCES : response.data);
             })
             .catch(() => {
-                if (active) setPreferences(getBookingPreferences() || DEFAULT_BOOKING_PREFERENCES);
+                if (active) {
+                    setPreferences(DEFAULT_BOOKING_PREFERENCES);
+                    setError(true);
+                }
             })
             .finally(() => {
                 if (active) setLoading(false);
@@ -46,5 +52,5 @@ export const useBookingPreferences = () => {
         return () => window.removeEventListener(BOOKING_PREFERENCES_EVENT, syncLocalFallback);
     }, []);
 
-    return {preferences, loading};
+    return {preferences, loading, error};
 };

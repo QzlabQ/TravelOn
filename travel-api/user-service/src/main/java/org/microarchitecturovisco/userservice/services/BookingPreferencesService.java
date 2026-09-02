@@ -7,6 +7,8 @@ import org.microarchitecturovisco.userservice.dto.BookingPreferencesRequest;
 import org.microarchitecturovisco.userservice.dto.BookingPreferencesResponse;
 import org.microarchitecturovisco.userservice.repositories.BookingPreferencesRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,6 +23,7 @@ public class BookingPreferencesService {
 
     private final UserService userService;
     private final BookingPreferencesRepository bookingPreferencesRepository;
+    private final CityCatalog cityCatalog;
 
     public Optional<BookingPreferencesResponse> get(String token) {
         User user = userService.requireUserByToken(token);
@@ -38,8 +41,16 @@ public class BookingPreferencesService {
                 .distinct()
                 .toList();
         BigDecimal rating = request.preferredHotelMinRating().setScale(1, java.math.RoundingMode.HALF_UP);
-        preferences.setDefaultDepartureCity(request.defaultDepartureCity().trim());
-        preferences.setDefaultArrivalCity(request.defaultArrivalCity().trim());
+        String departureCity = cityCatalog.canonicalName(request.defaultDepartureCity());
+        String arrivalCity = cityCatalog.canonicalName(request.defaultArrivalCity());
+        if (departureCity == null || arrivalCity == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported booking preference city");
+        }
+        if (departureCity.equals(arrivalCity)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Departure and arrival cities must differ");
+        }
+        preferences.setDefaultDepartureCity(departureCity);
+        preferences.setDefaultArrivalCity(arrivalCity);
         preferences.setPreferredHotelMinRating(rating);
         preferences.setPreferredHotelMaxPrice(normalizePrice(request.preferredHotelMaxPrice()));
         preferences.setPreferredTrainTypes(String.join(",", trainTypes));

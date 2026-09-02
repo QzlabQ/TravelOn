@@ -564,7 +564,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   const session = useAuthSession();
   const isAuthenticated = Boolean(session);
   const rebookState = (location.state ?? {}) as TicketRebookState;
-  const {preferences: bookingPreferences, loading: bookingPreferencesLoading} = useBookingPreferences();
+  const {preferences: bookingPreferences, loading: bookingPreferencesLoading, error: bookingPreferencesError} = useBookingPreferences();
   const preferredTrainTypeFilters =
     bookingPreferences.preferredTrainTypes.filter(isTrainTypeFilter);
   const navigateTimerRef = useRef<number | null>(null);
@@ -1297,6 +1297,11 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       {error && (
         <Alert severity="warning" className="mb-4">
           后端票务数据暂时不可用，请确认交通服务已启动。
+        </Alert>
+      )}
+      {bookingPreferencesError && (
+        <Alert severity="warning" className="mb-4">
+          预订偏好读取失败，当前使用系统默认筛选条件。
         </Alert>
       )}
       {!isAuthenticated && (

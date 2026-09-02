@@ -167,10 +167,12 @@ services:
     build: ./user-service
     volumes:
       - ./logs/user:/logs
+      - ./seed-data/common:/seed-data/common:ro
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${USER_DB_NAME:-user_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
     depends_on:
       postgres:
         condition: service_healthy
