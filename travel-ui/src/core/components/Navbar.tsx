@@ -1,4 +1,4 @@
-import {Avatar, Button, ClickAwayListener, Popper, Tooltip} from "@mui/material";
+import {Avatar, Button, Popper, Tooltip} from "@mui/material";
 // @ts-ignore
 import logo from "../../assets/main_logo.png";
 import LoginIcon from "@mui/icons-material/Login";
@@ -10,7 +10,6 @@ import {
     Flight,
     Forum,
     Hotel,
-    KeyboardArrowDown,
     KeyboardArrowRight,
     Train
 } from "@mui/icons-material";
@@ -25,7 +24,6 @@ import {resolveCommunityImageUrl} from "../apiConfig";
 
 export default function Navbar() {
     const [authDialogOpen, setAuthDialogOpen] = useState(false);
-    const [reservationAnchorEl, setReservationAnchorEl] = React.useState<null | HTMLElement>(null);
     const [session, setSession] = useState<UserSession | null>(getCurrentUserSession());
 
     useEffect(() => {
@@ -40,25 +38,10 @@ export default function Navbar() {
         };
     }, []);
 
-    const closeNavPoppers = () => {
-        setReservationAnchorEl(null);
-    };
-
-    const handleReservationClick = (event: React.MouseEvent<HTMLElement>) => {
-        setReservationAnchorEl(reservationAnchorEl ? null : event.currentTarget);
-    };
-
-    const reservationLinks = [
-        {label: "机票预订", to: "/reservations/flights", icon: <Flight/>},
-        {label: "火车票预订", to: "/reservations/trains", icon: <Train/>},
-        {label: "酒店预订", to: "/reservations/hotels", icon: <Hotel/>},
-        {label: "我的预订", to: "/reservations", icon: <Bookmarks/>},
-        {label: "我的行程", to: "/reservations/timeline", icon: <EventNote/>}
-    ];
-
     const location = useLocation();
     const isActive = (path: string) =>
-        path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
+        path === "/" ? location.pathname === "/" :
+            path === "/reservations" ? location.pathname === path : location.pathname.startsWith(path);
 
     // Shared pill styling for the top-level nav items, with an active (current page) state.
     const navItemSx = (active: boolean) => ({
@@ -87,8 +70,6 @@ export default function Navbar() {
             <Link to="/" className="shrink-0">
                 <img src={logo} style={{maxHeight: "60px", pointerEvents: "none"}} alt="TourCentral"/>
             </Link>
-
-            <ClickAwayListener onClickAway={closeNavPoppers}>
                 <ul className="flex w-full flex-wrap items-center justify-center gap-1 md:gap-2 xl:w-auto xl:gap-3">
                     <li className="flex flex-row items-center">
                         <Button
@@ -112,60 +93,32 @@ export default function Navbar() {
                             社区
                         </Button>
                     </li>
-                    <li className="relative flex flex-row items-center">
-                        <Button
-                            disableElevation
-                            startIcon={<Bookmarks/>}
-                            endIcon={
-                                <KeyboardArrowDown
-                                    sx={{
-                                        transition: "transform .2s ease",
-                                        transform: reservationAnchorEl ? "rotate(180deg)" : "none",
-                                    }}
-                                />
-                            }
-                            onClick={handleReservationClick}
-                            sx={navItemSx(isActive("/reservations"))}
-                        >
-                            预订
+                    <li className="flex flex-row items-center">
+                        <Button component={Link} to="/reservations" disableElevation startIcon={<Bookmarks/>} sx={navItemSx(isActive("/reservations"))}>
+                            历史订单
                         </Button>
-                        <Popper open={Boolean(reservationAnchorEl)} anchorEl={reservationAnchorEl} placement="bottom-start" style={{zIndex: 30}}>
-                            <div
-                                className="mt-2 flex min-w-44 flex-col gap-0.5 rounded-xl border border-slate-100 bg-white p-2 shadow-[0_12px_32px_-8px_rgba(15,23,42,0.18)]"
-                            >
-                                {reservationLinks.map((item) => {
-                                    const active = location.pathname === item.to;
-                                    return (
-                                        <Button
-                                            key={item.to}
-                                            component={Link}
-                                            to={item.to}
-                                            onClick={closeNavPoppers}
-                                            fullWidth
-                                            disableElevation
-                                            startIcon={item.icon}
-                                            sx={{
-                                                justifyContent: "flex-start",
-                                                textTransform: "none",
-                                                borderRadius: "10px",
-                                                px: 1.5,
-                                                py: 1,
-                                                fontWeight: 500,
-                                                color: active ? "#1d4ed8" : "#111827",
-                                                backgroundColor: active ? "#eff6ff" : "transparent",
-                                                "& .MuiButton-startIcon": {color: "#2563eb"},
-                                                "&:hover": {backgroundColor: "#f1f5f9"},
-                                            }}
-                                        >
-                                            {item.label}
-                                        </Button>
-                                    );
-                                })}
-                            </div>
-                        </Popper>
                     </li>
-                </ul>
-            </ClickAwayListener>
+                    <li className="flex flex-row items-center">
+                        <Button component={Link} to="/reservations/timeline" disableElevation startIcon={<EventNote/>} sx={navItemSx(isActive("/reservations/timeline"))}>
+                            我的行程
+                        </Button>
+                    </li>
+                    <li className="flex flex-row items-center">
+                        <Button component={Link} to="/reservations/flights" disableElevation startIcon={<Flight/>} sx={navItemSx(isActive("/reservations/flights"))}>
+                            机票
+                        </Button>
+                    </li>
+                    <li className="flex flex-row items-center">
+                        <Button component={Link} to="/reservations/trains" disableElevation startIcon={<Train/>} sx={navItemSx(isActive("/reservations/trains"))}>
+                            火车票
+                        </Button>
+                    </li>
+                    <li className="flex flex-row items-center">
+                        <Button component={Link} to="/reservations/hotels" disableElevation startIcon={<Hotel/>} sx={navItemSx(isActive("/reservations/hotels"))}>
+                            酒店
+                        </Button>
+                    </li>                </ul>
+
 
             <div className="relative flex items-center gap-3">
                 {session ?
