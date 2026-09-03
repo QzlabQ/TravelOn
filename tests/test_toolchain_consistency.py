@@ -77,3 +77,17 @@ def test_python_host_and_container_versions_are_intentionally_distinct() -> None
     ):
         dockerfile = (API_ROOT / relative_path).read_text(encoding="utf-8")
         assert dockerfile.startswith("FROM python:3.13-slim\n"), relative_path
+
+
+def test_cd_prune_allowlist_uses_full_group_version_kind() -> None:
+    """Keep kubectl's prune allowlist syntax valid for core API resources."""
+    scripts = (
+        ROOT / "ops" / "runner" / "travelon-deploy-k3s",
+        ROOT / "scripts" / "deploy-k3s.sh",
+    )
+    for script_path in scripts:
+        script = script_path.read_text(encoding="utf-8")
+        assert "--prune-allowlist=core/v1/Service" in script, script_path
+        assert "--prune-allowlist=core/v1/ConfigMap" in script, script_path
+        assert "--prune-allowlist=v1/Service" not in script, script_path
+        assert "--prune-allowlist=v1/ConfigMap" not in script, script_path

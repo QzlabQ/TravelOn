@@ -52,8 +52,8 @@ done < "$retired_resources"
 sudo -n kubectl -n travelon apply --prune -l app.kubernetes.io/managed-by=travelon-cd \
   --prune-allowlist=apps/v1/Deployment \
   --prune-allowlist=apps/v1/StatefulSet \
-  --prune-allowlist=v1/Service \
-  --prune-allowlist=v1/ConfigMap \
+  --prune-allowlist=core/v1/Service \
+  --prune-allowlist=core/v1/ConfigMap \
   --prune-allowlist=networking.k8s.io/v1/Ingress \
   --prune-allowlist=autoscaling/v2/HorizontalPodAutoscaler \
   --prune-allowlist=policy/v1/PodDisruptionBudget \
