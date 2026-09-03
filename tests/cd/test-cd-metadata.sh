@@ -10,6 +10,38 @@ trap 'rm -f "$rendered" "$expected_images" "$actual_images"' EXIT
 
 kubectl kustomize k8s/base >"$rendered"
 
+rabbitmq_pvc="$(awk 'BEGIN { RS = "---[[:space:]]*\n" }
+  /kind: PersistentVolumeClaim/ && /name: rabbitmq-data/ { print; found = 1 }
+  END { exit !found }
+' "$rendered")" || {
+  echo 'RabbitMQ PVC is missing from the rendered manifest' >&2
+  exit 1
+}
+grep -Fq 'storage: 20Gi' <<<"$rabbitmq_pvc" || {
+  echo 'RabbitMQ PVC must request 20Gi' >&2
+  exit 1
+}
+
+rabbitmq_deployment="$(awk 'BEGIN { RS = "---[[:space:]]*\n" }
+  /kind: Deployment/ && /name: rabbitmq/ { print; found = 1 }
+  END { exit !found }
+' "$rendered")" || {
+  echo 'RabbitMQ Deployment is missing from the rendered manifest' >&2
+  exit 1
+}
+grep -Fq 'claimName: rabbitmq-data' <<<"$rabbitmq_deployment" || {
+  echo 'RabbitMQ Deployment does not reference rabbitmq-data' >&2
+  exit 1
+}
+grep -Fq 'mountPath: /var/lib/rabbitmq' <<<"$rabbitmq_deployment" || {
+  echo 'RabbitMQ Deployment does not mount /var/lib/rabbitmq' >&2
+  exit 1
+}
+grep -Fq 'hostname: rabbitmq' <<<"$rabbitmq_deployment" || {
+  echo 'RabbitMQ Pod must keep a stable hostname for its persisted node data' >&2
+  exit 1
+}
+
 for label in app.kubernetes.io/part-of:\ travelon app.kubernetes.io/managed-by:\ travelon-cd; do
   grep -Fq "$label" "$rendered" || {
     echo "missing CD lifecycle label: $label" >&2

@@ -92,9 +92,19 @@ spec:
   template:
     metadata: {labels: {app: rabbitmq}}
     spec:
+      hostname: rabbitmq
       containers:
         - name: rabbitmq
           image: rabbitmq:3.13-management
           ports: [{containerPort: 5672}, {containerPort: 15672}]
           resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 500m, memory: 768Mi}}
           readinessProbe: {tcpSocket: {port: 5672}, periodSeconds: 5}
+          volumeMounts: [{name: data, mountPath: /var/lib/rabbitmq}]
+      volumes: [{name: data, persistentVolumeClaim: {claimName: rabbitmq-data}}]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: rabbitmq-data}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 20Gi}}
