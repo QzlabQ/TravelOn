@@ -1,0 +1,21 @@
+services:
+  postgres:
+    cpuset: "12-19"
+  rabbitmq:
+    cpuset: "12-19"
+  discovery:
+    cpuset: "12-19"
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:ActiveProcessorCount=8"
+  gateway:
+    cpuset: "12-19"
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:ActiveProcessorCount=8"
+  hotel:
+    cpuset: "12-19"
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:ActiveProcessorCount=8"
+  transport:
+    cpuset: "12-19"
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:ActiveProcessorCount=8"

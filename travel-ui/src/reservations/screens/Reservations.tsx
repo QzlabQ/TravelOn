@@ -13,7 +13,7 @@ import {
     TableHead,
     TableRow
 } from "@mui/material";
-import {Cancel, EventNote, Refresh, Visibility} from "@mui/icons-material";
+import {Cancel, Refresh, Visibility} from "@mui/icons-material";
 import {ApiRequests, ReservationResponse} from "../../core/apiConfig";
 import {getCurrentUserId, getCurrentUserMode} from "../../core/currentUser";
 import {useAuthSession} from "../../core/useAuthSession";
@@ -76,15 +76,12 @@ const Reservations = () => {
         <div className='flex flex-col px-48 py-16'>
             <div className='flex flex-row items-center justify-between mb-6'>
                 <div>
-                    <h1 className='text-2xl font-semibold mb-2'>我的预定</h1>
-                    <p className='text-sm text-gray-500'>
-                        {userMode === 'GUEST' ? '当前使用游客身份保存预定，之后登录账号可以迁移绑定。' : '当前显示账号下的预定。'}
-                    </p>
+                    <h1 className='text-2xl font-semibold mb-2'>历史订单</h1>
+                    {userMode === 'GUEST' && <p className='text-sm text-gray-500'>
+                        当前使用游客身份保存预定，之后登录账号可以迁移绑定。
+                    </p>}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <Button component={Link} to="/reservations/timeline" variant="contained" startIcon={<EventNote/>}>
-                        我的行程
-                    </Button>
                     <Button variant='outlined' startIcon={<Refresh/>} onClick={loadReservations} disabled={loading}>
                         刷新
                     </Button>

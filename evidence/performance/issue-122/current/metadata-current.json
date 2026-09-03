@@ -1,0 +1,13 @@
+{
+  "variant": "current",
+  "commit": "e2b9bbc65f163fa7e29ffb2587fc88cfec0e884d",
+  "destination_id": "928c6512-b3a8-a0dc-74a9-3ee63e77842a",
+  "hotel_id": 5289,
+  "date_from": "2026-09-12",
+  "date_to": "2026-09-14",
+  "concurrency": 32,
+  "duration_seconds": 30,
+  "warmup_seconds": 10,
+  "application_cpuset": "12-19",
+  "load_generator_cpuset": "8-11"
+}
