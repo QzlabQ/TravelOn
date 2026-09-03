@@ -8,6 +8,7 @@ demo coverage records so the application never presents them as live inventory.
 from __future__ import annotations
 
 import csv
+import hashlib
 import math
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -60,6 +61,33 @@ COORDINATES = {
 }
 
 FLIGHT_CARRIERS = (("中国国航", "CA"), ("东方航空", "MU"), ("南方航空", "CZ"), ("海南航空", "HU"))
+
+ECONOMY_CABIN = "经济舱"
+
+# 航班的高舱位：舱位名、相对经济舱的价格倍率、相对经济舱的座位倍率、覆盖比例。
+#
+# 覆盖比例不是 100%：国内航线里窄体机通常只有经济舱和公务舱，头等舱要少得多。
+# 每个航班是否有某个高舱位由航班号哈希决定，既贴近真实，也让日期展开后的
+# CSV 不会直接膨胀三倍（座位等级在这个数据模型里是独立的行）。
+FLIGHT_CABINS = (
+    ("商务舱", 2.35, 0.28, 0.45),
+    ("头等舱", 3.60, 0.14, 0.20),
+)
+
+
+def deterministic_ratio(*parts: str) -> float:
+    """把任意输入映射到 [0, 1) 的确定性伪随机数。
+
+    种子数据必须可重现——同一份输入重跑两次要得到完全一样的 CSV，否则每次
+    重新生成都是一个 15 万行的无意义 diff。所以这里用哈希而不是 random。
+    """
+    digest = hashlib.blake2s("|".join(parts).encode("utf-8"), digest_size=8).hexdigest()
+    return int(digest, 16) / float(1 << 64)
+
+
+def jittered(value: float, spread: float, *parts: str) -> float:
+    """在 value 上叠加 ±spread 的确定性扰动。"""
+    return value * (1 + (deterministic_ratio(*parts) * 2 - 1) * spread)
 
 
 def ticket_cities() -> list[str]:
@@ -116,7 +144,9 @@ def generated_flight(left: str, right: str, seed: int, ids: dict[str, str]) -> t
     carrier, prefix = FLIGHT_CARRIERS[seed % len(FLIGHT_CARRIERS)]
     departure = 360 + (seed * 37) % 840
     duration = max(70, round(55 + distance / 10))
-    price = max(260, round((230 + distance * 0.45 + seed % 170) / 10) * 10)
+    # seed % 170 会让相邻航线的价格呈锯齿状线性递增，看上去一眼就是编出来的。
+    base = 230 + distance * 0.45
+    price = max(260, round(jittered(base, 0.22, "flight-price", left, right, str(seed)) / 10) * 10)
     seats = str(3 + seed % 35)
     return (
         "FLIGHT", ids.get(left, left), ids.get(right, right), "", "",
@@ -131,7 +161,8 @@ def generated_train(left: str, right: str, seed: int, ids: dict[str, str]) -> tu
     distance = distance_km(left, right)
     departure = 330 + (seed * 29) % 900
     duration = max(35, round(25 + distance / 3.1))
-    price = max(24, round((18 + distance * 0.36 + seed % 55) / 5) * 5)
+    base = 18 + distance * 0.36
+    price = max(24, round(jittered(base, 0.20, "train-price", left, right, str(seed)) / 5) * 5)
     seats = str(5 + seed % 31)
     return (
         "TRAIN", ids.get(left, left), ids.get(right, right), "", "",
@@ -140,6 +171,42 @@ def generated_train(left: str, right: str, seed: int, ids: dict[str, str]) -> tu
         "二等座", str(price), seats, seats,
         TRAIN_STATIONS.get(left, f"{left}站"), TRAIN_STATIONS.get(right, f"{right}站"),
     )
+
+
+def expand_flight_cabins(rows: list[tuple[str, ...]]) -> list[tuple[str, ...]]:
+    """给经济舱航班派生商务舱和头等舱行。
+
+    座位等级在这个 CSV 里是独立的行——火车票本来就是这么存的（同一车次的
+    二等座/一等座/商务座各占一行），航班此前只有经济舱一行。这里按同样的方式
+    补齐高舱位，价格和座位数都从该航班自己的经济舱派生，所以人工整理过的
+    真实票价仍然是基准，不会被公式覆盖掉。
+
+    幂等：脚本会把上一次的输出当作既有数据重新读入，已经存在的舱位不再重复补。
+    """
+    existing = {(row[1], row[2], row[10], row[11]) for row in rows}
+    expanded: list[tuple[str, ...]] = []
+
+    for row in rows:
+        expanded.append(row)
+        if row[11] != ECONOMY_CABIN:
+            continue
+
+        departure_city, arrival_city, code = row[1], row[2], row[10]
+        for cabin, price_factor, seat_factor, share in FLIGHT_CABINS:
+            if (departure_city, arrival_city, code, cabin) in existing:
+                continue
+            if deterministic_ratio("cabin", cabin, code, departure_city, arrival_city) >= share:
+                continue
+
+            price = round(
+                jittered(float(row[12]) * price_factor, 0.10, "cabin-price", cabin, code, departure_city) / 10
+            ) * 10
+            seats = max(2, round(int(row[14]) * seat_factor))
+            expanded.append(
+                tuple(row[:11]) + (cabin, str(price), str(seats), str(seats)) + tuple(row[15:17])
+            )
+
+    return expanded
 
 
 def main() -> None:
@@ -172,8 +239,9 @@ def main() -> None:
             if ("TRAIN", left_id, right_id) not in covered_routes:
                 generated_train_rows.append(generated_train(left, right, seed, ids))
 
-    historical_flight_rows = [row for row in historical_rows if row[0] == "FLIGHT"]
-    historical_train_rows = [row for row in historical_rows if row[0] == "TRAIN"]
+    historical_flight_rows = [tuple(row) for row in historical_rows if row[0] == "FLIGHT"]
+    historical_train_rows = [tuple(row) for row in historical_rows if row[0] == "TRAIN"]
+    flight_rows = expand_flight_cabins(historical_flight_rows + generated_flight_rows)
 
     PLANE_TICKETS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with TRAIN_TICKETS_FILE.open("w", encoding="utf-8", newline="") as handle:
@@ -185,11 +253,15 @@ def main() -> None:
     with PLANE_TICKETS_FILE.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
         writer.writerow(HEADER)
-        writer.writerows(historical_flight_rows)
-        writer.writerows(generated_flight_rows)
+        writer.writerows(flight_rows)
 
     generated_total = len(generated_flight_rows) + len(generated_train_rows)
-    print(f"cities={len(cities)} historical={len(historical_rows)} generated={generated_total} total={len(historical_rows) + generated_total}")
+    cabin_rows = len(flight_rows) - len(historical_flight_rows) - len(generated_flight_rows)
+    total_rows = len(flight_rows) + len(historical_train_rows) + len(generated_train_rows)
+    print(
+        f"cities={len(cities)} historical={len(historical_rows)} generated={generated_total} "
+        f"flight-cabins={cabin_rows} total={total_rows}"
+    )
 
 
 if __name__ == "__main__":

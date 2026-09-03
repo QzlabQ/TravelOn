@@ -36,3 +36,26 @@ test('机票查询结果全部落在所选出行日期', async ({page}) => {
     // 结果区顶部会回显当前查询日期，用它确认返回的是所选日期的班次。
     await expect(page.getByText(date, {exact: true}).first()).toBeVisible();
 });
+
+test('机票同一航班可以在经济舱、商务舱和头等舱之间切换', async ({page}) => {
+    await page.goto('/reservations/flights');
+    await page.getByLabel('出行日期').fill(isoDate(3));
+    await page.getByRole('button', {name: '查询', exact: true}).click();
+    await expect(page.getByRole('heading', {name: '推荐方案'})).toBeVisible();
+
+    // 种子数据里北京 → 上海的航班带有完整的三个舱位（见 scripts/generate-ticket-offers.py
+    // 的 FLIGHT_CABINS），所以这三个按钮在默认航线上一定存在。
+    await expect(page.getByRole('button', {name: /^经济舱/}).first()).toBeVisible({timeout: 30_000});
+    const businessCabin = page.getByRole('button', {name: /^商务舱/}).first();
+    await expect(businessCabin).toBeVisible();
+    await expect(page.getByRole('button', {name: /^头等舱/}).first()).toBeVisible();
+
+    const economyPrice = await page.getByText(/^当前舱位价格$/).first()
+        .locator('xpath=following-sibling::p[1]').innerText();
+    await businessCabin.click();
+    await expect(page.getByText(/当前舱位 商务舱/).first()).toBeVisible();
+    // 切换舱位后展示的必须是该舱位的价格，而不是仍然停在经济舱价格上。
+    const businessPrice = await page.getByText(/^当前舱位价格$/).first()
+        .locator('xpath=following-sibling::p[1]').innerText();
+    expect(businessPrice).not.toEqual(economyPrice);
+});

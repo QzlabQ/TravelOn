@@ -7,9 +7,10 @@ route, carrier, code, seat class, price and total seats matter; the date baked
 into the template is ignored.
 
 For every template we emit one row per calendar day in the booking window, so
-the booking flow can query real dates. Remaining seats are varied per
-(code, route, seat class, date) so each day's availability differs instead of
-being identical across the whole window.
+the booking flow can query real dates. Both remaining seats and price are varied
+per (code, route, seat class, date) so each day differs instead of being
+identical across the whole window -- the template price is the baseline the
+daily price fluctuates around.
 
 The window is relative to the day this script runs, not a fixed date range: a
 hard-coded range silently expires and every transport query then returns an
@@ -74,6 +75,37 @@ def remaining_for(code: str, route_key: str, date_iso: str, total_seats: int) ->
     return max(0, min(total_seats, round(total_seats * ratio)))
 
 
+# 单个班次单天的价格浮动幅度。模板里的价格是这条线路的基准价，展开后每个
+# （班次, 舱位/席别, 日期）都在基准价上下浮动一次。
+PRICE_SPREAD = 0.20
+
+# 价格取整步长：机票按 10 元、火车票按 5 元，和模板里的定价习惯保持一致。
+PRICE_STEP = {"FLIGHT": 10, "TRAIN": 5}
+
+
+def price_for(ticket_type: str, base_price: str, code: str, route_key: str, date_iso: str) -> str:
+    """同一班次不同日期、同一线路不同班次的价格都应该不一样。
+
+    模板里一条线路的票价是一个固定值，直接按日期展开的话，整块数据看上去就是
+    "同一航线所有航班同价、且 40 天都同价"，一眼假。这里用和 remaining_for 同样的
+    确定性哈希做浮动：输入相同结果就相同，重跑不会产生无意义的巨大 diff。
+    """
+    try:
+        base = float(base_price)
+    except ValueError:
+        return base_price
+    if base <= 0:
+        return base_price
+
+    digest = int(
+        hashlib.md5(f"price|{code}|{route_key}|{date_iso}".encode("utf-8")).hexdigest()[:8],
+        16,
+    )
+    ratio = 1 + ((digest % 1001) / 1000.0 * 2 - 1) * PRICE_SPREAD
+    step = PRICE_STEP.get(ticket_type, 10)
+    return str(max(step, round(base * ratio / step) * step))
+
+
 def read_templates(path: Path) -> list[list[str]]:
     with path.open(encoding="utf-8", newline="") as handle:
         rows = list(csv.reader(handle, delimiter="\t"))
@@ -128,6 +160,7 @@ def build_rows(
             arrival = departure + duration
             date_iso = day.strftime("%Y-%m-%d")
             remaining = remaining_for(code, route_key, date_iso, total)
+            dated_price = price_for(ticket_type, price, code, route_key, date_iso)
             rows.append(
                 [
                     ticket_type,
@@ -142,7 +175,7 @@ def build_rows(
                     carrier,
                     code,
                     seat_class,
-                    price,
+                    dated_price,
                     str(remaining),
                     str(total),
                     departure_station_name,

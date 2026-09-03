@@ -109,6 +109,13 @@ FROM seed_hotel_rooms r
 JOIN seed_hotels h ON h.source_id = r.source_hotel_id
 ON CONFLICT (id) DO NOTHING;
 
+-- 票务种子表整表重建。
+--
+-- 这张表的主键是行内容（含价格）的 md5，所以改一次种子价格就是一批全新的 id：
+-- 只做 INSERT ... ON CONFLICT DO NOTHING 的话旧行会原样留下，同一个班次同一天
+-- 会同时存在新旧两个价格。这张表是纯种子数据、没有任何外键指向它，直接清空重建。
+DELETE FROM public.ticket_offer_templates;
+
 INSERT INTO public.ticket_offer_templates (
     id,
     type,

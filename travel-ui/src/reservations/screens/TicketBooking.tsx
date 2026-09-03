@@ -103,7 +103,8 @@ const popularRoutes: Record<TicketMode, Array<{ from: string; to: string }>> = {
 
 type TrainTypeFilter = "GC" | "D" | "T" | "K" | "Z" | "OTHER";
 
-type TrainOfferGroup = {
+/** 同一班次（车次或航班）下的一组席别/舱位。 */
+type OfferGroup = {
   key: string;
   offers: TicketSearchOffer[];
   order: number;
@@ -145,7 +146,7 @@ const getTrainTypeGroup = (code: string): TrainTypeFilter => {
   return "OTHER";
 };
 
-const getTrainOfferGroupKey = (offer: TicketSearchOffer) =>
+const getOfferGroupKey = (offer: TicketSearchOffer) =>
   [
     offer.code,
     offer.departureCity,
@@ -171,25 +172,45 @@ const getTrainSeatRank = (seatClass: string) => {
   return 11;
 };
 
-const getTrainSeatKey = (seatClass: string) => seatClass.replace(/\s/g, "");
-
-const compareTrainSeatOffers = (
-  left: TicketSearchOffer,
-  right: TicketSearchOffer,
-) => {
-  const rankDiff =
-    getTrainSeatRank(left.seatClass) - getTrainSeatRank(right.seatClass);
-  if (rankDiff !== 0) {
-    return rankDiff;
-  }
-  return left.price - right.price;
+// 机票舱位从高到低。种子数据里同一航班的经济舱/商务舱/头等舱和火车的
+// 二等座/一等座/商务座一样是各占一行的，所以两种模式共用同一套分组逻辑。
+const getFlightCabinRank = (seatClass: string) => {
+  const normalizedSeatClass = seatClass.replace(/\s/g, "");
+  if (normalizedSeatClass.includes("头等")) return 0;
+  if (normalizedSeatClass.includes("公务")) return 1;
+  if (normalizedSeatClass.includes("商务")) return 1;
+  if (normalizedSeatClass.includes("超级经济")) return 2;
+  if (normalizedSeatClass.includes("豪华经济")) return 2;
+  if (normalizedSeatClass.includes("经济")) return 3;
+  return 4;
 };
 
-const dedupeTrainSeatOffers = (offers: TicketSearchOffer[]) => {
+const getSeatRank = (mode: TicketMode, seatClass: string) =>
+  mode === "train"
+    ? getTrainSeatRank(seatClass)
+    : getFlightCabinRank(seatClass);
+
+const getSeatKey = (seatClass: string) => seatClass.replace(/\s/g, "");
+
+const compareSeatOffers =
+  (mode: TicketMode) =>
+  (left: TicketSearchOffer, right: TicketSearchOffer) => {
+    const rankDiff =
+      getSeatRank(mode, left.seatClass) - getSeatRank(mode, right.seatClass);
+    if (rankDiff !== 0) {
+      return rankDiff;
+    }
+    return left.price - right.price;
+  };
+
+const dedupeSeatOffers = (
+  offers: TicketSearchOffer[],
+  mode: TicketMode,
+) => {
   const seats = new Map<string, TicketSearchOffer>();
 
   offers.forEach((offer) => {
-    const seatKey = getTrainSeatKey(offer.seatClass);
+    const seatKey = getSeatKey(offer.seatClass);
     const existingOffer = seats.get(seatKey);
     if (
       !existingOffer ||
@@ -201,16 +222,17 @@ const dedupeTrainSeatOffers = (offers: TicketSearchOffer[]) => {
     }
   });
 
-  return Array.from(seats.values()).sort(compareTrainSeatOffers);
+  return Array.from(seats.values()).sort(compareSeatOffers(mode));
 };
 
-const buildTrainOfferGroups = (
+const buildOfferGroups = (
   offers: TicketSearchOffer[],
-): TrainOfferGroup[] => {
-  const groupedOffers = new Map<string, TrainOfferGroup>();
+  mode: TicketMode,
+): OfferGroup[] => {
+  const groupedOffers = new Map<string, OfferGroup>();
 
   offers.forEach((offer, index) => {
-    const groupKey = getTrainOfferGroupKey(offer);
+    const groupKey = getOfferGroupKey(offer);
     const existingGroup = groupedOffers.get(groupKey);
     if (existingGroup) {
       existingGroup.offers.push(offer);
@@ -227,7 +249,7 @@ const buildTrainOfferGroups = (
     .sort((left, right) => left.order - right.order)
     .map((group) => ({
       ...group,
-      offers: dedupeTrainSeatOffers(group.offers),
+      offers: dedupeSeatOffers(group.offers, mode),
     }));
 };
 
@@ -330,105 +352,9 @@ const formatAirportFilterOption = (airportCode: string) => {
     : `${airportName}（${normalizedCode}）`;
 };
 
-const TicketCard = ({
-  offer,
-  mode,
-  compact = false,
-  onReserve,
-  reserving = false,
-  canReserve = true,
-  disabledLabel,
-  selected = false,
-}: {
-  offer: TicketSearchOffer;
-  mode: TicketMode;
-  compact?: boolean;
-  onReserve?: (offer: TicketSearchOffer) => void;
-  reserving?: boolean;
-  canReserve?: boolean;
-  disabledLabel?: string;
-  selected?: boolean;
-}) => {
-  const config = modeConfig[mode];
-  const departurePlace = [
-    offer.departureStationName,
-    offer.departureTerminalName,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const arrivalPlace = [offer.arrivalStationName, offer.arrivalTerminalName]
-    .filter(Boolean)
-    .join(" ");
-  const departureDateLabel = formatTicketDate(offer.departureTime);
-  const arrivalDateLabel = formatTicketDate(offer.arrivalTime);
-
-  return (
-    <div
-      className={`bg-white rounded-lg border ${selected ? "border-blue-500 ring-2 ring-blue-100" : "border-slate-200"} ${compact ? "w-full" : "min-w-[760px]"} p-5 shadow-sm hover:shadow-md transition-shadow`}
-    >
-      <div className="flex flex-row items-center gap-5">
-        <div className="w-28">
-          <p className="text-3xl font-bold" style={{ color: config.accent }}>
-            {formatTicketClock(offer.departureTime)}
-          </p>
-          {departureDateLabel && (
-            <p className="mt-1 text-xs text-slate-400">{departureDateLabel}</p>
-          )}
-          <p className="mt-1 text-sm font-semibold text-slate-800">
-            {departurePlace}
-          </p>
-        </div>
-        <div className="flex-1 flex flex-col items-center text-slate-500">
-          <p className="text-sm">{offer.duration}</p>
-          <div className="my-2 flex flex-row items-center w-full gap-2">
-            <div className="h-px bg-slate-300 flex-1" />
-            <Chip size="small" label={offer.code} variant="outlined" />
-            <div className="h-px bg-slate-300 flex-1" />
-          </div>
-          <p className="text-xs">
-            {offer.carrier} · {offer.seatClass}
-          </p>
-        </div>
-        <div className="w-28">
-          <p className="text-3xl font-bold text-slate-900">
-            {formatTicketClock(offer.arrivalTime)}
-          </p>
-          {arrivalDateLabel && (
-            <p className="mt-1 text-xs text-slate-400">{arrivalDateLabel}</p>
-          )}
-          <p className="mt-1 text-sm font-semibold text-slate-800">
-            {arrivalPlace}
-          </p>
-        </div>
-        <div className="w-32 text-right">
-          <p className="text-sm text-slate-400">参考价</p>
-          <p className="text-3xl font-bold text-orange-500">¥{offer.price}</p>
-          <p className="mt-1 text-xs text-slate-500">
-            余票 {offer.remainingSeats}/{offer.totalSeats}
-          </p>
-        </div>
-        <Button
-          variant="contained"
-          size="large"
-          sx={{ borderRadius: 2 }}
-          disabled={reserving || !canReserve}
-          onClick={() => onReserve?.(offer)}
-        >
-          {!canReserve
-            ? (disabledLabel ?? "不可选择")
-            : reserving
-              ? "提交中"
-              : selected
-                ? "继续订票"
-                : "去订票"}
-        </Button>
-      </div>
-    </div>
-  );
-};
-
-const TrainTicketCard = ({
+const GroupedTicketCard = ({
   group,
+  mode,
   displayedOffer,
   onSeatChange,
   onReserve,
@@ -437,7 +363,8 @@ const TrainTicketCard = ({
   disabledLabel,
   selected = false,
 }: {
-  group: TrainOfferGroup;
+  group: OfferGroup;
+  mode: TicketMode;
   displayedOffer: TicketSearchOffer;
   onSeatChange: (offer: TicketSearchOffer) => void;
   onReserve?: (offer: TicketSearchOffer) => void;
@@ -446,7 +373,8 @@ const TrainTicketCard = ({
   disabledLabel?: string;
   selected?: boolean;
 }) => {
-  const config = modeConfig.train;
+  const config = modeConfig[mode];
+  const seatLabel = mode === "flight" ? "舱位" : "席别";
   const minPrice = Math.min(...group.offers.map((offer) => offer.price));
   const departureDateLabel = formatTicketDate(displayedOffer.departureTime);
   const arrivalDateLabel = formatTicketDate(displayedOffer.arrivalTime);
@@ -480,7 +408,7 @@ const TrainTicketCard = ({
             <div className="h-px bg-slate-300 flex-1" />
           </div>
           <p className="text-xs">
-            {displayedOffer.carrier} · 当前席别 {displayedOffer.seatClass}
+            {displayedOffer.carrier} · 当前{seatLabel} {displayedOffer.seatClass}
           </p>
         </div>
         <div className="w-28">
@@ -501,10 +429,13 @@ const TrainTicketCard = ({
         </div>
         <div className="w-36 text-right">
           <p className="text-sm text-slate-400">
-            {group.offers.length > 1 ? "当前席别价格" : "参考价"}
+            {group.offers.length > 1 ? `当前${seatLabel}价格` : "参考价"}
           </p>
           <p className="text-3xl font-bold text-orange-500">
             ¥{displayedOffer.price}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            余票 {displayedOffer.remainingSeats}/{displayedOffer.totalSeats}
           </p>
           {group.offers.length > 1 && (
             <p className="mt-1 text-xs text-slate-400">最低 ¥{minPrice} 起</p>
@@ -529,9 +460,12 @@ const TrainTicketCard = ({
 
       <div className="mt-4 border-t border-slate-200 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-slate-900">可选席别</p>
+          <p className="text-sm font-semibold text-slate-900">
+            可选{seatLabel}
+          </p>
           <p className="text-xs text-slate-500">
-            同车次可直接切换席别查看价格与余票
+            同{mode === "flight" ? "航班" : "车次"}可直接切换{seatLabel}
+            查看价格与余票
           </p>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -613,9 +547,10 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   const [trainCodeQuery, setTrainCodeQuery] = useState(
     rebookState.bookingCode ?? "",
   );
-  const [trainSeatSelections, setTrainSeatSelections] = useState<
-    Record<string, string>
-  >({});
+  // 用户在某个班次卡片上手动选过的席别/舱位，key 是分组键。
+  const [seatSelections, setSeatSelections] = useState<Record<string, string>>(
+    {},
+  );
   const [departureAirportFilter, setDepartureAirportFilter] = useState("");
   const [arrivalAirportFilter, setArrivalAirportFilter] = useState("");
   const [departureStationFilter, setDepartureStationFilter] = useState("");
@@ -711,42 +646,24 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     timeAvailableOffers,
     trainCodeQuery,
   ]);
-  const trainOfferGroups = useMemo(
-    () => (mode === "train" ? buildTrainOfferGroups(offers) : []),
+  const offerGroups = useMemo(
+    () => buildOfferGroups(offers, mode),
     [mode, offers],
   );
-  const recommendedOffer = mode === "train" ? null : offers[0];
-  const moreOffers =
-    mode === "train" || !recommendedOffer
-      ? []
-      : offers.filter((offer) => offer.id !== recommendedOffer.id);
-  const recommendedTrainGroup = mode === "train" ? trainOfferGroups[0] : null;
-  const moreTrainGroups = recommendedTrainGroup
-    ? trainOfferGroups.filter(
-        (group) => group.key !== recommendedTrainGroup.key,
-      )
+  const recommendedGroup = offerGroups[0] ?? null;
+  const moreGroups = recommendedGroup
+    ? offerGroups.filter((group) => group.key !== recommendedGroup.key)
     : [];
-  const moreOfferCount =
-    mode === "train" ? moreTrainGroups.length : moreOffers.length;
+  const moreOfferCount = moreGroups.length;
   const moreOfferPageCount = Math.max(
     1,
     Math.ceil(moreOfferCount / TICKET_PAGE_SIZE),
   );
   const currentMoreOfferPage = Math.min(resultPage, moreOfferPageCount);
-  const pagedMoreOffers =
-    mode === "train"
-      ? []
-      : moreOffers.slice(
-          (currentMoreOfferPage - 1) * TICKET_PAGE_SIZE,
-          currentMoreOfferPage * TICKET_PAGE_SIZE,
-        );
-  const pagedMoreTrainGroups =
-    mode === "train"
-      ? moreTrainGroups.slice(
-          (currentMoreOfferPage - 1) * TICKET_PAGE_SIZE,
-          currentMoreOfferPage * TICKET_PAGE_SIZE,
-        )
-      : [];
+  const pagedMoreGroups = moreGroups.slice(
+    (currentMoreOfferPage - 1) * TICKET_PAGE_SIZE,
+    currentMoreOfferPage * TICKET_PAGE_SIZE,
+  );
   const pageStart =
     moreOfferCount === 0
       ? 0
@@ -767,13 +684,12 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     transportType: mode === "flight" ? "FLIGHT" : "TRAIN",
     departureDate: date,
   });
-  const displayedResultCount =
-    mode === "train" ? trainOfferGroups.length : offers.length;
+  const displayedResultCount = offerGroups.length;
   const allTrainTypesSelected =
     selectedTrainTypes.length === trainTypeFilters.length;
 
-  const getDisplayedTrainOffer = (group: TrainOfferGroup) => {
-    const manuallySelectedSeatId = trainSeatSelections[group.key];
+  const getDisplayedOffer = (group: OfferGroup) => {
+    const manuallySelectedSeatId = seatSelections[group.key];
     if (manuallySelectedSeatId) {
       const manuallySelectedSeat = group.offers.find(
         (offer) => offer.id === manuallySelectedSeatId,
@@ -1029,11 +945,8 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     setResultPage(1);
   };
 
-  const changeTrainSeat = (
-    group: TrainOfferGroup,
-    nextOffer: TicketSearchOffer,
-  ) => {
-    setTrainSeatSelections((current) => ({
+  const changeSeat = (group: OfferGroup, nextOffer: TicketSearchOffer) => {
+    setSeatSelections((current) => ({
       ...current,
       [group.key]: nextOffer.id,
     }));
@@ -1629,39 +1542,22 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
               </h2>
               <span className="text-sm text-slate-500">{date}</span>
             </div>
-            {mode === "train" && recommendedTrainGroup ? (
-              <TrainTicketCard
-                group={recommendedTrainGroup}
-                displayedOffer={getDisplayedTrainOffer(recommendedTrainGroup)}
-                onSeatChange={(offer) =>
-                  changeTrainSeat(recommendedTrainGroup, offer)
-                }
+            {recommendedGroup ? (
+              <GroupedTicketCard
+                group={recommendedGroup}
+                mode={mode}
+                displayedOffer={getDisplayedOffer(recommendedGroup)}
+                onSeatChange={(offer) => changeSeat(recommendedGroup, offer)}
                 onReserve={selectTicket}
-                reserving={
-                  bookingId === getDisplayedTrainOffer(recommendedTrainGroup).id
-                }
+                reserving={bookingId === getDisplayedOffer(recommendedGroup).id}
                 canReserve={
                   isAuthenticated &&
-                  getDisplayedTrainOffer(recommendedTrainGroup).remainingSeats >
-                    0
+                  getDisplayedOffer(recommendedGroup).remainingSeats > 0
                 }
                 disabledLabel={!isAuthenticated ? "登录后选择" : "暂无余票"}
                 selected={
-                  selectedOffer?.id ===
-                  getDisplayedTrainOffer(recommendedTrainGroup).id
+                  selectedOffer?.id === getDisplayedOffer(recommendedGroup).id
                 }
-              />
-            ) : recommendedOffer ? (
-              <TicketCard
-                offer={recommendedOffer}
-                mode={mode}
-                onReserve={selectTicket}
-                reserving={bookingId === recommendedOffer.id}
-                canReserve={
-                  isAuthenticated && recommendedOffer.remainingSeats > 0
-                }
-                disabledLabel={!isAuthenticated ? "登录后选择" : "暂无余票"}
-                selected={selectedOffer?.id === recommendedOffer.id}
               />
             ) : (
               <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-slate-500">
@@ -1696,43 +1592,23 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
             </div>
             <div className="mt-4 rounded-lg bg-slate-50 p-3 pr-2">
               <div className="flex flex-col gap-3">
-                {mode === "train" &&
-                  pagedMoreTrainGroups.map((group) => (
-                    <TrainTicketCard
-                      key={group.key}
-                      group={group}
-                      displayedOffer={getDisplayedTrainOffer(group)}
-                      onSeatChange={(offer) => changeTrainSeat(group, offer)}
-                      onReserve={selectTicket}
-                      reserving={bookingId === getDisplayedTrainOffer(group).id}
-                      canReserve={
-                        isAuthenticated &&
-                        getDisplayedTrainOffer(group).remainingSeats > 0
-                      }
-                      disabledLabel={
-                        !isAuthenticated ? "登录后选择" : "暂无余票"
-                      }
-                      selected={
-                        selectedOffer?.id === getDisplayedTrainOffer(group).id
-                      }
-                    />
-                  ))}
-                {mode !== "train" &&
-                  pagedMoreOffers.map((offer) => (
-                    <TicketCard
-                      key={offer.id}
-                      offer={offer}
-                      mode={mode}
-                      compact
-                      onReserve={selectTicket}
-                      reserving={bookingId === offer.id}
-                      canReserve={isAuthenticated && offer.remainingSeats > 0}
-                      disabledLabel={
-                        !isAuthenticated ? "登录后选择" : "暂无余票"
-                      }
-                      selected={selectedOffer?.id === offer.id}
-                    />
-                  ))}
+                {pagedMoreGroups.map((group) => (
+                  <GroupedTicketCard
+                    key={group.key}
+                    group={group}
+                    mode={mode}
+                    displayedOffer={getDisplayedOffer(group)}
+                    onSeatChange={(offer) => changeSeat(group, offer)}
+                    onReserve={selectTicket}
+                    reserving={bookingId === getDisplayedOffer(group).id}
+                    canReserve={
+                      isAuthenticated &&
+                      getDisplayedOffer(group).remainingSeats > 0
+                    }
+                    disabledLabel={!isAuthenticated ? "登录后选择" : "暂无余票"}
+                    selected={selectedOffer?.id === getDisplayedOffer(group).id}
+                  />
+                ))}
                 {moreOfferCount === 0 && (
                   <div className="rounded-lg border border-dashed border-slate-300 bg-white py-12 text-center text-slate-500">
                     暂无更多可选方案

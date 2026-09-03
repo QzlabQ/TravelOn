@@ -572,6 +572,10 @@ Playwright 报告：在 `travel-ui` 执行 `corepack yarn test:e2e:report`。
 
 实际导入 PostgreSQL 的文件是对应目录下的 `generated_ticket_offers.csv`。
 
+模板由 `travel-api/scripts/generate-ticket-offers.py` 维护（注意是中划线，和上面按日期展开的脚本不是同一个）：它补齐城市两两之间缺失的航线与车次，并给航班派生商务舱和头等舱。座位等级在这份 CSV 里是独立的行——火车票本来就是同一车次的每个席别各占一行，航班现在也一样。高舱位不是每个航班都有（商务舱约 45%、头等舱约 20%，由航班号哈希决定），既贴近真实，也避免按日期展开后文件体积直接翻三倍。
+
+票价方面，模板里的价格是这条线路的基准价，按日期展开时每个（班次, 舱位/席别, 日期）都会在基准价上下浮动约 20%。浮动用的是确定性哈希而不是随机数：同一份输入重跑两次得到完全一样的 CSV，不会产生十几万行的无意义 diff。
+
 售票窗口以**生成当天**为基准滚动（默认为前 3 天到后 38 天），不是固定日期区间。窗口一旦落后于日历，所有交通查询都会返回空。`travel-api/tests/test_seed_window.py` 会在 `mise run test:pre` 里守住这条线：窗口不再覆盖「今天 + 30 天」时直接报错并提示重新生成。
 
 如需修改数据：
@@ -597,6 +601,8 @@ Playwright 报告：在 `travel-ui` 执行 `corepack yarn test:e2e:report`。
    docker compose exec -T postgres psql -U admin -d travel_core_db -f /database/seed/transport_seed.sql
    docker compose restart travel-core
    ```
+
+   票务种子表的主键是行内容（含价格）的哈希，改了价格就是一批全新的 id。种子脚本因此会先 `DELETE FROM public.ticket_offer_templates` 再导入——否则旧行会留在库里，同一班次同一天出现新旧两个价格。全新启动的环境由 Flyway 的 `R__seed.sql` 自动完成同样的事。
 
    如果 `.env` 修改过数据库用户名或 `TRAVEL_CORE_DB_NAME`，请替换 `admin` 和 `travel_core_db`。导入脚本使用确定性 ID 和 `ON CONFLICT (id) DO NOTHING`，会保留已有数据并补充新日期。
 
