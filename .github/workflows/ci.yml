@@ -94,31 +94,7 @@ jobs:
 
       - name: Compile applications
         if: steps.changes.outputs.run_ci == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          for pom in travel-api/*/pom.xml; do
-            module="${pom%/pom.xml}"
-            echo "::group::Compile ${module##*/}"
-            (
-              cd "$module"
-              sh ./mvnw \
-                --batch-mode \
-                --no-transfer-progress \
-                -DskipTests \
-                package
-            )
-            echo "::endgroup::"
-          done
-
-          python -m compileall -q \
-            travel-api/ai-arrange-agent-service/app
-
-          (
-            cd travel-ui
-            corepack yarn build
-          )
+        run: mise run build
 
       - name: Prepare integration environment
         if: steps.changes.outputs.run_ci == 'true'
@@ -136,7 +112,7 @@ jobs:
       # This validates every image listed in ops/cd/images.tsv, including UI.
       - name: Build all deployment Docker images
         if: steps.changes.outputs.run_ci == 'true'
-        run: bash scripts/verify-k3s-images.sh "ci-${{ github.sha }}"
+        run: mise run deploy:images "ci-${{ github.sha }}"
 
       - name: Upload test reports
         if: ${{ !cancelled() && steps.changes.outputs.run_ci == 'true' }}

@@ -32,8 +32,52 @@ depends = ["setup:ui"]
 run = "corepack yarn playwright install chromium"
 
 [tasks.setup]
-description = "一次性准备全部测试依赖"
+description = "一次性准备 Python 与前端依赖"
 depends = ["setup:py", "setup:ui"]
+
+[tasks."ui:dev"]
+description = "启动前端开发服务器"
+dir = "travel-ui"
+run = "corepack yarn start"
+
+[tasks."ui:build"]
+description = "构建前端生产产物"
+dir = "travel-ui"
+run = "corepack yarn build"
+
+[tasks."ui:serve"]
+description = "预览前端生产产物"
+dir = "travel-ui"
+run = "corepack yarn serve"
+
+[tasks.build]
+description = "构建全部 Java、Python 和前端应用"
+run = "python scripts/build_all.py"
+
+[tasks."services:up"]
+description = "使用已有镜像启动后端服务"
+dir = "travel-api"
+run = "docker compose up -d"
+
+[tasks."services:up_build"]
+description = "构建并启动后端服务"
+dir = "travel-api"
+run = "docker compose up -d --build"
+
+[tasks."services:status"]
+description = "查看后端服务状态"
+dir = "travel-api"
+run = "docker compose ps"
+
+[tasks."services:stop"]
+description = "停止后端服务并保留容器"
+dir = "travel-api"
+run = "docker compose stop"
+
+[tasks."services:down"]
+description = "停止并删除后端服务容器"
+dir = "travel-api"
+run = "docker compose down"
 
 [tasks."test:pre"]
 description = "前置守卫（种子数据、迁移脚本、资源与配置）"
@@ -61,6 +105,14 @@ description = "运行与 CI 相同的测试阶段"
 depends = ["setup:e2e"]
 run = "python tests/run_tests.py ci --manage-services"
 
+[tasks."deploy:images"]
+description = "验证全部部署镜像可构建；需追加镜像标签"
+run = "bash scripts/verify-k3s-images.sh"
+
+[tasks."deploy:k3s"]
+description = "部署已构建镜像到 K3s；仅限部署主机并需追加 sha-* 标签"
+run = "bash scripts/deploy-k3s.sh"
+
 [tasks.verify]
 description = "跑单个最小模块，确认测试链路可用"
 run = "python tests/run_tests.py unit --module discovery-service"
@@ -68,9 +120,11 @@ run = "python tests/run_tests.py unit --module discovery-service"
 [tasks.doctor]
 description = "打印当前工具链版本，便于排查环境不一致"
 run = [
+  "git --version",
   "java -version",
   "node --version",
   "cd travel-ui && corepack yarn --version",
   "python --version",
   "docker --version",
+  "docker compose version",
 ]

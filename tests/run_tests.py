@@ -26,6 +26,10 @@ UI_ROOT = ROOT / "travel-ui"
 DEFAULT_ARTIFACTS = ROOT / "artifacts" / "test-results"
 MIGRATION_TEST = ROOT / "tests" / "migration" / "run_migration_test.py"
 JAVA_MODULES = tuple(sorted(path.parent for path in API_ROOT.glob("*/pom.xml")))
+EXPECTED_JAVA_MAJOR = "21"
+EXPECTED_NODE_VERSION = "22.22.3"
+EXPECTED_YARN_VERSION = "4.2.2"
+EXPECTED_PYTHON_VERSION = (3, 12)
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -177,26 +181,26 @@ def require_command(name: str, remediation: str) -> str:
 
 def preflight(category: str, browser: str) -> dict[str, str]:
     versions: dict[str, str] = {"os": platform.platform(), "python": platform.python_version()}
-    if sys.version_info[:2] != (3, 12):
+    if sys.version_info[:2] != EXPECTED_PYTHON_VERSION:
         raise RuntimeError(f"需要 Python 3.12，当前为 {platform.python_version()}。请使用 Python 3.12 重新运行本脚本。")
 
     if category != "migration":
         java = require_command("java", "请安装 JDK 21 并配置 PATH。")
         versions["java"] = command_version([java, "-version"])
         java_match = re.search(r'"(\d+)', versions["java"])
-        if not java_match or java_match.group(1) != "21":
+        if not java_match or java_match.group(1) != EXPECTED_JAVA_MAJOR:
             raise RuntimeError(f"需要 Java 21，当前检测结果：{versions['java']}")
 
     if category in {"unit", "e2e", "ci"}:
         node = require_command("node", "请安装 Node.js 22.22.3。")
         versions["node"] = command_version([node, "--version"])
-        if versions["node"].lstrip("v") != "22.22.3":
-            raise RuntimeError(f"需要 Node.js 22.22.3，当前为 {versions['node']}。")
+        if versions["node"].lstrip("v") != EXPECTED_NODE_VERSION:
+            raise RuntimeError(f"需要 Node.js {EXPECTED_NODE_VERSION}，当前为 {versions['node']}。")
         corepack = require_command("corepack", "Node.js 安装后请启用 Corepack。")
         versions["corepack"] = command_version([corepack, "--version"])
         versions["yarn"] = command_version([corepack, "yarn", "--version"], cwd=UI_ROOT)
-        if versions["yarn"] != "4.2.2":
-            raise RuntimeError(f"需要 Yarn 4.2.2，当前为 {versions['yarn']}。")
+        if versions["yarn"] != EXPECTED_YARN_VERSION:
+            raise RuntimeError(f"需要 Yarn {EXPECTED_YARN_VERSION}，当前为 {versions['yarn']}。")
 
     if category in {"migration", "integration", "e2e", "ci"}:
         docker = require_command("docker", "请安装并启动 Docker Desktop 或 Docker Engine。")
@@ -552,6 +556,14 @@ def run_pre(args: argparse.Namespace, artifacts: Path) -> list[Result]:
             "seed-data",
             [sys.executable, "-m", "pytest", "-q", "tests/test_seed_window.py", f"--junitxml={junit}"],
             API_ROOT,
+        ))
+    if not selected or "toolchain" in selected:
+        junit = artifacts / "pre" / "toolchain" / "junit.xml"
+        junit.parent.mkdir(parents=True, exist_ok=True)
+        jobs.append((
+            "toolchain",
+            [sys.executable, "-m", "pytest", "-q", "tests/test_toolchain_consistency.py", f"--junitxml={junit}"],
+            ROOT,
         ))
     for module in modules_with_pre_tests():
         if selected and module.name not in selected:

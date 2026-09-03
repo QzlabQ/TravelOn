@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:22.22.3-alpine AS build
 WORKDIR /usr/app
 
 # Node.js ships Corepack, but it must be enabled before the packageManager

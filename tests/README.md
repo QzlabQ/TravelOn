@@ -15,7 +15,7 @@ mise run test:ci
 
 ## 运行器
 
-`run_tests.py` 是纯 Python 编排器，`shell=False` 直接拉起子进程，不依赖 PowerShell、Bash、`curl` 或 `jq`。同一组命令可在 Windows、Linux、macOS 的任意 shell 下使用。它只负责预检、编排、服务管理和汇总；测试代码本身按所属功能就近存放。
+`run_tests.py` 是纯 Python 编排器，`shell=False` 直接拉起子进程，不依赖 PowerShell、Bash、`curl` 或 `jq`。同一组命令可在 Windows、Linux、macOS 的任意 shell 下使用。它只负责预检、编排、服务管理和汇总；测试代码本身按所属功能就近存放。应用构建的统一入口是仓库根目录的 `mise run build`。
 
 不通过 mise 直接调用时，须自行保证 PATH 中是正确的工具版本（Java 21 / Node 22.22.3 / Yarn 4.2.2 / Python 3.12），否则预检会拒绝执行。用 `mise exec -- <命令>` 可以省去这一步。
 
@@ -32,11 +32,11 @@ python tests/run_tests.py ci
 
 | 类别 | 内容 | 需要服务 | 对应 mise 任务 |
 | --- | --- | --- | --- |
-| `pre` | 前置守卫：种子数据、迁移脚本、classpath 资源、MQ 与网关配置，约 20 秒 | 否 | `test:pre` |
+| `pre` | 前置守卫：种子数据、迁移脚本、classpath 资源、MQ、网关与工具版本配置，约 20 秒 | 否 | `test:pre` |
 | `unit` | 单元测试与覆盖率门禁，约 50 秒 | 否 | `test:unit` |
 | `migration` | PostgreSQL 旧数据库迁移回归测试 | 临时 PostgreSQL 容器 | `test:migration` |
 | `integration` | Java `*IT`、Agent 集成、API 测试；模型调用使用固定响应桩；resilience 用例另起一段 | 是 | `test:integration` |
-| `e2e` | Playwright，默认 Chromium；自动 `yarn build` 后 `yarn serve` | 是 | `test:e2e` |
+| `e2e` | Playwright，默认 Chromium；自动构建并启动前端静态服务 | 是 | `test:e2e` |
 | `ci` | `pre + unit + migration + integration + Chromium E2E + resilience`，前置阶段失败立即停止 | 是 | `test:ci` |
 
 ## 参数
@@ -115,7 +115,7 @@ corepack yarn test:e2e:all
 `R__seed.sql` 是否幂等、图片资源在不在 classpath 上、MQ 队列与网关路由的配置声明。
 它们跑得快、不需要服务栈，但和"单元测试"是两回事——混在一起会让覆盖率和用例数都失真。
 
-现在这些用例带 `@Tag("pre")`（Python 侧是 `tests/test_seed_window.py`），单独成 `pre` 阶段：
+现在这些用例带 `@Tag("pre")`（Python 侧是 `tests/test_seed_window.py` 与 `tests/test_toolchain_consistency.py`），单独成 `pre` 阶段：
 
 | 模块 | 用例 | 内容 |
 | --- | ---: | --- |
@@ -123,6 +123,7 @@ corepack yarn test:e2e:all
 | api-gateway | 3 | 网关路由定义 |
 | community-service | 5 | `R__seed.sql` 幂等、随包图片资源存在性 |
 | travel-core-service | 7 | Flyway 基线兼容、种子迁移、MQ 队列与交换机声明 |
+| toolchain | 3 | mise、Dockerfile、POM 与 `packageManager` 的 Java / Python / Node.js / Yarn 版本口径一致 |
 
 编排上的两点约定：
 
