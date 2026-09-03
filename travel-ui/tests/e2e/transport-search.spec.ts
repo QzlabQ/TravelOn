@@ -1,4 +1,5 @@
 import {expect, test} from '@playwright/test';
+import {waitForDefaultTicketLocations} from './support/booking';
 
 // 页面默认查询当天。前端按售票截止时间过滤班次（火车提前 30 分钟、机票提前 90 分钟停售），
 // 当天班次全部发出之后查询结果必然为空，测试就会随运行时刻的不同而时通时挂。
@@ -17,6 +18,7 @@ for (const journey of [
     test(`${journey.path} 可以查询`, async ({page}) => {
         await page.goto(journey.path);
         await expect(page.getByRole('heading', {name: '查询行程'})).toBeVisible();
+        await waitForDefaultTicketLocations(page, journey.path);
         await page.getByLabel('出行日期').fill(tomorrow());
         await page.getByRole('button', {name: '查询', exact: true}).click();
         await expect(page.getByRole('heading', {name: journey.results})).toBeVisible();

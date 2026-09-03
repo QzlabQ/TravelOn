@@ -8,6 +8,14 @@ export function isoDate(offsetDays: number): string {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** 等待票务页加载稳定的默认出发地和到达地。 */
+export async function waitForDefaultTicketLocations(page: Page, path: string): Promise<void> {
+    const isFlight = path.includes('/flights');
+    const fromLabel = isFlight ? '出发机场/城市' : '出发站/城市';
+    const toLabel = isFlight ? '到达机场/城市' : '到达站/城市';
+    await expect(page.getByRole('combobox', {name: fromLabel})).toHaveValue('北京市', {timeout: 30_000});
+    await expect(page.getByRole('combobox', {name: toLabel})).toHaveValue('上海市', {timeout: 30_000});
+}
 /** 在下单页添加一位临时出行人（account/components/TravelerSelector.tsx 的弹窗）。 */
 export async function addTemporaryTraveler(
     page: Page,
@@ -27,6 +35,7 @@ export async function addTemporaryTraveler(
  */
 export async function bookTicket(page: Page, path: string, resultsHeading: string): Promise<string> {
     await page.goto(path);
+    await waitForDefaultTicketLocations(page, path);
     await page.getByLabel('出行日期').fill(isoDate(3));
     await page.getByRole('button', {name: '查询', exact: true}).click();
     await expect(page.getByRole('heading', {name: resultsHeading})).toBeVisible();
