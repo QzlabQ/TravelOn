@@ -12,8 +12,7 @@
 4. 重新部署，Flyway 会自动增量应用，无需删库：
 
 ```powershell
-cd travel-api
-docker compose up -d --build
+mise run services:up_build
 ```
 
 ## 仍然需要重置数据库的情况
@@ -27,7 +26,7 @@ docker compose up -d --build
 
 ```powershell
 cd travel-api
-docker compose down
+mise run services:down
 Remove-Item -Recurse -Force .\data\postgres
-docker compose up -d --build
+mise run services:up_build
 ```

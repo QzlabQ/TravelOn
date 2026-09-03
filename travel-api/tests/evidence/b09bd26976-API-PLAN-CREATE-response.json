@@ -1,0 +1,26 @@
+{
+  "id": "1d9d68d1-9b4e-423f-bd61-05e4240f9907",
+  "userId": "d5f22093-562a-4a20-ab6a-db94567fdef2",
+  "status": "ACTIVE_CHAT",
+  "coreSlots": {
+    "city": "Shanghai",
+    "departureCity": null,
+    "travelStartDate": "2026-10-02",
+    "travelEndDate": "2026-10-04",
+    "peopleCount": 2,
+    "budget": null,
+    "travelStyle": null,
+    "accommodationPreference": null,
+    "transportPreference": null,
+    "notes": null,
+    "mustVisitKeywords": [],
+    "avoidKeywords": []
+  },
+  "title": "Shanghai 行前规划",
+  "currentMarkdown": "",
+  "nextQuestion": "你想先从酒店区域、核心景点，还是餐厅偏好开始？",
+  "latestSnapshotVersion": 0,
+  "selectedPlaceIds": [],
+  "createdAt": "2026-09-02T06:27:10.777988965Z",
+  "updatedAt": "2026-09-02T06:27:10.777989933Z"
+}

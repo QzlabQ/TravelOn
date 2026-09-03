@@ -1,0 +1,9 @@
+{
+  "method": "DELETE",
+  "url": "http://localhost:58082/hotels/admin/rooms/990012",
+  "headers": {
+    "Accept": "application/json",
+    "X-User-Token": "<redacted>"
+  },
+  "body": null
+}

@@ -14,7 +14,9 @@ export default defineConfig({
     fullyParallel: false,
     forbidOnly: Boolean(process.env.CI),
     retries: process.env.CI ? 2 : 0,
-    workers: process.env.CI ? 1 : undefined,
+    // 所有场景共用一套本地微服务和数据库。按 CPU 数自动并行会同时发起大量
+    // 票务查询，耗尽 travel-core 的 Hikari 连接池；本地与 CI 都必须串行。
+    workers: 1,
     outputDir: path.join(reportRoot, 'attachments'),
     reporter: [
         ['list'],
@@ -36,6 +38,8 @@ export default defineConfig({
         command: 'corepack yarn build && corepack yarn serve',
         url: baseURL,
         reuseExistingServer: true,
-        timeout: 300_000,
+        // 完整 test:ci 在 Java、Docker 阶段之后才做 CRA 冷构建，Windows
+        // 资源紧张时可能超过 5 分钟；这个超时只约束前端启动，不约束用例。
+        timeout: 600_000,
     },
 });

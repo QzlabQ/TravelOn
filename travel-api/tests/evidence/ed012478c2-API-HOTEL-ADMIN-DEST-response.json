@@ -1,0 +1,2554 @@
+[
+  {
+    "idLocation": "dd21c430-c85f-b420-8fa0-8ed975561e3c",
+    "cityId": "C002",
+    "country": "中国",
+    "province": "海南",
+    "region": "三亚市",
+    "normalizedName": "三亚市"
+  },
+  {
+    "idLocation": "5027ad67-85b2-ae53-c4cb-f2bdfd5ecf89",
+    "cityId": "C003",
+    "country": "中国",
+    "province": "福建",
+    "region": "三明市",
+    "normalizedName": "三明市"
+  },
+  {
+    "idLocation": "9314e82c-a0f0-204c-2c5b-49979787ad73",
+    "cityId": "C004",
+    "country": "中国",
+    "province": "河南",
+    "region": "三门峡市",
+    "normalizedName": "三门峡市"
+  },
+  {
+    "idLocation": "31d09894-2743-ed8b-46ac-13e7bc22e30e",
+    "cityId": "C005",
+    "country": "中国",
+    "province": "上海",
+    "region": "上海市",
+    "normalizedName": "上海市"
+  },
+  {
+    "idLocation": "acdb6b7d-5886-b415-45ea-dd38a3e3b3cd",
+    "cityId": "C006",
+    "country": "中国",
+    "province": "江西",
+    "region": "上饶市",
+    "normalizedName": "上饶市"
+  },
+  {
+    "idLocation": "2dff3377-3b62-ea14-1643-bf38eeb49930",
+    "cityId": "C007",
+    "country": "中国",
+    "province": "广东",
+    "region": "东莞市",
+    "normalizedName": "东莞市"
+  },
+  {
+    "idLocation": "5fd8dae3-0c96-6cd0-9250-7fed5ada3f63",
+    "cityId": "C008",
+    "country": "中国",
+    "province": "山东",
+    "region": "东营市",
+    "normalizedName": "东营市"
+  },
+  {
+    "idLocation": "7bd10d0f-9f28-ddeb-ecf7-17260ab31f72",
+    "cityId": "C009",
+    "country": "中国",
+    "province": "宁夏",
+    "region": "中卫市",
+    "normalizedName": "中卫市"
+  },
+  {
+    "idLocation": "4197da95-12d3-aaab-bb46-7f40ff1374bb",
+    "cityId": "C010",
+    "country": "中国",
+    "province": "广东",
+    "region": "中山市",
+    "normalizedName": "中山市"
+  },
+  {
+    "idLocation": "3f2af4b4-ca7c-9f67-e423-91e62f62cdf2",
+    "cityId": "C011",
+    "country": "中国",
+    "province": "山西",
+    "region": "临汾市",
+    "normalizedName": "临汾市"
+  },
+  {
+    "idLocation": "0005b353-2a75-6a37-7636-a4c7c2b5fb37",
+    "cityId": "C012",
+    "country": "中国",
+    "province": "山东",
+    "region": "临沂市",
+    "normalizedName": "临沂市"
+  },
+  {
+    "idLocation": "4e2fcf2a-8d0a-b8d7-5a02-51d201ba312e",
+    "cityId": "C013",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "丹东市",
+    "normalizedName": "丹东市"
+  },
+  {
+    "idLocation": "a41b227b-b37e-d933-aa19-53c0089d636b",
+    "cityId": "C014",
+    "country": "中国",
+    "province": "浙江",
+    "region": "丽水市",
+    "normalizedName": "丽水市"
+  },
+  {
+    "idLocation": "070b9fb7-d856-1a9c-2074-69a93bec8eb6",
+    "cityId": "C015",
+    "country": "中国",
+    "province": "云南",
+    "region": "丽江市",
+    "normalizedName": "丽江市"
+  },
+  {
+    "idLocation": "a03aa040-c266-d329-7501-677d666cd908",
+    "cityId": "C016",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "乌兰察布市",
+    "normalizedName": "乌兰察布市"
+  },
+  {
+    "idLocation": "71f7df43-3489-fed9-f024-8e242f3a1aee",
+    "cityId": "C017",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "乌海市",
+    "normalizedName": "乌海市"
+  },
+  {
+    "idLocation": "76489c47-bc4c-79ee-7cd0-f318aac79ef1",
+    "cityId": "C018",
+    "country": "中国",
+    "province": "新疆",
+    "region": "乌鲁木齐市",
+    "normalizedName": "乌鲁木齐市"
+  },
+  {
+    "idLocation": "20b6c0ea-5ebb-d98c-d908-d9f2287ab072",
+    "cityId": "C019",
+    "country": "中国",
+    "province": "四川",
+    "region": "乐山市",
+    "normalizedName": "乐山市"
+  },
+  {
+    "idLocation": "f2810f55-b879-d25d-e44a-c5fbab990016",
+    "cityId": "C020",
+    "country": "中国",
+    "province": "江西",
+    "region": "九江市",
+    "normalizedName": "九江市"
+  },
+  {
+    "idLocation": "98c563e4-c215-874e-031f-585a15961599",
+    "cityId": "C021",
+    "country": "中国",
+    "province": "广东",
+    "region": "云浮市",
+    "normalizedName": "云浮市"
+  },
+  {
+    "idLocation": "c39225d9-0a02-f39e-3262-52b0af3141be",
+    "cityId": "C022",
+    "country": "中国",
+    "province": "安徽",
+    "region": "亳州市",
+    "normalizedName": "亳州市"
+  },
+  {
+    "idLocation": "c0421f7d-eecc-eda8-f397-c7cf35aede92",
+    "cityId": "C023",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "伊春市",
+    "normalizedName": "伊春市"
+  },
+  {
+    "idLocation": "253eea39-700e-681c-db23-4ea26bd97499",
+    "cityId": "C024",
+    "country": "中国",
+    "province": "新疆",
+    "region": "伊犁哈萨克自治州",
+    "normalizedName": "伊犁哈萨克自治州"
+  },
+  {
+    "idLocation": "c9d61bbf-77f5-4dca-8239-9994fbd3f2e2",
+    "cityId": "C025",
+    "country": "中国",
+    "province": "广东",
+    "region": "佛山市",
+    "normalizedName": "佛山市"
+  },
+  {
+    "idLocation": "460aeead-2555-b2e0-6162-0dc6a458af11",
+    "cityId": "C026",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "佳木斯市",
+    "normalizedName": "佳木斯市"
+  },
+  {
+    "idLocation": "5cf96866-2bf7-f013-b8fe-9c2ad07437a4",
+    "cityId": "C027",
+    "country": "中国",
+    "province": "河北",
+    "region": "保定市",
+    "normalizedName": "保定市"
+  },
+  {
+    "idLocation": "342c1c87-989c-f0be-07e0-50ddf323c0ef",
+    "cityId": "C028",
+    "country": "中国",
+    "province": "河南",
+    "region": "信阳市",
+    "normalizedName": "信阳市"
+  },
+  {
+    "idLocation": "990d0a50-76db-3a2f-0806-8c17bfc83d1e",
+    "cityId": "C029",
+    "country": "中国",
+    "province": "海南",
+    "region": "儋州市",
+    "normalizedName": "儋州市"
+  },
+  {
+    "idLocation": "92573b2c-52ed-e78b-25b9-965350fd5d2c",
+    "cityId": "C030",
+    "country": "中国",
+    "province": "新疆",
+    "region": "克孜勒苏柯尔克孜自治州",
+    "normalizedName": "克孜勒苏柯尔克孜自治州"
+  },
+  {
+    "idLocation": "64a10b59-bf72-e118-cc55-4feb2d96b957",
+    "cityId": "C031",
+    "country": "中国",
+    "province": "新疆",
+    "region": "克拉玛依市",
+    "normalizedName": "克拉玛依市"
+  },
+  {
+    "idLocation": "d282443b-15d9-0e1f-1033-d7a135af8c83",
+    "cityId": "C032",
+    "country": "中国",
+    "province": "安徽",
+    "region": "六安市",
+    "normalizedName": "六安市"
+  },
+  {
+    "idLocation": "5347fed9-1cc4-03cb-fb52-0f44604d3b07",
+    "cityId": "C033",
+    "country": "中国",
+    "province": "贵州",
+    "region": "六盘水市",
+    "normalizedName": "六盘水市"
+  },
+  {
+    "idLocation": "8162d76f-d727-ed8a-72a1-1d9db8d47ffb",
+    "cityId": "C034",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "兰州市",
+    "normalizedName": "兰州市"
+  },
+  {
+    "idLocation": "5a61ab09-9202-52f4-2c7e-be704314b930",
+    "cityId": "C035",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "兴安盟",
+    "normalizedName": "兴安盟"
+  },
+  {
+    "idLocation": "af583c19-1942-f9aa-988b-46c8771d6ee0",
+    "cityId": "C036",
+    "country": "中国",
+    "province": "四川",
+    "region": "内江市",
+    "normalizedName": "内江市"
+  },
+  {
+    "idLocation": "7bdd0c6b-92d5-3653-9000-c53b743b077c",
+    "cityId": "C037",
+    "country": "中国",
+    "province": "四川",
+    "region": "凉山彝族自治州",
+    "normalizedName": "凉山彝族自治州"
+  },
+  {
+    "idLocation": "312861c3-f0d4-bdea-4b5b-2ee25f38a86c",
+    "cityId": "C038",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "包头市",
+    "normalizedName": "包头市"
+  },
+  {
+    "idLocation": "f2109fa9-b79f-d4c9-e063-6667ec1975a2",
+    "cityId": "C039",
+    "country": "中国",
+    "province": "北京",
+    "region": "北京市",
+    "normalizedName": "北京市"
+  },
+  {
+    "idLocation": "381f4545-103c-14d0-364c-7e998a5bcad8",
+    "cityId": "C040",
+    "country": "中国",
+    "province": "广西",
+    "region": "北海市",
+    "normalizedName": "北海市"
+  },
+  {
+    "idLocation": "9996e49a-ab15-4e68-de0b-5f5688c2d4b8",
+    "cityId": "C041",
+    "country": "中国",
+    "province": "湖北",
+    "region": "十堰市",
+    "normalizedName": "十堰市"
+  },
+  {
+    "idLocation": "7833727b-1c91-3e4a-56ea-225540682c46",
+    "cityId": "C042",
+    "country": "中国",
+    "province": "江苏",
+    "region": "南京市",
+    "normalizedName": "南京市"
+  },
+  {
+    "idLocation": "9578fed0-eed6-e883-1fad-69e683b10331",
+    "cityId": "C043",
+    "country": "中国",
+    "province": "四川",
+    "region": "南充市",
+    "normalizedName": "南充市"
+  },
+  {
+    "idLocation": "64076ec9-c4c7-4314-ac9b-7311efa091d9",
+    "cityId": "C044",
+    "country": "中国",
+    "province": "广西",
+    "region": "南宁市",
+    "normalizedName": "南宁市"
+  },
+  {
+    "idLocation": "8bb84465-a362-5415-0e2f-8143df223f4e",
+    "cityId": "C045",
+    "country": "中国",
+    "province": "福建",
+    "region": "南平市",
+    "normalizedName": "南平市"
+  },
+  {
+    "idLocation": "bcbea809-d683-8047-d0c7-959c805175d0",
+    "cityId": "C046",
+    "country": "中国",
+    "province": "江西",
+    "region": "南昌市",
+    "normalizedName": "南昌市"
+  },
+  {
+    "idLocation": "2a854823-1291-e8d9-6d9f-ce670bfa128b",
+    "cityId": "C047",
+    "country": "中国",
+    "province": "江苏",
+    "region": "南通市",
+    "normalizedName": "南通市"
+  },
+  {
+    "idLocation": "30225f37-0a4f-03ee-e408-3af2d0559102",
+    "cityId": "C048",
+    "country": "中国",
+    "province": "河南",
+    "region": "南阳市",
+    "normalizedName": "南阳市"
+  },
+  {
+    "idLocation": "ba3b6e49-efce-b28e-b242-64e6ef3cd1db",
+    "cityId": "C049",
+    "country": "中国",
+    "province": "新疆",
+    "region": "博尔塔拉蒙古自治州",
+    "normalizedName": "博尔塔拉蒙古自治州"
+  },
+  {
+    "idLocation": "f47f43c1-8454-1627-9268-405e42988fee",
+    "cityId": "C050",
+    "country": "中国",
+    "province": "福建",
+    "region": "厦门市",
+    "normalizedName": "厦门市"
+  },
+  {
+    "idLocation": "649e31ff-b483-21f8-9ec1-b955ebde4067",
+    "cityId": "C051",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "双鸭山市",
+    "normalizedName": "双鸭山市"
+  },
+  {
+    "idLocation": "8b85be10-ee0f-2d30-b3b3-a6ef0411cffa",
+    "cityId": "C052",
+    "country": "中国",
+    "province": "浙江",
+    "region": "台州市",
+    "normalizedName": "台州市"
+  },
+  {
+    "idLocation": "38fdd9c6-fc0f-6609-c4b7-95b580bcabaf",
+    "cityId": "C053",
+    "country": "中国",
+    "province": "安徽",
+    "region": "合肥市",
+    "normalizedName": "合肥市"
+  },
+  {
+    "idLocation": "6b3b673a-78b0-d953-848f-95ae30b98105",
+    "cityId": "C054",
+    "country": "中国",
+    "province": "江西",
+    "region": "吉安市",
+    "normalizedName": "吉安市"
+  },
+  {
+    "idLocation": "cc07c279-7be8-4a58-bfc6-0944580f3a96",
+    "cityId": "C055",
+    "country": "中国",
+    "province": "吉林",
+    "region": "吉林市",
+    "normalizedName": "吉林市"
+  },
+  {
+    "idLocation": "5cc90730-f889-e0af-b5db-7097859e7d53",
+    "cityId": "C316",
+    "country": "中国",
+    "province": "吉林",
+    "region": "吉林省",
+    "normalizedName": "吉林省"
+  },
+  {
+    "idLocation": "8c1c502e-9188-1e75-1f91-6e7d23894822",
+    "cityId": "C056",
+    "country": "中国",
+    "province": "新疆",
+    "region": "吐鲁番市",
+    "normalizedName": "吐鲁番市"
+  },
+  {
+    "idLocation": "404023b1-5b95-b9ce-c911-e7e56ed55396",
+    "cityId": "C057",
+    "country": "中国",
+    "province": "山西",
+    "region": "吕梁市",
+    "normalizedName": "吕梁市"
+  },
+  {
+    "idLocation": "e09d81b0-abf0-4a20-de9e-4494a02f3a99",
+    "cityId": "C058",
+    "country": "中国",
+    "province": "宁夏",
+    "region": "吴忠市",
+    "normalizedName": "吴忠市"
+  },
+  {
+    "idLocation": "d112cad4-588e-2c50-8c6d-57a4de912ecc",
+    "cityId": "C059",
+    "country": "中国",
+    "province": "河南",
+    "region": "周口市",
+    "normalizedName": "周口市"
+  },
+  {
+    "idLocation": "3c25fd4e-5aa1-a0ab-0934-06c7063cfbfb",
+    "cityId": "C060",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "呼伦贝尔市",
+    "normalizedName": "呼伦贝尔市"
+  },
+  {
+    "idLocation": "cb1bcb86-4545-68fe-1070-c178cf774c69",
+    "cityId": "C061",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "呼和浩特市",
+    "normalizedName": "呼和浩特市"
+  },
+  {
+    "idLocation": "92afe308-fcce-bc1d-52c6-e0bd4f93624c",
+    "cityId": "C062",
+    "country": "中国",
+    "province": "新疆",
+    "region": "和田地区",
+    "normalizedName": "和田地区"
+  },
+  {
+    "idLocation": "b21d748e-1666-a553-debf-4db07c23246a",
+    "cityId": "C063",
+    "country": "中国",
+    "province": "湖北",
+    "region": "咸宁市",
+    "normalizedName": "咸宁市"
+  },
+  {
+    "idLocation": "8c0f4a21-0d5f-b6fd-3246-13232736c056",
+    "cityId": "C064",
+    "country": "中国",
+    "province": "陕西",
+    "region": "咸阳市",
+    "normalizedName": "咸阳市"
+  },
+  {
+    "idLocation": "aaad67df-39d9-321e-21cb-4591f0d032b9",
+    "cityId": "C065",
+    "country": "中国",
+    "province": "新疆",
+    "region": "哈密市",
+    "normalizedName": "哈密市"
+  },
+  {
+    "idLocation": "3406b19a-1c39-d864-995a-33d53fa1f3f8",
+    "cityId": "C066",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "哈尔滨市",
+    "normalizedName": "哈尔滨市"
+  },
+  {
+    "idLocation": "bae79ccc-7d0e-de26-ec54-8a38c3a36789",
+    "cityId": "C067",
+    "country": "中国",
+    "province": "河北",
+    "region": "唐山市",
+    "normalizedName": "唐山市"
+  },
+  {
+    "idLocation": "afec87ac-92a5-4146-7cb1-39ccb7d3169a",
+    "cityId": "C068",
+    "country": "中国",
+    "province": "河南",
+    "region": "商丘市",
+    "normalizedName": "商丘市"
+  },
+  {
+    "idLocation": "2fe2e8b8-f61d-d5df-025b-ba8f754cb478",
+    "cityId": "C069",
+    "country": "中国",
+    "province": "陕西",
+    "region": "商洛市",
+    "normalizedName": "商洛市"
+  },
+  {
+    "idLocation": "7ee04606-e261-d8c1-8a2f-46ce607e72c8",
+    "cityId": "C070",
+    "country": "中国",
+    "province": "新疆",
+    "region": "喀什地区",
+    "normalizedName": "喀什地区"
+  },
+  {
+    "idLocation": "2caf67e6-5a0b-c1a1-b856-b90d4abc605f",
+    "cityId": "C071",
+    "country": "中国",
+    "province": "浙江",
+    "region": "嘉兴市",
+    "normalizedName": "嘉兴市"
+  },
+  {
+    "idLocation": "f403c290-66f5-3e85-d655-420b905489f8",
+    "cityId": "C072",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "嘉峪关市",
+    "normalizedName": "嘉峪关市"
+  },
+  {
+    "idLocation": "08d75289-050d-a55e-3e28-6b97be4fdce6",
+    "cityId": "C073",
+    "country": "中国",
+    "province": "吉林",
+    "region": "四平市",
+    "normalizedName": "四平市"
+  },
+  {
+    "idLocation": "3fd66392-e688-a00d-d9e5-1b73d583dd53",
+    "cityId": "C074",
+    "country": "中国",
+    "province": "宁夏",
+    "region": "固原市",
+    "normalizedName": "固原市"
+  },
+  {
+    "idLocation": "e3e041ea-73af-92f1-1c0c-218f74b18065",
+    "cityId": "C075",
+    "country": "中国",
+    "province": "新疆",
+    "region": "塔城地区",
+    "normalizedName": "塔城地区"
+  },
+  {
+    "idLocation": "ea6bc2c6-d9c7-33f9-b98f-bab32eafceb6",
+    "cityId": "C076",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "大兴安岭地区",
+    "normalizedName": "大兴安岭地区"
+  },
+  {
+    "idLocation": "9ea92370-387a-1e3b-7527-c06a4b2881c1",
+    "cityId": "C077",
+    "country": "中国",
+    "province": "山西",
+    "region": "大同市",
+    "normalizedName": "大同市"
+  },
+  {
+    "idLocation": "625c77ab-ae5a-9fef-d6df-bd9c2f950a56",
+    "cityId": "C078",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "大庆市",
+    "normalizedName": "大庆市"
+  },
+  {
+    "idLocation": "6c79bb6c-8d1e-b10c-1dea-285364753ad2",
+    "cityId": "C079",
+    "country": "中国",
+    "province": "云南",
+    "region": "大理白族自治州",
+    "normalizedName": "大理白族自治州"
+  },
+  {
+    "idLocation": "9797a917-ee96-ff96-aa52-0731a159763b",
+    "cityId": "C080",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "大连市",
+    "normalizedName": "大连市"
+  },
+  {
+    "idLocation": "c075bb11-28b3-f48d-569f-63e987d38142",
+    "cityId": "C081",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "天水市",
+    "normalizedName": "天水市"
+  },
+  {
+    "idLocation": "381add1d-7fdd-430c-990b-d368d42c7708",
+    "cityId": "C082",
+    "country": "中国",
+    "province": "天津",
+    "region": "天津市",
+    "normalizedName": "天津市"
+  },
+  {
+    "idLocation": "a70b96ae-73b1-1b93-617f-ca251fd81b5c",
+    "cityId": "C083",
+    "country": "中国",
+    "province": "山西",
+    "region": "太原市",
+    "normalizedName": "太原市"
+  },
+  {
+    "idLocation": "2e6c5539-303f-7928-e345-36d8f7864c35",
+    "cityId": "C084",
+    "country": "中国",
+    "province": "山东",
+    "region": "威海市",
+    "normalizedName": "威海市"
+  },
+  {
+    "idLocation": "55394a86-0ac7-efa2-a0a3-e798730f7598",
+    "cityId": "C085",
+    "country": "中国",
+    "province": "湖南",
+    "region": "娄底市",
+    "normalizedName": "娄底市"
+  },
+  {
+    "idLocation": "b29efc96-1d48-8699-6e15-39a6f2bb407d",
+    "cityId": "C086",
+    "country": "中国",
+    "province": "湖北",
+    "region": "孝感市",
+    "normalizedName": "孝感市"
+  },
+  {
+    "idLocation": "f9fce2cf-3b60-7a5a-22fc-298a3ec69b0e",
+    "cityId": "C087",
+    "country": "中国",
+    "province": "福建",
+    "region": "宁德市",
+    "normalizedName": "宁德市"
+  },
+  {
+    "idLocation": "bc3c4892-eb76-fc40-1c25-a7f4c7116e06",
+    "cityId": "C088",
+    "country": "中国",
+    "province": "浙江",
+    "region": "宁波市",
+    "normalizedName": "宁波市"
+  },
+  {
+    "idLocation": "e823bfb6-13df-9f51-a727-5bcb36d8a713",
+    "cityId": "C089",
+    "country": "中国",
+    "province": "安徽",
+    "region": "安庆市",
+    "normalizedName": "安庆市"
+  },
+  {
+    "idLocation": "c2771785-1a20-9553-8275-e333969d33c0",
+    "cityId": "C090",
+    "country": "中国",
+    "province": "陕西",
+    "region": "安康市",
+    "normalizedName": "安康市"
+  },
+  {
+    "idLocation": "50b0429e-efef-d555-5b47-c11a7c51d847",
+    "cityId": "C091",
+    "country": "中国",
+    "province": "河南",
+    "region": "安阳市",
+    "normalizedName": "安阳市"
+  },
+  {
+    "idLocation": "c5393067-a116-30b1-66f7-e3176eb5a979",
+    "cityId": "C092",
+    "country": "中国",
+    "province": "贵州",
+    "region": "安顺市",
+    "normalizedName": "安顺市"
+  },
+  {
+    "idLocation": "a46b6809-ab77-922e-985e-f4a5f6e4b739",
+    "cityId": "C093",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "定西市",
+    "normalizedName": "定西市"
+  },
+  {
+    "idLocation": "deb9975f-ee8a-1ece-bf9a-cade210e58fb",
+    "cityId": "C094",
+    "country": "中国",
+    "province": "四川",
+    "region": "宜宾市",
+    "normalizedName": "宜宾市"
+  },
+  {
+    "idLocation": "7284d17a-4302-528a-535b-e122247b9b81",
+    "cityId": "C095",
+    "country": "中国",
+    "province": "湖北",
+    "region": "宜昌市",
+    "normalizedName": "宜昌市"
+  },
+  {
+    "idLocation": "4324f906-6528-7195-6d59-f5a9678674c0",
+    "cityId": "C096",
+    "country": "中国",
+    "province": "江西",
+    "region": "宜春市",
+    "normalizedName": "宜春市"
+  },
+  {
+    "idLocation": "ffe009c1-5d65-7746-3880-f04ebfa08f1e",
+    "cityId": "C097",
+    "country": "中国",
+    "province": "陕西",
+    "region": "宝鸡市",
+    "normalizedName": "宝鸡市"
+  },
+  {
+    "idLocation": "a29e7329-2c4a-2930-7e75-e0e765ec60a1",
+    "cityId": "C098",
+    "country": "中国",
+    "province": "安徽",
+    "region": "宣城市",
+    "normalizedName": "宣城市"
+  },
+  {
+    "idLocation": "412e567a-c0db-7368-8aff-59b8f15db25f",
+    "cityId": "C099",
+    "country": "中国",
+    "province": "安徽",
+    "region": "宿州市",
+    "normalizedName": "宿州市"
+  },
+  {
+    "idLocation": "249e03db-e543-4447-1caa-45764df02d53",
+    "cityId": "C100",
+    "country": "中国",
+    "province": "江苏",
+    "region": "宿迁市",
+    "normalizedName": "宿迁市"
+  },
+  {
+    "idLocation": "8558ce41-f93e-7f90-4890-6608049daae7",
+    "cityId": "C101",
+    "country": "中国",
+    "province": "湖南",
+    "region": "岳阳市",
+    "normalizedName": "岳阳市"
+  },
+  {
+    "idLocation": "53494231-3d5b-778f-5abe-49ceab904a61",
+    "cityId": "C102",
+    "country": "中国",
+    "province": "广西",
+    "region": "崇左市",
+    "normalizedName": "崇左市"
+  },
+  {
+    "idLocation": "ae556455-8d74-139e-a0c0-a864610b0d09",
+    "cityId": "C103",
+    "country": "中国",
+    "province": "四川",
+    "region": "巴中市",
+    "normalizedName": "巴中市"
+  },
+  {
+    "idLocation": "fbead1fd-590a-2934-e874-5090536dfca0",
+    "cityId": "C104",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "巴彦淖尔市",
+    "normalizedName": "巴彦淖尔市"
+  },
+  {
+    "idLocation": "cc715e79-c1d8-4211-9f23-0546381302be",
+    "cityId": "C105",
+    "country": "中国",
+    "province": "新疆",
+    "region": "巴音郭楞蒙古自治州",
+    "normalizedName": "巴音郭楞蒙古自治州"
+  },
+  {
+    "idLocation": "16e2c492-ecfc-af34-b6ce-a8e9b7da8e7a",
+    "cityId": "C106",
+    "country": "中国",
+    "province": "江苏",
+    "region": "常州市",
+    "normalizedName": "常州市"
+  },
+  {
+    "idLocation": "888fe9c3-9a35-934f-b3f1-fbb9c420980f",
+    "cityId": "C107",
+    "country": "中国",
+    "province": "湖南",
+    "region": "常德市",
+    "normalizedName": "常德市"
+  },
+  {
+    "idLocation": "1968d7f6-3136-e58d-a53d-df02807ef35b",
+    "cityId": "C108",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "平凉市",
+    "normalizedName": "平凉市"
+  },
+  {
+    "idLocation": "b25b9926-9f98-958e-25b8-e40a2cb9f1a6",
+    "cityId": "C109",
+    "country": "中国",
+    "province": "河南",
+    "region": "平顶山市",
+    "normalizedName": "平顶山市"
+  },
+  {
+    "idLocation": "eae0bd58-650b-dd21-373e-6b88990e3931",
+    "cityId": "C110",
+    "country": "中国",
+    "province": "四川",
+    "region": "广元市",
+    "normalizedName": "广元市"
+  },
+  {
+    "idLocation": "bc81da4f-c0e8-232d-2316-5c045ca14ba7",
+    "cityId": "C111",
+    "country": "中国",
+    "province": "四川",
+    "region": "广安市",
+    "normalizedName": "广安市"
+  },
+  {
+    "idLocation": "ee62a2a8-72f1-6ae1-31c0-f69f957aca3e",
+    "cityId": "C112",
+    "country": "中国",
+    "province": "广东",
+    "region": "广州市",
+    "normalizedName": "广州市"
+  },
+  {
+    "idLocation": "784d3322-5328-fc72-dd61-a5ead271af55",
+    "cityId": "C113",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "庆阳市",
+    "normalizedName": "庆阳市"
+  },
+  {
+    "idLocation": "29f63b4d-740c-5890-cbcc-f4cccbc32f0a",
+    "cityId": "C114",
+    "country": "中国",
+    "province": "河北",
+    "region": "廊坊市",
+    "normalizedName": "廊坊市"
+  },
+  {
+    "idLocation": "f28cd4b3-09d5-d641-8941-970727cfd8d5",
+    "cityId": "C115",
+    "country": "中国",
+    "province": "陕西",
+    "region": "延安市",
+    "normalizedName": "延安市"
+  },
+  {
+    "idLocation": "4f654fce-e068-690e-94c1-57bc8fd5ee27",
+    "cityId": "C116",
+    "country": "中国",
+    "province": "吉林",
+    "region": "延边朝鲜族自治州",
+    "normalizedName": "延边朝鲜族自治州"
+  },
+  {
+    "idLocation": "92469efe-b3d9-586b-84bf-bf928cf9781a",
+    "cityId": "C117",
+    "country": "中国",
+    "province": "河南",
+    "region": "开封市",
+    "normalizedName": "开封市"
+  },
+  {
+    "idLocation": "41c516d1-bfca-cce8-c4b5-8ca9a7c55576",
+    "cityId": "C118",
+    "country": "中国",
+    "province": "河北",
+    "region": "张家口市",
+    "normalizedName": "张家口市"
+  },
+  {
+    "idLocation": "5c62f10b-a4fa-6dbd-8546-cc486bac43e1",
+    "cityId": "C119",
+    "country": "中国",
+    "province": "湖南",
+    "region": "张家界市",
+    "normalizedName": "张家界市"
+  },
+  {
+    "idLocation": "8f5282b7-60b9-13fe-2234-996d8d7a89de",
+    "cityId": "C120",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "张掖市",
+    "normalizedName": "张掖市"
+  },
+  {
+    "idLocation": "9c319f29-e281-9857-5891-6f0899820deb",
+    "cityId": "C121",
+    "country": "中国",
+    "province": "江苏",
+    "region": "徐州市",
+    "normalizedName": "徐州市"
+  },
+  {
+    "idLocation": "79ce9720-c782-c298-b345-52c512629eac",
+    "cityId": "C122",
+    "country": "中国",
+    "province": "山东",
+    "region": "德州市",
+    "normalizedName": "德州市"
+  },
+  {
+    "idLocation": "927cf89f-a1d4-89a1-0d49-980aabafa35a",
+    "cityId": "C123",
+    "country": "中国",
+    "province": "四川",
+    "region": "德阳市",
+    "normalizedName": "德阳市"
+  },
+  {
+    "idLocation": "9d3ce2b0-e8ee-a5b3-7a34-68b0cce31270",
+    "cityId": "C124",
+    "country": "中国",
+    "province": "山西",
+    "region": "忻州市",
+    "normalizedName": "忻州市"
+  },
+  {
+    "idLocation": "33fb4b35-824a-bd34-b9a4-94cf204b47e1",
+    "cityId": "C125",
+    "country": "中国",
+    "province": "湖南",
+    "region": "怀化市",
+    "normalizedName": "怀化市"
+  },
+  {
+    "idLocation": "d190cca5-26c7-6458-199f-141c9c733d11",
+    "cityId": "C126",
+    "country": "中国",
+    "province": "湖北",
+    "region": "恩施土家族苗族自治州",
+    "normalizedName": "恩施土家族苗族自治州"
+  },
+  {
+    "idLocation": "3cb560d0-0051-e2e5-7f65-e1ac308db953",
+    "cityId": "C127",
+    "country": "中国",
+    "province": "广东",
+    "region": "惠州市",
+    "normalizedName": "惠州市"
+  },
+  {
+    "idLocation": "642d3c06-90b1-fba5-e8fa-cd8ceebf9e57",
+    "cityId": "C128",
+    "country": "中国",
+    "province": "四川",
+    "region": "成都市",
+    "normalizedName": "成都市"
+  },
+  {
+    "idLocation": "01949745-5a55-fb63-a292-e70cad038dff",
+    "cityId": "C129",
+    "country": "中国",
+    "province": "江苏",
+    "region": "扬州市",
+    "normalizedName": "扬州市"
+  },
+  {
+    "idLocation": "e52d92ad-4858-46f0-059d-8f414b65d722",
+    "cityId": "C130",
+    "country": "中国",
+    "province": "河北",
+    "region": "承德市",
+    "normalizedName": "承德市"
+  },
+  {
+    "idLocation": "98d80843-5298-3049-9185-6aac52a3266d",
+    "cityId": "C131",
+    "country": "中国",
+    "province": "江西",
+    "region": "抚州市",
+    "normalizedName": "抚州市"
+  },
+  {
+    "idLocation": "af596db1-e499-cbaf-5d68-86da6019952c",
+    "cityId": "C132",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "抚顺市",
+    "normalizedName": "抚顺市"
+  },
+  {
+    "idLocation": "ce2c6331-4478-3e19-f4d5-cd3c05920846",
+    "cityId": "C133",
+    "country": "中国",
+    "province": "西藏",
+    "region": "拉萨市",
+    "normalizedName": "拉萨市"
+  },
+  {
+    "idLocation": "edf7fcd3-7ab9-4557-d452-3f4c08c80c4e",
+    "cityId": "C134",
+    "country": "中国",
+    "province": "广东",
+    "region": "揭阳市",
+    "normalizedName": "揭阳市"
+  },
+  {
+    "idLocation": "2f9290f0-d27a-cd97-2e39-5fb8a74e9bfd",
+    "cityId": "C135",
+    "country": "中国",
+    "province": "四川",
+    "region": "攀枝花市",
+    "normalizedName": "攀枝花市"
+  },
+  {
+    "idLocation": "98e1d6da-7c57-8440-d25b-8116dba700be",
+    "cityId": "C136",
+    "country": "中国",
+    "province": "云南",
+    "region": "文山壮族苗族自治州",
+    "normalizedName": "文山壮族苗族自治州"
+  },
+  {
+    "idLocation": "28ebc0c7-cd91-d26f-a491-7fbf1f6f50cb",
+    "cityId": "C137",
+    "country": "中国",
+    "province": "河南",
+    "region": "新乡市",
+    "normalizedName": "新乡市"
+  },
+  {
+    "idLocation": "acd8ea34-6fbf-0abc-c055-cd0139983d4d",
+    "cityId": "C138",
+    "country": "中国",
+    "province": "江西",
+    "region": "新余市",
+    "normalizedName": "新余市"
+  },
+  {
+    "idLocation": "565d69ae-7732-6b29-2e5c-0cd339c4ae61",
+    "cityId": "C317",
+    "country": "中国",
+    "province": "新疆",
+    "region": "新疆维吾尔自治区-自治区直辖县级行政区划",
+    "normalizedName": "新疆维吾尔自治区-自治区直辖县级行政区划"
+  },
+  {
+    "idLocation": "cd168b8b-97e4-c17c-98fa-0181d9d5a3d3",
+    "cityId": "C139",
+    "country": "中国",
+    "province": "江苏",
+    "region": "无锡市",
+    "normalizedName": "无锡市"
+  },
+  {
+    "idLocation": "22869a4d-9662-efd9-e09e-0a3750a566bc",
+    "cityId": "C140",
+    "country": "中国",
+    "province": "西藏",
+    "region": "日喀则市",
+    "normalizedName": "日喀则市"
+  },
+  {
+    "idLocation": "dcec9a00-3b64-af11-0c35-2242de119c8d",
+    "cityId": "C141",
+    "country": "中国",
+    "province": "山东",
+    "region": "日照市",
+    "normalizedName": "日照市"
+  },
+  {
+    "idLocation": "0b6510a8-fb84-0c29-21a1-c2affe619442",
+    "cityId": "C142",
+    "country": "中国",
+    "province": "云南",
+    "region": "昆明市",
+    "normalizedName": "昆明市"
+  },
+  {
+    "idLocation": "366d8f56-9b36-4408-3fa7-a92e503e9ed9",
+    "cityId": "C143",
+    "country": "中国",
+    "province": "新疆",
+    "region": "昌吉回族自治州",
+    "normalizedName": "昌吉回族自治州"
+  },
+  {
+    "idLocation": "f87d5578-d6f7-0fa3-6871-e05a495efb0a",
+    "cityId": "C144",
+    "country": "中国",
+    "province": "云南",
+    "region": "昭通市",
+    "normalizedName": "昭通市"
+  },
+  {
+    "idLocation": "f732b3c8-7717-b0ae-a102-08b4bb2327f3",
+    "cityId": "C145",
+    "country": "中国",
+    "province": "山西",
+    "region": "晋中市",
+    "normalizedName": "晋中市"
+  },
+  {
+    "idLocation": "479debe6-ecd4-f96f-b8c4-63d1bebe89ef",
+    "cityId": "C146",
+    "country": "中国",
+    "province": "山西",
+    "region": "晋城市",
+    "normalizedName": "晋城市"
+  },
+  {
+    "idLocation": "a578b9b4-e5e6-6929-1454-4cf81a2a5901",
+    "cityId": "C147",
+    "country": "中国",
+    "province": "江西",
+    "region": "景德镇市",
+    "normalizedName": "景德镇市"
+  },
+  {
+    "idLocation": "79b7adfa-5a01-cf83-e898-127331df4981",
+    "cityId": "C148",
+    "country": "中国",
+    "province": "云南",
+    "region": "曲靖市",
+    "normalizedName": "曲靖市"
+  },
+  {
+    "idLocation": "2e8a4feb-f732-15eb-e83a-9030259d82b0",
+    "cityId": "C149",
+    "country": "中国",
+    "province": "山西",
+    "region": "朔州市",
+    "normalizedName": "朔州市"
+  },
+  {
+    "idLocation": "91b4470b-a6a2-e0bf-d72f-750604ecf73c",
+    "cityId": "C150",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "朝阳市",
+    "normalizedName": "朝阳市"
+  },
+  {
+    "idLocation": "72262206-22fd-a385-28a1-b509aa3f8613",
+    "cityId": "C151",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "本溪市",
+    "normalizedName": "本溪市"
+  },
+  {
+    "idLocation": "a7cff126-9de1-5511-5911-469f7b6fa5c2",
+    "cityId": "C152",
+    "country": "中国",
+    "province": "广西",
+    "region": "来宾市",
+    "normalizedName": "来宾市"
+  },
+  {
+    "idLocation": "4e6900b5-696a-f159-d494-7a0df65dd8b6",
+    "cityId": "C153",
+    "country": "中国",
+    "province": "浙江",
+    "region": "杭州市",
+    "normalizedName": "杭州市"
+  },
+  {
+    "idLocation": "9a574a18-b753-845c-2ede-a2eeb5cd2026",
+    "cityId": "C154",
+    "country": "中国",
+    "province": "吉林",
+    "region": "松原市",
+    "normalizedName": "松原市"
+  },
+  {
+    "idLocation": "c5938984-680f-158f-c577-2c0bb07adede",
+    "cityId": "C155",
+    "country": "中国",
+    "province": "山东",
+    "region": "枣庄市",
+    "normalizedName": "枣庄市"
+  },
+  {
+    "idLocation": "49d5a416-e611-962a-c9e0-8a891969736d",
+    "cityId": "C156",
+    "country": "中国",
+    "province": "广西",
+    "region": "柳州市",
+    "normalizedName": "柳州市"
+  },
+  {
+    "idLocation": "104bd361-ef64-d467-1fd3-f276a1e84925",
+    "cityId": "C157",
+    "country": "中国",
+    "province": "湖南",
+    "region": "株洲市",
+    "normalizedName": "株洲市"
+  },
+  {
+    "idLocation": "72e77249-8e8a-d6cd-2eae-96af4413cd8a",
+    "cityId": "C158",
+    "country": "中国",
+    "province": "广西",
+    "region": "桂林市",
+    "normalizedName": "桂林市"
+  },
+  {
+    "idLocation": "011e9db3-6c52-0b67-846d-09e9ee081733",
+    "cityId": "C159",
+    "country": "中国",
+    "province": "广东",
+    "region": "梅州市",
+    "normalizedName": "梅州市"
+  },
+  {
+    "idLocation": "4e7709b8-6e3f-acc6-f0f3-57793ac9063a",
+    "cityId": "C160",
+    "country": "中国",
+    "province": "广西",
+    "region": "梧州市",
+    "normalizedName": "梧州市"
+  },
+  {
+    "idLocation": "c185ce2a-f309-ee62-166b-3a0dd3ae701b",
+    "cityId": "C161",
+    "country": "中国",
+    "province": "云南",
+    "region": "楚雄彝族自治州",
+    "normalizedName": "楚雄彝族自治州"
+  },
+  {
+    "idLocation": "b4332874-4097-d1c0-f24f-9489ade698b4",
+    "cityId": "C162",
+    "country": "中国",
+    "province": "陕西",
+    "region": "榆林市",
+    "normalizedName": "榆林市"
+  },
+  {
+    "idLocation": "5851cdeb-96c3-c62b-1efc-0faa8dfffc35",
+    "cityId": "C163",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "武威市",
+    "normalizedName": "武威市"
+  },
+  {
+    "idLocation": "f957e64b-9e08-eeab-857b-fe37b475c66a",
+    "cityId": "C164",
+    "country": "中国",
+    "province": "湖北",
+    "region": "武汉市",
+    "normalizedName": "武汉市"
+  },
+  {
+    "idLocation": "1857dd68-6f04-5975-1eb8-818bed3776c8",
+    "cityId": "C165",
+    "country": "中国",
+    "province": "贵州",
+    "region": "毕节市",
+    "normalizedName": "毕节市"
+  },
+  {
+    "idLocation": "fb36b6f4-481c-1ce8-186a-7c01eac356f0",
+    "cityId": "C166",
+    "country": "中国",
+    "province": "湖南",
+    "region": "永州市",
+    "normalizedName": "永州市"
+  },
+  {
+    "idLocation": "4efdb6d4-6f09-6760-08ae-4bbee999f51b",
+    "cityId": "C167",
+    "country": "中国",
+    "province": "陕西",
+    "region": "汉中市",
+    "normalizedName": "汉中市"
+  },
+  {
+    "idLocation": "02ddd440-643d-62be-1a4e-cd483c893ad5",
+    "cityId": "C168",
+    "country": "中国",
+    "province": "广东",
+    "region": "汕头市",
+    "normalizedName": "汕头市"
+  },
+  {
+    "idLocation": "a86edd9d-2758-0aa6-0c65-007b0f8a1c54",
+    "cityId": "C169",
+    "country": "中国",
+    "province": "广东",
+    "region": "汕尾市",
+    "normalizedName": "汕尾市"
+  },
+  {
+    "idLocation": "7d95a43b-3818-1762-06d0-c9ea2ab86cc9",
+    "cityId": "C170",
+    "country": "中国",
+    "province": "广东",
+    "region": "江门市",
+    "normalizedName": "江门市"
+  },
+  {
+    "idLocation": "50c57391-c168-6bb5-e9a5-03cad6d3f89b",
+    "cityId": "C171",
+    "country": "中国",
+    "province": "安徽",
+    "region": "池州市",
+    "normalizedName": "池州市"
+  },
+  {
+    "idLocation": "ebed0aa7-36d2-a5e6-c0e2-2f02505d9dbe",
+    "cityId": "C172",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "沈阳市",
+    "normalizedName": "沈阳市"
+  },
+  {
+    "idLocation": "c9720047-38ea-c2b3-e77d-e14038ea8317",
+    "cityId": "C173",
+    "country": "中国",
+    "province": "河北",
+    "region": "沧州市",
+    "normalizedName": "沧州市"
+  },
+  {
+    "idLocation": "d6b37060-8417-5043-2291-8a1fbbe32edd",
+    "cityId": "C318",
+    "country": "中国",
+    "province": "河南",
+    "region": "河南省-省直辖县级行政区划",
+    "normalizedName": "河南省-省直辖县级行政区划"
+  },
+  {
+    "idLocation": "60e41f2a-6d36-73a8-d479-c7241a3bba35",
+    "cityId": "C174",
+    "country": "中国",
+    "province": "广西",
+    "region": "河池市",
+    "normalizedName": "河池市"
+  },
+  {
+    "idLocation": "3f864e49-a55d-cd59-bc3b-10d48893cda4",
+    "cityId": "C175",
+    "country": "中国",
+    "province": "广东",
+    "region": "河源市",
+    "normalizedName": "河源市"
+  },
+  {
+    "idLocation": "65bcae4f-3237-dad0-0f1f-eff9597407a4",
+    "cityId": "C176",
+    "country": "中国",
+    "province": "福建",
+    "region": "泉州市",
+    "normalizedName": "泉州市"
+  },
+  {
+    "idLocation": "34080391-5479-d660-aa67-7d4405c12abb",
+    "cityId": "C177",
+    "country": "中国",
+    "province": "山东",
+    "region": "泰安市",
+    "normalizedName": "泰安市"
+  },
+  {
+    "idLocation": "74071955-5716-d194-a2d6-e9224058010c",
+    "cityId": "C178",
+    "country": "中国",
+    "province": "江苏",
+    "region": "泰州市",
+    "normalizedName": "泰州市"
+  },
+  {
+    "idLocation": "045ddeb5-0c8c-1a8f-37ae-c150a5c32458",
+    "cityId": "C179",
+    "country": "中国",
+    "province": "河南",
+    "region": "洛阳市",
+    "normalizedName": "洛阳市"
+  },
+  {
+    "idLocation": "831ac985-4d87-4a15-31b8-fc9643bdb346",
+    "cityId": "C180",
+    "country": "中国",
+    "province": "山东",
+    "region": "济南市",
+    "normalizedName": "济南市"
+  },
+  {
+    "idLocation": "adafa542-e589-e3db-ac11-98e5d281dad4",
+    "cityId": "C181",
+    "country": "中国",
+    "province": "山东",
+    "region": "济宁市",
+    "normalizedName": "济宁市"
+  },
+  {
+    "idLocation": "44b70305-498d-c43a-4afa-8fa490ebced2",
+    "cityId": "C182",
+    "country": "中国",
+    "province": "青海",
+    "region": "海东市",
+    "normalizedName": "海东市"
+  },
+  {
+    "idLocation": "c07677f2-d400-d7c5-639d-329b44686299",
+    "cityId": "C183",
+    "country": "中国",
+    "province": "青海",
+    "region": "海北藏族自治州",
+    "normalizedName": "海北藏族自治州"
+  },
+  {
+    "idLocation": "ff6cbffd-e900-6518-26c6-d4703e12bfa2",
+    "cityId": "C319",
+    "country": "中国",
+    "province": "海南",
+    "region": "海南省-自治区直辖县级行政区划",
+    "normalizedName": "海南省-自治区直辖县级行政区划"
+  },
+  {
+    "idLocation": "0b919136-c212-f924-8290-b03d733fc80d",
+    "cityId": "C184",
+    "country": "中国",
+    "province": "海南",
+    "region": "海口市",
+    "normalizedName": "海口市"
+  },
+  {
+    "idLocation": "94e0ab90-1957-127a-cdd3-f101e195b160",
+    "cityId": "C185",
+    "country": "中国",
+    "province": "青海",
+    "region": "海西蒙古族藏族自治州",
+    "normalizedName": "海西蒙古族藏族自治州"
+  },
+  {
+    "idLocation": "5d434968-d669-0865-2c2b-454a0887c226",
+    "cityId": "C186",
+    "country": "中国",
+    "province": "山东",
+    "region": "淄博市",
+    "normalizedName": "淄博市"
+  },
+  {
+    "idLocation": "ea018b63-3388-688d-e222-ce2e3de01faa",
+    "cityId": "C187",
+    "country": "中国",
+    "province": "安徽",
+    "region": "淮北市",
+    "normalizedName": "淮北市"
+  },
+  {
+    "idLocation": "fa458822-f5bf-01a5-9aed-45d99ee043d3",
+    "cityId": "C188",
+    "country": "中国",
+    "province": "安徽",
+    "region": "淮南市",
+    "normalizedName": "淮南市"
+  },
+  {
+    "idLocation": "7c35b05d-874e-0f93-6930-53ed9dffb7ce",
+    "cityId": "C189",
+    "country": "中国",
+    "province": "江苏",
+    "region": "淮安市",
+    "normalizedName": "淮安市"
+  },
+  {
+    "idLocation": "7cf0ace0-baa6-7e8e-fc9b-2bd3e23e7c53",
+    "cityId": "C190",
+    "country": "中国",
+    "province": "广东",
+    "region": "深圳市",
+    "normalizedName": "深圳市"
+  },
+  {
+    "idLocation": "878a811b-7539-d8e5-4150-c29fd287d056",
+    "cityId": "C191",
+    "country": "中国",
+    "province": "广东",
+    "region": "清远市",
+    "normalizedName": "清远市"
+  },
+  {
+    "idLocation": "03658036-12bd-18fd-a2a3-d70793310c53",
+    "cityId": "C192",
+    "country": "中国",
+    "province": "浙江",
+    "region": "温州市",
+    "normalizedName": "温州市"
+  },
+  {
+    "idLocation": "bbc9425c-95d0-40ef-23d0-3164dfe857ae",
+    "cityId": "C193",
+    "country": "中国",
+    "province": "陕西",
+    "region": "渭南市",
+    "normalizedName": "渭南市"
+  },
+  {
+    "idLocation": "5e276e0b-b6bb-dacf-f08c-2f30ede77ee1",
+    "cityId": "C320",
+    "country": "中国",
+    "province": "湖北",
+    "region": "湖北省-自治区直辖县级行政区划",
+    "normalizedName": "湖北省-自治区直辖县级行政区划"
+  },
+  {
+    "idLocation": "492a51d2-7b15-696d-781d-c74a965f8004",
+    "cityId": "C194",
+    "country": "中国",
+    "province": "浙江",
+    "region": "湖州市",
+    "normalizedName": "湖州市"
+  },
+  {
+    "idLocation": "fc15d1cc-537a-f3f8-334e-b6458eda3d25",
+    "cityId": "C195",
+    "country": "中国",
+    "province": "湖南",
+    "region": "湘潭市",
+    "normalizedName": "湘潭市"
+  },
+  {
+    "idLocation": "d6eede60-44f4-38f1-f65f-46f8d90cfd3d",
+    "cityId": "C196",
+    "country": "中国",
+    "province": "湖南",
+    "region": "湘西土家族苗族自治州",
+    "normalizedName": "湘西土家族苗族自治州"
+  },
+  {
+    "idLocation": "8b9f9478-4ca0-2f06-15b9-9cf2d61243b3",
+    "cityId": "C197",
+    "country": "中国",
+    "province": "广东",
+    "region": "湛江市",
+    "normalizedName": "湛江市"
+  },
+  {
+    "idLocation": "0cc58631-93e9-4223-89e3-5cf344d7179d",
+    "cityId": "C198",
+    "country": "中国",
+    "province": "安徽",
+    "region": "滁州市",
+    "normalizedName": "滁州市"
+  },
+  {
+    "idLocation": "76e38ee7-1fee-691c-fa41-7008b2f28a75",
+    "cityId": "C199",
+    "country": "中国",
+    "province": "山东",
+    "region": "滨州市",
+    "normalizedName": "滨州市"
+  },
+  {
+    "idLocation": "bf351787-188e-36d1-0018-bf15d4098bd4",
+    "cityId": "C200",
+    "country": "中国",
+    "province": "河南",
+    "region": "漯河市",
+    "normalizedName": "漯河市"
+  },
+  {
+    "idLocation": "615af0c8-d879-2d51-3c47-2f4b9d08fa32",
+    "cityId": "C201",
+    "country": "中国",
+    "province": "福建",
+    "region": "漳州市",
+    "normalizedName": "漳州市"
+  },
+  {
+    "idLocation": "2fd50f2f-4aa3-6c19-67dc-da89fe2dda68",
+    "cityId": "C202",
+    "country": "中国",
+    "province": "山东",
+    "region": "潍坊市",
+    "normalizedName": "潍坊市"
+  },
+  {
+    "idLocation": "a8c18cc6-f12f-e595-d5b8-dadcbfdcf7b3",
+    "cityId": "C203",
+    "country": "中国",
+    "province": "广东",
+    "region": "潮州市",
+    "normalizedName": "潮州市"
+  },
+  {
+    "idLocation": "248fa101-fd09-5bdc-b824-56c5ae8c2b1d",
+    "cityId": "C204",
+    "country": "中国",
+    "province": "河南",
+    "region": "濮阳市",
+    "normalizedName": "濮阳市"
+  },
+  {
+    "idLocation": "7234a5e9-b9dc-6889-ee7b-be00a8fb3301",
+    "cityId": "C205",
+    "country": "中国",
+    "province": "山东",
+    "region": "烟台市",
+    "normalizedName": "烟台市"
+  },
+  {
+    "idLocation": "96ef4c35-f533-5cc2-5e24-6ea050dbf399",
+    "cityId": "C206",
+    "country": "中国",
+    "province": "河南",
+    "region": "焦作市",
+    "normalizedName": "焦作市"
+  },
+  {
+    "idLocation": "cfea7e88-5aea-71fc-a97f-53987d0996e1",
+    "cityId": "C207",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "牡丹江市",
+    "normalizedName": "牡丹江市"
+  },
+  {
+    "idLocation": "43a96062-96b5-73a0-1e64-9daa59ab1fec",
+    "cityId": "C208",
+    "country": "中国",
+    "province": "广西",
+    "region": "玉林市",
+    "normalizedName": "玉林市"
+  },
+  {
+    "idLocation": "c7725634-3859-2492-48a8-7854cf60f84a",
+    "cityId": "C209",
+    "country": "中国",
+    "province": "云南",
+    "region": "玉溪市",
+    "normalizedName": "玉溪市"
+  },
+  {
+    "idLocation": "c344708e-ec91-f5b4-efb2-df7b86dafafb",
+    "cityId": "C210",
+    "country": "中国",
+    "province": "广东",
+    "region": "珠海市",
+    "normalizedName": "珠海市"
+  },
+  {
+    "idLocation": "bf575aed-1d4c-b81b-10c6-7140fd89e2d8",
+    "cityId": "C211",
+    "country": "中国",
+    "province": "吉林",
+    "region": "白城市",
+    "normalizedName": "白城市"
+  },
+  {
+    "idLocation": "7813b050-3178-43a2-9be4-8a474dd7ca4f",
+    "cityId": "C212",
+    "country": "中国",
+    "province": "吉林",
+    "region": "白山市",
+    "normalizedName": "白山市"
+  },
+  {
+    "idLocation": "39b6efcc-54d2-ad72-d785-5d5c637ab662",
+    "cityId": "C213",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "白银市",
+    "normalizedName": "白银市"
+  },
+  {
+    "idLocation": "cc45d6dc-bd9e-3a77-379f-bccc9209a3dd",
+    "cityId": "C214",
+    "country": "中国",
+    "province": "广西",
+    "region": "百色市",
+    "normalizedName": "百色市"
+  },
+  {
+    "idLocation": "b84c9369-6cb1-7aa4-b297-49466e63c857",
+    "cityId": "C215",
+    "country": "中国",
+    "province": "湖南",
+    "region": "益阳市",
+    "normalizedName": "益阳市"
+  },
+  {
+    "idLocation": "bd23c35b-2a77-3a26-02ac-d96debdb1481",
+    "cityId": "C216",
+    "country": "中国",
+    "province": "江苏",
+    "region": "盐城市",
+    "normalizedName": "盐城市"
+  },
+  {
+    "idLocation": "2f5d6032-c202-6ff8-5a5a-cd640ad9c3b3",
+    "cityId": "C217",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "盘锦市",
+    "normalizedName": "盘锦市"
+  },
+  {
+    "idLocation": "792a9e2a-c5be-1d82-3200-663012ebb763",
+    "cityId": "C218",
+    "country": "中国",
+    "province": "四川",
+    "region": "眉山市",
+    "normalizedName": "眉山市"
+  },
+  {
+    "idLocation": "c685c74d-3b0a-5d72-6ed4-1dd776cda192",
+    "cityId": "C219",
+    "country": "中国",
+    "province": "宁夏",
+    "region": "石嘴山市",
+    "normalizedName": "石嘴山市"
+  },
+  {
+    "idLocation": "180fc914-767b-7e32-0466-d2a1a723fe3c",
+    "cityId": "C220",
+    "country": "中国",
+    "province": "河北",
+    "region": "石家庄市",
+    "normalizedName": "石家庄市"
+  },
+  {
+    "idLocation": "e7ba4d38-8598-5e9f-d87d-034e4fd4e098",
+    "cityId": "C221",
+    "country": "中国",
+    "province": "福建",
+    "region": "福州市",
+    "normalizedName": "福州市"
+  },
+  {
+    "idLocation": "9d91ecd2-2f7c-ace3-833c-c606f148afc2",
+    "cityId": "C222",
+    "country": "中国",
+    "province": "河北",
+    "region": "秦皇岛市",
+    "normalizedName": "秦皇岛市"
+  },
+  {
+    "idLocation": "ef1765a7-4a2c-1127-cdd7-8d927be8989c",
+    "cityId": "C223",
+    "country": "中国",
+    "province": "云南",
+    "region": "红河哈尼族彝族自治州",
+    "normalizedName": "红河哈尼族彝族自治州"
+  },
+  {
+    "idLocation": "e5e5b8c8-dcf8-9464-b095-980b523add93",
+    "cityId": "C224",
+    "country": "中国",
+    "province": "浙江",
+    "region": "绍兴市",
+    "normalizedName": "绍兴市"
+  },
+  {
+    "idLocation": "7d73d34c-c4b7-7d2f-9ce0-a786b08d2062",
+    "cityId": "C225",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "绥化市",
+    "normalizedName": "绥化市"
+  },
+  {
+    "idLocation": "5b2e6a0e-ef91-e9d2-68d4-820d246ad164",
+    "cityId": "C226",
+    "country": "中国",
+    "province": "四川",
+    "region": "绵阳市",
+    "normalizedName": "绵阳市"
+  },
+  {
+    "idLocation": "d2409b33-b92d-2b2b-bb01-1dfeeaecc634",
+    "cityId": "C227",
+    "country": "中国",
+    "province": "山东",
+    "region": "聊城市",
+    "normalizedName": "聊城市"
+  },
+  {
+    "idLocation": "2a138dba-0bb8-cf71-2017-15ae22492c98",
+    "cityId": "C228",
+    "country": "中国",
+    "province": "广东",
+    "region": "肇庆市",
+    "normalizedName": "肇庆市"
+  },
+  {
+    "idLocation": "e47edf86-a40e-2686-7b9f-f08448fe14e9",
+    "cityId": "C229",
+    "country": "中国",
+    "province": "四川",
+    "region": "自贡市",
+    "normalizedName": "自贡市"
+  },
+  {
+    "idLocation": "0624abc0-43b5-e800-478e-cdd9af475918",
+    "cityId": "C230",
+    "country": "中国",
+    "province": "安徽",
+    "region": "芜湖市",
+    "normalizedName": "芜湖市"
+  },
+  {
+    "idLocation": "59242674-2837-e8c6-78e4-616e0feec4a5",
+    "cityId": "C231",
+    "country": "中国",
+    "province": "江苏",
+    "region": "苏州市",
+    "normalizedName": "苏州市"
+  },
+  {
+    "idLocation": "e93a0d2f-9e5b-8a9e-8a06-43dd18b5f083",
+    "cityId": "C232",
+    "country": "中国",
+    "province": "广东",
+    "region": "茂名市",
+    "normalizedName": "茂名市"
+  },
+  {
+    "idLocation": "027532cb-25b1-f625-5e1c-823f0e54f363",
+    "cityId": "C233",
+    "country": "中国",
+    "province": "湖北",
+    "region": "荆州市",
+    "normalizedName": "荆州市"
+  },
+  {
+    "idLocation": "5867766e-df95-c7ec-3d1f-67caad98327c",
+    "cityId": "C234",
+    "country": "中国",
+    "province": "湖北",
+    "region": "荆门市",
+    "normalizedName": "荆门市"
+  },
+  {
+    "idLocation": "36b97fd7-c8dd-2f78-46d2-bebc7f1efd45",
+    "cityId": "C235",
+    "country": "中国",
+    "province": "福建",
+    "region": "莆田市",
+    "normalizedName": "莆田市"
+  },
+  {
+    "idLocation": "085b8b1d-ca40-3c55-1182-189f9ca828d4",
+    "cityId": "C236",
+    "country": "中国",
+    "province": "山东",
+    "region": "菏泽市",
+    "normalizedName": "菏泽市"
+  },
+  {
+    "idLocation": "853d9a3f-64dd-4162-c1bb-ff626e96cd42",
+    "cityId": "C237",
+    "country": "中国",
+    "province": "江西",
+    "region": "萍乡市",
+    "normalizedName": "萍乡市"
+  },
+  {
+    "idLocation": "e77936e4-c0c4-2f9f-3df0-38be56ed154a",
+    "cityId": "C238",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "营口市",
+    "normalizedName": "营口市"
+  },
+  {
+    "idLocation": "ff4d0c99-f330-a965-7a6d-8db5e0f18925",
+    "cityId": "C239",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "葫芦岛市",
+    "normalizedName": "葫芦岛市"
+  },
+  {
+    "idLocation": "03ad1a7b-8141-d3ab-9279-c507f4e0b91e",
+    "cityId": "C240",
+    "country": "中国",
+    "province": "安徽",
+    "region": "蚌埠市",
+    "normalizedName": "蚌埠市"
+  },
+  {
+    "idLocation": "933f3bcf-2313-8260-27da-fb0d3f927d17",
+    "cityId": "C241",
+    "country": "中国",
+    "province": "河北",
+    "region": "衡水市",
+    "normalizedName": "衡水市"
+  },
+  {
+    "idLocation": "1ff1bd2d-fd0b-d863-5019-e9e7e3d6c57c",
+    "cityId": "C242",
+    "country": "中国",
+    "province": "湖南",
+    "region": "衡阳市",
+    "normalizedName": "衡阳市"
+  },
+  {
+    "idLocation": "dce47a71-4317-1fbf-da05-856d354b49d3",
+    "cityId": "C243",
+    "country": "中国",
+    "province": "浙江",
+    "region": "衢州市",
+    "normalizedName": "衢州市"
+  },
+  {
+    "idLocation": "0a66ea75-0b40-2966-7f2b-27f3c3362682",
+    "cityId": "C244",
+    "country": "中国",
+    "province": "湖北",
+    "region": "襄阳市",
+    "normalizedName": "襄阳市"
+  },
+  {
+    "idLocation": "598771cd-4a6d-d0bd-9309-c9264d881d4a",
+    "cityId": "C245",
+    "country": "中国",
+    "province": "青海",
+    "region": "西宁市",
+    "normalizedName": "西宁市"
+  },
+  {
+    "idLocation": "666861b0-a589-ea97-301e-15c1935e2b28",
+    "cityId": "C246",
+    "country": "中国",
+    "province": "陕西",
+    "region": "西安市",
+    "normalizedName": "西安市"
+  },
+  {
+    "idLocation": "4b92a7da-9e1a-da97-c44e-ddfb09734bc2",
+    "cityId": "C247",
+    "country": "中国",
+    "province": "河南",
+    "region": "许昌市",
+    "normalizedName": "许昌市"
+  },
+  {
+    "idLocation": "39bb5b59-74b3-f17e-a809-973b3d2bbb9c",
+    "cityId": "C248",
+    "country": "中国",
+    "province": "广西",
+    "region": "贵港市",
+    "normalizedName": "贵港市"
+  },
+  {
+    "idLocation": "2d87480f-e998-fb84-ac2d-a505d3286617",
+    "cityId": "C249",
+    "country": "中国",
+    "province": "贵州",
+    "region": "贵阳市",
+    "normalizedName": "贵阳市"
+  },
+  {
+    "idLocation": "93cda8cb-bc26-f267-c014-bbe2a0e9c724",
+    "cityId": "C250",
+    "country": "中国",
+    "province": "广西",
+    "region": "贺州市",
+    "normalizedName": "贺州市"
+  },
+  {
+    "idLocation": "b6e836df-7951-8e87-d0d3-fd34f464ee6c",
+    "cityId": "C251",
+    "country": "中国",
+    "province": "四川",
+    "region": "资阳市",
+    "normalizedName": "资阳市"
+  },
+  {
+    "idLocation": "bcdc1d9f-4f05-35b2-f312-83afcc133496",
+    "cityId": "C252",
+    "country": "中国",
+    "province": "江西",
+    "region": "赣州市",
+    "normalizedName": "赣州市"
+  },
+  {
+    "idLocation": "91fae115-0c82-2f00-d7d0-282f2bb4c73c",
+    "cityId": "C253",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "赤峰市",
+    "normalizedName": "赤峰市"
+  },
+  {
+    "idLocation": "22093dd1-7d89-9437-8d1f-643a1a35af28",
+    "cityId": "C254",
+    "country": "中国",
+    "province": "吉林",
+    "region": "辽源市",
+    "normalizedName": "辽源市"
+  },
+  {
+    "idLocation": "cc50f520-3d86-a4b0-7b50-8617c37f16a7",
+    "cityId": "C255",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "辽阳市",
+    "normalizedName": "辽阳市"
+  },
+  {
+    "idLocation": "4787fbb1-0f51-deb4-ec03-1091acf14063",
+    "cityId": "C256",
+    "country": "中国",
+    "province": "四川",
+    "region": "达州市",
+    "normalizedName": "达州市"
+  },
+  {
+    "idLocation": "c1acde03-2532-33d8-f535-1996a134957f",
+    "cityId": "C257",
+    "country": "中国",
+    "province": "山西",
+    "region": "运城市",
+    "normalizedName": "运城市"
+  },
+  {
+    "idLocation": "bb5008d7-7bf5-e31b-375d-536c6e0ba0f1",
+    "cityId": "C258",
+    "country": "中国",
+    "province": "江苏",
+    "region": "连云港市",
+    "normalizedName": "连云港市"
+  },
+  {
+    "idLocation": "fb8b407d-2422-ed19-4f3f-246ff720ed0d",
+    "cityId": "C259",
+    "country": "中国",
+    "province": "吉林",
+    "region": "通化市",
+    "normalizedName": "通化市"
+  },
+  {
+    "idLocation": "b01363c0-a151-e44e-59f6-72eb8a55e021",
+    "cityId": "C260",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "通辽市",
+    "normalizedName": "通辽市"
+  },
+  {
+    "idLocation": "208f38e5-438e-1984-85a7-e4f2958e5b00",
+    "cityId": "C261",
+    "country": "中国",
+    "province": "四川",
+    "region": "遂宁市",
+    "normalizedName": "遂宁市"
+  },
+  {
+    "idLocation": "2d60160e-f65d-ad14-1744-a0a6cbb13316",
+    "cityId": "C262",
+    "country": "中国",
+    "province": "贵州",
+    "region": "遵义市",
+    "normalizedName": "遵义市"
+  },
+  {
+    "idLocation": "f37846ae-b74a-9115-802d-b9a1aa0c5bfc",
+    "cityId": "C263",
+    "country": "中国",
+    "province": "河北",
+    "region": "邢台市",
+    "normalizedName": "邢台市"
+  },
+  {
+    "idLocation": "2cfa44ee-89c8-f18e-e43e-34bd2a0a9db6",
+    "cityId": "C264",
+    "country": "中国",
+    "province": "西藏",
+    "region": "那曲市",
+    "normalizedName": "那曲市"
+  },
+  {
+    "idLocation": "2398d0da-eb66-f831-f99e-f939fead98d6",
+    "cityId": "C265",
+    "country": "中国",
+    "province": "河北",
+    "region": "邯郸市",
+    "normalizedName": "邯郸市"
+  },
+  {
+    "idLocation": "c50fd027-bbb5-80ac-fc9a-eb4397012f47",
+    "cityId": "C266",
+    "country": "中国",
+    "province": "湖南",
+    "region": "邵阳市",
+    "normalizedName": "邵阳市"
+  },
+  {
+    "idLocation": "06f7553a-0ef3-df3a-2783-55389503d257",
+    "cityId": "C267",
+    "country": "中国",
+    "province": "河南",
+    "region": "郑州市",
+    "normalizedName": "郑州市"
+  },
+  {
+    "idLocation": "fcc42646-e3c7-7f28-bef0-5ed4def51cce",
+    "cityId": "C268",
+    "country": "中国",
+    "province": "湖南",
+    "region": "郴州市",
+    "normalizedName": "郴州市"
+  },
+  {
+    "idLocation": "d668d260-4535-a20c-9531-01c91f945949",
+    "cityId": "C269",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "鄂尔多斯市",
+    "normalizedName": "鄂尔多斯市"
+  },
+  {
+    "idLocation": "2cf7e073-3d2d-cdd1-27da-35c670da4c6e",
+    "cityId": "C270",
+    "country": "中国",
+    "province": "湖北",
+    "region": "鄂州市",
+    "normalizedName": "鄂州市"
+  },
+  {
+    "idLocation": "6cbec12b-913d-0316-0d69-8c99f2507f30",
+    "cityId": "C271",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "酒泉市",
+    "normalizedName": "酒泉市"
+  },
+  {
+    "idLocation": "51639d93-da0b-8e66-4f31-86a94bf59a93",
+    "cityId": "C272",
+    "country": "中国",
+    "province": "重庆",
+    "region": "重庆市",
+    "normalizedName": "重庆市"
+  },
+  {
+    "idLocation": "14e677c6-cfdf-cede-9a61-fa2aa8fab102",
+    "cityId": "C273",
+    "country": "中国",
+    "province": "浙江",
+    "region": "金华市",
+    "normalizedName": "金华市"
+  },
+  {
+    "idLocation": "b693e72b-a9fb-7458-e53c-6d3c1e3cd1ca",
+    "cityId": "C274",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "金昌市",
+    "normalizedName": "金昌市"
+  },
+  {
+    "idLocation": "aaf8af65-00a4-e37d-fc60-e19f60512b82",
+    "cityId": "C275",
+    "country": "中国",
+    "province": "广西",
+    "region": "钦州市",
+    "normalizedName": "钦州市"
+  },
+  {
+    "idLocation": "506ea157-e111-e8cd-a2b5-05aa1c07830d",
+    "cityId": "C276",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "铁岭市",
+    "normalizedName": "铁岭市"
+  },
+  {
+    "idLocation": "e9586edb-0975-998b-0524-46596f70ae70",
+    "cityId": "C277",
+    "country": "中国",
+    "province": "贵州",
+    "region": "铜仁市",
+    "normalizedName": "铜仁市"
+  },
+  {
+    "idLocation": "7483c2af-d565-b5c0-0290-a6b9a45c79b9",
+    "cityId": "C278",
+    "country": "中国",
+    "province": "安徽",
+    "region": "铜陵市",
+    "normalizedName": "铜陵市"
+  },
+  {
+    "idLocation": "35cb0866-c424-c0db-7cd9-4b3f3ff807f8",
+    "cityId": "C279",
+    "country": "中国",
+    "province": "宁夏",
+    "region": "银川市",
+    "normalizedName": "银川市"
+  },
+  {
+    "idLocation": "3d864a3d-5968-43b4-548c-c44567af5337",
+    "cityId": "C280",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "锡林郭勒盟",
+    "normalizedName": "锡林郭勒盟"
+  },
+  {
+    "idLocation": "9f69e2f6-5d6d-abc3-5e82-56419d2d4346",
+    "cityId": "C281",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "锦州市",
+    "normalizedName": "锦州市"
+  },
+  {
+    "idLocation": "e1dcd7f0-0ade-eb67-4e97-816118728767",
+    "cityId": "C282",
+    "country": "中国",
+    "province": "江苏",
+    "region": "镇江市",
+    "normalizedName": "镇江市"
+  },
+  {
+    "idLocation": "2ba8f4b4-3a2d-1042-2104-89f023cb74b4",
+    "cityId": "C283",
+    "country": "中国",
+    "province": "吉林",
+    "region": "长春市",
+    "normalizedName": "长春市"
+  },
+  {
+    "idLocation": "36cbe4cd-2225-26bf-eaa2-0593a49a76a8",
+    "cityId": "C284",
+    "country": "中国",
+    "province": "湖南",
+    "region": "长沙市",
+    "normalizedName": "长沙市"
+  },
+  {
+    "idLocation": "c40ae888-4199-2265-8502-6e16225dde9b",
+    "cityId": "C285",
+    "country": "中国",
+    "province": "山西",
+    "region": "长治市",
+    "normalizedName": "长治市"
+  },
+  {
+    "idLocation": "6b55094f-db4f-f453-e64e-08d2d1824824",
+    "cityId": "C286",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "阜新市",
+    "normalizedName": "阜新市"
+  },
+  {
+    "idLocation": "5aa39c51-cc4c-ba5d-e02c-b03d52f0b60f",
+    "cityId": "C287",
+    "country": "中国",
+    "province": "安徽",
+    "region": "阜阳市",
+    "normalizedName": "阜阳市"
+  },
+  {
+    "idLocation": "a68a2aa7-9019-7b1c-7161-3bd496a5fef2",
+    "cityId": "C288",
+    "country": "中国",
+    "province": "广西",
+    "region": "防城港市",
+    "normalizedName": "防城港市"
+  },
+  {
+    "idLocation": "e06ea735-9f37-09bb-d76d-e63d3535966e",
+    "cityId": "C289",
+    "country": "中国",
+    "province": "广东",
+    "region": "阳江市",
+    "normalizedName": "阳江市"
+  },
+  {
+    "idLocation": "b46539bb-61b8-b54c-d3df-4693541b8d92",
+    "cityId": "C290",
+    "country": "中国",
+    "province": "山西",
+    "region": "阳泉市",
+    "normalizedName": "阳泉市"
+  },
+  {
+    "idLocation": "eb9ec013-9ef1-5cc2-c418-73194460ef27",
+    "cityId": "C291",
+    "country": "中国",
+    "province": "新疆",
+    "region": "阿克苏地区",
+    "normalizedName": "阿克苏地区"
+  },
+  {
+    "idLocation": "dd07d29f-dcad-3f86-20ff-3f2bff9727e9",
+    "cityId": "C292",
+    "country": "中国",
+    "province": "新疆",
+    "region": "阿勒泰地区",
+    "normalizedName": "阿勒泰地区"
+  },
+  {
+    "idLocation": "5b14d75e-c48f-1fa3-0f40-a6c0749e5bab",
+    "cityId": "C293",
+    "country": "中国",
+    "province": "内蒙古",
+    "region": "阿拉善盟",
+    "normalizedName": "阿拉善盟"
+  },
+  {
+    "idLocation": "9780d387-4704-ad6b-50e6-39cad4f0ba5d",
+    "cityId": "C294",
+    "country": "中国",
+    "province": "甘肃",
+    "region": "陇南市",
+    "normalizedName": "陇南市"
+  },
+  {
+    "idLocation": "961eb61d-4b1f-823e-85cc-a88819497f6e",
+    "cityId": "C295",
+    "country": "中国",
+    "province": "湖北",
+    "region": "随州市",
+    "normalizedName": "随州市"
+  },
+  {
+    "idLocation": "b6259ea6-015d-9bfe-d0fb-a83722599ac4",
+    "cityId": "C296",
+    "country": "中国",
+    "province": "四川",
+    "region": "雅安市",
+    "normalizedName": "雅安市"
+  },
+  {
+    "idLocation": "8ad50952-247f-174b-1746-8d00571f995e",
+    "cityId": "C297",
+    "country": "中国",
+    "province": "山东",
+    "region": "青岛市",
+    "normalizedName": "青岛市"
+  },
+  {
+    "idLocation": "0225e0d1-1a4e-2b04-e78a-b2699cc3ae1a",
+    "cityId": "C298",
+    "country": "中国",
+    "province": "辽宁",
+    "region": "鞍山市",
+    "normalizedName": "鞍山市"
+  },
+  {
+    "idLocation": "79518edf-0164-f135-489b-734bee3622a8",
+    "cityId": "C299",
+    "country": "中国",
+    "province": "广东",
+    "region": "韶关市",
+    "normalizedName": "韶关市"
+  },
+  {
+    "idLocation": "9dbde578-9cfb-52b7-2a1d-6e5dc2399b2a",
+    "cityId": "C300",
+    "country": "中国",
+    "province": "香港",
+    "region": "香港特别行政区",
+    "normalizedName": "香港特别行政区"
+  },
+  {
+    "idLocation": "9ac59272-3682-4e2d-e795-b3bf7946f0b8",
+    "cityId": "C301",
+    "country": "中国",
+    "province": "安徽",
+    "region": "马鞍山市",
+    "normalizedName": "马鞍山市"
+  },
+  {
+    "idLocation": "cc3ed178-4d41-74ce-ee14-9875ef4aa31e",
+    "cityId": "C302",
+    "country": "中国",
+    "province": "河南",
+    "region": "驻马店市",
+    "normalizedName": "驻马店市"
+  },
+  {
+    "idLocation": "b5a6ba4f-3819-b949-a783-1b4837f2dce8",
+    "cityId": "C303",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "鸡西市",
+    "normalizedName": "鸡西市"
+  },
+  {
+    "idLocation": "bf5174bd-9362-12c9-540e-e8a14ef9ff0f",
+    "cityId": "C304",
+    "country": "中国",
+    "province": "河南",
+    "region": "鹤壁市",
+    "normalizedName": "鹤壁市"
+  },
+  {
+    "idLocation": "6c695cd6-aa49-ed20-bb82-abed8e2b2952",
+    "cityId": "C305",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "鹤岗市",
+    "normalizedName": "鹤岗市"
+  },
+  {
+    "idLocation": "8422900e-8aa6-8435-6be9-d8013034ba73",
+    "cityId": "C306",
+    "country": "中国",
+    "province": "江西",
+    "region": "鹰潭市",
+    "normalizedName": "鹰潭市"
+  },
+  {
+    "idLocation": "903a6f61-e8d7-956b-898f-6c1d48c1be85",
+    "cityId": "C307",
+    "country": "中国",
+    "province": "湖北",
+    "region": "黄冈市",
+    "normalizedName": "黄冈市"
+  },
+  {
+    "idLocation": "9ed98d50-e523-a96d-a82d-d5f455406003",
+    "cityId": "C308",
+    "country": "中国",
+    "province": "安徽",
+    "region": "黄山市",
+    "normalizedName": "黄山市"
+  },
+  {
+    "idLocation": "cf6b1441-146a-dd0f-29f3-4279d7968c95",
+    "cityId": "C309",
+    "country": "中国",
+    "province": "湖北",
+    "region": "黄石市",
+    "normalizedName": "黄石市"
+  },
+  {
+    "idLocation": "619c6461-762f-e2e1-7269-e2fe7b564d72",
+    "cityId": "C310",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "黑河市",
+    "normalizedName": "黑河市"
+  },
+  {
+    "idLocation": "d7f998d8-0238-0252-1e0a-a786c69716c2",
+    "cityId": "C311",
+    "country": "中国",
+    "province": "贵州",
+    "region": "黔东南苗族侗族自治州",
+    "normalizedName": "黔东南苗族侗族自治州"
+  },
+  {
+    "idLocation": "d0c3e3bc-7fba-7a55-7433-a1830facf968",
+    "cityId": "C312",
+    "country": "中国",
+    "province": "贵州",
+    "region": "黔南布依族苗族自治州",
+    "normalizedName": "黔南布依族苗族自治州"
+  },
+  {
+    "idLocation": "aad9b888-0897-d495-b3cd-e0665e392190",
+    "cityId": "C313",
+    "country": "中国",
+    "province": "贵州",
+    "region": "黔西南布依族苗族自治州",
+    "normalizedName": "黔西南布依族苗族自治州"
+  },
+  {
+    "idLocation": "a1bb7687-b1ad-9ad1-cee6-691a490f5631",
+    "cityId": "C314",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "齐齐哈尔市",
+    "normalizedName": "齐齐哈尔市"
+  },
+  {
+    "idLocation": "70e63a0e-9bfe-008c-5321-f994e4d3c684",
+    "cityId": "C315",
+    "country": "中国",
+    "province": "福建",
+    "region": "龙岩市",
+    "normalizedName": "龙岩市"
+  }
+]

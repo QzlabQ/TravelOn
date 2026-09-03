@@ -1,0 +1,35 @@
+{
+  "id": "392625ac-94bf-43d6-a56f-cdd242689a25",
+  "conversationId": "1d9d68d1-9b4e-423f-bd61-05e4240f9907",
+  "userId": "d5f22093-562a-4a20-ab6a-db94567fdef2",
+  "version": 4,
+  "baseVersion": 2,
+  "scope": "ROLLBACK",
+  "targetDayIndex": null,
+  "currentDayIndex": null,
+  "completedDayIndexes": [],
+  "title": "Shanghai 行前规划",
+  "summary": "",
+  "markdown": "# 第一版\n- 外滩",
+  "nextQuestion": "你想先从酒店区域、核心景点，还是餐厅偏好开始？",
+  "assistantText": "",
+  "places": [],
+  "routes": [],
+  "currentDayPlan": null,
+  "dayPlans": [],
+  "selectedPlaceIds": [],
+  "rejectedPlaceIds": [],
+  "changeSummary": "Restored from version 2",
+  "patchOps": [
+    {
+      "fromVersion": 2,
+      "op": "rollback",
+      "toVersion": 4
+    }
+  ],
+  "checksum": null,
+  "traceId": null,
+  "agentToolCalls": [],
+  "agentWarnings": [],
+  "createdAt": "2026-09-02T06:27:10.971417554Z"
+}

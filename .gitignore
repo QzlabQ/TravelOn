@@ -156,3 +156,6 @@ docs/microservices-learning.html
 # mise 本地覆盖（个人机器专用，不入库）
 mise.local.toml
 .mise.local.toml
+
+# others
+travel-api/tests/evidence/

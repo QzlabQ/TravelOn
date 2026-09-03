@@ -1,0 +1,11 @@
+{
+  "method": "PUT",
+  "url": "http://localhost:58082/ai-arrange/api/conversations/63516042-e678-4dcb-9dc9-7e306a2aa642/selection",
+  "headers": {
+    "Accept": "application/json"
+  },
+  "body": {
+    "userId": "3cf26bb5-d395-49f0-81f1-185c188f6d0b",
+    "selectedPlaceIds": []
+  }
+}

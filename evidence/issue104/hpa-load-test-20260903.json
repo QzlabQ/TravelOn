@@ -1,0 +1,282 @@
+{
+  "url": "http://127.0.0.1/hotels/destinations",
+  "duration_seconds": 180,
+  "cooldown_seconds": 240,
+  "concurrency": 32,
+  "requests": 50080,
+  "throughput_rps": 278.22222222222223,
+  "average_latency_ms": 80.66371823162173,
+  "p95_latency_ms": 467.2910200897604,
+  "error_rate": 0.0,
+  "sampling_error_count": 0,
+  "sampling_errors": [],
+  "scale_up_observed": true,
+  "scale_down_observed": true,
+  "replica_samples": [
+    {
+      "at": 1788423368.6599622,
+      "phase": "before-load",
+      "replicas": 1,
+      "ready": 1
+    },
+    {
+      "at": 1788423368.7352133,
+      "phase": "load",
+      "replicas": 1,
+      "ready": 1
+    },
+    {
+      "at": 1788423378.730012,
+      "phase": "load",
+      "replicas": 1,
+      "ready": 1
+    },
+    {
+      "at": 1788423388.7247262,
+      "phase": "load",
+      "replicas": 1,
+      "ready": 1
+    },
+    {
+      "at": 1788423398.7400184,
+      "phase": "load",
+      "replicas": 2,
+      "ready": 1
+    },
+    {
+      "at": 1788423408.7528653,
+      "phase": "load",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423418.7733355,
+      "phase": "load",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423428.7742996,
+      "phase": "load",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423438.7865477,
+      "phase": "load",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423448.7824552,
+      "phase": "load",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423458.8007865,
+      "phase": "load",
+      "replicas": 4,
+      "ready": 2
+    },
+    {
+      "at": 1788423468.822459,
+      "phase": "load",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423478.830448,
+      "phase": "load",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423488.8274565,
+      "phase": "load",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423498.854854,
+      "phase": "load",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423508.859426,
+      "phase": "load",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423518.8705864,
+      "phase": "load",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423528.8791015,
+      "phase": "load",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423538.8905694,
+      "phase": "load",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423548.898292,
+      "phase": "load",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423549.0082395,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423559.0730908,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423569.1397514,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423579.2074068,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423589.271645,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423599.3410938,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423609.4021409,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423619.4708042,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423629.5373085,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423639.6056955,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423649.6712315,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423659.7354438,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423669.8041139,
+      "phase": "cooldown",
+      "replicas": 4,
+      "ready": 4
+    },
+    {
+      "at": 1788423679.8702834,
+      "phase": "cooldown",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423689.9404771,
+      "phase": "cooldown",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423700.008225,
+      "phase": "cooldown",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423710.0784922,
+      "phase": "cooldown",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423720.1456952,
+      "phase": "cooldown",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423730.2132583,
+      "phase": "cooldown",
+      "replicas": 2,
+      "ready": 2
+    },
+    {
+      "at": 1788423740.2836764,
+      "phase": "cooldown",
+      "replicas": 1,
+      "ready": 1
+    },
+    {
+      "at": 1788423750.3541157,
+      "phase": "cooldown",
+      "replicas": 1,
+      "ready": 1
+    },
+    {
+      "at": 1788423760.4221523,
+      "phase": "cooldown",
+      "replicas": 1,
+      "ready": 1
+    },
+    {
+      "at": 1788423770.480969,
+      "phase": "cooldown",
+      "replicas": 1,
+      "ready": 1
+    },
+    {
+      "at": 1788423780.5461369,
+      "phase": "cooldown",
+      "replicas": 1,
+      "ready": 1
+    }
+  ],
+  "finished_at": 1788423790.5694077
+}

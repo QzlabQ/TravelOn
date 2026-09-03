@@ -1,5 +1,6 @@
 package org.microarchitecturovisco.hotelservice;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 
@@ -8,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Tag("pre")  // 前置守卫：校验数据、资源与配置本身，不是业务逻辑的单元测试
 class TravelCoreSeedMigrationTest {
 
     @Test

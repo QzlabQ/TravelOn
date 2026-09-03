@@ -1,0 +1,14 @@
+{
+  "method": "POST",
+  "url": "http://localhost:58082/users/auth/register",
+  "headers": {
+    "Accept": "application/json"
+  },
+  "body": {
+    "email": "integration.1788330735503-b952d2bcbb@example.test",
+    "password": "TravelTest123!",
+    "name": "Integration",
+    "surname": "Tester",
+    "phone": "13800138000"
+  }
+}

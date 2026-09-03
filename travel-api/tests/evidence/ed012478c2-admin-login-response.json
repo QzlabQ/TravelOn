@@ -1,0 +1,16 @@
+{
+  "token": "c3bcfe0d-707a-41ab-a3fe-2de4bb3cc58f.13d3a25a-b374-4b65-953a-6061a30b0b64",
+  "user": {
+    "id": "bd88940c-f720-a40a-cb9b-545eec4995dd",
+    "email": "nullptrofficial@nullptr.email",
+    "name": "Admin",
+    "surname": "",
+    "phone": null,
+    "avatarUrl": null,
+    "loyaltyTier": "Administrator",
+    "role": "ADMIN",
+    "createdAt": "2026-09-01T07:27:26.731682Z",
+    "updatedAt": "2026-09-02T06:32:14.927036776Z",
+    "lastLoginAt": "2026-09-02T06:32:14.926595680Z"
+  }
+}

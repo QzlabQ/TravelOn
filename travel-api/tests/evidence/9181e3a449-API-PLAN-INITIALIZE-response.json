@@ -1,0 +1,26 @@
+{
+  "id": "862166d6-6981-414b-9cc2-efb6754ff0aa",
+  "userId": "e0f7e5cd-29d5-4cea-ab01-e102730b7d6c",
+  "status": "ACTIVE_CHAT",
+  "coreSlots": {
+    "city": "Shanghai",
+    "departureCity": null,
+    "travelStartDate": "2026-10-02",
+    "travelEndDate": "2026-10-04",
+    "peopleCount": 2,
+    "budget": null,
+    "travelStyle": null,
+    "accommodationPreference": null,
+    "transportPreference": null,
+    "notes": null,
+    "mustVisitKeywords": [],
+    "avoidKeywords": []
+  },
+  "title": "Shanghai 行前规划",
+  "currentMarkdown": "# Shanghai 行前规划\n\n## 本轮结论\nAI 正在整理本轮建议。\n\n## 可直接添加建议\n- 暂无可直接添加的候选\n\n## 下一步建议\n你想先从酒店区域、核心景点，还是餐厅偏好开始？\n\n## 参考路线\n- 暂无路线\n\n### 景点图片参考\n- 暂无可展示图片，待地图服务返回图片后补充。",
+  "nextQuestion": "你想先从酒店区域、核心景点，还是餐厅偏好开始？",
+  "latestSnapshotVersion": 1,
+  "selectedPlaceIds": [],
+  "createdAt": "2026-09-02T06:32:15.711Z",
+  "updatedAt": "2026-09-02T06:32:15.768656338Z"
+}

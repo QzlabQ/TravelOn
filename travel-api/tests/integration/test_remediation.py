@@ -82,6 +82,37 @@ def reservation_payload(context: dict, room_ids: list[int] | None = None, includ
     return payload
 
 
+def cleanup_hotel_reservation(api_client: ApiClient, token: str, reservation_id: str) -> None:
+    reservation_exists = postgres_scalar(
+        "reservation_db", f"select count(*) from reservation where id = '{reservation_id}';"
+    ) > 0
+    if reservation_exists:
+        # Wait for the asynchronous create projection before publishing its delete,
+        # otherwise messages on the two fanout queues can race and leave inventory behind.
+        try:
+            wait_until(
+                "hotel reservation projection before cleanup", 15,
+                lambda: postgres_scalar(
+                    "travel_core_db",
+                    f"select count(*) from room_reservation where main_reservation_id = '{reservation_id}';",
+                ) > 0,
+            )
+        except AssertionError:
+            pass
+        api_client.request(
+            "INT-HOTEL-CLEANUP", "POST", f"/reservations/{reservation_id}/cancel",
+            expected=(200, 404), token=token,
+            json_body={"reason": "Integration test cleanup"},
+        )
+    wait_until(
+        "hotel inventory cleanup", 30,
+        lambda: postgres_scalar(
+            "travel_core_db",
+            f"select count(*) from room_reservation where main_reservation_id = '{reservation_id}';",
+        ) == 0,
+    )
+
+
 def test_invalid_room_ids_are_rejected_before_publish(api_client: ApiClient, registered_user: dict) -> None:
     context = hotel_context(api_client, registered_user)
     api_client.request(
@@ -96,41 +127,52 @@ def test_invalid_room_ids_are_rejected_before_publish(api_client: ApiClient, reg
     assert "reservation" in queues.lower()
 
 
+@pytest.mark.resilience
 def test_real_hotel_reservation_is_projected_and_timeout_rolls_back(
     api_client: ApiClient, registered_user: dict
 ) -> None:
     context = hotel_context(api_client, registered_user, offset=70)
-    created = api_client.request(
-        "INT-HOTEL-CREATE", "POST", "/reservations/hotels",
-        token=context["token"], json_body=reservation_payload(context),
-    ).data
-    reservation_id = created["id"]
-    deadline = datetime.fromisoformat(created["paymentDeadline"].replace("Z", "+00:00"))
-    remaining = (deadline - datetime.now(timezone.utc)).total_seconds()
-    configured_timeout = int(os.getenv("TRAVEL_TEST_PAYMENT_TIMEOUT_SECONDS", "10"))
-    if remaining > configured_timeout + 20:
-        pytest.skip(
-            "支付超时测试要求以 APP_PAYMENT_TIMEOUT_SECONDS="
-            f"{configured_timeout} 启动服务；当前截止时间仍有 {remaining:.0f} 秒。"
+    reservation_id = None
+    try:
+        created = api_client.request(
+            "INT-HOTEL-CREATE", "POST", "/reservations/hotels",
+            token=context["token"], json_body=reservation_payload(context),
+        ).data
+        reservation_id = created["id"]
+        deadline = datetime.fromisoformat(created["paymentDeadline"].replace("Z", "+00:00"))
+        remaining = (deadline - datetime.now(timezone.utc)).total_seconds()
+        configured_timeout = int(os.getenv("TRAVEL_TEST_PAYMENT_TIMEOUT_SECONDS", "10"))
+        if remaining > configured_timeout + 20:
+            message = (
+                "支付超时测试要求以 APP_PAYMENT_TIMEOUT_SECONDS="
+                f"{configured_timeout} 启动服务；当前截止时间仍有 {remaining:.0f} 秒。"
+            )
+            # 运行器重建过 order 服务时会设置这个标志，此时前置条件不满足说明重建
+            # 没有真正生效，必须报错——否则这条用例会年复一年地静默跳过。
+            if os.getenv("TRAVEL_TEST_EXPECT_SHORT_PAYMENT_TIMEOUT") == "1":
+                raise AssertionError(message + " 运行器已声明应用短超时，配置未生效。")
+            pytest.skip(message + " 本次运行未应用短超时，超时补偿未被验证。")
+
+        wait_until(
+            "travel-core room reservation projection", configured_timeout,
+            lambda: postgres_scalar(
+                "travel_core_db", f"select count(*) from room_reservation where main_reservation_id = '{reservation_id}';"
+            ) == len(context["room_ids"]),
         )
-
-    wait_until(
-        "travel-core room reservation projection", configured_timeout,
-        lambda: postgres_scalar(
-            "travel_core_db", f"select count(*) from room_reservation where main_reservation_id = '{reservation_id}';"
-        ) == len(context["room_ids"]),
-    )
-    wait_until(
-        "payment timeout rollback", configured_timeout + 45,
-        lambda: postgres_scalar(
-            "reservation_db", f"select count(*) from reservation where id = '{reservation_id}';"
-        ) == 0 and postgres_scalar(
-            "travel_core_db", f"select count(*) from room_reservation where main_reservation_id = '{reservation_id}';"
-        ) == 0,
-    )
+        wait_until(
+            "payment timeout rollback", configured_timeout + 45,
+            lambda: postgres_scalar(
+                "reservation_db", f"select count(*) from reservation where id = '{reservation_id}';"
+            ) == 0 and postgres_scalar(
+                "travel_core_db", f"select count(*) from room_reservation where main_reservation_id = '{reservation_id}';"
+            ) == 0,
+        )
+    finally:
+        if reservation_id is not None:
+            cleanup_hotel_reservation(api_client, context["token"], reservation_id)
 
 
-@pytest.mark.disruptive
+@pytest.mark.resilience
 def test_community_restart_deregisters_and_recovers(api_client: ApiClient) -> None:
     api_client.request("INT-COM-BEFORE", "GET", "/community/posts")
     compose("stop", "community")
@@ -164,8 +206,7 @@ def test_community_restart_deregisters_and_recovers(api_client: ApiClient) -> No
         api_client.request(f"INT-COM-RECOVERY-{index}", "GET", "/community/posts")
 
 
-@pytest.mark.external
-def test_real_deepseek_response_is_persisted(api_client: ApiClient) -> None:
+def test_model_response_is_persisted(api_client: ApiClient) -> None:
     user_id = str(uuid.uuid4())
     travel_day = (date.today() + timedelta(days=75)).isoformat()
     conversation = api_client.request(
@@ -180,7 +221,7 @@ def test_real_deepseek_response_is_persisted(api_client: ApiClient) -> None:
     ).data
     conversation_id = conversation["id"]
     snapshot = api_client.request(
-        "INT-AI-RUN", "POST", f"/ai-arrange/api/conversations/{conversation_id}/planner/run", timeout=300,
+        "INT-AI-RUN", "POST", f"/ai-arrange/api/conversations/{conversation_id}/planner/run", timeout=90,
         json_body={
             "userId": user_id,
             "message": "Create a concise one-day Shanghai itinerary with two attractions, one local meal, transit advice, and backup plans.",
@@ -189,8 +230,14 @@ def test_real_deepseek_response_is_persisted(api_client: ApiClient) -> None:
         },
     ).data
     trace_id = snapshot["traceId"]
-    deepseek_calls = [call for call in snapshot["agentToolCalls"] if call["tool"] == "deepseek_chat_completion"]
-    assert deepseek_calls and deepseek_calls[0]["status"] in {"SUCCESS", "PARTIAL_SUCCESS"}
+    # 托管测试栈把 OpenAI 兼容端点指向固定响应的桩服务，因此这里既验证模型调用记录，
+    # 也验证模型结果生成的快照确实持久化到了 MongoDB。
+    model_calls = [call for call in snapshot["agentToolCalls"] if call["tool"] == "model_chat_completion"]
+    assert model_calls, (
+        "快照里没有 model_chat_completion 调用记录；"
+        f"实际出现的工具：{sorted({call['tool'] for call in snapshot['agentToolCalls']})}"
+    )
+    assert model_calls[0]["status"] in {"SUCCESS", "PARTIAL_SUCCESS"}
     snapshots = api_client.request(
         "INT-AI-SNAPSHOTS", "GET",
         f"/ai-arrange/api/conversations/{conversation_id}/snapshots?userId={user_id}",

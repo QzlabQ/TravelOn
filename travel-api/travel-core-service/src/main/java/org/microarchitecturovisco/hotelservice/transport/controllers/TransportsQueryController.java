@@ -70,7 +70,8 @@ public class TransportsQueryController {
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(defaultValue = "false") boolean studentOnly,
             @RequestParam(defaultValue = "false") boolean onlyAvailable,
-            @RequestParam(defaultValue = "departure") String sortBy
+            @RequestParam(defaultValue = "departure") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDirection
     ) {
         return transportsQueryService.searchTicketOffers(
                 type,
@@ -81,7 +82,8 @@ public class TransportsQueryController {
                 maxPrice,
                 studentOnly,
                 onlyAvailable,
-                sortBy
+                sortBy,
+                sortDirection
         );
     }
 

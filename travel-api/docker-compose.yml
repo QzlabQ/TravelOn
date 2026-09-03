@@ -9,6 +9,20 @@ x-service-defaults: &service-defaults
       max-file: "5"
 
 services:
+  llm-stub:
+    <<: *service-defaults
+    build: ./llm-stub
+    profiles: ["test"]
+    expose:
+      - "9099"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9099/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+
   postgres:
     <<: *service-defaults
     image: postgres:16
