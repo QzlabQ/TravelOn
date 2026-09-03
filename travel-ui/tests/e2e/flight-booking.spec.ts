@@ -9,7 +9,7 @@ test('机票默认北京→上海，可以选航班、填乘客并生成待支�
     await registerThroughUi(page, uniqueAccount('flight'));
 
     await page.goto('/reservations/flights');
-    await expect(page.getByRole('heading', {name: '机票订票与比价'})).toBeVisible();
+    await expect(page.getByRole('heading', {name: '机票', exact: true})).toBeVisible();
     // 业务场景文档要求机票页默认使用北京 → 上海。
     // 默认值不是初始 state：TicketBooking 要先取回 /transports/tickets/options 和用户的
     // 预订偏好，才在 .then() 里 setFrom/setTo，机器负载高时这一步会超过默认的 5 秒断言超时。

@@ -10,6 +10,9 @@ test('用户可以注册、查看账户、退出并重新登录', async ({page})
     await expect(page.getByRole('button', {name: '退出登录'})).toBeVisible();
 
     await page.getByRole('button', {name: '退出登录'}).click();
+    const logoutDialog = page.getByRole('dialog', {name: '确认退出登录'});
+    await expect(logoutDialog).toBeVisible();
+    await logoutDialog.getByRole('button', {name: '退出登录'}).click();
     // 退出登录后应用会跳转到首页（Account.tsx 的 logout 末尾调用 navigate("/")），
     // 「登录 / 注册」按钮只存在于 /account 的未登录分支，因此先回到该页再断言。
     await expect(page).toHaveURL(/\/$/);

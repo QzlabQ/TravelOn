@@ -5,7 +5,7 @@ import {bookTicket, cancelReservation, isoDate} from './support/booking';
 /** BS-04 火车票查询与火车票预订：车次类型筛选、按车次号筛选、席别切换、下单。 */
 test('火车票可以按车次类型和车次号筛选', async ({page}) => {
     await page.goto('/reservations/trains');
-    await expect(page.getByRole('heading', {name: '火车票订票与比价'})).toBeVisible();
+    await expect(page.getByRole('heading', {name: '火车票', exact: true})).toBeVisible();
     await page.getByLabel('出行日期').fill(isoDate(3));
     await page.getByRole('button', {name: '查询', exact: true}).click();
     await expect(page.getByRole('heading', {name: '推荐车次'})).toBeVisible();

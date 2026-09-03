@@ -24,14 +24,14 @@ test('订单列表与旅行时间线按支付状态区分行程', async ({page})
 
         // 订单列表要同时列出两张订单。
         await page.goto('/reservations');
-        await expect(page.getByRole('heading', {name: '我的预定'})).toBeVisible();
+        await expect(page.getByRole('heading', {name: '历史订单', exact: true})).toBeVisible();
         await expect(page.getByText(paidId)).toBeVisible({timeout: 30_000});
         await expect(page.getByText(pendingId)).toBeVisible();
 
         // 时间线只收已支付且未开始的行程，待支付的那张不该出现。
         await page.getByRole('link', {name: '我的行程'}).click();
         await expect(page).toHaveURL(/\/reservations\/timeline$/);
-        await expect(page.getByRole('heading', {name: '已确认行程时间线'})).toBeVisible();
+        await expect(page.getByRole('heading', {name: '我的行程', exact: true})).toBeVisible();
         await expect(page.getByRole('link', {name: '查看订单'})).toHaveAttribute(
             'href', `/reservations/${paidId}`, {timeout: 30_000},
         );
@@ -45,6 +45,6 @@ test('订单列表与旅行时间线按支付状态区分行程', async ({page})
 test('没有已支付行程时时间线给出空状态而不是报错', async ({page}) => {
     await registerThroughUi(page, uniqueAccount('timeline-empty'));
     await page.goto('/reservations/timeline');
-    await expect(page.getByRole('heading', {name: '已确认行程时间线'})).toBeVisible();
+    await expect(page.getByRole('heading', {name: '我的行程', exact: true})).toBeVisible();
     await expect(page.getByRole('heading', {name: '暂无接下来的行程'})).toBeVisible();
 });
