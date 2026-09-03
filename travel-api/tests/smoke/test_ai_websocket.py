@@ -11,7 +11,7 @@ from websockets.sync.client import connect
 from conftest import ApiClient
 
 
-pytestmark = [pytest.mark.integration, pytest.mark.external]
+pytestmark = pytest.mark.integration
 
 
 def test_planner_websocket_refresh_is_saved(api_client: ApiClient) -> None:

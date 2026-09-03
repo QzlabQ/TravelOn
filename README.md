@@ -420,17 +420,16 @@ docker compose stop
 
 ### 一、环境配置（一次性）
 
-| 配置项 | `unit` | `integration` | `e2e` | `full` |
-| --- | :-: | :-: | :-: | :-: |
-| 工具链（Java / Node / Yarn / Python） | ✓ | ✓ | ✓ | ✓ |
-| Python 测试依赖 | ✓ | ✓ | ✓ | ✓ |
-| 前端依赖 | ✓ | — | ✓ | ✓ |
-| Playwright 浏览器 | — | — | ✓ | ✓（三浏览器） |
-| Docker Compose V2 运行中 | — | ✓ | ✓ | ✓ |
-| 后端镜像已构建 | — | ✓ | ✓ | ✓ |
-| `travel-api/.env` | — | ✓ | ✓ | ✓ |
-| `travel-ui/.env` | ✓ | — | ✓ | ✓ |
-| 有效 `AI_API_KEY` + 管理员凭据 | — | — | — | ✓ |
+| 配置项 | `unit` | `integration` | `e2e` |
+| --- | :-: | :-: | :-: |
+| 工具链（Java / Node / Yarn / Python） | ✓ | ✓ | ✓ |
+| Python 测试依赖 | ✓ | ✓ | ✓ |
+| 前端依赖 | ✓ | — | ✓ |
+| Playwright 浏览器 | — | — | ✓（Chromium） |
+| Docker Compose V2 运行中 | — | ✓ | ✓ |
+| 后端镜像已构建 | — | ✓ | ✓ |
+| `travel-api/.env` | — | ✓ | ✓ |
+| `travel-ui/.env` | ✓ | — | ✓ |
 
 `.env` 字段见[环境变量配置](#环境变量配置)。
 
@@ -505,11 +504,9 @@ mise run verify
 | `mise run test:pre` | 前置守卫：种子数据、迁移脚本、classpath 资源、MQ 与网关配置，约 20 秒 | 否 |
 | `mise run test:unit` | 单元测试与覆盖率门禁，约 50 秒 | 否 |
 | `mise run test:migration` | 跨平台 PostgreSQL 旧数据库迁移回归测试 | 临时 PostgreSQL 容器 |
-| `mise run test:integration` | Java `*IT`、Agent 集成、API 测试；跳过真实模型调用；resilience 用例另起一段 | 是 |
+| `mise run test:integration` | Java `*IT`、Agent 集成、API 测试；模型调用使用固定响应桩；resilience 用例另起一段 | 是 |
 | `mise run test:e2e` | Playwright，Chromium | 是 |
-| `mise run test:all` | `pre + unit + integration + Chromium E2E + resilience` | 是 |
 | `mise run test:ci` | 与 CI 相同的 `pre + unit + migration + integration + Chromium E2E + resilience`，失败立即停止 | 是 |
-| `mise run test:full` | `all` 之外追加真实模型调用、WebSocket、三浏览器 E2E；需有效 `AI_API_KEY` 与管理员凭据 | 是 |
 | `mise run verify` | 单个最小模块，确认链路可用 | 否 |
 | `mise run doctor` | 打印 java/node/yarn/python/docker 版本 | 否 |
 
@@ -555,7 +552,6 @@ Playwright 报告：在 `travel-ui` 执行 `corepack yarn test:e2e:report`。
 | `docker compose` 失败并提示 `auth.docker.io` | Docker Hub 不可达，配置加速器或本轮用 `--no-build` |
 | 测试结果与源码不符 | 多半是 `--no-build` 跑在旧镜像上，去掉重建 |
 | 等待 Gateway 超时 | `docker compose -f travel-api/docker-compose.yml logs` 查看具体服务 |
-| `full` 报缺少管理员凭据 | 设 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 或确认 `admin_account.txt` 存在 |
 | `.venv` 突然找不到标准库 | 基础解释器已被移除；删除 `.venv` 后重跑 `mise run setup:py`（先关闭占用进程） |
 
 不用 mise 也可以：按[环境要求](#环境要求)手动装同版本工具，底层命令见 [tests/README.md](tests/README.md)。

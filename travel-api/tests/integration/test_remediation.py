@@ -206,8 +206,7 @@ def test_community_restart_deregisters_and_recovers(api_client: ApiClient) -> No
         api_client.request(f"INT-COM-RECOVERY-{index}", "GET", "/community/posts")
 
 
-@pytest.mark.external
-def test_real_model_response_is_persisted(api_client: ApiClient) -> None:
+def test_model_response_is_persisted(api_client: ApiClient) -> None:
     user_id = str(uuid.uuid4())
     travel_day = (date.today() + timedelta(days=75)).isoformat()
     conversation = api_client.request(
@@ -222,7 +221,7 @@ def test_real_model_response_is_persisted(api_client: ApiClient) -> None:
     ).data
     conversation_id = conversation["id"]
     snapshot = api_client.request(
-        "INT-AI-RUN", "POST", f"/ai-arrange/api/conversations/{conversation_id}/planner/run", timeout=300,
+        "INT-AI-RUN", "POST", f"/ai-arrange/api/conversations/{conversation_id}/planner/run", timeout=90,
         json_body={
             "userId": user_id,
             "message": "Create a concise one-day Shanghai itinerary with two attractions, one local meal, transit advice, and backup plans.",
@@ -231,9 +230,8 @@ def test_real_model_response_is_persisted(api_client: ApiClient) -> None:
         },
     ).data
     trace_id = snapshot["traceId"]
-    # 工具名随「只支持 DeepSeek → OpenAI 兼容」的改造从 deepseek_chat_completion 改成了
-    # model_chat_completion，这里的过滤条件当时没跟着改，永远匹配不到；因为用例带 external
-    # 标记、只在 test:full 里跑，一直没暴露。
+    # 托管测试栈把 OpenAI 兼容端点指向固定响应的桩服务，因此这里既验证模型调用记录，
+    # 也验证模型结果生成的快照确实持久化到了 MongoDB。
     model_calls = [call for call in snapshot["agentToolCalls"] if call["tool"] == "model_chat_completion"]
     assert model_calls, (
         "快照里没有 model_chat_completion 调用记录；"

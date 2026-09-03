@@ -161,7 +161,7 @@ Without `AI_API_KEY`, the service still runs and returns a local placeholder ans
 
 ## Smoke Test
 
-The cross-platform WebSocket smoke test lives at `travel-api/tests/smoke/test_ai_websocket.py` and is part of the external/full suite. Run it from the repository root after starting the backend and configuring `AI_API_KEY`:
+The cross-platform WebSocket smoke test lives at `travel-api/tests/smoke/test_ai_websocket.py` and is part of the regular integration suite. Managed test runs use the deterministic LLM stub:
 
 ```text
 cd travel-api/tests

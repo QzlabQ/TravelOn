@@ -187,7 +187,7 @@ def preflight(category: str, browser: str) -> dict[str, str]:
         if not java_match or java_match.group(1) != "21":
             raise RuntimeError(f"需要 Java 21，当前检测结果：{versions['java']}")
 
-    if category in {"unit", "e2e", "all", "ci", "full"}:
+    if category in {"unit", "e2e", "ci"}:
         node = require_command("node", "请安装 Node.js 22.22.3。")
         versions["node"] = command_version([node, "--version"])
         if versions["node"].lstrip("v") != "22.22.3":
@@ -198,7 +198,7 @@ def preflight(category: str, browser: str) -> dict[str, str]:
         if versions["yarn"] != "4.2.2":
             raise RuntimeError(f"需要 Yarn 4.2.2，当前为 {versions['yarn']}。")
 
-    if category in {"migration", "integration", "e2e", "all", "ci", "full"}:
+    if category in {"migration", "integration", "e2e", "ci"}:
         docker = require_command("docker", "请安装并启动 Docker Desktop 或 Docker Engine。")
         versions["docker"] = command_version([docker, "--version"])
         compose = subprocess.run([docker, "compose", "version"], text=True, capture_output=True, check=False)
@@ -223,7 +223,7 @@ def preflight(category: str, browser: str) -> dict[str, str]:
                 f"；否则执行：{hint}"
             ) from exc
 
-    if category in {"e2e", "all", "ci", "full"} and browser:
+    if category in {"e2e", "ci"} and browser:
         browser_cache = Path(os.environ.get("PLAYWRIGHT_BROWSERS_PATH", Path.home() / ".cache" / "ms-playwright"))
         if platform.system() == "Windows":
             browser_cache = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "ms-playwright"
@@ -298,7 +298,7 @@ def compose(
     args: Sequence[str], check: bool = True, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
     completed = subprocess.run(
-        ["docker", "compose", "-f", str(API_ROOT / "docker-compose.yml"), *args],
+        ["docker", "compose", "-f", str(API_ROOT / "docker-compose.yml"), "--profile", "test", *args],
         cwd=API_ROOT,
         text=True,
         capture_output=True,
@@ -358,6 +358,12 @@ class ManagedServices:
         before = compose(["ps", "--services", "--status", "running"], check=False)
         self.preexisting = {line.strip() for line in before.stdout.splitlines() if line.strip()}
         compose_env = os.environ.copy()
+        compose_env.update({
+            "AI_BASE_URL": "http://llm-stub:9099",
+            "AI_CHAT_COMPLETIONS_PATH": "/v1/chat/completions",
+            "AI_API_KEY": "e2e-stub-key",
+            "AI_MODEL": "stub-model",
+        })
         try:
             print()
             print(paint("== 服务栈 ==", BOLD))
@@ -623,7 +629,7 @@ def run_migration(artifacts: Path) -> list[Result]:
     ]
 
 
-def run_integration(args: argparse.Namespace, artifacts: Path, include_heavy: bool = False) -> list[Result]:
+def run_integration(args: argparse.Namespace, artifacts: Path) -> list[Result]:
     selected = set(args.module or [])
     jobs: list[tuple[str, list[str], Path, dict[str, str] | None]] = []
     for module in JAVA_MODULES:
@@ -650,8 +656,6 @@ def run_integration(args: argparse.Namespace, artifacts: Path, include_heavy: bo
     if not selected or "api" in selected:
         # resilience 用例（saga / disruptive）要改服务配置或重启服务，由 run_resilience 单独跑。
         marker = "integration and not resilience"
-        if not include_heavy:
-            marker += " and not external"
         junit = artifacts / "integration" / "api-junit.xml"
         jobs.append((
             "api",
@@ -745,6 +749,8 @@ def run_e2e(args: argparse.Namespace, artifacts: Path) -> list[Result]:
         "TRAVEL_UI_URL": args.ui_url,
         "PLAYWRIGHT_REPORT_DIR": str(artifacts / "e2e"),
     })
+    if args.manage_services:
+        env["TRAVEL_TEST_LLM_STUB"] = "1"
     progress = Progress("e2e", 1)
     return [
         run_process(
@@ -932,7 +938,7 @@ def print_summary(results: list[Result], artifacts: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="TravelOn 跨平台测试入口")
-    parser.add_argument("category", choices=("pre", "unit", "migration", "integration", "e2e", "all", "ci", "full"))
+    parser.add_argument("category", choices=("pre", "unit", "migration", "integration", "e2e", "ci"))
     parser.add_argument("--module", action="append", help="只运行指定模块，可重复")
     parser.add_argument("--manage-services", action="store_true", help="自动启动并恢复 Docker 服务")
     parser.add_argument(
@@ -953,7 +959,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    args.browser = args.browser or ("all" if args.category == "full" else "chromium")
+    args.browser = args.browser or "chromium"
     artifacts = args.artifacts_dir.resolve()
     try:
         print(paint("== 环境预检 ==", BOLD), flush=True)
@@ -965,14 +971,14 @@ def main() -> int:
         results: list[Result] = []
 
         # pre 独立成段：test:unit 就只跑单元测试，组合类别里 pre 排在最前面先失败。
-        if args.category in {"pre", "all", "ci", "full"}:
+        if args.category in {"pre", "ci"}:
             results.extend(run_pre(args, artifacts))
             if args.category == "ci" and any(result.status != "passed" for result in results):
                 write_summary(results, artifacts, versions, collect_coverage(artifacts))
                 print_summary(results, artifacts)
                 return 1
 
-        if args.category in {"unit", "all", "ci", "full"}:
+        if args.category in {"unit", "ci"}:
             results.extend(run_unit(args, artifacts))
             if args.category == "ci" and any(result.status != "passed" for result in results):
                 write_summary(results, artifacts, versions, collect_coverage(artifacts))
@@ -986,18 +992,18 @@ def main() -> int:
                 print_summary(results, artifacts)
                 return 1
 
-        needs_services = args.category in {"integration", "e2e", "all", "ci", "full"}
+        needs_services = args.category in {"integration", "e2e", "ci"}
         with ManagedServices(
             args.manage_services and needs_services,
             args.gateway_url,
             build=not args.no_build,
         ):
-            if args.category in {"integration", "all", "ci", "full"}:
-                results.extend(run_integration(args, artifacts, include_heavy=args.category == "full"))
-            if args.category in {"e2e", "all", "ci", "full"}:
+            if args.category in {"integration", "ci"}:
+                results.extend(run_integration(args, artifacts))
+            if args.category in {"e2e", "ci"}:
                 results.extend(run_e2e(args, artifacts))
             # 放在最后：这一步会重建 order、重启 community，之前的用例不应受影响。
-            if args.category in {"integration", "all", "ci", "full"}:
+            if args.category in {"integration", "ci"}:
                 results.extend(run_resilience(args, artifacts))
         write_summary(results, artifacts, versions, collect_coverage(artifacts))
         print_summary(results, artifacts)

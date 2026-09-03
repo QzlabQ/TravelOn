@@ -421,17 +421,16 @@ docker compose stop
 
 ### Part 1 — Environment Setup (one-time)
 
-| Requirement | `unit` | `integration` | `e2e` | `full` |
-| --- | :-: | :-: | :-: | :-: |
-| Toolchain (Java / Node / Yarn / Python) | ✓ | ✓ | ✓ | ✓ |
-| Python test dependencies | ✓ | ✓ | ✓ | ✓ |
-| Frontend dependencies | ✓ | — | ✓ | ✓ |
-| Playwright browsers | — | — | ✓ | ✓ (all three) |
-| Docker Compose V2 running | — | ✓ | ✓ | ✓ |
-| Backend images built | — | ✓ | ✓ | ✓ |
-| `travel-api/.env` | — | ✓ | ✓ | ✓ |
-| `travel-ui/.env` | ✓ | — | ✓ | ✓ |
-| Valid `AI_API_KEY` + admin credentials | — | — | — | ✓ |
+| Requirement | `unit` | `integration` | `e2e` |
+| --- | :-: | :-: | :-: |
+| Toolchain (Java / Node / Yarn / Python) | ✓ | ✓ | ✓ |
+| Python test dependencies | ✓ | ✓ | ✓ |
+| Frontend dependencies | ✓ | — | ✓ |
+| Playwright browsers | — | — | ✓ (Chromium) |
+| Docker Compose V2 running | — | ✓ | ✓ |
+| Backend images built | — | ✓ | ✓ |
+| `travel-api/.env` | — | ✓ | ✓ |
+| `travel-ui/.env` | ✓ | — | ✓ |
 
 `.env` fields are documented under [Environment Variables](#environment-variables).
 
@@ -506,11 +505,9 @@ Runs the smallest single module (about 3 seconds) to confirm the whole chain wor
 | `mise run test:pre` | Preflight guards: seed data, migration scripts, classpath resources, MQ and gateway config; about 20 seconds | No |
 | `mise run test:unit` | Unit tests and the coverage gate, about 50 seconds | No |
 | `mise run test:migration` | Cross-platform PostgreSQL legacy-database migration regression test | Throwaway PostgreSQL container |
-| `mise run test:integration` | Java `*IT`, Agent integration, API tests; skips real model calls; resilience cases run in their own pass | Yes |
+| `mise run test:integration` | Java `*IT`, Agent integration, API tests; model calls use a deterministic stub; resilience cases run in their own pass | Yes |
 | `mise run test:e2e` | Playwright, Chromium | Yes |
-| `mise run test:all` | `pre + unit + integration + Chromium E2E + resilience` | Yes |
 | `mise run test:ci` | The same stages as CI: `pre + unit + migration + integration + Chromium E2E + resilience`, stopping at the first failure | Yes |
-| `mise run test:full` | `all` plus real model calls, WebSocket, three-browser E2E; needs a valid `AI_API_KEY` and admin credentials | Yes |
 | `mise run verify` | A single minimal module, to confirm the chain works | No |
 | `mise run doctor` | Prints java/node/yarn/python/docker versions | No |
 
@@ -556,7 +553,6 @@ Playwright report: run `corepack yarn test:e2e:report` inside `travel-ui`.
 | `docker compose` fails mentioning `auth.docker.io` | Docker Hub unreachable; configure a mirror or use `--no-build` |
 | Results contradict the source | Usually `--no-build` on stale images; drop it and rebuild |
 | Timeout waiting for the Gateway | `docker compose -f travel-api/docker-compose.yml logs` |
-| `full` reports missing admin credentials | Set `ADMIN_EMAIL` / `ADMIN_PASSWORD` or confirm `admin_account.txt` exists |
 | `.venv` suddenly cannot find the standard library | Its base interpreter is gone; delete `.venv` and rerun `mise run setup:py` (close anything holding it first) |
 
 mise is optional: install the same versions manually per [Prerequisites](#prerequisites); the underlying commands are documented in [tests/README.md](tests/README.md).

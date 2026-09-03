@@ -8,7 +8,6 @@ mise run test:unit
 mise run test:migration
 mise run test:integration
 mise run test:e2e
-mise run test:all
 mise run test:ci
 ```
 
@@ -28,9 +27,7 @@ python tests/run_tests.py unit
 python tests/run_tests.py migration
 python tests/run_tests.py integration
 python tests/run_tests.py e2e
-python tests/run_tests.py all
 python tests/run_tests.py ci
-python tests/run_tests.py full
 ```
 
 | 类别 | 内容 | 需要服务 | 对应 mise 任务 |
@@ -38,11 +35,9 @@ python tests/run_tests.py full
 | `pre` | 前置守卫：种子数据、迁移脚本、classpath 资源、MQ 与网关配置，约 20 秒 | 否 | `test:pre` |
 | `unit` | 单元测试与覆盖率门禁，约 50 秒 | 否 | `test:unit` |
 | `migration` | PostgreSQL 旧数据库迁移回归测试 | 临时 PostgreSQL 容器 | `test:migration` |
-| `integration` | Java `*IT`、Agent 集成、API 测试；跳过真实模型调用；resilience 用例另起一段 | 是 | `test:integration` |
+| `integration` | Java `*IT`、Agent 集成、API 测试；模型调用使用固定响应桩；resilience 用例另起一段 | 是 | `test:integration` |
 | `e2e` | Playwright，默认 Chromium；自动 `yarn build` 后 `yarn serve` | 是 | `test:e2e` |
-| `all` | `pre + unit + integration + Chromium E2E + resilience` | 是 | `test:all` |
 | `ci` | `pre + unit + migration + integration + Chromium E2E + resilience`，前置阶段失败立即停止 | 是 | `test:ci` |
-| `full` | `all` 之外追加真实模型调用、WebSocket、三浏览器 E2E | 是 | `test:full` |
 
 ## 参数
 
@@ -51,7 +46,7 @@ python tests/run_tests.py full
 | `--module <名称>` | 只跑指定模块，可重复指定多个 |
 | `--manage-services` | 由运行器启停 Docker 服务；不传则假设后端已在运行 |
 | `--no-build` | 启动服务时跳过 `docker compose --build`，直接用已有镜像 |
-| `--browser chromium\|firefox\|webkit\|all` | E2E 浏览器，`full` 默认 `all`，其余默认 `chromium` |
+| `--browser chromium\|firefox\|webkit\|all` | E2E 浏览器，默认 `chromium`；`all` 仍可手动运行三浏览器 |
 | `--gateway-url <URL>` | 默认 `http://localhost:58082` |
 | `--eureka-url <URL>` | 默认 `http://localhost:58010` |
 | `--ui-url <URL>` | 默认 `http://localhost:53000` |
@@ -82,8 +77,6 @@ python tests/run_tests.py unit --module user-service --module travel-core-servic
 python tests/run_tests.py migration
 python tests/run_tests.py integration --module api
 python tests/run_tests.py e2e --browser firefox
-python tests/run_tests.py all --manage-services
-python tests/run_tests.py full --manage-services --browser all
 python tests/run_tests.py ci --manage-services
 python tests/run_tests.py integration --manage-services --no-build
 ```
@@ -92,7 +85,29 @@ python tests/run_tests.py integration --manage-services --no-build
 
 ## 服务管理
 
-`integration` / `e2e` / `all` / `ci` / `full` 默认假设后端已在运行。传入 `--manage-services` 后，运行器执行 `docker compose up -d --build`，轮询 Gateway 直到就绪（上限 20 分钟），结束时**只停止本次新启动的服务**，此前已在运行的容器不受影响。`ci` 会先完成前置守卫、单元与迁移测试，再启动服务栈运行集成测试。
+`integration` / `e2e` / `ci` 默认假设后端已在运行。传入 `--manage-services` 后，运行器以 `test` profile 执行 `docker compose up -d --build`，同时启动固定响应的 `llm-stub`，轮询 Gateway 直到就绪（上限 20 分钟），结束时**只停止本次新启动的服务**，此前已在运行的容器不受影响。`ci` 会先完成前置守卫、单元与迁移测试，再启动服务栈运行集成测试。
+
+## 模型桩、真实模型与三浏览器
+
+托管服务模式会把 Agent 的 OpenAI 兼容端点指向 `llm-stub:9099`。桩只替代模型本身；前端、Gateway、Java 编排、Python Agent、WebSocket、快照和 MongoDB 仍走真实链路。BS-08 的确定性 E2E 还会检查桩特有文案，避免模型调用失败后静默走 fallback。未使用 `--manage-services` 时，相关 E2E 会跳过并提示启用方法。
+
+自动化测试不再调用真实模型。需要手动验证真实调用时，先用真实配置重建 Agent，再直接运行这两条 pytest：
+
+```powershell
+$env:AI_BASE_URL="https://api.deepseek.com"
+$env:AI_CHAT_COMPLETIONS_PATH="/chat/completions"
+$env:AI_API_KEY="<真实 API Key>"
+$env:AI_MODEL="<真实模型名>"
+docker compose -f travel-api/docker-compose.yml up -d --force-recreate ai-arrange-agent
+python -m pytest -q travel-api/tests/integration/test_remediation.py::test_model_response_is_persisted travel-api/tests/smoke/test_ai_websocket.py
+```
+
+三浏览器 E2E 仍可手动运行（需先安装 Chromium、Firefox、WebKit）：
+
+```text
+cd travel-ui
+corepack yarn test:e2e:all
+```
 
 ## pre 阶段（前置守卫）
 
@@ -129,7 +144,7 @@ python tests/run_tests.py integration --manage-services --no-build
 | 支付超时补偿 | `order` 以 `APP_PAYMENT_TIMEOUT_SECONDS=10` 运行 |
 | 社区停机与 Eureka 摘除恢复 | 中途 `docker compose stop community` |
 
-`integration` / `all` / `ci` / `full` 会在所有其它测试结束后追加一段 `resilience`：先以 10 秒支付超时重建 `order` 容器，只跑这一组用例，跑完恢复默认超时。**该段需要 `--manage-services`**，否则跳过并给出提示。
+`integration` / `ci` 会在所有其它测试结束后追加一段 `resilience`：先以 10 秒支付超时重建 `order` 容器，只跑这一组用例，跑完恢复默认超时。**该段需要 `--manage-services`**，否则跳过并给出提示。
 
 10 秒超时不能作用于整批用例——它会把所有未在 10 秒内付款的订单一并回滚，全链路用例根本跑不完。运行器实际应用短超时时会注入 `TRAVEL_TEST_EXPECT_SHORT_PAYMENT_TIMEOUT=1`，此时超时用例若发现配置未生效会直接失败，而不是静默跳过。
 
@@ -161,6 +176,7 @@ python tests/run_tests.py integration --manage-services --no-build
 | `TRAVEL_TEST_EVIDENCE_DIR` | API 请求/响应证据的输出目录 |
 | `TRAVEL_TEST_PAYMENT_TIMEOUT_SECONDS` | 支付超时补偿用例的等待上限 |
 | `TRAVEL_TEST_EXPECT_SHORT_PAYMENT_TIMEOUT` | 设为 `1` 表示本次运行确实应用了短超时，超时用例此时不允许跳过 |
+| `TRAVEL_TEST_LLM_STUB` | 设为 `1` 时执行依赖桩模型的 BS-08 E2E；由 `--manage-services` 自动注入 |
 | `TRAVEL_UI_URL` | Playwright 访问的前端地址 |
 | `PLAYWRIGHT_REPORT_DIR` | Playwright 报告输出目录 |
 | `PLAYWRIGHT_BROWSERS_PATH` | Playwright 浏览器缓存位置 |
@@ -186,7 +202,7 @@ cd travel-api/ai-arrange-agent-service && python -m pytest -q tests/unit
 cd travel-api/ai-arrange-agent-service && python -m pytest -q tests/integration
 
 # API 集成测试（后端需已运行）
-cd travel-api/tests && python -m pytest -q -m "integration and not external and not resilience"
+cd travel-api/tests && python -m pytest -q -m "integration and not resilience"
 
 # UI 单元 / E2E
 cd travel-ui && corepack yarn test:unit:coverage

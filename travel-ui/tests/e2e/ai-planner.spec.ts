@@ -1,13 +1,7 @@
 import {expect, test} from '@playwright/test';
 import {registerThroughUi, uniqueAccount} from './support/auth';
 
-/**
- * BS-08 AI 行程规划与版本管理。此前 /ai-planner 页面零 E2E 覆盖。
- *
- * 刻意不断言模型生成的内容：外部模型不可用时规划会走降级路径，断言正文会让这条用例
- * 变成 CI 里最大的 flaky 来源。这里只验证结构性结果——会话能创建、规划工作台能进入、
- * 快照与版本控件真实存在。
- */
+/** BS-08 AI 行程规划与版本管理。 */
 test('AI 规划可以创建会话并进入带版本控制的工作台', async ({page}) => {
     test.setTimeout(180_000);
     await registerThroughUi(page, uniqueAccount('planner'));
@@ -50,4 +44,70 @@ test('未填必填项时规划表单给出明确提示', async ({page}) => {
     // 只保留非必填的出发城市，按钮应保持禁用。
     await expect(page.getByRole('button', {name: '开始规划'})).toBeDisabled();
     await expect(page.getByText('城市、日期、人数是必填项，其它信息会作为 AI 生成规划的偏好约束。')).toBeVisible();
+});
+
+test.describe('桩模型下的确定性规划与版本闭环', () => {
+    test.skip(
+        !process.env.TRAVEL_TEST_LLM_STUB,
+        '需要桩模型端点：用 python tests/run_tests.py e2e --manage-services 运行',
+    );
+
+    async function startStubPlan(page: Parameters<typeof registerThroughUi>[0], accountPrefix: string) {
+        await registerThroughUi(page, uniqueAccount(accountPrefix));
+        await page.goto('/ai-planner');
+        await page.getByLabel('旅游城市').fill('上海');
+        // MUI DatePicker 使用 locale 格式；保留页面自带的有效默认日期。
+        await page.getByLabel('人数').fill('2');
+        await page.getByRole('button', {name: '开始规划'}).click();
+        await expect(page.getByRole('button', {name: '开始规划'})).toHaveCount(0, {timeout: 60_000});
+    }
+
+    test('生成行程使用桩响应并产出第 1 天计划', async ({page}) => {
+        test.setTimeout(180_000);
+        await startStubPlan(page, 'planner-stub-generate');
+
+        const markdownPanel = page.locator('section').filter({
+            has: page.getByText('规划 Markdown', {exact: true}),
+        });
+        await expect(markdownPanel.getByRole('heading', {name: '桩模型示例行程'})).toBeVisible({timeout: 120_000});
+        await expect(markdownPanel.getByText('这是由 E2E 桩模型返回的固定规划')).toBeVisible();
+        await expect(page.getByText('第 1 天 · 桩模型示例行程', {exact: false})).toBeVisible();
+        await expect(page.getByText('日计划待生成')).toHaveCount(0);
+    });
+
+    test('Markdown 新版本可以回看旧版本并回到最新', async ({page}) => {
+        test.setTimeout(180_000);
+        await startStubPlan(page, 'planner-stub-version');
+
+        const historySelector = page.getByRole('combobox', {name: '历史版本'});
+        await expect(historySelector).toBeVisible();
+        await expect(page.getByText('暂无历史版本')).toBeVisible();
+        const markdownPanel = page.locator('section').filter({
+            has: page.getByText('规划 Markdown', {exact: true}),
+        });
+        await expect(markdownPanel.getByRole('heading', {name: '桩模型示例行程'})).toBeVisible({timeout: 120_000});
+        await expect(page.getByText('1 个历史版本')).toBeVisible();
+
+        const editedMarkdown = '# E2E 手工版本\n\n这是手工编辑后的确定内容。';
+        await page.getByRole('button', {name: '编辑'}).click();
+        await page.getByPlaceholder('AI 生成的 Markdown 规划会显示在这里。').fill(editedMarkdown);
+        await page.getByRole('button', {name: '保存为新版本'}).click();
+
+        await expect(page.getByRole('heading', {name: 'E2E 手工版本'})).toBeVisible({timeout: 60_000});
+        await expect(page.getByText('2 个历史版本')).toBeVisible({timeout: 60_000});
+
+        await historySelector.click();
+        const versionOptions = page.getByRole('option').filter({hasText: /^v\d+/});
+        await expect(versionOptions).toHaveCount(2);
+        await page.getByRole('option', {name: /^v1\b/}).click();
+
+        await expect(page.getByText('正在只读回看', {exact: false})).toBeVisible();
+        await expect(markdownPanel.getByRole('heading', {name: '桩模型示例行程'})).toBeVisible();
+        await expect(page.getByText('这是手工编辑后的确定内容。')).toHaveCount(0);
+
+        await page.getByRole('button', {name: '回到最新'}).click();
+        await expect(page.getByText('正在只读回看', {exact: false})).toHaveCount(0);
+        await expect(page.getByRole('heading', {name: 'E2E 手工版本'})).toBeVisible();
+        await expect(page.getByText('这是手工编辑后的确定内容。')).toBeVisible();
+    });
 });

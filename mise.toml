@@ -56,19 +56,10 @@ description = "端到端测试（Playwright chromium）"
 depends = ["setup:e2e"]
 run = "python tests/run_tests.py e2e --manage-services --browser chromium"
 
-[tasks."test:all"]
-description = "全量测试"
-depends = ["setup:e2e"]
-run = "python tests/run_tests.py all --manage-services --browser chromium"
-
 [tasks."test:ci"]
 description = "运行与 CI 相同的测试阶段"
 depends = ["setup:e2e"]
 run = "python tests/run_tests.py ci --manage-services"
-
-[tasks."test:full"]
-description = "完整测试（含真实 DeepSeek、三浏览器 E2E，需有效 Key 与管理员凭据）"
-run = "python tests/run_tests.py full --manage-services --browser all"
 
 [tasks.verify]
 description = "跑单个最小模块，确认测试链路可用"
