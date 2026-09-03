@@ -69,6 +69,23 @@ CREATE TABLE public.saved_bank_cards (
 );
 
 --
+-- Name: booking_preferences; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.booking_preferences (
+    id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    default_departure_city character varying(80) NOT NULL,
+    default_arrival_city character varying(80) NOT NULL,
+    preferred_hotel_min_rating numeric(2,1) NOT NULL,
+    preferred_hotel_max_price character varying(32),
+    preferred_train_types character varying(255) NOT NULL,
+    only_available_tickets boolean NOT NULL,
+    created_at timestamp(6) with time zone,
+    updated_at timestamp(6) with time zone
+);
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -99,11 +116,17 @@ ALTER TABLE ONLY public.user_identities
 ALTER TABLE ONLY public.saved_bank_cards
     ADD CONSTRAINT saved_bank_cards_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.booking_preferences
+    ADD CONSTRAINT booking_preferences_pkey PRIMARY KEY (id);
+
 ALTER TABLE ONLY public.user_identities
     ADD CONSTRAINT uk_user_identities_user_id UNIQUE (user_id);
 
 ALTER TABLE ONLY public.saved_bank_cards
     ADD CONSTRAINT uk_saved_bank_cards_user_card UNIQUE (user_id, card_number);
+
+ALTER TABLE ONLY public.booking_preferences
+    ADD CONSTRAINT uk_booking_preferences_user_id UNIQUE (user_id);
 
 --
 -- Name: travelers travelers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -145,8 +168,12 @@ ALTER TABLE ONLY public.user_identities
 ALTER TABLE ONLY public.saved_bank_cards
     ADD CONSTRAINT fk_saved_bank_cards_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY public.booking_preferences
+    ADD CONSTRAINT fk_booking_preferences_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
 CREATE INDEX idx_travelers_user ON public.travelers(user_id);
 CREATE INDEX idx_saved_bank_cards_user ON public.saved_bank_cards(user_id);
+CREATE INDEX idx_booking_preferences_user ON public.booking_preferences(user_id);
 CREATE INDEX idx_travelers_user_default ON public.travelers(user_id, default_traveler);
 CREATE INDEX idx_users_email ON public.users(email);
 CREATE INDEX idx_users_session_token ON public.users(session_token);

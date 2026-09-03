@@ -27,9 +27,9 @@ import { ApiRequests, TicketSearchOffer } from "../../core/apiConfig";
 import { BookingPersonPayload } from "../../core/apiConfig";
 import {
   addNotification,
-  getBookingPreferences,
   getCurrentUserSession,
 } from "../../core/currentUser";
+import {useBookingPreferences} from "../../core/useBookingPreferences";
 import TravelerSelector from "../../account/components/TravelerSelector";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
@@ -564,7 +564,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   const session = useAuthSession();
   const isAuthenticated = Boolean(session);
   const rebookState = (location.state ?? {}) as TicketRebookState;
-  const bookingPreferences = useMemo(() => getBookingPreferences(), []);
+  const {preferences: bookingPreferences, loading: bookingPreferencesLoading, error: bookingPreferencesError} = useBookingPreferences();
   const preferredTrainTypeFilters =
     bookingPreferences.preferredTrainTypes.filter(isTrainTypeFilter);
   const navigateTimerRef = useRef<number | null>(null);
@@ -877,6 +877,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   };
 
   useEffect(() => {
+    if (bookingPreferencesLoading) return;
     setHasLoadedOptions(false);
     setDepartureAirportFilter("");
     setArrivalAirportFilter("");
@@ -885,8 +886,9 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     setSelectedTrainTypes(
       mode === "train" && preferredTrainTypeFilters.length > 0
         ? preferredTrainTypeFilters
-        : defaultTrainTypeFilters,
+      : defaultTrainTypeFilters,
     );
+    setOnlyAvailable(bookingPreferences.onlyAvailableTickets);
     setTrainCodeQuery(mode === "train" ? (rebookState.bookingCode ?? "") : "");
     setLoading(true);
     setError(false);
@@ -939,7 +941,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         setHasLoadedOptions(true);
         setLoading(false);
       });
-  }, [mode]);
+  }, [mode, bookingPreferences, bookingPreferencesLoading]);
 
   useEffect(() => {
     if (!hasLoadedOptions || !from || !to) return;
@@ -1238,6 +1240,100 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
           {toastMessage}
         </Alert>
       </Snackbar>
+
+      <div className="mb-6 rounded-lg bg-white border border-slate-200 px-7 py-6 shadow-sm">
+        <Chip
+          icon={config.icon}
+          label={config.eyebrow}
+          sx={{ backgroundColor: "#eff6ff", color: config.accent }}
+        />
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-950">
+              {config.title}
+            </h1>
+            <p className="mt-2 text-slate-500">{config.hero}</p>
+          </div>
+          <div className="flex gap-2">
+            <Chip
+              icon={<ArrowForward />}
+              label={`${from || "-"} 到 ${to || "-"}`}
+            />
+            <Chip
+              icon={<Tune />}
+              label={
+                mode === "train"
+                  ? `${displayedResultCount} 趟车次`
+                  : `${displayedResultCount} 个方案`
+              }
+            />
+            {mode === "train" && (
+              <Chip
+                label={
+                  trainCodeQuery.trim()
+                    ? `车次 ${trainCodeQuery.trim()}`
+                    : allTrainTypesSelected
+                      ? "全部车次"
+                      : `${selectedTrainTypes.length} 类车次`
+                }
+              />
+            )}
+            {mode === "train" &&
+              (departureStationFilter || arrivalStationFilter) && (
+                <Chip
+                  label={`${departureStationFilter || "全部出发站"} → ${arrivalStationFilter || "全部到达站"}`}
+                />
+              )}
+            {mode === "flight" &&
+              (departureAirportFilter || arrivalAirportFilter) && (
+                <Chip
+                  label={`${departureAirportFilter ? formatAirportFilterOption(departureAirportFilter) : "全部出发机场"} → ${arrivalAirportFilter ? formatAirportFilterOption(arrivalAirportFilter) : "全部到达机场"}`}
+                />
+              )}
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <Alert severity="warning" className="mb-4">
+          后端票务数据暂时不可用，请确认交通服务已启动。
+        </Alert>
+      )}
+      {bookingPreferencesError && (
+        <Alert severity="warning" className="mb-4">
+          预订偏好读取失败，当前使用系统默认筛选条件。
+        </Alert>
+      )}
+      {!isAuthenticated && (
+        <Alert severity="info" className="mb-4">
+          未登录时可以查询票价和查看方案；登录后才能选择班次、填写出行人并提交订单。
+        </Alert>
+      )}
+      {bookingError && (
+        <Alert severity="error" className="mb-4">
+          创建预订失败，请确认后端服务已启动。
+        </Alert>
+      )}
+      {bookingMessage && (
+        <Alert
+          severity={bookingError ? "warning" : "success"}
+          className="mb-4"
+          action={
+            reservationId ? (
+              <Button
+                component={Link}
+                to={`/reservations/${reservationId}#payment-countdown`}
+                color="inherit"
+                size="small"
+              >
+                订单详情
+              </Button>
+            ) : undefined
+          }
+        >
+          {bookingMessage}
+        </Alert>
+      )}
 
           <section className="rounded-lg bg-white border border-slate-200 p-5 shadow-sm">
             <h2 className="text-lg font-bold text-slate-900 mb-4">查询行程</h2>

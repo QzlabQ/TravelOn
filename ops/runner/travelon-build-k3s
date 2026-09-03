@@ -11,6 +11,7 @@ manifest="$workspace/ops/cd/images.tsv"; [[ -r "$manifest" ]] || exit 6
 while IFS=$'\t' read -r name context dockerfile; do
   [[ -z "$name" || "$name" == \#* ]] && continue
   [[ "$name" =~ ^[a-z0-9-]+$ && "$context" != /* && "$dockerfile" != /* ]] || exit 7
+  [[ "$context" != *..* && "$dockerfile" != *..* && -d "$workspace/$context" && -f "$workspace/$dockerfile" ]] || exit 7
   build_and_import "$name" "$context" "$dockerfile"
 done < "$manifest"
 for image in mongo:7 rabbitmq:3.13-management; do docker image inspect "$image" >/dev/null; docker save "$image" | k3s ctr images import -; done

@@ -120,7 +120,7 @@ class ToolRegistry:
                 input_summary=input_summary,
             )
 
-        if name == "deepseek_chat_completion":
+        if name == "model_chat_completion":
             if context.model_call_count >= self._policy.max_model_calls_per_turn:
                 return self._limit_result(
                     context=context,
@@ -215,7 +215,7 @@ class ToolRegistry:
                 self._attach_summaries(last_result, input_summary)
 
             if attempt < retry_count:
-                retry_phase = "model" if name == "deepseek_chat_completion" else "tool"
+                retry_phase = "model" if name == "model_chat_completion" else "tool"
                 context.recorder.emit(
                     event_type="TOOL_CALL_RETRY",
                     name=name,
@@ -232,7 +232,7 @@ class ToolRegistry:
             break
 
         assert last_result is not None
-        if name == "deepseek_chat_completion":
+        if name == "model_chat_completion":
             after_model_call(
                 context.recorder,
                 spec.name,

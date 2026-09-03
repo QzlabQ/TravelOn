@@ -9,6 +9,7 @@ import org.microarchitecturovisco.aiarrangeservice.domain.model.request.RunPlann
 import org.microarchitecturovisco.aiarrangeservice.domain.model.request.UpdatePlannerSelectionRequest;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerConversationResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerDayVersionResponse;
+import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerMessageResponse;
 import org.microarchitecturovisco.aiarrangeservice.domain.model.response.PlannerSnapshotDiffResponse;
 import org.microarchitecturovisco.aiarrangeservice.service.PlannerConversationService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,6 +44,11 @@ public class PlannerConversationController {
     @GetMapping("/{conversationId}")
     public PlannerConversationResponse get(@PathVariable UUID conversationId, @RequestParam UUID userId) {
         return plannerConversationService.getConversation(conversationId, userId);
+    }
+
+    @GetMapping("/{conversationId}/messages")
+    public List<PlannerMessageResponse> listMessages(@PathVariable UUID conversationId, @RequestParam UUID userId) {
+        return plannerConversationService.listMessages(conversationId, userId);
     }
 
     @PutMapping("/{conversationId}/selection")

@@ -3,6 +3,8 @@ package org.microarchitecturovisco.userservice.controllers;
 import jakarta.validation.Valid;
 import org.microarchitecturovisco.userservice.dto.AccountIdentityRequest;
 import org.microarchitecturovisco.userservice.dto.AccountIdentityResponse;
+import org.microarchitecturovisco.userservice.dto.BookingPreferencesRequest;
+import org.microarchitecturovisco.userservice.dto.BookingPreferencesResponse;
 import org.microarchitecturovisco.userservice.dto.AuthResponse;
 import org.microarchitecturovisco.userservice.dto.LoginRequest;
 import org.microarchitecturovisco.userservice.dto.RegisterRequest;
@@ -13,6 +15,7 @@ import org.microarchitecturovisco.userservice.dto.TravelerResponse;
 import org.microarchitecturovisco.userservice.dto.UpdateProfileRequest;
 import org.microarchitecturovisco.userservice.dto.UserProfileResponse;
 import org.microarchitecturovisco.userservice.services.AccountIdentityService;
+import org.microarchitecturovisco.userservice.services.BookingPreferencesService;
 import org.microarchitecturovisco.userservice.services.SavedBankCardService;
 import org.microarchitecturovisco.userservice.services.TravelerService;
 import org.microarchitecturovisco.userservice.services.UserService;
@@ -35,18 +38,21 @@ public class UserController {
     private final TravelerService travelerService;
     private final AccountIdentityService accountIdentityService;
     private final SavedBankCardService savedBankCardService;
+    private final BookingPreferencesService bookingPreferencesService;
 
     @Autowired
     public UserController(
             UserService userService,
             TravelerService travelerService,
             AccountIdentityService accountIdentityService,
-            SavedBankCardService savedBankCardService
+            SavedBankCardService savedBankCardService,
+            BookingPreferencesService bookingPreferencesService
     ) {
         this.userService = userService;
         this.travelerService = travelerService;
         this.accountIdentityService = accountIdentityService;
         this.savedBankCardService = savedBankCardService;
+        this.bookingPreferencesService = bookingPreferencesService;
     }
 
     @PostMapping("/auth/register")
@@ -95,6 +101,21 @@ public class UserController {
             @Valid @RequestBody AccountIdentityRequest request
     ) {
         return accountIdentityService.save(token, request);
+    }
+
+    @GetMapping("/me/booking-preferences")
+    public ResponseEntity<BookingPreferencesResponse> getBookingPreferences(@RequestHeader("X-User-Token") String token) {
+        return bookingPreferencesService.get(token)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @PutMapping("/me/booking-preferences")
+    public BookingPreferencesResponse saveBookingPreferences(
+            @RequestHeader("X-User-Token") String token,
+            @Valid @RequestBody BookingPreferencesRequest request
+    ) {
+        return bookingPreferencesService.save(token, request);
     }
 
     @GetMapping("/me/bank-cards")

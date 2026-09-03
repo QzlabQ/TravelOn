@@ -167,10 +167,12 @@ services:
     build: ./user-service
     volumes:
       - ./logs/user:/logs
+      - ./seed-data/common:/seed-data/common:ro
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${USER_DB_NAME:-user_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-admin}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      APP_SEED_DATA_COMMON_BASE_PATH: file:/seed-data/common/
     depends_on:
       postgres:
         condition: service_healthy
@@ -220,12 +222,18 @@ services:
       https_proxy: ""
       ALL_PROXY: ""
       all_proxy: ""
-      DEEPSEEK_TIMEOUT_SECONDS: "180"
-      DEEPSEEK_THINKING_TYPE: "disabled"
+      AI_BASE_URL: "${AI_BASE_URL:-https://api.deepseek.com}"
+      AI_CHAT_COMPLETIONS_PATH: "${AI_CHAT_COMPLETIONS_PATH:-/chat/completions}"
+      AI_API_KEY: "${AI_API_KEY:-}"
+      AI_MODEL: "${AI_MODEL:-deepseek-v4-pro}"
+      AI_JSON_MODE: "${AI_JSON_MODE:-true}"
+      AI_TEMPERATURE: "${AI_TEMPERATURE:-0.6}"
+      AI_MODEL_TIMEOUT_SECONDS: "${AI_MODEL_TIMEOUT_SECONDS:-180}"
+      AI_THINKING_TYPE: "${AI_THINKING_TYPE:-omit}"
       AGENT_MODEL_TIMEOUT_SECONDS: "180"
       AGENT_MAX_RUNTIME_SECONDS: "240"
-      DEEPSEEK_MAX_TOKENS: "${DEEPSEEK_MAX_TOKENS:-12000}"
-      DEEPSEEK_SLOW_RESPONSE_WARNING_MS: "60000"
+      AI_MAX_TOKENS: "${AI_MAX_TOKENS:-12000}"
+      AI_SLOW_RESPONSE_WARNING_MS: "${AI_SLOW_RESPONSE_WARNING_MS:-60000}"
       TRAVEL_GATEWAY_BASE_URL: "http://gateway:8082"
       NO_PROXY: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
       no_proxy: "localhost,127.0.0.1,::1,ai-arrange-agent,ai-arrange,gateway,discovery,mongo,rabbitmq"
@@ -250,6 +258,7 @@ services:
       - AI_AGENT_ENABLED=true
       - AI_ARRANGE_AGENT_BASE_URL=http://ai-arrange-agent:8090
       - AI_ARRANGE_AGENT_TIMEOUT_SECONDS=270
+      - AI_ARRANGE_LOG_FILE=/logs/ai-arrange-service.log
       - HTTP_PROXY=
       - HTTPS_PROXY=
       - http_proxy=

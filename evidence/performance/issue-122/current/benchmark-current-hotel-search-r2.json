@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-02T08:49:57.768535+00:00",
+  "version": "current",
+  "commit": "e2b9bbc65f163fa7e29ffb2587fc88cfec0e884d",
+  "endpoint": "hotel-search",
+  "round": 2,
+  "concurrency": 32,
+  "configured_duration_seconds": 30.0,
+  "warmup_seconds": 10.0,
+  "elapsed_seconds": 30.009708772180602,
+  "requests": 86469,
+  "successful_requests": 86469,
+  "failed_requests": 0,
+  "error_rate_percent": 0.0,
+  "requests_per_second": 2881.3675153075096,
+  "response_bytes": 535156641,
+  "status_counts": {
+    "200": 86469
+  },
+  "error_counts": {},
+  "latency_ms": {
+    "mean": 11.101426227445673,
+    "p50": 10.842707,
+    "p90": 15.063615799999997,
+    "p95": 17.720822999999996,
+    "p99": 20.055548479999974,
+    "max": 51.13686
+  },
+  "request_path": "/hotels/search?destinationId=928c6512-b3a8-a0dc-74a9-3ee63e77842a&dateFrom=2026-09-12&dateTo=2026-09-14&adults=2&sortBy=price"
+}

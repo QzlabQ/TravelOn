@@ -155,26 +155,34 @@ Both `.env` files must be in place before starting either mode.
 ### Backend: `travel-api/.env`
 
 ```env
-DEEPSEEK_API_KEY=
+AI_BASE_URL=https://api.deepseek.com
+AI_CHAT_COMPLETIONS_PATH=/chat/completions
+AI_API_KEY=
+AI_MODEL=deepseek-v4-pro
+AI_THINKING_TYPE=omit
+AI_JSON_MODE=true
+AI_TEMPERATURE=0.6
+AI_MAX_TOKENS=12000
+AI_MODEL_TIMEOUT_SECONDS=90
+AI_SLOW_RESPONSE_WARNING_MS=60000
 AMAP_API_KEY=
-DEEPSEEK_MODEL=
-DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
-DEEPSEEK_PRO_MODEL=deepseek-v4-pro
-DEEPSEEK_THINKING_TYPE=disabled
-DEEPSEEK_MAX_TOKENS=12000
-DEEPSEEK_SLOW_RESPONSE_WARNING_MS=60000
 ```
 
 | Variable | Description |
 | --- | --- |
-| `DEEPSEEK_API_KEY` | DeepSeek API key, required for AI features |
+| `AI_BASE_URL` | Base URL of the OpenAI-compatible model service |
+| `AI_CHAT_COMPLETIONS_PATH` | Chat Completions path |
+| `AI_API_KEY` | Model service API key, required for AI features |
+| `AI_MODEL` | Model name to invoke |
+| `AI_THINKING_TYPE` | Optional thinking parameter; use `omit` when unsupported |
+| `AI_JSON_MODE` | Whether to send `response_format=json_object`; set to `false` when unsupported |
+| `AI_TEMPERATURE` | Sampling temperature |
+| `AI_MAX_TOKENS` | Maximum token count |
+| `AI_MODEL_TIMEOUT_SECONDS` | Model request timeout in seconds |
+| `AI_RETRY_COUNT` | Number of model request retries |
+| `AI_RETRY_BACKOFF_SECONDS` | Retry backoff in seconds |
+| `AI_SLOW_RESPONSE_WARNING_MS` | Slow response warning threshold in milliseconds |
 | `AMAP_API_KEY` | AMap key for backend POI/route enrichment |
-| `DEEPSEEK_MODEL` | Optional default model |
-| `DEEPSEEK_FLASH_MODEL` | Flash model name, used by default on the AI planning page |
-| `DEEPSEEK_PRO_MODEL` | Pro model name, switchable in the UI |
-| `DEEPSEEK_THINKING_TYPE` | Thinking mode switch |
-| `DEEPSEEK_MAX_TOKENS` | Max token limit |
-| `DEEPSEEK_SLOW_RESPONSE_WARNING_MS` | Slow response warning threshold (ms) |
 
 AI features require keys; leave them empty if you only need non-AI features such as the community pages.
 
@@ -423,7 +431,7 @@ docker compose stop
 | Backend images built | — | ✓ | ✓ | ✓ |
 | `travel-api/.env` | — | ✓ | ✓ | ✓ |
 | `travel-ui/.env` | ✓ | — | ✓ | ✓ |
-| Valid `DEEPSEEK_API_KEY` + admin credentials | — | — | — | ✓ |
+| Valid `AI_API_KEY` + admin credentials | — | — | — | ✓ |
 
 `.env` fields are documented under [Environment Variables](#environment-variables).
 
@@ -499,7 +507,7 @@ Runs the smallest single module (about 3 seconds) to confirm the whole chain wor
 | `mise run test:integration` | Java `*IT`, Agent integration, API tests; skips real DeepSeek and community downtime | Yes |
 | `mise run test:e2e` | Playwright, Chromium | Yes |
 | `mise run test:all` | `unit + integration + Chromium E2E` | Yes |
-| `mise run test:full` | `all` plus real DeepSeek, WebSocket, community stop/recovery, three-browser E2E; needs a valid `DEEPSEEK_API_KEY` and admin credentials | Yes |
+| `mise run test:full` | `all` plus the configured model, WebSocket, community stop/recovery, and three-browser E2E; needs a valid `AI_API_KEY` and admin credentials | Yes |
 | `mise run verify` | A single minimal module, to confirm the chain works | No |
 | `mise run doctor` | Prints java/node/yarn/python/docker versions | No |
 
@@ -642,8 +650,8 @@ Check frontend AMap variables:
 
 Check backend AI variables:
 
-- `DEEPSEEK_API_KEY`
-- `DEEPSEEK_FLASH_MODEL` / `DEEPSEEK_PRO_MODEL`
+- `AI_API_KEY`
+- `AI_MODEL`
 
 Restart backend services after `.env` updates.
 

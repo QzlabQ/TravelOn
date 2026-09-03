@@ -91,6 +91,23 @@ class PythonPlannerAgentClientTest {
     }
 
     @Test
+    void streamPlannerFailsWhenAgentConnectionClosesBeforeTerminalEvent() {
+        ExchangeFunction exchange = request -> Mono.error(new RuntimeException("connection reset by peer"));
+        PlannerAgentProperties properties = new PlannerAgentProperties();
+        properties.setTimeoutSeconds(5);
+        PythonPlannerAgentClient client = new PythonPlannerAgentClient(
+                WebClient.builder().baseUrl("http://agent").exchangeFunction(exchange).build(),
+                new ObjectMapper().findAndRegisterModules(),
+                properties
+        );
+
+        assertThatThrownBy(() -> client.streamPlanner(request(), ignored -> {
+        }).join())
+                .isInstanceOf(CompletionException.class)
+                .hasRootCauseMessage("connection reset by peer");
+    }
+
+    @Test
     void configuredWebClientSerializesLocalDatesAsIsoStrings() throws IOException {
         AtomicReference<String> capturedBody = new AtomicReference<>("");
         String responseBody = """
