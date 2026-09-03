@@ -91,3 +91,25 @@ def test_cd_prune_allowlist_uses_full_group_version_kind() -> None:
         assert "--prune-allowlist=core/v1/ConfigMap" in script, script_path
         assert "--prune-allowlist=v1/Service" not in script, script_path
         assert "--prune-allowlist=v1/ConfigMap" not in script, script_path
+
+
+def test_cd_smoke_checks_retry_until_service_discovery_is_stable() -> None:
+    """冒烟检查应容忍 Eureka 短暂缓存旧 Pod，但仍保持明确失败上限。"""
+    scripts = (
+        ROOT / "ops" / "runner" / "travelon-deploy-k3s",
+        ROOT / "scripts" / "deploy-k3s.sh",
+    )
+    expected_checks = (
+        "run_smoke_check discovery http://discovery:8010/",
+        "run_smoke_check ai-arrange-agent http://ai-arrange-agent:8090/agent/health",
+        "run_smoke_check gateway-hotels http://gateway:8082/hotels/destinations 3",
+    )
+    for script_path in scripts:
+        script = script_path.read_text(encoding="utf-8")
+        assert "run_smoke_check()" in script, script_path
+        assert "local max_attempts=36" in script, script_path
+        assert "local retry_delay_seconds=5" in script, script_path
+        assert "local command_timeout_seconds=10" in script, script_path
+        assert "consecutive_successes >= required_successes" in script, script_path
+        for check in expected_checks:
+            assert check in script, script_path
