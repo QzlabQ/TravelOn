@@ -7,3 +7,6 @@
 `tests/cd/test-cd-metadata.sh` 会渲染清单，校验生命周期标签、镜像清单覆盖和退休资源白名单；可在提交前执行。
 
 `travelon-secrets` 由管理员预置在 `travelon` namespace，CD runner 不持有或写入 Kubernetes Secret。
+
+阿里云 Docker Compose 部署使用独立的 runner、工作流和服务器私有环境文件，参见
+[ALIYUN.md](ALIYUN.md)。该部署不会替换 `production-256` K3s 流水线。

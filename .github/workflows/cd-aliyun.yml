@@ -1,0 +1,39 @@
+name: CD Aliyun
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-travelon-aliyun
+  cancel-in-progress: false
+
+jobs:
+  deploy-aliyun:
+    name: Deploy to Aliyun Docker Compose
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: [self-hosted, linux, x64, travelon-aliyun]
+    environment: production-aliyun
+    timeout-minutes: 120
+    steps:
+      - name: Checkout verified main revision
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - name: Deploy and smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          deploy_sha="$(git rev-parse HEAD)"
+          sudo -n /usr/local/sbin/travelon-deploy-compose \
+            "sha-${deploy_sha:0:7}" "$deploy_sha"

@@ -113,6 +113,11 @@ jobs:
           cd travel-ui
           corepack yarn build
 
+      - name: Validate Aliyun deployment metadata
+        if: steps.changes.outputs.run_ci == 'true'
+        shell: bash
+        run: bash tests/cd/test-aliyun-compose.sh
+
       - name: Run unit tests
         if: steps.changes.outputs.run_ci == 'true'
         run: mise run test:unit

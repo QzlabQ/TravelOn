@@ -1,0 +1,58 @@
+services:
+  postgres:
+    restart: unless-stopped
+
+  rabbitmq:
+    restart: unless-stopped
+
+  mongo:
+    restart: unless-stopped
+
+  discovery:
+    image: travelon-discovery:${DEPLOY_TAG:-latest}
+    restart: unless-stopped
+
+  gateway:
+    image: travelon-gateway:${DEPLOY_TAG:-latest}
+    restart: unless-stopped
+
+  travel-core-migration:
+    restart: "no"
+
+  travel-core:
+    image: travelon-travel-core:${DEPLOY_TAG:-latest}
+    restart: unless-stopped
+
+  order:
+    image: travelon-order:${DEPLOY_TAG:-latest}
+    restart: unless-stopped
+
+  user:
+    image: travelon-user:${DEPLOY_TAG:-latest}
+    restart: unless-stopped
+
+  community:
+    image: travelon-community:${DEPLOY_TAG:-latest}
+    restart: unless-stopped
+
+  ai-arrange-agent:
+    image: travelon-ai-arrange-agent:${DEPLOY_TAG:-latest}
+    restart: unless-stopped
+
+  ai-arrange:
+    image: travelon-ai-arrange:${DEPLOY_TAG:-latest}
+    restart: unless-stopped
+
+  front:
+    image: travelon-ui:${DEPLOY_TAG:-latest}
+    build:
+      context: ../travel-ui
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${FRONT_HOST_PORT:-80}:80"
+    depends_on:
+      gateway:
+        condition: service_started
+    networks:
+      - backend

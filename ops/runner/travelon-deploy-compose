@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+tag="${1:-}"
+expected_sha="${2:-}"
+[[ "$tag" =~ ^sha-[0-9a-f]{7,40}$ ]] || exit 2
+[[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || exit 2
+[[ "${SUDO_USER:-}" == travelon-runner ]] || exit 3
+
+workspace="$(pwd -P)"
+case "$workspace" in
+  /home/travelon-runner/_work/*/*|/home/travelon-runner/actions-runner/_work/*/*) ;;
+  *) exit 4 ;;
+esac
+[[ "$(stat -c %U "$workspace")" == travelon-runner ]] || exit 5
+[[ "$(git rev-parse HEAD)" == "$expected_sha" ]] || exit 6
+
+destination=/root/demo-app
+environment_file="$destination/travel-api/.env"
+rendered="$(mktemp /tmp/travelon-compose.XXXXXX.json)"
+compose_files=(
+  -f "$destination/travel-api/docker-compose.yml"
+  -f "$destination/ops/cd/docker-compose.aliyun.yml"
+)
+trap 'rm -f "$rendered"' EXIT
+
+exec 9>/run/lock/travelon-compose-deploy.lock
+flock -n 9 || { echo "another TravelOn deployment is running" >&2; exit 7; }
+[[ -s "$environment_file" ]] || {
+  echo "missing production environment file: $environment_file" >&2
+  exit 8
+}
+
+mkdir -p "$destination/travel-api/data" "$destination/travel-api/logs"
+rsync -a --delete \
+  --exclude '/.git/' \
+  --exclude '/travel-api/.env' \
+  --exclude '/travel-api/data/' \
+  --exclude '/travel-api/logs/' \
+  "$workspace/" "$destination/"
+printf '%s\n' "$expected_sha" >"$destination/.deploy-revision"
+
+export DEPLOY_TAG="$tag"
+cd "$destination"
+docker compose --env-file "$environment_file" "${compose_files[@]}" \
+  config --format json >"$rendered"
+
+python3 - "$rendered" "$destination" <<'PY'
+import json
+import os
+import sys
+
+config_path, destination = sys.argv[1:]
+with open(config_path, encoding="utf-8") as config_file:
+    services = json.load(config_file).get("services", {})
+
+expected = {
+    "postgres", "rabbitmq", "mongo", "discovery", "gateway",
+    "travel-core-migration", "travel-core", "order", "user", "community",
+    "ai-arrange-agent", "ai-arrange", "front",
+}
+if set(services) != expected:
+    raise SystemExit("unexpected Compose service inventory")
+
+destination = os.path.realpath(destination)
+for name, service in services.items():
+    if service.get("privileged"):
+        raise SystemExit(f"privileged service rejected: {name}")
+    if service.get("network_mode") == "host" or service.get("pid") == "host" or service.get("ipc") == "host":
+        raise SystemExit(f"host namespace rejected: {name}")
+    if service.get("devices") or service.get("cap_add"):
+        raise SystemExit(f"device or capability grant rejected: {name}")
+
+    build = service.get("build")
+    if build:
+        context = build if isinstance(build, str) else build.get("context", "")
+        dockerfile = "Dockerfile" if isinstance(build, str) else build.get("dockerfile", "Dockerfile")
+        context = os.path.realpath(context)
+        dockerfile = os.path.realpath(os.path.join(context, dockerfile))
+        for path in (context, dockerfile):
+            if os.path.commonpath((destination, path)) != destination:
+                raise SystemExit(f"build path outside deployment directory: {name}")
+
+    for volume in service.get("volumes", []):
+        if volume.get("type") != "bind":
+            continue
+        source = os.path.realpath(volume.get("source", ""))
+        if os.path.commonpath((destination, source)) != destination:
+            raise SystemExit(f"bind mount outside deployment directory: {name}")
+
+    for port in service.get("ports", []):
+        target = int(port.get("target", 0))
+        published = str(port.get("published", ""))
+        host_ip = port.get("host_ip", "")
+        if name == "front" and target == 80 and published == "80":
+            continue
+        if host_ip != "127.0.0.1":
+            raise SystemExit(f"public non-frontend port rejected: {name}:{published}")
+PY
+
+docker compose --env-file "$environment_file" "${compose_files[@]}" \
+  up -d --build --remove-orphans
+
+for attempt in $(seq 1 60); do
+  if curl --fail --silent --show-error --max-time 15 \
+      http://127.0.0.1/ >/dev/null && \
+    curl --fail --silent --show-error --max-time 30 \
+      http://127.0.0.1/hotels/destinations >/dev/null; then
+    docker compose --env-file "$environment_file" "${compose_files[@]}" \
+      exec -T front wget -qO- http://ai-arrange-agent:8090/agent/health >/dev/null
+    docker compose --env-file "$environment_file" "${compose_files[@]}" ps
+    exit 0
+  fi
+  sleep 5
+done
+
+docker compose --env-file "$environment_file" "${compose_files[@]}" ps -a >&2
+docker compose --env-file "$environment_file" "${compose_files[@]}" \
+  logs --tail=200 gateway travel-core front >&2
+echo "TravelOn smoke test timed out" >&2
+exit 9
