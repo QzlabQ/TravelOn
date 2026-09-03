@@ -69,7 +69,7 @@ test.describe('桩模型下的确定性规划与版本闭环', () => {
         const markdownPanel = page.locator('section').filter({
             has: page.getByText('规划 Markdown', {exact: true}),
         });
-        await expect(markdownPanel.getByRole('heading', {name: '桩模型示例行程'})).toBeVisible({timeout: 120_000});
+        await expect(markdownPanel.getByText('桩模型示例行程', {exact: true})).toBeVisible({timeout: 120_000});
         await expect(markdownPanel.getByText('这是由 E2E 桩模型返回的固定规划')).toBeVisible();
         await expect(page.getByText('第 1 天 · 桩模型示例行程', {exact: false})).toBeVisible();
         await expect(page.getByText('日计划待生成')).toHaveCount(0);
@@ -85,7 +85,7 @@ test.describe('桩模型下的确定性规划与版本闭环', () => {
         const markdownPanel = page.locator('section').filter({
             has: page.getByText('规划 Markdown', {exact: true}),
         });
-        await expect(markdownPanel.getByRole('heading', {name: '桩模型示例行程'})).toBeVisible({timeout: 120_000});
+        await expect(markdownPanel.getByText('桩模型示例行程', {exact: true})).toBeVisible({timeout: 120_000});
         await expect(page.getByText('1 个历史版本')).toBeVisible();
 
         const editedMarkdown = '# E2E 手工版本\n\n这是手工编辑后的确定内容。';
@@ -93,7 +93,7 @@ test.describe('桩模型下的确定性规划与版本闭环', () => {
         await page.getByPlaceholder('AI 生成的 Markdown 规划会显示在这里。').fill(editedMarkdown);
         await page.getByRole('button', {name: '保存为新版本'}).click();
 
-        await expect(page.getByRole('heading', {name: 'E2E 手工版本'})).toBeVisible({timeout: 60_000});
+        await expect(markdownPanel.getByText('E2E 手工版本', {exact: true})).toBeVisible({timeout: 60_000});
         await expect(page.getByText('2 个历史版本')).toBeVisible({timeout: 60_000});
 
         await historySelector.click();
@@ -102,12 +102,12 @@ test.describe('桩模型下的确定性规划与版本闭环', () => {
         await page.getByRole('option', {name: /^v1\b/}).click();
 
         await expect(page.getByText('正在只读回看', {exact: false})).toBeVisible();
-        await expect(markdownPanel.getByRole('heading', {name: '桩模型示例行程'})).toBeVisible();
+        await expect(markdownPanel.getByText('桩模型示例行程', {exact: true})).toBeVisible();
         await expect(page.getByText('这是手工编辑后的确定内容。')).toHaveCount(0);
 
         await page.getByRole('button', {name: '回到最新'}).click();
         await expect(page.getByText('正在只读回看', {exact: false})).toHaveCount(0);
-        await expect(page.getByRole('heading', {name: 'E2E 手工版本'})).toBeVisible();
+        await expect(markdownPanel.getByText('E2E 手工版本', {exact: true})).toBeVisible();
         await expect(page.getByText('这是手工编辑后的确定内容。')).toBeVisible();
     });
 });
