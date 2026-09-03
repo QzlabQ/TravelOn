@@ -65,12 +65,12 @@ export default function Navbar() {
 
     return (
         <div
-            className="flex flex-col items-center gap-3 border-b border-slate-200 px-4 py-3 shadow-[0_6px_18px_-10px_rgba(15,23,42,0.28)] lg:px-8 xl:flex-row xl:justify-between"
+            className="flex flex-col items-center gap-3 border-b border-slate-200 px-4 py-3 shadow-[0_6px_18px_-10px_rgba(15,23,42,0.28)] lg:px-8 xl:flex-row xl:items-center xl:gap-6"
         >
             <Link to="/" className="shrink-0">
                 <img src={logo} style={{maxHeight: "60px", pointerEvents: "none"}} alt="TourCentral"/>
             </Link>
-                <ul className="flex w-full flex-wrap items-center justify-center gap-1 md:gap-2 xl:w-auto xl:gap-3">
+                <ul className="flex w-full flex-wrap items-center justify-center gap-1 md:gap-2 xl:ml-auto xl:w-auto xl:justify-end xl:gap-3">
                     <li className="flex flex-row items-center">
                         <Button
                             component={Link}
@@ -94,16 +94,6 @@ export default function Navbar() {
                         </Button>
                     </li>
                     <li className="flex flex-row items-center">
-                        <Button component={Link} to="/reservations" disableElevation startIcon={<Bookmarks/>} sx={navItemSx(isActive("/reservations"))}>
-                            历史订单
-                        </Button>
-                    </li>
-                    <li className="flex flex-row items-center">
-                        <Button component={Link} to="/reservations/timeline" disableElevation startIcon={<EventNote/>} sx={navItemSx(isActive("/reservations/timeline"))}>
-                            我的行程
-                        </Button>
-                    </li>
-                    <li className="flex flex-row items-center">
                         <Button component={Link} to="/reservations/flights" disableElevation startIcon={<Flight/>} sx={navItemSx(isActive("/reservations/flights"))}>
                             机票
                         </Button>
@@ -117,10 +107,21 @@ export default function Navbar() {
                         <Button component={Link} to="/reservations/hotels" disableElevation startIcon={<Hotel/>} sx={navItemSx(isActive("/reservations/hotels"))}>
                             酒店
                         </Button>
-                    </li>                </ul>
+                    </li>
+                    <li className="flex flex-row items-center">
+                        <Button component={Link} to="/reservations/timeline" disableElevation startIcon={<EventNote/>} sx={navItemSx(isActive("/reservations/timeline"))}>
+                            我的行程
+                        </Button>
+                    </li>
+                    <li className="flex flex-row items-center">
+                        <Button component={Link} to="/reservations" disableElevation startIcon={<Bookmarks/>} sx={navItemSx(isActive("/reservations"))}>
+                            历史订单
+                        </Button>
+                    </li>
+                </ul>
 
 
-            <div className="relative flex items-center gap-3">
+            <div className="relative flex w-full items-center justify-center xl:w-auto">
                 {session ?
                     <Tooltip title="进入账户中心" arrow>
                         <Button
