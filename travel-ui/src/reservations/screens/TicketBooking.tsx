@@ -16,12 +16,10 @@ import {
   ToggleButtonGroup,
 } from "@mui/material";
 import {
-  ArrowForward,
   Flight,
   Search,
   SwapHoriz,
   Train,
-  Tune,
 } from "@mui/icons-material";
 import { ApiRequests, TicketSearchOffer } from "../../core/apiConfig";
 import { BookingPersonPayload } from "../../core/apiConfig";
@@ -1241,59 +1239,6 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         </Alert>
       </Snackbar>
 
-      <div className="mb-6 rounded-lg bg-white border border-slate-200 px-7 py-6 shadow-sm">
-        <Chip
-          icon={config.icon}
-          label={config.eyebrow}
-          sx={{ backgroundColor: "#eff6ff", color: config.accent }}
-        />
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-950">
-              {config.title}
-            </h1>
-            <p className="mt-2 text-slate-500">{config.hero}</p>
-          </div>
-          <div className="flex gap-2">
-            <Chip
-              icon={<ArrowForward />}
-              label={`${from || "-"} 到 ${to || "-"}`}
-            />
-            <Chip
-              icon={<Tune />}
-              label={
-                mode === "train"
-                  ? `${displayedResultCount} 趟车次`
-                  : `${displayedResultCount} 个方案`
-              }
-            />
-            {mode === "train" && (
-              <Chip
-                label={
-                  trainCodeQuery.trim()
-                    ? `车次 ${trainCodeQuery.trim()}`
-                    : allTrainTypesSelected
-                      ? "全部车次"
-                      : `${selectedTrainTypes.length} 类车次`
-                }
-              />
-            )}
-            {mode === "train" &&
-              (departureStationFilter || arrivalStationFilter) && (
-                <Chip
-                  label={`${departureStationFilter || "全部出发站"} → ${arrivalStationFilter || "全部到达站"}`}
-                />
-              )}
-            {mode === "flight" &&
-              (departureAirportFilter || arrivalAirportFilter) && (
-                <Chip
-                  label={`${departureAirportFilter ? formatAirportFilterOption(departureAirportFilter) : "全部出发机场"} → ${arrivalAirportFilter ? formatAirportFilterOption(arrivalAirportFilter) : "全部到达机场"}`}
-                />
-              )}
-          </div>
-        </div>
-      </div>
-
       {error && (
         <Alert severity="warning" className="mb-4">
           后端票务数据暂时不可用，请确认交通服务已启动。
@@ -1335,9 +1280,9 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         </Alert>
       )}
 
-          <section className="rounded-lg bg-white border border-slate-200 p-5 shadow-sm">
+          <section className="w-full rounded-lg bg-white border border-slate-200 p-6 shadow-sm">
             <h2 className="text-lg font-bold text-slate-900 mb-4">查询行程</h2>
-            <div className="grid gap-3">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)_minmax(180px,0.9fr)_auto] md:items-center">
               <Autocomplete
                 size="small"
                 options={departures}
@@ -1351,7 +1296,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
               <Button
                 onClick={swapLocations}
                 variant="outlined"
-                sx={{ minWidth: 44, width: 64, height: 44, borderRadius: 2, justifySelf: "center" }}
+                sx={{ minWidth: 44, width: 56, height: 44, borderRadius: 2, justifySelf: "center" }}
               >
                 <SwapHoriz />
               </Button>
@@ -1365,6 +1310,26 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
                   <TextField {...params} label={config.toLabel} />
                 )}
               />
+              <TextField
+                fullWidth
+                size="small"
+                type="date"
+                label="出行日期"
+                value={date}
+                inputProps={{ min: currentDate }}
+                InputLabelProps={{ shrink: true }}
+                onChange={(event) => updateDepartureDate(event.target.value)}
+              />
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<Search />}
+                sx={{ minWidth: 112, height: 44, borderRadius: 2 }}
+                onClick={() => searchTickets()}
+                disabled={loading || !from || !to}
+              >
+                {loading ? "查询中" : "查询"}
+              </Button>
             </div>
             {availablePopularRoutes.length > 0 && (
               <div className="mt-4">
@@ -1384,27 +1349,6 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
                 </div>
               </div>
             )}
-            <label className="block mt-5 text-sm font-semibold text-slate-700">
-              出行日期
-              <input
-                className="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900"
-                type="date"
-                value={date}
-                min={currentDate}
-                onChange={(event) => updateDepartureDate(event.target.value)}
-              />
-            </label>
-            <Button
-              fullWidth
-              variant="contained"
-              size="large"
-              startIcon={<Search />}
-              sx={{ mt: 2, borderRadius: 2 }}
-              onClick={() => searchTickets()}
-              disabled={loading || !from || !to}
-            >
-              {loading ? "查询中" : "查询"}
-            </Button>
           </section>
 
       {error && (

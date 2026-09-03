@@ -531,20 +531,6 @@ const HotelBooking = () => {
                 </Alert>
             </Snackbar>
 
-            <div className='mb-6 rounded-lg bg-white border border-slate-200 px-7 py-6 shadow-sm'>
-                <Chip icon={<Hotel/>} label='酒店服务' sx={{backgroundColor: '#eff6ff', color: '#2563eb'}}/>
-                <div className='mt-4 flex flex-wrap items-end justify-between gap-4'>
-                    <div>
-                        <h1 className='text-3xl font-bold text-slate-950'>酒店预订</h1>
-                        <p className='mt-2 text-slate-500'>按目的地、日期、评分和房型筛选可预订酒店</p>
-                    </div>
-                    <div className='flex gap-2'>
-                        <Chip icon={<Bed/>} label={`${visibleOffers.length} 家酒店`}/>
-                        <Chip icon={<Star/>} label={stars ? `${stars} 分以上` : '不限评分'}/>
-                    </div>
-                </div>
-            </div>
-
             {error && <Alert severity='warning' className='mb-4'>后端酒店数据暂时不可用，请启动服务后重试。</Alert>}
             {bookingPreferencesError && <Alert severity='warning' className='mb-4'>预订偏好读取失败，当前使用系统默认筛选条件。</Alert>}
             {stayDateError && <Alert severity='warning' className='mb-4'>{stayDateError}</Alert>}
@@ -552,28 +538,43 @@ const HotelBooking = () => {
             {bookingError && <Alert severity='error' className='mb-4'>创建酒店预订失败，请检查日期或后端服务。</Alert>}
             {bookingMessage && <Alert severity={bookingError ? 'warning' : 'success'} className='mb-4' action={reservationId ? <Button component={Link} to={`/reservations/${reservationId}#payment-countdown`} color='inherit' size='small'>订单详情</Button> : undefined}>{bookingMessage}</Alert>}
 
-                    <section className='rounded-lg bg-white border border-slate-200 p-5 shadow-sm'>
+                    <section className='w-full rounded-lg bg-white border border-slate-200 p-6 shadow-sm'>
                         <h2 className='text-lg font-bold text-slate-900 mb-4'>查询酒店</h2>
-                        <TextField
-                            fullWidth
-                            size='small'
-                            label='酒店名称'
-                            value={hotelNameQuery}
-                            onChange={event => setHotelNameQuery(event.target.value)}
-                            placeholder='输入酒店名搜索'
-                            sx={{mb: 2}}
-                        />
-                        <Autocomplete
-                            fullWidth
-                            size='small'
-                            options={destinations}
-                            value={destination ?? null}
-                            noOptionsText='没有匹配城市'
-                            getOptionLabel={(option) => `${option.region}, ${option.country}`}
-                            isOptionEqualToValue={(option, value) => option.idLocation === value.idLocation}
-                            onChange={(_, value) => setDestination(value ?? undefined)}
-                            renderInput={(params) => <TextField {...params} label='住宿地'/>}
-                        />
+                        <div className='grid gap-3 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1.5fr)_auto] md:items-center'>
+                            <TextField
+                                fullWidth
+                                size='small'
+                                label='目的地 / 酒店名称'
+                                value={hotelNameQuery}
+                                onChange={event => setHotelNameQuery(event.target.value)}
+                                placeholder='输入酒店名称（可选）'
+                            />
+                            <div className='grid grid-cols-2 gap-3 md:min-w-[340px]'>
+                                <TextField
+                                    fullWidth
+                                    size='small'
+                                    type='date'
+                                    label='入住日期'
+                                    value={dateFrom}
+                                    InputLabelProps={{shrink: true}}
+                                    onChange={event => setDateFrom(event.target.value)}
+                                />
+                                <TextField
+                                    fullWidth
+                                    size='small'
+                                    type='date'
+                                    label='离店日期'
+                                    value={dateTo}
+                                    InputLabelProps={{shrink: true}}
+                                    onChange={event => setDateTo(event.target.value)}
+                                />
+                            </div>
+                            <div className='min-w-[112px]'>
+                                <Button fullWidth variant='contained' size='large' startIcon={<Search/>} sx={{minWidth: 112, height: 40, borderRadius: 2}} onClick={() => searchHotels(true)} disabled={loading || !destination || hasInvalidPriceRange || Boolean(stayDateError)}>
+                                查询
+                                </Button>
+                            </div>
+                        </div>
                         {popularDestinations.length > 0 &&
                             <div className='mt-4'>
                                 <p className='mb-2 text-xs font-semibold text-slate-500'>热门城市</p>
@@ -590,19 +591,9 @@ const HotelBooking = () => {
                                 </div>
                             </div>
                         }
-                        <label className='block mt-5 text-sm font-semibold text-slate-700'>
-                            入住和离店日期
-                            <div className='grid grid-cols-2 gap-3 mt-2'>
-                                <input className='rounded-lg border border-slate-300 px-3 py-2 text-slate-900' type='date' value={dateFrom} onChange={event => setDateFrom(event.target.value)}/>
-                                <input className='rounded-lg border border-slate-300 px-3 py-2 text-slate-900' type='date' value={dateTo} onChange={event => setDateTo(event.target.value)}/>
-                            </div>
-                            <p className={`mt-2 text-xs ${stayDateError ? 'text-red-500' : 'text-slate-500'}`}>
-                                {stayDateError || '入住日期不能早于今天，离店日期需晚于入住日期。'}
-                            </p>
-                        </label>
-                        <Button fullWidth variant='contained' size='large' startIcon={<Search/>} sx={{mt: 2, borderRadius: 2}} onClick={() => searchHotels(true)} disabled={loading || !destination || hasInvalidPriceRange || Boolean(stayDateError)}>
-                            查询
-                        </Button>
+                        <p className={`mt-3 text-xs ${stayDateError ? 'text-red-500' : 'text-slate-500'}`}>
+                            {stayDateError || '入住日期不能早于今天，离店日期需晚于入住日期。'}
+                        </p>
                     </section>
 
             {error && <Alert severity='warning' className='mb-4'>后端酒店数据暂时不可用，请启动服务后重试。</Alert>}
