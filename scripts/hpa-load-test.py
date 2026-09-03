@@ -2,8 +2,9 @@
 """Run a bounded HTTP load and record latency/error and HPA replica evidence."""
 import argparse, json, os, statistics, subprocess, time
 from concurrent.futures import ThreadPoolExecutor
-from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
 
 def replicas(namespace, deployment):
     try:
@@ -18,6 +19,8 @@ def replicas(namespace, deployment):
         return None, f"kubectl exited {exc.returncode}: {detail}"
     except (subprocess.SubprocessError, ValueError, OSError) as exc:
         return None, f"{type(exc).__name__}: {exc}"
+
+
 def sample(namespace, deployment, phase, errors):
     value, error = replicas(namespace, deployment)
     entry = {"at": time.time(), "phase": phase}
@@ -27,6 +30,26 @@ def sample(namespace, deployment, phase, errors):
         errors.append(error)
         entry["error"] = error
     return entry
+
+
+def scaling_observed(samples):
+    valid = [item for item in samples if "replicas" in item and "ready" in item]
+    if not valid:
+        return False, False
+    initial = valid[0]
+    expanded = [
+        (index, item) for index, item in enumerate(valid[1:], start=1)
+        if item["replicas"] > initial["replicas"] and item["ready"] > initial["ready"]
+    ]
+    if not expanded:
+        return False, False
+    peak_index, peak = max(expanded, key=lambda pair: (pair[1]["ready"], pair[1]["replicas"]))
+    scaled_down = any(
+        item["replicas"] < peak["replicas"] and item["ready"] < peak["ready"]
+        for item in valid[peak_index + 1:]
+    )
+    return True, scaled_down
+
 
 def one(url, timeout):
     started = time.perf_counter()
@@ -86,16 +109,7 @@ def main():
     ordered = sorted(latencies)
     p95 = ordered[max(0, int(len(ordered) * .95) - 1)] if ordered else None
     valid_samples = [item for item in samples if "replicas" in item and "ready" in item]
-    observed = [item["replicas"] for item in valid_samples]
-    ready_observed = [item["ready"] for item in valid_samples]
-    if not observed and not a.skip_scaling_check:
-        raise SystemExit("no valid replica samples; kubectl sampling failed")
-    peak = max(observed) if observed else None
-    final = observed[-1] if observed else None
-    ready_peak = max(ready_observed) if ready_observed else None
-    ready_final = ready_observed[-1] if ready_observed else None
-    scale_up = peak is not None and ready_peak is not None and peak > observed[0] and ready_peak > ready_observed[0]
-    scale_down = scale_up and final < peak and ready_final < ready_peak
+    scale_up, scale_down = scaling_observed(samples)
     report = {"url": a.url, "duration_seconds": a.duration, "cooldown_seconds": a.cooldown,
               "concurrency": a.concurrency, "requests": len(results),
               "throughput_rps": len(results) / max(a.duration, 1),
@@ -110,6 +124,8 @@ def main():
     with open(a.output, "w", encoding="utf-8") as f: json.dump(report, f, indent=2)
     print(json.dumps(report, indent=2))
     if not results: raise SystemExit("load test produced no requests")
+    if not valid_samples and not a.skip_scaling_check:
+        raise SystemExit("no valid replica samples; kubectl sampling failed")
     if not a.skip_scaling_check and not (scale_up and scale_down):
         raise SystemExit("expected both scale-up and scale-down were not observed")
 
