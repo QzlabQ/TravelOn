@@ -112,27 +112,14 @@ travel-on-2026NULLptr/
 ```text
 Git
 Docker Desktop / Docker Engine（含 Docker Compose V2）
-mise
 ```
 
-不需要预先安装 Java、Python、Node.js 或 Yarn；`mise install` 会根据仓库配置下载并锁定 Java 21、Python 3.12 和 Node.js 22.22.3，Yarn 4.2.2 由 Corepack 按 `travel-ui/package.json` 提供。在仓库根目录执行：
+可能需要执行如下指令来获得 Docker 权限：
 
-```bash
-mise trust
-mise install
-mise run doctor
+```shell
+sudo usermod -aG docker "$USER" # 永久获取权限，但是需要重启生效
+newgrp docker # 立即在当前会话生效
 ```
-
-`mise run doctor` 会统一检查：
-
-```text
-git --version
-docker --version
-docker compose version
-Java 21 / Python 3.12 / Node.js 22.22.3 / Yarn 4.2.2
-```
-
----
 
 ## 工具链管理（mise）
 
@@ -150,11 +137,12 @@ winget install jdx.mise
 
 macOS / Linux:
 
-```
+```shell
 curl https://mise.run | sh
+# 手动添加环境变量
 ```
 
-#### 2. 加入 PATH
+#### 2. 加入 PATH (Windows)
 
 先新开一个终端验证（已打开的终端读不到新 PATH）：
 

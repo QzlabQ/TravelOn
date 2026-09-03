@@ -112,24 +112,13 @@ Only the following tools need to be installed manually:
 ```text
 Git
 Docker Desktop / Docker Engine (including Docker Compose V2)
-mise
 ```
 
-Java, Python, Node.js, and Yarn do not need to be installed beforehand. `mise install` downloads and pins Java 21, Python 3.12, and Node.js 22.22.3 from the repository configuration; Corepack provides Yarn 4.2.2 according to `travel-ui/package.json`. From the repository root:
+You may need to run the following command to obtain Docker permissions:
 
-```bash
-mise trust
-mise install
-mise run doctor
-```
-
-`mise run doctor` checks:
-
-```text
-git --version
-docker --version
-docker compose version
-Java 21 / Python 3.12 / Node.js 22.22.3 / Yarn 4.2.2
+```shell
+sudo usermod -aG docker "$USER" # To obtain permissions permanentlt, but a restart is required for the changes to take effect
+newgrp docker # To take effect immediately, but only for this session
 ```
 
 ---
@@ -150,11 +139,12 @@ winget install jdx.mise
 
 macOS / Linux:
 
-```
+```shell
 curl https://mise.run | sh
+# then add it to PATH manually
 ```
 
-#### 2. Put mise on PATH
+#### 2. Put mise on PATH (Windows)
 
 Open a new terminal first and verify (existing terminals cannot see a new PATH):
 
