@@ -1,0 +1,9 @@
+{
+  "variant": "before",
+  "database": "hotel_db",
+  "cities": 320,
+  "hotels": 8637,
+  "rooms": 21518,
+  "hotel_photos": 17274,
+  "room_reservations": 0
+}

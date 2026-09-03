@@ -27,9 +27,9 @@ import { ApiRequests, TicketSearchOffer } from "../../core/apiConfig";
 import { BookingPersonPayload } from "../../core/apiConfig";
 import {
   addNotification,
-  getBookingPreferences,
   getCurrentUserSession,
 } from "../../core/currentUser";
+import {useBookingPreferences} from "../../core/useBookingPreferences";
 import TravelerSelector from "../../account/components/TravelerSelector";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import CheckoutConfirmDialog from "../components/CheckoutConfirmDialog";
@@ -564,7 +564,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   const session = useAuthSession();
   const isAuthenticated = Boolean(session);
   const rebookState = (location.state ?? {}) as TicketRebookState;
-  const bookingPreferences = useMemo(() => getBookingPreferences(), []);
+  const {preferences: bookingPreferences, loading: bookingPreferencesLoading, error: bookingPreferencesError} = useBookingPreferences();
   const preferredTrainTypeFilters =
     bookingPreferences.preferredTrainTypes.filter(isTrainTypeFilter);
   const navigateTimerRef = useRef<number | null>(null);
@@ -877,6 +877,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   };
 
   useEffect(() => {
+    if (bookingPreferencesLoading) return;
     setHasLoadedOptions(false);
     setDepartureAirportFilter("");
     setArrivalAirportFilter("");
@@ -885,8 +886,9 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     setSelectedTrainTypes(
       mode === "train" && preferredTrainTypeFilters.length > 0
         ? preferredTrainTypeFilters
-        : defaultTrainTypeFilters,
+      : defaultTrainTypeFilters,
     );
+    setOnlyAvailable(bookingPreferences.onlyAvailableTickets);
     setTrainCodeQuery(mode === "train" ? (rebookState.bookingCode ?? "") : "");
     setLoading(true);
     setError(false);
@@ -939,7 +941,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         setHasLoadedOptions(true);
         setLoading(false);
       });
-  }, [mode]);
+  }, [mode, bookingPreferences, bookingPreferencesLoading]);
 
   useEffect(() => {
     if (!hasLoadedOptions || !from || !to) return;
@@ -1295,6 +1297,11 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
       {error && (
         <Alert severity="warning" className="mb-4">
           后端票务数据暂时不可用，请确认交通服务已启动。
+        </Alert>
+      )}
+      {bookingPreferencesError && (
+        <Alert severity="warning" className="mb-4">
+          预订偏好读取失败，当前使用系统默认筛选条件。
         </Alert>
       )}
       {!isAuthenticated && (

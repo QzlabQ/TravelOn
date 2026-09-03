@@ -84,6 +84,15 @@ public class PlannerWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
 
+            if (envelope.getType() == PlannerMessageType.PLANNER_SYNC) {
+                UUID requestedRunId = null;
+                if (envelope.getPayload() != null && envelope.getPayload().hasNonNull("runId")) {
+                    requestedRunId = UUID.fromString(envelope.getPayload().get("runId").asText());
+                }
+                plannerConversationService.syncPlannerRun(conversationId, userId, requestedRunId);
+                return;
+            }
+
             if (envelope.getType() == PlannerMessageType.PLANNER_PLACE_SELECTION) {
                 PlannerPlaceSelectionPayload payload = objectMapper.treeToValue(envelope.getPayload(), PlannerPlaceSelectionPayload.class);
                 plannerConversationService.updateSelection(conversationId, userId, payload.getSelectedPlaceIds());

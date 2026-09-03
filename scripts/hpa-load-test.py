@@ -1,18 +1,32 @@
 #!/usr/bin/env python3
 """Run a bounded HTTP load and record latency/error and HPA replica evidence."""
 import argparse, json, os, statistics, subprocess, time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 def replicas(namespace, deployment):
     try:
-        raw = subprocess.check_output(["kubectl", "-n", namespace, "get", "deployment", deployment,
-                                       "-o", "jsonpath={.status.replicas}:{.status.readyReplicas}"], text=True).strip()
+        raw = subprocess.check_output(
+            ["kubectl", "-n", namespace, "get", "deployment", deployment,
+             "-o", "jsonpath={.status.replicas}:{.status.readyReplicas}"],
+            stderr=subprocess.STDOUT, text=True).strip()
         current, ready = (raw.split(":") + [""])[:2]
-        return {"replicas": int(current or 0), "ready": int(ready or 0)}
-    except (subprocess.SubprocessError, ValueError, OSError):
-        return None
+        return {"replicas": int(current or 0), "ready": int(ready or 0)}, None
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.output or str(exc)).strip()
+        return None, f"kubectl exited {exc.returncode}: {detail}"
+    except (subprocess.SubprocessError, ValueError, OSError) as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+def sample(namespace, deployment, phase, errors):
+    value, error = replicas(namespace, deployment)
+    entry = {"at": time.time(), "phase": phase}
+    if value is not None:
+        entry.update(value)
+    if error is not None:
+        errors.append(error)
+        entry["error"] = error
+    return entry
 
 def one(url, timeout):
     started = time.perf_counter()
@@ -35,11 +49,19 @@ def main():
     p.add_argument("--cooldown", type=int, default=240,
                    help="seconds to watch replicas after load stops")
     p.add_argument("--skip-scaling-check", action="store_true")
+    p.add_argument("--allow-starting-replicas", action="store_true",
+                   help="do not require exactly one replica before load")
     p.add_argument("--output", default="artifacts/hpa-load-test.json")
     a = p.parse_args()
     started = time.monotonic()
     end = started + a.duration
-    samples, results = [], []
+    samples, results, sampling_errors = [], [], []
+    initial = sample(a.namespace, a.deployment, "before-load", sampling_errors)
+    samples.append(initial)
+    if "replicas" not in initial and not a.skip_scaling_check:
+        raise SystemExit("unable to sample initial replicas: " + sampling_errors[-1])
+    if not a.skip_scaling_check and not a.allow_starting_replicas and initial.get("replicas") != 1:
+        raise SystemExit("expected exactly 1 starting replica; scale deployment to 1 first")
     with ThreadPoolExecutor(max_workers=a.concurrency) as pool:
         futures = set()
         next_sample = 0.0
@@ -52,28 +74,35 @@ def main():
             for f in done:
                 results.append(f.result()); futures.remove(f)
             if now >= next_sample:
-                samples.append({"at": time.time(), "phase": "load", **(replicas(a.namespace, a.deployment) or {})})
+                samples.append(sample(a.namespace, a.deployment, "load", sampling_errors))
                 next_sample = now + a.sample_interval
             time.sleep(0.02)
     cooldown_end = time.monotonic() + a.cooldown
     while time.monotonic() < cooldown_end:
-        samples.append({"at": time.time(), "phase": "cooldown", **(replicas(a.namespace, a.deployment) or {})})
+        samples.append(sample(a.namespace, a.deployment, "cooldown", sampling_errors))
         time.sleep(a.sample_interval)
     latencies = [latency for latency, _ in results]
     successful = sum(ok for _, ok in results)
     ordered = sorted(latencies)
     p95 = ordered[max(0, int(len(ordered) * .95) - 1)] if ordered else None
-    observed = [sample["replicas"] for sample in samples if "replicas" in sample]
+    valid_samples = [item for item in samples if "replicas" in item and "ready" in item]
+    observed = [item["replicas"] for item in valid_samples]
+    ready_observed = [item["ready"] for item in valid_samples]
+    if not observed and not a.skip_scaling_check:
+        raise SystemExit("no valid replica samples; kubectl sampling failed")
     peak = max(observed) if observed else None
     final = observed[-1] if observed else None
-    scale_up = peak is not None and peak > observed[0]
-    scale_down = scale_up and final < peak
+    ready_peak = max(ready_observed) if ready_observed else None
+    ready_final = ready_observed[-1] if ready_observed else None
+    scale_up = peak is not None and ready_peak is not None and peak > observed[0] and ready_peak > ready_observed[0]
+    scale_down = scale_up and final < peak and ready_final < ready_peak
     report = {"url": a.url, "duration_seconds": a.duration, "cooldown_seconds": a.cooldown,
               "concurrency": a.concurrency, "requests": len(results),
               "throughput_rps": len(results) / max(a.duration, 1),
               "average_latency_ms": statistics.mean(latencies) * 1000 if latencies else None,
               "p95_latency_ms": p95 * 1000 if p95 is not None else None,
               "error_rate": (len(results) - successful) / len(results) if results else 1,
+              "sampling_error_count": len(sampling_errors), "sampling_errors": sampling_errors,
               "scale_up_observed": scale_up, "scale_down_observed": scale_down,
               "replica_samples": samples, "finished_at": time.time()}
     output_dir = os.path.dirname(a.output)

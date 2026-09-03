@@ -69,6 +69,7 @@ travel-api/logs/
 travel-api/**/target/
 travel-api/.env
 travel-api/.env.*
+!travel-api/.env.example
 travel-api/.venv/
 travel-api/venv/
 .venv/

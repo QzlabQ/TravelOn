@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-02T08:34:25.049635+00:00",
+  "version": "before",
+  "commit": "4d3f470db5fb9a8d4366950fe42943f90bb69584",
+  "endpoint": "hotel-destinations",
+  "round": 1,
+  "concurrency": 32,
+  "configured_duration_seconds": 30.0,
+  "warmup_seconds": 10.0,
+  "elapsed_seconds": 30.00463557895273,
+  "requests": 188506,
+  "successful_requests": 188506,
+  "failed_requests": 0,
+  "error_rate_percent": 0.0,
+  "requests_per_second": 6282.562556174847,
+  "response_bytes": 9843406308,
+  "status_counts": {
+    "200": 188506
+  },
+  "error_counts": {},
+  "latency_ms": {
+    "mean": 5.091206432516737,
+    "p50": 4.5731785,
+    "p90": 8.110963,
+    "p95": 9.56369525,
+    "p99": 13.987593800000013,
+    "max": 114.48028
+  },
+  "request_path": "/hotels/destinations"
+}

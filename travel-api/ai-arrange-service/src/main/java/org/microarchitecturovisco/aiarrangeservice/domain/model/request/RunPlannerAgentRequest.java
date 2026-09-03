@@ -21,6 +21,7 @@ public class RunPlannerAgentRequest {
     @NotNull
     private UUID userId;
 
+    private UUID runId;
     private String message;
     private String planningMode;
     private String planningScope;
@@ -34,6 +35,7 @@ public class RunPlannerAgentRequest {
 
     public PlannerChatSendPayload toChatPayload() {
         return PlannerChatSendPayload.builder()
+                .runId(runId)
                 .message(message)
                 .planningMode(planningMode)
                 .planningScope(planningScope)

@@ -114,6 +114,7 @@ spec:
             - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/user_db"}
             - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {configMapKeyRef: {name: travelon-config, key: POSTGRES_USER}}}
             - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: travelon-secrets, key: POSTGRES_PASSWORD}}}
+            - {name: APP_SEED_DATA_COMMON_BASE_PATH, value: "file:/seed-data/common/"}
           startupProbe: {tcpSocket: {port: 8081}, failureThreshold: 120, periodSeconds: 10}
           readinessProbe: {tcpSocket: {port: 8081}, periodSeconds: 5}
           livenessProbe: {tcpSocket: {port: 8081}, periodSeconds: 15}
@@ -206,10 +207,21 @@ spec:
           image: travelon-ai-arrange-agent
           ports: [{containerPort: 8090}]
           env:
+            - {name: AI_BASE_URL, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_BASE_URL}}}
+            - {name: AI_CHAT_COMPLETIONS_PATH, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_CHAT_COMPLETIONS_PATH}}}
+            - {name: AI_API_KEY, valueFrom: {secretKeyRef: {name: travelon-secrets, key: AI_API_KEY, optional: true}}}
+            - {name: AI_MODEL, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_MODEL}}}
+            - {name: AI_JSON_MODE, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_JSON_MODE}}}
+            - {name: AI_THINKING_TYPE, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_THINKING_TYPE}}}
+            - {name: AI_TEMPERATURE, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_TEMPERATURE}}}
+            - {name: AI_MAX_TOKENS, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_MAX_TOKENS}}}
+            - {name: AI_MODEL_TIMEOUT_SECONDS, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_MODEL_TIMEOUT_SECONDS}}}
+            - {name: AI_SLOW_RESPONSE_WARNING_MS, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_SLOW_RESPONSE_WARNING_MS}}}
+            - {name: AGENT_MODEL_TIMEOUT_SECONDS, valueFrom: {configMapKeyRef: {name: travelon-config, key: AGENT_MODEL_TIMEOUT_SECONDS}}}
+            - {name: AGENT_MAX_RUNTIME_SECONDS, valueFrom: {configMapKeyRef: {name: travelon-config, key: AGENT_MAX_RUNTIME_SECONDS}}}
             - {name: DEEPSEEK_API_KEY, valueFrom: {secretKeyRef: {name: travelon-secrets, key: DEEPSEEK_API_KEY, optional: true}}}
             - {name: AMAP_API_KEY, valueFrom: {secretKeyRef: {name: travelon-secrets, key: AMAP_API_KEY, optional: true}}}
             - {name: TRAVEL_GATEWAY_BASE_URL, value: "http://gateway:8082"}
-            - {name: AGENT_MAX_RUNTIME_SECONDS, value: "240"}
           startupProbe: {httpGet: {path: /agent/health, port: 8090}, failureThreshold: 30, periodSeconds: 5}
           readinessProbe: {httpGet: {path: /agent/health, port: 8090}, periodSeconds: 10}
           livenessProbe: {httpGet: {path: /agent/health, port: 8090}, periodSeconds: 30}
@@ -240,6 +252,10 @@ spec:
             - {name: AI_AGENT_ENABLED, value: "true"}
             - {name: AI_ARRANGE_AGENT_BASE_URL, value: "http://ai-arrange-agent:8090"}
             - {name: AI_ARRANGE_AGENT_TIMEOUT_SECONDS, value: "270"}
+            - {name: AI_BASE_URL, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_BASE_URL}}}
+            - {name: AI_CHAT_COMPLETIONS_PATH, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_CHAT_COMPLETIONS_PATH}}}
+            - {name: AI_API_KEY, valueFrom: {secretKeyRef: {name: travelon-secrets, key: AI_API_KEY, optional: true}}}
+            - {name: AI_MODEL, valueFrom: {configMapKeyRef: {name: travelon-config, key: AI_MODEL}}}
             - {name: DEEPSEEK_API_KEY, valueFrom: {secretKeyRef: {name: travelon-secrets, key: DEEPSEEK_API_KEY, optional: true}}}
             - {name: AMAP_API_KEY, valueFrom: {secretKeyRef: {name: travelon-secrets, key: AMAP_API_KEY, optional: true}}}
           startupProbe: {tcpSocket: {port: 8087}, failureThreshold: 60, periodSeconds: 10}

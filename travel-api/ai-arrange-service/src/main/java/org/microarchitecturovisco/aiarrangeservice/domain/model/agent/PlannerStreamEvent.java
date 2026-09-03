@@ -18,6 +18,7 @@ public class PlannerStreamEvent {
 
     private String eventId;
     private String traceId;
+    private UUID runId;
     private UUID conversationId;
     private UUID userId;
     private String type;

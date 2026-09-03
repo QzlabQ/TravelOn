@@ -7,6 +7,15 @@ resources:
   - data.yaml
   - apps.yaml
   - autoscaling.yaml
+# These labels identify objects whose lifecycle is owned by the repository CD
+# pipeline.  Do not include selectors: adding a new selector label to an
+# existing Deployment/StatefulSet would be an immutable-field change.
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: travelon
+      app.kubernetes.io/managed-by: travelon-cd
+    includeSelectors: false
+    includeTemplates: true
 images:
   - name: travelon-postgres
     newName: ghcr.io/qzlabq/travelon-postgres

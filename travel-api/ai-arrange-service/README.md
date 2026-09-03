@@ -146,20 +146,22 @@ When the final Agent response is saved as a Java-owned snapshot, the server send
 
 ## Configuration
 
-- `DEEPSEEK_API_KEY`: enables real AI calls.
-- `DEEPSEEK_BASE_URL`: default `https://api.deepseek.com`.
-- `DEEPSEEK_MODEL`: default `deepseek-v4-pro`.
+- `AI_BASE_URL`: OpenAI-compatible model service base URL, default `https://api.deepseek.com`.
+- `AI_CHAT_COMPLETIONS_PATH`: Chat Completions path, default `/chat/completions`.
+- `AI_API_KEY`: model service API key; enables real AI calls.
+- `AI_MODEL`: model name, default `deepseek-v4-pro`.
+- `AI_JSON_MODE`: whether to request JSON mode; set to `false` for providers that do not support it.
 - `AI_ARRANGE_AGENT_BASE_URL`: Python Agent base URL, default `http://ai-arrange-agent:8090` in Docker Compose. The Compose service is available only on the internal `backend` network and is not published to the host. For a local non-Docker agent process, the documented default remains `http://localhost:58090`.
 - `AI_ARRANGE_AGENT_TIMEOUT_SECONDS`: Python Agent HTTP timeout, default `150`.
 - `AMAP_API_KEY`: enables Amap POI enrichment.
 - `MONGODB_URI` or `MONGO_HOST`: MongoDB persistence.
 - `RABBITMQ_HOST`: reserved for the later offer-provider integration phase.
 
-Without `DEEPSEEK_API_KEY`, the service still runs and returns a local placeholder answer so local development can proceed.
+Without `AI_API_KEY`, the service still runs and returns a local placeholder answer so local development can proceed. The old `DEEPSEEK_*` variables remain accepted as migration aliases.
 
 ## Smoke Test
 
-The cross-platform WebSocket smoke test lives at `travel-api/tests/smoke/test_ai_websocket.py` and is part of the external/full suite. Run it from the repository root after starting the backend and configuring `DEEPSEEK_API_KEY`:
+The cross-platform WebSocket smoke test lives at `travel-api/tests/smoke/test_ai_websocket.py` and is part of the external/full suite. Run it from the repository root after starting the backend and configuring `AI_API_KEY`:
 
 ```text
 cd travel-api/tests

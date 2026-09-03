@@ -190,7 +190,7 @@ class PlannerSnapshotServiceTest {
                 .summary("summary")
                 .markdown("# Shanghai plan")
                 .toolCalls(List.of(PlannerAgentToolCall.builder()
-                        .tool("deepseek_chat_completion")
+                        .tool("model_chat_completion")
                         .status("SUCCESS")
                         .latencyMs(1234)
                         .outputSummary("requestMs=1200; model=flash")
