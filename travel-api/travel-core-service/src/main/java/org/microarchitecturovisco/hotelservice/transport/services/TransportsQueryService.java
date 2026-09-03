@@ -89,7 +89,8 @@ public class TransportsQueryService {
             BigDecimal maxPrice,
             boolean studentOnly,
             boolean onlyAvailable,
-            String sortBy
+            String sortBy,
+            String sortDirection
     ) {
         return ticketOfferTemplateRepository
                 .findByTypeAndDepartureCityIdAndArrivalCityIdAndDepartureDateTimeGreaterThanEqualAndDepartureDateTimeLessThanOrderByDepartureDateTimeAsc(
@@ -103,7 +104,7 @@ public class TransportsQueryService {
                 .filter(offer -> minPrice == null || offer.getPrice().compareTo(minPrice) >= 0)
                 .filter(offer -> maxPrice == null || offer.getPrice().compareTo(maxPrice) <= 0)
                 .filter(offer -> !onlyAvailable || offer.getRemainingSeats() > 0)
-                .sorted(ticketOfferComparator(sortBy))
+                .sorted(ticketOfferComparator(sortBy, sortDirection))
                 .map(this::mapTicketOffer)
                 .toList();
     }
@@ -129,15 +130,23 @@ public class TransportsQueryService {
                 .build();
     }
 
-    private Comparator<TicketOfferTemplate> ticketOfferComparator(String sortBy) {
+    /**
+     * 这里排的是「行」：同一班次的每个席别/舱位在库里都是独立一行，所以这个顺序
+     * 只是行级顺序，不等于前端卡片的顺序——卡片按班次聚合后由前端自己排。
+     * sortDirection 只对主排序键取反，次级键仍然升序，保证同一主键内的顺序稳定。
+     */
+    private Comparator<TicketOfferTemplate> ticketOfferComparator(String sortBy, String sortDirection) {
+        Comparator<TicketOfferTemplate> comparator = switch (sortBy == null ? "departure" : sortBy.toLowerCase()) {
+            case "price" -> Comparator.comparing(TicketOfferTemplate::getPrice);
+            case "seats" -> Comparator.comparingInt(TicketOfferTemplate::getRemainingSeats).reversed();
+            default -> Comparator.comparing(TicketOfferTemplate::getDepartureDateTime);
+        };
+        if ("desc".equalsIgnoreCase(sortDirection)) {
+            comparator = comparator.reversed();
+        }
         return switch (sortBy == null ? "departure" : sortBy.toLowerCase()) {
-            case "price" -> Comparator.comparing(TicketOfferTemplate::getPrice)
-                    .thenComparing(TicketOfferTemplate::getDepartureDateTime);
-            case "seats" -> Comparator.comparingInt(TicketOfferTemplate::getRemainingSeats)
-                    .reversed()
-                    .thenComparing(TicketOfferTemplate::getDepartureDateTime);
-            default -> Comparator.comparing(TicketOfferTemplate::getDepartureDateTime)
-                    .thenComparing(TicketOfferTemplate::getPrice);
+            case "price", "seats" -> comparator.thenComparing(TicketOfferTemplate::getDepartureDateTime);
+            default -> comparator.thenComparing(TicketOfferTemplate::getPrice);
         };
     }
 

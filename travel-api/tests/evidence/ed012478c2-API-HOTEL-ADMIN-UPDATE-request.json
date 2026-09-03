@@ -1,0 +1,19 @@
+{
+  "method": "PUT",
+  "url": "http://localhost:58082/hotels/admin/99001",
+  "headers": {
+    "Accept": "application/json",
+    "X-User-Token": "<redacted>"
+  },
+  "body": {
+    "hotelId": 99001,
+    "name": "后台测试酒店 1788330734960-0c8884ce39 已更新",
+    "rating": 4.5,
+    "description": "由 API 集成测试创建的酒店。",
+    "location": {
+      "idLocation": "dd21c430-c85f-b420-8fa0-8ed975561e3c"
+    },
+    "photos": [],
+    "rooms": []
+  }
+}

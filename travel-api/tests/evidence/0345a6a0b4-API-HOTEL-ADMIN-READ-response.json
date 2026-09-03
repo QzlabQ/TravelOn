@@ -1,0 +1,29 @@
+{
+  "hotelId": 99001,
+  "hotelName": "后台测试酒店 1788330381857-7aec764f17",
+  "rating": 4.5,
+  "description": "由 API 集成测试创建的酒店。",
+  "location": {
+    "idLocation": "928c6512-b3a8-a0dc-74a9-3ee63e77842a",
+    "cityId": "C001",
+    "country": "中国",
+    "province": "黑龙江",
+    "region": "七台河市",
+    "normalizedName": "七台河市"
+  },
+  "photos": [],
+  "roomsConfigurations": [
+    {
+      "rooms": [
+        {
+          "roomId": 990011,
+          "name": "初始房型",
+          "guestCapacity": 2,
+          "roomType": "STANDARD",
+          "description": "测试房型"
+        }
+      ],
+      "pricePerAdult": 288.0
+    }
+  ]
+}

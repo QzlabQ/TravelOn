@@ -330,14 +330,14 @@ public class HotelsService {
         hotelEventProjector.project(List.of(roomUpdateEvent));
     }
 
-    public Hotel updateHotel(Integer hotelId, org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto) {
+    public void updateHotel(Integer hotelId, org.microarchitecturovisco.hotelservice.model.dto.HotelDto hotelDto) {
         Hotel hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hotel not found"));
         hotel.setName(hotelDto.getName());
         hotel.setRating(hotelDto.getRating());
         hotel.setDescription(hotelDto.getDescription());
         hotel.setPhotos(hotelDto.getPhotos());
-        return hotelRepository.save(hotel);
+        hotelRepository.save(hotel);
     }
 
     public void deleteRoom(Long roomId) {

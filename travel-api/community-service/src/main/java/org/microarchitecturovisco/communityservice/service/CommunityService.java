@@ -77,7 +77,11 @@ public class CommunityService {
         boolean liked = currentUserId != null && likeRepository.existsByPostIdAndUserId(post.getId(), currentUserId);
         boolean favorited = favoriteService.isFavorited(currentUserId, FavoriteTargetType.POST, post.getId().toString());
         long commentCount = commentService.countPostComments(post.getId());
-        return PostResponse.from(post, liked, favorited, commentCount);
+        // community_post.like_count 是建帖时写死的 0，toggleLike 只增删 post_like 行、
+        // 从不回写这一列，照着它返回会让所有列表和详情的点赞数永远是 0。
+        // 与 likedByCurrentUser、commentCount 保持一致，直接按明细表实时统计。
+        int likeCount = Math.toIntExact(likeRepository.countByPostId(post.getId()));
+        return PostResponse.from(post, likeCount, liked, favorited, commentCount);
     }
 
     public PostResponse createPost(String token, CreatePostRequest request) {
@@ -102,17 +106,17 @@ public class CommunityService {
                 .likeCount(0)
                 .build();
 
-        return PostResponse.from(postRepository.save(post), false);
+        return PostResponse.forNewPost(postRepository.save(post));
     }
 
     @Transactional
     public LikeResponse toggleLike(String token, UUID postId) {
         UserProfileResponse user = userClient.requireUser(token);
         CommunityPost post = requirePost(postId);
-        return likeRepository.findByPostIdAndUserId(postId, user.id())
+        boolean liked = likeRepository.findByPostIdAndUserId(postId, user.id())
                 .map(existingLike -> {
                     likeRepository.delete(existingLike);
-                    return new LikeResponse(post.getId(), false, Math.toIntExact(likeRepository.countByPostId(postId)));
+                    return false;
                 })
                 .orElseGet(() -> {
                     likeRepository.save(PostLike.builder()
@@ -121,8 +125,14 @@ public class CommunityService {
                             .userId(user.id())
                             .createdAt(Instant.now())
                             .build());
-                    return new LikeResponse(post.getId(), true, Math.toIntExact(likeRepository.countByPostId(postId)));
+                    return true;
                 });
+        // listPosts 的 "popular" 排序按 community_post.like_count 排，这一列此前从不更新，
+        // 热门排序等同于按创建时间排。这里回写权威计数（而不是 ±1），顺便修正历史漂移。
+        int likeCount = Math.toIntExact(likeRepository.countByPostId(postId));
+        post.setLikeCount(likeCount);
+        postRepository.save(post);
+        return new LikeResponse(post.getId(), liked, likeCount);
     }
 
     public Page<ReviewResponse> listReviews(ReviewTargetType targetType, String targetId, CommunityCategory category, int page, int size, String token) {

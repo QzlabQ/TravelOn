@@ -1,0 +1,8 @@
+{
+  "method": "GET",
+  "url": "http://localhost:58082/hotels/99001?dateFrom=2027-03-21&dateTo=2027-03-23&adults=1",
+  "headers": {
+    "Accept": "application/json"
+  },
+  "body": null
+}

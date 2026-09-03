@@ -10,6 +10,7 @@ directory is empty.
   applies schema files, then applies seed files.
 - `schema/*.sql` owns table creation.
 - `seed/*.sql` owns initial data import from `seed-data`.
+- `../seed-data/README.md` documents ticket-template generation and rolling dates.
 - `cleanup/*.sql` contains one-off cleanup scripts for existing developer
   databases.
 
@@ -33,12 +34,13 @@ The Docker PostgreSQL entrypoint runs `database/init` only when
 `travel-api/data/postgres` is empty. To rebuild from SQL:
 
 ```powershell
-docker compose down
+mise run services:down
 Remove-Item -Recurse -Force .\data\postgres
-docker compose up -d --build
+mise run services:up_build
 ```
 
-This deletes local database data. Use cleanup scripts instead when preserving
+Run these commands from `travel-api`; mise still resolves the repository task
+and its Compose working directory. This deletes local database data. Use cleanup scripts instead when preserving
 existing data matters.
 
 ## Existing volumes and legacy data migration

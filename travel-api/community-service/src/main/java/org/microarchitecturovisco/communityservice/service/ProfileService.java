@@ -12,6 +12,7 @@ import org.microarchitecturovisco.communityservice.dto.ReviewResponse;
 import org.microarchitecturovisco.communityservice.dto.TravelRouteResponse;
 import org.microarchitecturovisco.communityservice.repository.AttractionRepository;
 import org.microarchitecturovisco.communityservice.repository.CommunityPostRepository;
+import org.microarchitecturovisco.communityservice.repository.PostLikeRepository;
 import org.microarchitecturovisco.communityservice.repository.ReviewRepository;
 import org.microarchitecturovisco.communityservice.repository.TargetRatingAggregate;
 import org.microarchitecturovisco.communityservice.repository.TravelRouteRepository;
@@ -36,13 +37,23 @@ public class ProfileService {
     private final FavoriteService favoriteService;
     private final ReviewLikeService reviewLikeService;
     private final CommentService commentService;
+    private final PostLikeRepository likeRepository;
+
+    private int likeCount(UUID postId) {
+        return Math.toIntExact(likeRepository.countByPostId(postId));
+    }
+
+    private boolean likedBy(UUID userId, UUID postId) {
+        return likeRepository.existsByPostIdAndUserId(postId, userId);
+    }
 
     // ── My content ────────────────────────────────────────────────────────────
 
     public List<PostResponse> myPosts(String token) {
         UUID userId = userClient.requireUser(token).id();
         return postRepository.findByAuthorUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(post -> PostResponse.from(post, false, false, commentService.countPostComments(post.getId())))
+                .map(post -> PostResponse.from(post, likeCount(post.getId()), likedBy(userId, post.getId()), false,
+                        commentService.countPostComments(post.getId())))
                 .toList();
     }
 
@@ -66,7 +77,8 @@ public class ProfileService {
         return ids.stream()
                 .map(byId::get)
                 .filter(post -> post != null)
-                .map(post -> PostResponse.from(post, false, true, commentService.countPostComments(post.getId())))
+                .map(post -> PostResponse.from(post, likeCount(post.getId()), likedBy(userId, post.getId()), true,
+                        commentService.countPostComments(post.getId())))
                 .toList();
     }
 

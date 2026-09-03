@@ -1,0 +1,13 @@
+{
+  "method": "POST",
+  "url": "http://localhost:58082/ai-arrange/api/conversations/63516042-e678-4dcb-9dc9-7e306a2aa642/markdown-snapshots",
+  "headers": {
+    "Accept": "application/json"
+  },
+  "body": {
+    "userId": "3cf26bb5-d395-49f0-81f1-185c188f6d0b",
+    "markdown": "# 第二版\n- 外滩\n- 豫园",
+    "mode": "TRIP",
+    "baseVersion": 2
+  }
+}

@@ -430,7 +430,7 @@ class PlannerConversationServiceTest {
                 PlannerAgentWarning.builder()
                         .code("MODEL_FAILED")
                         .message("模型生成失败，已使用本地规划模板。")
-                        .source("deepseek")
+                        .source("model")
                         .build()
         ));
         PlannerSnapshot savedSnapshot = agentSnapshot(conversationId, userId, 1, null, "fallback-checksum");

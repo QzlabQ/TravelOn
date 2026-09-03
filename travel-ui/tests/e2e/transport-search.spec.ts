@@ -11,12 +11,12 @@ function tomorrow(): string {
 }
 
 for (const journey of [
-    {path: '/reservations/trains', heading: '火车票订票与比价', results: '推荐车次'},
-    {path: '/reservations/flights', heading: '机票订票与比价', results: '推荐方案'},
+    {path: '/reservations/trains', name: '火车票订票与比价', heading: '火车票', results: '推荐车次'},
+    {path: '/reservations/flights', name: '机票订票与比价', heading: '机票', results: '推荐方案'},
 ]) {
-    test(`${journey.heading}可以查询`, async ({page}) => {
+    test(`${journey.name}可以查询`, async ({page}) => {
         await page.goto(journey.path);
-        await expect(page.getByRole('heading', {name: journey.heading})).toBeVisible();
+        await expect(page.getByRole('heading', {name: journey.heading, exact: true})).toBeVisible();
         await page.getByLabel('出行日期').fill(tomorrow());
         await page.getByRole('button', {name: '查询', exact: true}).click();
         await expect(page.getByRole('heading', {name: journey.results})).toBeVisible();

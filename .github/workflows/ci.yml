@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 0
 
       # Keep the workflow-level check alive for branch protection. A workflow
-      # skipped with `paths-ignore` can otherwise leave a required check pending.
+      # skipped with paths-ignore can otherwise leave a required check pending.
       - name: Detect changes requiring CI
         id: changes
         shell: bash
@@ -94,48 +94,25 @@ jobs:
 
       - name: Compile applications
         if: steps.changes.outputs.run_ci == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          for pom in travel-api/*/pom.xml; do
-            module="${pom%/pom.xml}"
-            echo "::group::Compile ${module##*/}"
-            (
-              cd "$module"
-              sh ./mvnw --batch-mode --no-transfer-progress -DskipTests package
-            )
-            echo "::endgroup::"
-          done
-
-          python -m compileall -q travel-api/ai-arrange-agent-service/app
-
-          cd travel-ui
-          corepack yarn build
-
-      - name: Run unit tests
-        if: steps.changes.outputs.run_ci == 'true'
-        run: mise run test:unit
+        run: mise run build
 
       - name: Prepare integration environment
         if: steps.changes.outputs.run_ci == 'true'
         shell: bash
         run: touch travel-api/.env
 
-      - name: Run PostgreSQL migration regression test
+      # This is the shared local/CI entry point. It runs preflight guards,
+      # unit tests, migration regression tests, integration/API tests,
+      # Chromium E2E tests, resilience tests and coverage gates.
+      - name: Run CI test suite
         if: steps.changes.outputs.run_ci == 'true'
-        shell: bash
-        run: bash tests/migration/test-existing-databases.sh
+        run: mise run test:ci
 
-      - name: Run integration tests
-        if: steps.changes.outputs.run_ci == 'true'
-        run: mise run test:integration
-
-      # Build images only after every compile and test gate passes.  A failure
-      # above therefore cannot produce artifacts that a later CD might deploy.
+      # Build deployment images only after every compile and test gate passes.
+      # This validates every image listed in ops/cd/images.tsv, including UI.
       - name: Build all deployment Docker images
         if: steps.changes.outputs.run_ci == 'true'
-        run: bash scripts/verify-k3s-images.sh "ci-${{ github.sha }}"
+        run: mise run deploy:images "ci-${{ github.sha }}"
 
       - name: Upload test reports
         if: ${{ !cancelled() && steps.changes.outputs.run_ci == 'true' }}

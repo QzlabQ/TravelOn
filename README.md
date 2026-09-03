@@ -17,17 +17,14 @@ https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
 - [技术栈](#技术栈)
 - [项目结构](#项目结构)
 - [环境要求](#环境要求)
+- [工具链管理（mise）](#工具链管理mise)
+  - [一、环境配置（一次性）](#一环境配置一次性)
+  - [二、日常命令](#二日常命令)
 - [环境变量配置](#环境变量配置)
 - [内置管理员账号](#内置管理员账号)
 - [快速开始](#快速开始)
 - [开发模式 Debug](#开发模式-debug)
 - [生产模式 Build 与 Serve](#生产模式-build-与-serve)
-- [工具链管理（mise）](#工具链管理mise)
-  - [一、环境配置（一次性）](#一环境配置一次性)
-  - [二、日常测试命令](#二日常测试命令)
-- [运行时扩展机票和火车票日期](#运行时扩展机票和火车票日期)
-- [两种模式对比](#两种模式对比)
-- [常见问题排查](#常见问题排查)
 - [FAQ](#faq)
 
 ---
@@ -110,38 +107,155 @@ travel-on-2026NULLptr/
 
 ## 环境要求
 
-请先安装以下工具：
+本机只需要手动安装以下工具：
 
 ```text
 Git
-Docker Desktop / Docker Engine
-Java 21
-Python 3.12
-Node.js 22.22.3
-Yarn 4.2.2（通过 Corepack）
+Docker Desktop / Docker Engine（含 Docker Compose V2）
+mise
 ```
 
-检查版本：
+不需要预先安装 Java、Python、Node.js 或 Yarn；`mise install` 会根据仓库配置下载并锁定 Java 21、Python 3.12 和 Node.js 22.22.3，Yarn 4.2.2 由 Corepack 按 `travel-ui/package.json` 提供。在仓库根目录执行：
 
-```cmd
+```bash
+mise trust
+mise install
+mise run doctor
+```
+
+`mise run doctor` 会统一检查：
+
+```text
 git --version
 docker --version
 docker compose version
-node --version
-corepack --version
+Java 21 / Python 3.12 / Node.js 22.22.3 / Yarn 4.2.2
 ```
-
-启用 Yarn（Corepack）：
-
-```cmd
-corepack enable
-```
-
-> 提示：本项目的测试脚本一律使用 `corepack yarn ...` 子命令形式，**不依赖** `corepack enable`。若该命令因写入系统 Node 安装目录而报 `EPERM`，可直接跳过。
-
-推荐使用 mise 自动安装并锁定上述 Java/Node.js/Python 版本，见[工具链管理（mise）](#工具链管理mise)。
 
 ---
+
+## 工具链管理（mise）
+
+仓库根目录的 [`mise.toml`](mise.toml) 不只管理测试工具，也统一开发、构建、测试和部署入口：它锁定 Java 21、Python 3.12、Node.js 22.22.3，并通过 `travel-ui/package.json` 与 Corepack 固定 Yarn 4.2.2。`tests/run_tests.py` 会再次校验这些版本，不符即报错退出。Docker 需自行安装，Maven 版本由各模块的 `mvnw` 锁定；Agent 与模型桩的运行容器有意使用 Python 3.13。
+
+### 一、环境配置（一次性）
+
+#### 1. 安装 mise
+
+Windows:
+
+```
+winget install jdx.mise
+```
+
+macOS / Linux:
+
+```
+curl https://mise.run | sh
+```
+
+#### 2. 加入 PATH
+
+先新开一个终端验证（已打开的终端读不到新 PATH）：
+
+```powershell
+Get-Command mise
+```
+
+找不到则手动加入用户级 PATH：`Win + R` → `sysdm.cpl` → 高级 → 环境变量 → 用户变量 `Path` → 新建 → 填入 mise 安装位置，然后**重开终端**。
+
+#### 3. 授信并安装
+
+```bash
+mise trust
+mise install
+```
+
+#### 4. 安装项目依赖
+
+```bash
+mise run setup        # Python + 前端依赖
+mise run setup:e2e    # 跑 e2e 时追加：Playwright Chromium
+```
+
+#### 5. 验证
+
+```bash
+mise run doctor
+```
+
+打印 mise 实际提供的 java / node / yarn / python / docker 版本，与[环境要求](#环境要求)逐条核对。
+
+```bash
+mise run verify
+```
+
+跑单个最小模块（约 3 秒），确认整条链路可用：预检通过 → Maven wrapper 能执行 → 报告写入 `artifacts/test-results/`。输出末尾为「结果：全部通过」即成功。
+
+### 二、日常命令
+
+> 若 IDE 终端自动激活了虚拟环境（提示符带 `(.venv)`），先执行 `deactivate` 退出再跑下面的命令。已激活状态下 `VIRTUAL_ENV` 已被预设，mise 会跳过自身的 venv 激活，导致解析到错误的解释器。
+
+`mise run <任务>` 执行前自动注入本项目的工具版本，`mise tasks` 列出全部：
+
+#### 1. 前端
+
+| 任务 | 内容 |
+| --- | --- |
+| `mise run setup:ui` | 安装前端依赖 |
+| `mise run ui:dev` | 启动前端开发服务器（热更新） |
+| `mise run ui:build` | 构建前端生产产物 |
+| `mise run ui:serve` | 预览已构建的前端产物 |
+
+#### 2. 后端
+
+| 任务 | 内容 |
+| --- | --- |
+| `mise run build` | 构建全部 Java 模块、检查 Agent Python 源码并构建前端 |
+| `mise run services:up` | 使用已有镜像启动后端 |
+| `mise run services:up_build` | 构建镜像并启动后端 |
+| `mise run services:status` | 查看后端服务状态 |
+| `mise run services:stop` | 停止后端并保留容器 |
+| `mise run services:down` | 停止并删除后端服务容器 |
+
+#### 3. 测试
+
+| 任务 | 内容 | 需要服务 |
+| --- | --- | --- |
+| `mise run setup` | 安装 Python 与前端测试依赖 | 否 |
+| `mise run setup:py` | 只安装 Python 测试依赖 | 否 |
+| `mise run setup:e2e` | 安装前端依赖与 Playwright Chromium | 否 |
+| `mise run test:pre` | 前置守卫：种子数据、迁移脚本、classpath 资源、MQ 与网关配置，约 20 秒 | 否 |
+| `mise run test:unit` | 单元测试与覆盖率门禁，约 50 秒 | 否 |
+| `mise run test:migration` | 跨平台 PostgreSQL 旧数据库迁移回归测试 | 临时 PostgreSQL 容器 |
+| `mise run test:integration` | Java `*IT`、Agent 集成、API 测试；模型调用使用固定响应桩；resilience 用例另起一段 | 是 |
+| `mise run test:e2e` | Playwright，Chromium | 是 |
+| `mise run test:ci` | 与 CI 相同的完整自动化测试链路，失败立即停止 | 是 |
+| `mise run verify` | 单个最小模块，确认测试链路可用 | 否 |
+| `mise run doctor` | 检查 Git、Java、Node、Yarn、Python、Docker 与 Compose 版本 | 否 |
+
+#### 4. 部署
+
+| 任务 | 内容 |
+| --- | --- |
+| `mise run deploy:images <标签>` | 验证全部 K3s 部署镜像可构建 |
+| `mise run deploy:k3s <sha-* 标签>` | 在部署主机部署已构建镜像 |
+
+#### 输出与报告
+
+报告位于 `artifacts/test-results/`（不入库）：
+
+| 文件/目录 | 内容 |
+| --- | --- |
+| `summary.json` | 机器可读结果、用例数、覆盖率与环境版本 |
+| `latest.md` | 汇总表格（每个任务的用例数 + 各模块覆盖率） |
+| `pre/` `unit/` `integration/` `e2e/` | JUnit、API 请求响应证据、Playwright 报告与失败截图/视频/trace |
+| `coverage/{java,java-it,python,ui}/` | JaCoCo、pytest-cov、Jest 覆盖率报告的副本 |
+
+Playwright 报告：在 `travel-ui` 执行 `corepack yarn test:e2e:report`。
+
+---
+
 
 ## 环境变量配置
 
@@ -214,7 +328,7 @@ REACT_APP_AMAP_SECURITY_JS_CODE=
 | --- | --- |
 | `REACT_APP_API_HOSTNAME` | 后端主机名（通常 `localhost`） |
 | `REACT_APP_API_PORT` | 后端网关端口（默认 `58082`，需与 `GATEWAY_HOST_PORT` 一致） |
-| `PORT` | 开发服务器端口（默认 `53000`，仅对 `yarn start` 生效） |
+| `PORT` | 开发服务器端口（默认 `53000`，仅对 `mise run ui:dev` 生效） |
 | `REACT_APP_AMAP_JS_API_KEY` | 浏览器端地图渲染 Key |
 | `REACT_APP_AMAP_SECURITY_JS_CODE` | 高德 JS 安全码 |
 
@@ -230,8 +344,8 @@ REACT_APP_AMAP_SECURITY_JS_CODE=
 
 **重要：** `REACT_APP_*` 变量是编译期注入的。
 
-- 开发模式下改完 `.env` 需要重启 `yarn start`；
-- 生产模式下改完 `.env` 必须重新 `yarn build`，只重启 `yarn serve` 不会生效。
+- 开发模式下改完 `.env` 需要重启 `mise run ui:dev`；
+- 生产模式下改完 `.env` 必须重新执行 `mise run ui:build`，只重启 `mise run ui:serve` 不会生效。
 
 ---
 
@@ -266,43 +380,19 @@ cd travel-on-2026NULLptr
 
 按 [环境变量配置](#环境变量配置) 创建 `travel-api/.env` 与 `travel-ui/.env`。
 
-### 3) 启动后端
+### 3) 安装项目依赖
 
-```cmd
-cd travel-api
-docker compose up -d --build
-docker compose ps
+```bash
+mise trust
+mise install
+mise run setup
 ```
 
-### 本地旧服务目录清理
+### 4) 构建并启动后端
 
-微服务合并后，Git 中已经删除的旧服务目录可能仍因本地 Maven 构建产物而残留。
-确认没有未提交的个人文件后，可在仓库根目录执行以下命令清理这些本地目录；该操作
-不会影响远程仓库中的当前服务：
-
-```powershell
-Remove-Item -Recurse -Force `
-  .\travel-api\offer-provider-service, `
-  .\travel-api\hotel-service, `
-  .\travel-api\transport-service, `
-  .\travel-api\reservation-service, `
-  .\travel-api\payment-service `
-  -ErrorAction SilentlyContinue
-```
-
-网关地址：
-
-```text
-http://localhost:58082
-```
-
-> 首次启动会初始化数据库并导入种子数据，耗时较长，`docker compose ps` 中 postgres 显示 `starting` 属于正常现象，等待其变为 `healthy` 即可。
-
-### 4) 安装前端依赖
-
-```cmd
-cd ..\travel-ui
-yarn install
+```bash
+mise run services:up_build
+mise run services:status
 ```
 
 ### 5) 选择启动方式
@@ -318,26 +408,16 @@ yarn install
 
 ### 后端
 
-```cmd
-cd travel-api
-
-:: 启动
-docker compose up -d
-
-:: 关闭
-docker compose stop
+```bash
+mise run services:up
+mise run services:stop
 ```
 
 ### 前端（热更新）
 
-```cmd
-cd travel-ui
-
-:: 启动
-yarn start
-
-:: 停止
-Ctrl + C
+```bash
+mise run ui:dev
+# 停止：Ctrl + C
 ```
 
 访问地址：
@@ -349,12 +429,11 @@ http://localhost:53000
 ### 调试要点
 
 - 前端源码修改后自动刷新，无需重启。
-- 修改 `travel-ui/.env` 后必须 `Ctrl + C` 停止再重新 `yarn start`。
+- 修改 `travel-ui/.env` 后必须 `Ctrl + C` 停止再重新执行 `mise run ui:dev`。
 - 修改后端代码或 `docker-compose.yml` 后需要重建镜像：
 
-  ```cmd
-  cd travel-api
-  docker compose up -d --build
+  ```bash
+  mise run services:up_build
   ```
 
 ---
@@ -365,17 +444,16 @@ http://localhost:53000
 
 ### 1) 构建前端
 
-```cmd
-cd travel-ui
-yarn build
+```bash
+mise run ui:build
 ```
 
 产物输出到 `travel-ui/build/`。构建会把当前 `.env` 中的 `REACT_APP_*` 值写死进产物，因此请确认 `.env` 已经配置正确再构建。
 
 ### 2) 启动静态服务
 
-```cmd
-yarn serve
+```bash
+mise run ui:serve
 ```
 
 等价于 `serve -s build -l 53000`，端口固定为 `53000`，不读取 `.env` 中的 `PORT`。
@@ -390,9 +468,8 @@ http://localhost:53000
 
 后端在两种模式下都以容器方式运行，命令相同：
 
-```cmd
-cd travel-api
-docker compose up -d --build
+```bash
+mise run services:up_build
 ```
 
 若要使用预构建镜像整体部署（含前端容器），可参考 `travel-api/docker-compose-deploy.yml`。
@@ -407,235 +484,9 @@ Ctrl + C
 
 后端：
 
-```cmd
-cd travel-api
-docker compose stop
-```
-
----
-
-## 工具链管理（mise）
-
-`tests/run_tests.py` 会校验 Java 21、Python 3.12、Node.js 22.22.3、Yarn 4.2.2，不符即报错退出。仓库根目录的 [`mise.toml`](mise.toml) 用 [mise](https://mise.jdx.dev) 锁定这些版本，Docker 需自行安装，Maven 由各模块的 `mvnw` 提供。
-
-### 一、环境配置（一次性）
-
-| 配置项 | `unit` | `integration` | `e2e` | `full` |
-| --- | :-: | :-: | :-: | :-: |
-| 工具链（Java / Node / Yarn / Python） | ✓ | ✓ | ✓ | ✓ |
-| Python 测试依赖 | ✓ | ✓ | ✓ | ✓ |
-| 前端依赖 | ✓ | — | ✓ | ✓ |
-| Playwright 浏览器 | — | — | ✓ | ✓（三浏览器） |
-| Docker Compose V2 运行中 | — | ✓ | ✓ | ✓ |
-| 后端镜像已构建 | — | ✓ | ✓ | ✓ |
-| `travel-api/.env` | — | ✓ | ✓ | ✓ |
-| `travel-ui/.env` | ✓ | — | ✓ | ✓ |
-| 有效 `AI_API_KEY` + 管理员凭据 | — | — | — | ✓ |
-
-`.env` 字段见[环境变量配置](#环境变量配置)。
-
-#### 1. 安装 mise
-
-Windows:
-
-```
-winget install jdx.mise
-```
-
-macOS / Linux: 
-
-```
-curl https://mise.run | sh
-```
-
-#### 2. 加入 PATH
-
-先新开一个终端验证（已打开的终端读不到新 PATH）：
-
-```powershell
-Get-Command mise
-```
-
-找不到则手动加入用户级 PATH：`Win + R` → `sysdm.cpl` → 高级 → 环境变量 → 用户变量 `Path` → 新建 → 填入 `C:\Program Files\mise`，然后**重开终端**。
-
-> Windows 上改 PATH 建议用图形界面。`setx PATH "...;%PATH%"` 会把系统 PATH 复制进用户 PATH，且超过 1024 字符静默截断；`[Environment]::SetEnvironmentVariable` 会展开原值里的 `%USERPROFILE%` 并把注册表类型从 `REG_EXPAND_SZ` 降级为 `REG_SZ`。
-
-#### 3. 授信并安装
-
 ```bash
-mise trust
-mise install
+mise run services:stop
 ```
-
-`mise.toml` 含可执行内容，需按绝对路径授信一次；换机器或换目录要重做。`mise install` 下载 JDK 21 / Node 22.22.3 / Python 3.12（约 485 MB，装到 `%LOCALAPPDATA%\mise\installs`），并在仓库根目录创建 `.venv`。
-
-#### 4. 安装测试依赖
-
-```bash
-mise run setup        # Python + 前端依赖
-mise run setup:e2e    # 跑 e2e 时追加：Playwright Chromium
-```
-
-可拆分执行 `setup:py` / `setup:ui`。三浏览器：`mise exec -- corepack yarn --cwd travel-ui playwright install`。
-
-#### 5. 验证
-
-```bash
-mise run doctor
-```
-
-打印 mise 实际提供的 java / node / yarn / python / docker 版本，与[环境要求](#环境要求)逐条核对。
-
-```bash
-mise run verify
-```
-
-跑单个最小模块（约 3 秒），确认整条链路可用：预检通过 → Maven wrapper 能执行 → 报告写入 `artifacts/test-results/`。输出末尾为「结果：全部通过」即成功。
-
-### 二、日常测试命令
-
-#### mise 任务
-
-> 若 IDE 终端自动激活了虚拟环境（提示符带 `(.venv)`），先执行 `deactivate` 退出再跑下面的命令。已激活状态下 `VIRTUAL_ENV` 已被预设，mise 会跳过自身的 venv 激活，导致解析到错误的解释器。
-
-`mise run <任务>` 执行前自动注入本项目的工具版本，`mise tasks` 列出全部：
-
-| 任务 | 内容 | 需要服务 |
-| --- | --- | --- |
-| `mise run test:unit` | 全部单元测试与覆盖率，约 1 分钟 | 否 |
-| `mise run test:integration` | Java `*IT`、Agent 集成、API 测试；跳过真实 DeepSeek 与社区停机 | 是 |
-| `mise run test:e2e` | Playwright，Chromium | 是 |
-| `mise run test:all` | `unit + integration + Chromium E2E` | 是 |
-| `mise run test:full` | `all` 之外追加真实模型、WebSocket、社区停机恢复、三浏览器 E2E；需有效 `AI_API_KEY` 与管理员凭据 | 是 |
-| `mise run verify` | 单个最小模块，确认链路可用 | 否 |
-| `mise run doctor` | 打印 java/node/yarn/python/docker 版本 | 否 |
-
-带服务的任务会自动执行 `docker compose up -d --build`，轮询 Gateway 直到就绪，结束时只停止本次新启动的服务，不影响你原有的容器。
-
-需要按模块筛选、跳过镜像构建、自定义地址端口，或想绕过运行器单独调试某个模块时，见 [tests/README.md](tests/README.md)。
-
-#### 输出与报告
-
-运行器显示预检、进度条和汇总，子进程输出只写日志文件。失败项标红并附日志路径。报告位于 `artifacts/test-results/`（不入库）：
-
-| 文件/目录 | 内容 |
-| --- | --- |
-| `summary.json` | 机器可读结果与环境版本 |
-| `latest.md` | 汇总表格 |
-| `unit/` `integration/` `e2e/` | JUnit、覆盖率、API 请求响应证据、Playwright 报告与失败截图/视频/trace |
-
-Playwright 报告：在 `travel-ui` 执行 `corepack yarn test:e2e:report`。
-
-### 常见问题与排错
-
-| 现象 | 处理 |
-| --- | --- |
-| 找不到 `mise` 命令 | 终端早于 PATH 配置打开，重开终端 |
-| `mise WARN ... is not trusted` | 执行 `mise trust`；`mise.toml` 改动后需重做 |
-| `mise-shim.exe not found` 刷屏 | `mise settings set windows_shim_mode file` |
-| `chpwd functionality requires PowerShell 7` | PowerShell 5.1 无目录切换事件，功能不受影响；设 `$env:MISE_PWSH_CHPWD_WARNING=0` 可消除 |
-| 装 Node 报 `EPERM ... C:\Program Files\nodejs\` | `corepack enable` 写系统目录失败，本项目不需要该步骤，可忽略 |
-| 预检报版本不符 | mise 未生效，`mise run doctor` 核对 |
-| 缺少 pytest / httpx | `mise run setup:py`。注意别把包装进 mise 全局解释器（`installs\python\...`），`.venv` 不会继承它 |
-| `docker compose` 失败并提示 `auth.docker.io` | Docker Hub 不可达，配置加速器或本轮用 `--no-build` |
-| 测试结果与源码不符 | 多半是 `--no-build` 跑在旧镜像上，去掉重建 |
-| 等待 Gateway 超时 | `docker compose -f travel-api/docker-compose.yml logs` 查看具体服务 |
-| `full` 报缺少管理员凭据 | 设 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 或确认 `admin_account.txt` 存在 |
-| `.venv` 突然找不到标准库 | 基础解释器已被移除；删除 `.venv` 后重跑 `mise run setup:py`（先关闭占用进程） |
-
-不用 mise 也可以：按[环境要求](#环境要求)手动装同版本工具，底层命令见 [tests/README.md](tests/README.md)。
-
----
-
-## 运行时扩展机票和火车票日期
-
-当前日期票务数据由 `travel-api/scripts/generate_dated_ticket_offers.py`
-根据以下模板生成：
-
-- `travel-api/seed-data/transport/train/ticket_offers.csv`
-- `travel-api/seed-data/transport/plane/ticket_offers.csv`
-
-实际导入 PostgreSQL 的文件是对应目录下的 `generated_ticket_offers.csv`。
-
-如需修改数据：
-
-1. 修改 `travel-api/scripts/generate_dated_ticket_offers.py`：
-
-   ```python
-   START_DATE = datetime(year, month, day)
-   END_DATE = datetime(year, month, day)
-   ```
-
-2. 重新生成机票和火车票数据：
-
-   ```powershell
-   python generate_dated_ticket_offers.py
-   ```
-   
-3. 如果 Docker Compose 已在运行，导入现有旅行产品数据库：
-
-   ```powershell
-   docker compose exec -T postgres psql -U admin -d travel_core_db -f /database/seed/transport_seed.sql
-   docker compose restart travel-core
-   ```
-
-   如果 `.env` 修改过数据库用户名或 `TRAVEL_CORE_DB_NAME`，请替换 `admin` 和 `travel_core_db`。导入脚本使用确定性 ID 和 `ON CONFLICT (id) DO NOTHING`，会保留已有数据并补充新日期。
-
-`docker compose up -d --build` 只会重新构建镜像。若 `travel-api/data/postgres` 已有数据库，它不会自动重新生成或重新导入票务
-CSV；数据库初始化脚本只会在该目录为空时执行。修改 CSV 后仍建议显式执行上面的 `psql` 导入命令。
-
----
-
-## 两种模式对比
-
-| | 开发模式 Debug | 生产模式 Build 与 Serve |
-| --- | --- | --- |
-| 前端命令 | `yarn start` | `yarn build` + `yarn serve` |
-| 热更新 | 有 | 无 |
-| Source map / 断点调试 | 有 | 无 |
-| 代码压缩 | 无 | 有 |
-| 端口 | `.env` 中的 `PORT`（默认 `53000`） | 固定 `53000` |
-| 改 `.env` 后 | 重启 `yarn start` | 重新 `yarn build` |
-| 适用场景 | 日常开发 | 演示、验收、性能测试 |
-
----
-
-## 常见问题排查
-
-### 1) Docker 服务未正常启动
-
-```cmd
-docker compose ps
-docker compose logs
-```
-
-确认 Docker 已启动、端口未冲突。端口冲突可通过 [后端端口覆盖](#后端端口覆盖可选) 调整。
-
-### 2) 前端无法连接后端
-
-检查：
-
-- `REACT_APP_API_HOSTNAME`
-- `REACT_APP_API_PORT` 是否与后端网关端口一致
-- 后端容器状态（`travel-api` 下执行 `docker compose ps`）
-
-若是生产模式，确认改完 `.env` 后重新执行过 `yarn build`。
-
-### 3) 地图不显示
-
-检查前端高德配置：
-
-- `REACT_APP_AMAP_JS_API_KEY`
-- `REACT_APP_AMAP_SECURITY_JS_CODE`
-
-### 4) AI 功能不可用
-
-检查后端 AI 配置：
-
-- `AI_API_KEY`
-- `AI_MODEL`
-
-并在修改 `.env` 后重启后端服务。
 
 ---
 
@@ -654,10 +505,10 @@ docker compose logs
 ### Q3: 修改 `.env` 后是否需要重启？
 
 **A:**
-- 前端开发模式：重启 `yarn start`
-- 前端生产模式：重新 `yarn build`，再 `yarn serve`
-- 后端：重新 `docker compose up -d --build`
+- 前端开发模式：重启 `mise run ui:dev`
+- 前端生产模式：重新执行 `mise run ui:build`，再执行 `mise run ui:serve`
+- 后端：重新执行 `mise run services:up_build`
 
 ### Q4: 该用开发模式还是生产模式？
 
-**A:** 写代码用开发模式（热更新 + 断点调试）；演示、验收、看真实加载性能用生产模式。参见 [两种模式对比](#两种模式对比)。
+**A:** 写代码用开发模式（热更新 + 断点调试）；演示、验收、看真实加载性能用生产模式。

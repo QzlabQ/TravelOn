@@ -1,0 +1,17 @@
+{
+  "method": "PUT",
+  "url": "http://localhost:58082/hotels/admin/99001/rooms/990011",
+  "headers": {
+    "Accept": "application/json",
+    "X-User-Token": "<redacted>"
+  },
+  "body": {
+    "roomId": 990011,
+    "hotelId": 99001,
+    "name": "改名后的房型",
+    "guestCapacity": 2,
+    "roomType": "STANDARD",
+    "pricePerAdult": 288.0,
+    "description": "测试房型"
+  }
+}

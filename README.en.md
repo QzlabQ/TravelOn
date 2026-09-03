@@ -17,17 +17,14 @@ https://github.com/user-attachments/assets/ad9d7145-eee1-4f2c-bebe-2cd7702a3f3a
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
+- [Toolchain Management (mise)](#toolchain-management-mise)
+  - [Part 1 — Environment Setup](#part-1--environment-setup-one-time)
+  - [Part 2 — Everyday Commands](#part-2--everyday-commands)
 - [Environment Variables](#environment-variables)
 - [Built-in Admin Accounts](#built-in-admin-accounts)
 - [Quick Start](#quick-start)
 - [Development Mode (Debug)](#development-mode-debug)
 - [Production Mode (Build and Serve)](#production-mode-build-and-serve)
-- [Toolchain Management (mise)](#toolchain-management-mise)
-  - [Part 1 — Environment Setup](#part-1--environment-setup-one-time)
-  - [Part 2 — Everyday Test Commands](#part-2--everyday-test-commands)
-- [Runtime Extension of Flight and Train Ticket Dates](#runtime-extension-of-flight-and-train-ticket-dates)
-- [Mode Comparison](#mode-comparison)
-- [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
 
 ---
@@ -110,36 +107,152 @@ travel-on-2026NULLptr/
 
 ## Prerequisites
 
-Install the following tools first:
+Only the following tools need to be installed manually:
 
 ```text
 Git
-Docker Desktop / Docker Engine
-Java 21
-Python 3.12
-Node.js 22.22.3
-Yarn 4.2.2 (via Corepack)
+Docker Desktop / Docker Engine (including Docker Compose V2)
+mise
 ```
 
-Verify versions:
+Java, Python, Node.js, and Yarn do not need to be installed beforehand. `mise install` downloads and pins Java 21, Python 3.12, and Node.js 22.22.3 from the repository configuration; Corepack provides Yarn 4.2.2 according to `travel-ui/package.json`. From the repository root:
 
-```cmd
+```bash
+mise trust
+mise install
+mise run doctor
+```
+
+`mise run doctor` checks:
+
+```text
 git --version
 docker --version
 docker compose version
-node --version
-corepack --version
+Java 21 / Python 3.12 / Node.js 22.22.3 / Yarn 4.2.2
 ```
 
-Enable Yarn (Corepack):
+---
 
-```cmd
-corepack enable
+## Toolchain Management (mise)
+
+The repository's [`mise.toml`](mise.toml) manages more than test tooling: it provides common entry points for development, builds, tests, and deployment while pinning Java 21, Python 3.12, and Node.js 22.22.3. `travel-ui/package.json` and Corepack pin Yarn 4.2.2. `tests/run_tests.py` validates those versions again and aborts on a mismatch. Install Docker separately; each module's `mvnw` pins Maven. The Agent and model-stub containers intentionally run Python 3.13.
+
+### Part 1 — Environment Setup (one-time)
+
+#### 1. Install mise
+
+Windows:
+
+```
+winget install jdx.mise
 ```
 
-> Note: the test scripts always use the `corepack yarn ...` subcommand form and do **not** depend on `corepack enable`. If that command fails with `EPERM` because it tries to write into a system-wide Node installation directory, you can skip it.
+macOS / Linux:
 
-Using mise to install and pin the Java/Node.js/Python versions above is recommended; see [Toolchain Management (mise)](#toolchain-management-mise).
+```
+curl https://mise.run | sh
+```
+
+#### 2. Put mise on PATH
+
+Open a new terminal first and verify (existing terminals cannot see a new PATH):
+
+```powershell
+Get-Command mise
+```
+
+If it is missing, add it through the GUI: `Win + R` → `sysdm.cpl` → Advanced → Environment Variables → user `Path` → New → directory of mise, then **reopen the terminal**.
+
+#### 3. Trust and install
+
+```bash
+mise trust
+mise install
+```
+
+#### 4. Install project dependencies
+
+```bash
+mise run setup        # Python + frontend dependencies
+mise run setup:e2e    # add for e2e runs: Playwright Chromium
+```
+
+#### 5. Verify
+
+```bash
+mise run doctor
+```
+
+Prints the java / node / yarn / python / docker versions mise actually provides; check them against [Prerequisites](#prerequisites).
+
+```bash
+mise run verify
+```
+
+Runs the smallest single module (about 3 seconds) to confirm the whole chain works: preflight passes, the Maven wrapper executes, and reports are written to `artifacts/test-results/`. A trailing "全部通过" (all passed) means success.
+
+### Part 2 — Everyday Commands
+
+> If your IDE terminal activated the virtual environment automatically (the prompt shows `(.venv)`), run `deactivate` before the commands below. While it is active `VIRTUAL_ENV` is already set, so mise skips its own venv activation and resolves to the wrong interpreter.
+
+`mise run <task>` injects this project's tool versions first; `mise tasks` lists them all:
+
+#### 1. Frontend
+
+| Task | Contents |
+| --- | --- |
+| `mise run setup:ui` | Install frontend dependencies |
+| `mise run ui:dev` | Start the frontend development server with hot reload |
+| `mise run ui:build` | Build the frontend production bundle |
+| `mise run ui:serve` | Preview the built frontend bundle |
+
+#### 2. Backend
+
+| Task | Contents |
+| --- | --- |
+| `mise run build` | Build every Java module, check Agent Python sources, and build the frontend |
+| `mise run services:up` | Start the backend using existing images |
+| `mise run services:up_build` | Build images and start the backend |
+| `mise run services:status` | Show backend service status |
+| `mise run services:stop` | Stop the backend while retaining containers |
+| `mise run services:down` | Stop and remove backend service containers |
+
+#### 3. Tests
+
+| Task | Contents | Services |
+| --- | --- | --- |
+| `mise run setup` | Install Python and frontend test dependencies | No |
+| `mise run setup:py` | Install only the Python test dependencies | No |
+| `mise run setup:e2e` | Install frontend dependencies and Playwright Chromium | No |
+| `mise run test:pre` | Preflight guards: seed data, migration scripts, classpath resources, MQ and gateway config; about 20 seconds | No |
+| `mise run test:unit` | Unit tests and the coverage gate, about 50 seconds | No |
+| `mise run test:migration` | Cross-platform PostgreSQL legacy-database migration regression test | Throwaway PostgreSQL container |
+| `mise run test:integration` | Java `*IT`, Agent integration, API tests; model calls use a deterministic stub; resilience cases run in their own pass | Yes |
+| `mise run test:e2e` | Playwright, Chromium | Yes |
+| `mise run test:ci` | The complete CI-equivalent automated test chain, stopping at the first failure | Yes |
+| `mise run verify` | A single minimal module, to confirm the test chain works | No |
+| `mise run doctor` | Check Git, Java, Node, Yarn, Python, Docker, and Compose versions | No |
+
+#### 4. Deployment
+
+| Task | Contents |
+| --- | --- |
+| `mise run deploy:images <tag>` | Verify that all K3s deployment images build |
+| `mise run deploy:k3s <sha-* tag>` | Deploy built images on the deployment host |
+
+#### Output and reports
+
+Reports land in `artifacts/test-results/` (not committed):
+
+| File/directory | Contents |
+| --- | --- |
+| `summary.json` | Machine-readable results, case counts, coverage and environment versions |
+| `latest.md` | Summary table (per-task case counts plus per-module coverage) |
+| `pre/` `unit/` `integration/` `e2e/` | JUnit, API request/response evidence, Playwright reports and failure screenshots/video/traces |
+| `coverage/{java,java-it,python,ui}/` | Copies of the JaCoCo, pytest-cov and Jest coverage reports |
+
+Playwright report: run `corepack yarn test:e2e:report` inside `travel-ui`.
 
 ---
 
@@ -214,7 +327,7 @@ REACT_APP_AMAP_SECURITY_JS_CODE=
 | --- | --- |
 | `REACT_APP_API_HOSTNAME` | Backend hostname (usually `localhost`) |
 | `REACT_APP_API_PORT` | Backend gateway port (default `58082`, must match `GATEWAY_HOST_PORT`) |
-| `PORT` | Dev server port (default `53000`, applies to `yarn start` only) |
+| `PORT` | Dev server port (default `53000`, applies to `mise run ui:dev` only) |
 | `REACT_APP_AMAP_JS_API_KEY` | AMap JS key for browser map rendering |
 | `REACT_APP_AMAP_SECURITY_JS_CODE` | AMap JS security code |
 
@@ -230,8 +343,8 @@ REACT_APP_AMAP_SECURITY_JS_CODE=
 
 **Important:** `REACT_APP_*` variables are inlined at build time.
 
-- In development mode, restart `yarn start` after editing `.env`.
-- In production mode, you must re-run `yarn build` after editing `.env` — restarting `yarn serve` alone has no effect.
+- In development mode, restart `mise run ui:dev` after editing `.env`.
+- In production mode, you must re-run `mise run ui:build` after editing `.env` — restarting `mise run ui:serve` alone has no effect.
 
 ---
 
@@ -266,44 +379,19 @@ cd travel-on-2026NULLptr
 
 Create `travel-api/.env` and `travel-ui/.env` as described in [Environment Variables](#environment-variables).
 
-### 3) Start backend
+### 3) Install project dependencies
 
-```cmd
-cd travel-api
-docker compose up -d --build
-docker compose ps
+```bash
+mise trust
+mise install
+mise run setup
 ```
 
-### Local cleanup after service consolidation
+### 4) Build and start the backend
 
-After the microservice consolidation, deleted services may still remain locally because
-of previous Maven build output. After confirming that these directories contain no
-personal files, run the following command from the repository root. It only removes
-local leftovers and does not affect the current services in Git:
-
-```powershell
-Remove-Item -Recurse -Force `
-  .\travel-api\offer-provider-service, `
-  .\travel-api\hotel-service, `
-  .\travel-api\transport-service, `
-  .\travel-api\reservation-service, `
-  .\travel-api\payment-service `
-  -ErrorAction SilentlyContinue
-```
-
-Gateway URL:
-
-```text
-http://localhost:58082
-```
-
-> The first start initializes the database and imports seed data, which takes a while. Seeing postgres as `starting` in `docker compose ps` is expected — wait for it to turn `healthy`.
-
-### 4) Install frontend dependencies
-
-```cmd
-cd ..\travel-ui
-yarn install
+```bash
+mise run services:up_build
+mise run services:status
 ```
 
 ### 5) Pick a startup mode
@@ -319,26 +407,16 @@ For everyday development: hot reload on save, source maps included, and TypeScri
 
 ### Backend
 
-```cmd
-cd travel-api
-
-:: start
-docker compose up -d
-
-:: stop
-docker compose stop
+```bash
+mise run services:up
+mise run services:stop
 ```
 
 ### Frontend (hot reload)
 
-```cmd
-cd travel-ui
-
-:: start
-yarn start
-
-:: stop
-Ctrl + C
+```bash
+mise run ui:dev
+# stop: Ctrl + C
 ```
 
 URL:
@@ -350,12 +428,11 @@ http://localhost:53000
 ### Debugging notes
 
 - Frontend changes reload automatically; no restart needed.
-- After editing `travel-ui/.env`, stop with `Ctrl + C` and run `yarn start` again.
+- After editing `travel-ui/.env`, stop with `Ctrl + C` and run `mise run ui:dev` again.
 - After changing backend code or `docker-compose.yml`, rebuild the images:
 
-  ```cmd
-  cd travel-api
-  docker compose up -d --build
+  ```bash
+  mise run services:up_build
   ```
 
 ---
@@ -366,17 +443,16 @@ For demos and acceptance testing: minified static assets served by a static file
 
 ### 1) Build the frontend
 
-```cmd
-cd travel-ui
-yarn build
+```bash
+mise run ui:build
 ```
 
 Output goes to `travel-ui/build/`. The build bakes the current `REACT_APP_*` values into the bundle, so make sure `.env` is correct before building.
 
 ### 2) Serve the build
 
-```cmd
-yarn serve
+```bash
+mise run ui:serve
 ```
 
 This runs `serve -s build -l 53000`. The port is fixed at `53000` and does not read `PORT` from `.env`.
@@ -391,9 +467,8 @@ http://localhost:53000
 
 The backend runs in containers in both modes, with the same command:
 
-```cmd
-cd travel-api
-docker compose up -d --build
+```bash
+mise run services:up_build
 ```
 
 For a full deployment using prebuilt images (frontend container included), see `travel-api/docker-compose-deploy.yml`.
@@ -408,252 +483,9 @@ Ctrl + C
 
 Backend:
 
-```cmd
-cd travel-api
-docker compose stop
-```
-
----
-
-## Toolchain Management (mise)
-
-`tests/run_tests.py` strictly validates Java 21, Python 3.12, Node.js 22.22.3, and Yarn 4.2.2, aborting on any mismatch. The repository's [`mise.toml`](mise.toml) pins those versions with [mise](https://mise.jdx.dev) and collapses the test commands into tasks. Install Docker yourself; Maven comes from each module's `mvnw`.
-
-### Part 1 — Environment Setup (one-time)
-
-| Requirement | `unit` | `integration` | `e2e` | `full` |
-| --- | :-: | :-: | :-: | :-: |
-| Toolchain (Java / Node / Yarn / Python) | ✓ | ✓ | ✓ | ✓ |
-| Python test dependencies | ✓ | ✓ | ✓ | ✓ |
-| Frontend dependencies | ✓ | — | ✓ | ✓ |
-| Playwright browsers | — | — | ✓ | ✓ (all three) |
-| Docker Compose V2 running | — | ✓ | ✓ | ✓ |
-| Backend images built | — | ✓ | ✓ | ✓ |
-| `travel-api/.env` | — | ✓ | ✓ | ✓ |
-| `travel-ui/.env` | ✓ | — | ✓ | ✓ |
-| Valid `AI_API_KEY` + admin credentials | — | — | — | ✓ |
-
-`.env` fields are documented under [Environment Variables](#environment-variables).
-
-#### 1. Install mise
-
-Windows:
-
-```
-winget install jdx.mise
-```
-
-macOS / Linux: 
-
-```
-curl https://mise.run | sh
-```
-
-#### 2. Put mise on PATH
-
-Open a new terminal first and verify (existing terminals cannot see a new PATH):
-
-```powershell
-Get-Command mise
-```
-
-If it is missing, add it through the GUI: `Win + R` → `sysdm.cpl` → Advanced → Environment Variables → user `Path` → New → `C:\Program Files\mise`, then **reopen the terminal**.
-
-> Prefer the GUI for PATH edits on Windows. `setx PATH "...;%PATH%"` copies the system PATH into your user PATH and silently truncates past 1024 characters; `[Environment]::SetEnvironmentVariable` expands any `%USERPROFILE%` in the existing value and downgrades the registry type from `REG_EXPAND_SZ` to `REG_SZ`.
-
-#### 3. Trust and install
-
 ```bash
-mise trust
-mise install
+mise run services:stop
 ```
-
-`mise.toml` contains executable content, so it needs a one-time trust recorded per absolute path; repeat it on another machine or clone directory. `mise install` downloads JDK 21 / Node 22.22.3 / Python 3.12 (about 485 MB into `%LOCALAPPDATA%\mise\installs`) and creates `.venv` at the repository root.
-
-#### 4. Install test dependencies
-
-```bash
-mise run setup        # Python + frontend dependencies
-mise run setup:e2e    # add for e2e runs: Playwright Chromium
-```
-
-`setup:py` / `setup:ui` run them separately. All three browsers: `mise exec -- corepack yarn --cwd travel-ui playwright install`.
-
-#### 5. Verify
-
-```bash
-mise run doctor
-```
-
-Prints the java / node / yarn / python / docker versions mise actually provides; check them against [Prerequisites](#prerequisites).
-
-```bash
-mise run verify
-```
-
-Runs the smallest single module (about 3 seconds) to confirm the whole chain works: preflight passes, the Maven wrapper executes, and reports are written to `artifacts/test-results/`. A trailing "全部通过" (all passed) means success.
-
-### Part 2 — Everyday Test Commands
-
-#### mise tasks
-
-> If your IDE terminal activated the virtual environment automatically (the prompt shows `(.venv)`), run `deactivate` before the commands below. While it is active `VIRTUAL_ENV` is already set, so mise skips its own venv activation and resolves to the wrong interpreter.
-
-`mise run <task>` injects this project's tool versions first; `mise tasks` lists them all:
-
-| Task | Contents | Services |
-| --- | --- | --- |
-| `mise run test:unit` | All unit tests and coverage, about a minute | No |
-| `mise run test:integration` | Java `*IT`, Agent integration, API tests; skips real DeepSeek and community downtime | Yes |
-| `mise run test:e2e` | Playwright, Chromium | Yes |
-| `mise run test:all` | `unit + integration + Chromium E2E` | Yes |
-| `mise run test:full` | `all` plus the configured model, WebSocket, community stop/recovery, and three-browser E2E; needs a valid `AI_API_KEY` and admin credentials | Yes |
-| `mise run verify` | A single minimal module, to confirm the chain works | No |
-| `mise run doctor` | Prints java/node/yarn/python/docker versions | No |
-
-Tasks that need services run `docker compose up -d --build`, poll the Gateway until ready, and on exit stop only what they started, leaving your existing containers alone.
-
-For per-module filtering, skipping the image build, custom URLs and ports, or running a single module outside the runner, see [tests/README.md](tests/README.md).
-
-#### Output and reports
-
-The runner shows preflight, progress, and a summary; subprocess output goes only to log files. Failures are highlighted with their log path. Reports land in `artifacts/test-results/` (not committed):
-
-| File/directory | Contents |
-| --- | --- |
-| `summary.json` | Machine-readable results and environment versions |
-| `latest.md` | Summary table |
-| `unit/` `integration/` `e2e/` | JUnit, coverage, API request/response evidence, Playwright reports and failure screenshots/video/traces |
-
-Playwright report: run `corepack yarn test:e2e:report` inside `travel-ui`.
-
-### Troubleshooting
-
-| Symptom | Fix |
-| --- | --- |
-| `mise` not recognized | The terminal predates the PATH change; reopen it |
-| `mise WARN ... is not trusted` | Run `mise trust`; repeat after `mise.toml` changes |
-| Repeated `mise-shim.exe not found` | `mise settings set windows_shim_mode file` |
-| `chpwd functionality requires PowerShell 7` | PowerShell 5.1 has no directory-change event; behaviour is unaffected, silence with `$env:MISE_PWSH_CHPWD_WARNING=0` |
-| `EPERM ... C:\Program Files\nodejs\` installing Node | `corepack enable` cannot write the system directory; this project does not need it |
-| Preflight version mismatch | mise is not in effect; check with `mise run doctor` |
-| pytest / httpx missing | `mise run setup:py`. Do not install into mise's global interpreter (`installs\python\...`) — `.venv` does not inherit from it |
-| `docker compose` fails mentioning `auth.docker.io` | Docker Hub unreachable; configure a mirror or use `--no-build` |
-| Results contradict the source | Usually `--no-build` on stale images; drop it and rebuild |
-| Timeout waiting for the Gateway | `docker compose -f travel-api/docker-compose.yml logs` |
-| `full` reports missing admin credentials | Set `ADMIN_EMAIL` / `ADMIN_PASSWORD` or confirm `admin_account.txt` exists |
-| `.venv` suddenly cannot find the standard library | Its base interpreter is gone; delete `.venv` and rerun `mise run setup:py` (close anything holding it first) |
-
-mise is optional: install the same versions manually per [Prerequisites](#prerequisites); the underlying commands are documented in [tests/README.md](tests/README.md).
-
----
-
-## Runtime Extension of Flight and Train Ticket Dates
-
-The dated ticket data is generated by
-`travel-api/scripts/generate_dated_ticket_offers.py` from these templates:
-
-- `travel-api/seed-data/transport/train/ticket_offers.csv`
-- `travel-api/seed-data/transport/plane/ticket_offers.csv`
-
-The files actually imported into PostgreSQL are the corresponding
-`generated_ticket_offers.csv` files. To extend the ticket dates to
-**2026-10-15**, for example:
-
-1. Edit `travel-api/scripts/generate_dated_ticket_offers.py`:
-
-   ```python
-   END_DATE = datetime(2026, 10, 15)
-   ```
-
-2. Regenerate the flight and train data:
-
-   ```powershell
-   cd .\travel-api\scripts
-   python .\generate_dated_ticket_offers.py
-   cd ..
-   ```
-
-3. If Docker Compose is already running, import the data into the existing
-   transport database:
-
-   ```powershell
-   docker compose exec -T postgres psql -U admin -d travel_core_db -f /database/seed/transport_seed.sql
-   docker compose restart travel-core
-   ```
-
-   Replace `admin` or `travel_core_db` if they were changed in `.env`. The seed
-   script uses deterministic IDs and `ON CONFLICT (id) DO NOTHING`, preserving
-   existing data while adding the new dates.
-
-`docker compose up -d --build` only rebuilds the images. If
-`travel-api/data/postgres` already contains a database, it does not
-automatically regenerate or re-import the ticket CSV files; database
-initialization scripts run automatically only when that directory is empty.
-After changing the CSV files, explicitly run the `psql` import command above.
-
-To verify the imported date range:
-
-```powershell
-cd .\travel-api
-docker compose exec postgres psql -U admin -d travel_core_db -c "SELECT type, MIN(departure_date_time), MAX(departure_date_time), COUNT(*) FROM ticket_offer_templates GROUP BY type;"
-```
-
-An overnight train departing on October 15 and arriving on October 16 is
-expected.
-
----
-
-## Mode Comparison
-
-| | Development (Debug) | Production (Build and Serve) |
-| --- | --- | --- |
-| Frontend command | `yarn start` | `yarn build` + `yarn serve` |
-| Hot reload | Yes | No |
-| Source maps / breakpoints | Yes | No |
-| Minification | No | Yes |
-| Port | `PORT` from `.env` (default `53000`) | Fixed `53000` |
-| After editing `.env` | Restart `yarn start` | Re-run `yarn build` |
-| Use case | Everyday development | Demos, acceptance, performance checks |
-
----
-
-## Troubleshooting
-
-### 1) Docker services failed to start
-
-```cmd
-docker compose ps
-docker compose logs
-```
-
-Ensure Docker is running and ports are not occupied. Port clashes can be resolved via [Backend port overrides](#backend-port-overrides-optional).
-
-### 2) Frontend cannot reach backend
-
-Check:
-
-- `REACT_APP_API_HOSTNAME`
-- `REACT_APP_API_PORT` matches the backend gateway port
-- Backend container status (`docker compose ps` in `travel-api`)
-
-In production mode, confirm you re-ran `yarn build` after editing `.env`.
-
-### 3) Map is not displayed
-
-Check frontend AMap variables:
-
-- `REACT_APP_AMAP_JS_API_KEY`
-- `REACT_APP_AMAP_SECURITY_JS_CODE`
-
-### 4) AI features unavailable
-
-Check backend AI variables:
-
-- `AI_API_KEY`
-- `AI_MODEL`
-
-Restart backend services after `.env` updates.
 
 ---
 
@@ -672,10 +504,10 @@ Restart backend services after `.env` updates.
 ### Q3: Do I need to restart after updating `.env`?
 
 **A:**
-- Frontend, development mode: restart `yarn start`
-- Frontend, production mode: re-run `yarn build`, then `yarn serve`
-- Backend: re-run `docker compose up -d --build`
+- Frontend, development mode: restart `mise run ui:dev`
+- Frontend, production mode: re-run `mise run ui:build`, then `mise run ui:serve`
+- Backend: re-run `mise run services:up_build`
 
 ### Q4: Which mode should I use?
 
-**A:** Use development mode while writing code (hot reload + breakpoints); use production mode for demos, acceptance testing, and realistic load performance. See [Mode Comparison](#mode-comparison).
+**A:** Use development mode while writing code (hot reload + breakpoints); use production mode for demos, acceptance testing, and realistic load performance.
