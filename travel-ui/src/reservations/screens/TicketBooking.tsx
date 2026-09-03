@@ -107,8 +107,10 @@ type TrainTypeFilter = "GC" | "D" | "T" | "K" | "Z" | "OTHER";
 type OfferGroup = {
   key: string;
   offers: TicketSearchOffer[];
-  order: number;
 };
+
+type TicketSortField = "departure" | "price";
+type TicketSortDirection = "asc" | "desc";
 
 const trainTypeFilters: Array<{ label: string; value: TrainTypeFilter }> = [
   { label: "G/C", value: "GC" },
@@ -225,32 +227,78 @@ const dedupeSeatOffers = (
   return Array.from(seats.values()).sort(compareSeatOffers(mode));
 };
 
+/** 卡片默认展示的席别/舱位：同一班次里最便宜的那个，同价时优先余票多的。 */
+const cheapestOffer = (group: OfferGroup) =>
+  group.offers.reduce((best, offer) =>
+    offer.price < best.price ||
+    (offer.price === best.price && offer.remainingSeats > best.remainingSeats)
+      ? offer
+      : best,
+  );
+
+const groupMinPrice = (group: OfferGroup) =>
+  Math.min(...group.offers.map((offer) => offer.price));
+
+const toTimestamp = (value: string) => {
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+/** 同一分组里的所有票共享出发时刻（分组键里就包含它）。 */
+const groupDeparture = (group: OfferGroup) =>
+  toTimestamp(group.offers[0].departureTime);
+
+/**
+ * 卡片之间的排序。
+ *
+ * 这里必须自己排，不能沿用后端返回的行顺序：数据库里同一班次的每个席别/舱位是独立
+ * 一行，后端按行排序后，前端再把这些行聚合成一张卡片，卡片的位置就变成了「该班次
+ * 第一次出现在后端结果里的那一行的位置」——按价格排序时它是该班次最便宜的一行，
+ * 按出发时间排序时它又退化成任意一行，结果既不稳定也解释不清。
+ *
+ * 现在的规则是：卡片位置只取决于该班次最低价（或出发时刻），与卡片内部展示哪个
+ * 席别无关。
+ */
+const compareGroups =
+  (field: TicketSortField, direction: TicketSortDirection) =>
+  (left: OfferGroup, right: OfferGroup) => {
+    const sign = direction === "asc" ? 1 : -1;
+    const byPrice = groupMinPrice(left) - groupMinPrice(right);
+    const byDeparture = groupDeparture(left) - groupDeparture(right);
+    const primary = field === "price" ? byPrice : byDeparture;
+    if (primary !== 0) return primary * sign;
+
+    // 主排序键相同时用另一个字段兜底，最后用分组键保证顺序稳定。
+    const secondary = field === "price" ? byDeparture : byPrice;
+    if (secondary !== 0) return secondary;
+    return left.key.localeCompare(right.key);
+  };
+
 const buildOfferGroups = (
   offers: TicketSearchOffer[],
   mode: TicketMode,
+  sortField: TicketSortField,
+  sortDirection: TicketSortDirection,
 ): OfferGroup[] => {
   const groupedOffers = new Map<string, OfferGroup>();
 
-  offers.forEach((offer, index) => {
+  offers.forEach((offer) => {
     const groupKey = getOfferGroupKey(offer);
     const existingGroup = groupedOffers.get(groupKey);
     if (existingGroup) {
       existingGroup.offers.push(offer);
       return;
     }
-    groupedOffers.set(groupKey, {
-      key: groupKey,
-      offers: [offer],
-      order: index,
-    });
+    groupedOffers.set(groupKey, { key: groupKey, offers: [offer] });
   });
 
   return Array.from(groupedOffers.values())
-    .sort((left, right) => left.order - right.order)
     .map((group) => ({
       ...group,
+      // 卡片内部按席别/舱位等级排序，与卡片之间的价格排序无关。
       offers: dedupeSeatOffers(group.offers, mode),
-    }));
+    }))
+    .sort(compareGroups(sortField, sortDirection));
 };
 
 const formatTicketClock = (value: string) => {
@@ -509,7 +557,9 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [date, setDate] = useState(rebookState.departureDate ?? today);
-  const [sortBy, setSortBy] = useState("departure");
+  const [sortBy, setSortBy] = useState<TicketSortField>("departure");
+  const [sortDirection, setSortDirection] =
+    useState<TicketSortDirection>("asc");
   const [priceRange, setPriceRange] = useState<number[]>([
     config.lowPrice,
     config.highPrice,
@@ -647,8 +697,8 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     trainCodeQuery,
   ]);
   const offerGroups = useMemo(
-    () => buildOfferGroups(offers, mode),
-    [mode, offers],
+    () => buildOfferGroups(offers, mode, sortBy, sortDirection),
+    [mode, offers, sortBy, sortDirection],
   );
   const recommendedGroup = offerGroups[0] ?? null;
   const moreGroups = recommendedGroup
@@ -706,7 +756,7 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
         return currentSelectedOffer;
       }
     }
-    return group.offers[0];
+    return cheapestOffer(group);
   };
 
   const clearAutoNavigate = () => {
@@ -870,7 +920,9 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
     // Note: `date` is intentionally excluded so changing the date does not
     // auto-search; the user must click the 查询 button to apply a new date,
     // matching how departure/arrival city changes behave.
-  }, [priceRange, onlyAvailable, sortBy]);
+    // `sortBy` / `sortDirection` are excluded as well: 卡片顺序完全在前端按分组
+    // 计算，改排序不需要再往后端跑一趟。
+  }, [priceRange, onlyAvailable]);
 
   useEffect(() => {
     setDepartureAirportFilter("");
@@ -1511,6 +1563,23 @@ const TicketBooking = ({ mode }: TicketBookingProps) => {
               <ToggleButton value="departure">出发时间</ToggleButton>
               <ToggleButton value="price">价格</ToggleButton>
             </ToggleButtonGroup>
+            <ToggleButtonGroup
+              fullWidth
+              color="primary"
+              size="small"
+              sx={{ mt: 1 }}
+              value={sortDirection}
+              exclusive
+              onChange={(_, value) => value && setSortDirection(value)}
+            >
+              <ToggleButton value="asc">升序</ToggleButton>
+              <ToggleButton value="desc">降序</ToggleButton>
+            </ToggleButtonGroup>
+            <p className="mt-2 text-xs text-slate-500">
+              {sortBy === "price"
+                ? `按${mode === "flight" ? "航班" : "车次"}的最低${mode === "flight" ? "舱位" : "席别"}票价${sortDirection === "asc" ? "从低到高" : "从高到低"}排列`
+                : `按出发时间${sortDirection === "asc" ? "从早到晚" : "从晚到早"}排列`}
+            </p>
             <Button
               fullWidth
               variant="outlined"

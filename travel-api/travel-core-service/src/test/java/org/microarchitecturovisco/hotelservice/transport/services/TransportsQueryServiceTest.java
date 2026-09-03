@@ -102,7 +102,7 @@ class TransportsQueryServiceTest {
 
         List<TicketOfferDto> result = service.searchTicketOffers(
                 TicketType.FLIGHT, "Shanghai", "Beijing", departureDate,
-                new BigDecimal("100.00"), new BigDecimal("200.00"), false, true, "price"
+                new BigDecimal("100.00"), new BigDecimal("200.00"), false, true, "price", "asc"
         );
 
         assertThat(result).extracting(TicketOfferDto::getId).containsExactly(lowerBound.getId().toString(), upperBound.getId().toString());
@@ -130,7 +130,7 @@ class TransportsQueryServiceTest {
 
         List<TicketOfferDto> result = service.searchTicketOffers(
                 TicketType.TRAIN, "Shanghai", "Hangzhou", departureDate,
-                null, null, false, false, "seats"
+                null, null, false, false, "seats", "asc"
         );
 
         assertThat(result).extracting(TicketOfferDto::getId)
@@ -152,11 +152,39 @@ class TransportsQueryServiceTest {
 
         List<TicketOfferDto> result = service.searchTicketOffers(
                 TicketType.FLIGHT, "Shanghai", "Beijing", departureDate,
-                null, null, false, false, "unsupported"
+                null, null, false, false, "unsupported", "asc"
         );
 
         assertThat(result).extracting(TicketOfferDto::getId).containsExactly(earlier.getId().toString(), later.getId().toString());
         assertThat(result.getFirst().getDuration()).isEqualTo("2h 30m");
+    }
+
+    @Test
+    void searchTicketOffersSupportsDescendingOrder() {
+        LocalDate departureDate = LocalDate.of(2026, 9, 1);
+        TicketOfferTemplate cheap = offer("cheap", TicketType.FLIGHT, "SHA", "PEK", 100, 2, 8, 0);
+        TicketOfferTemplate expensive = offer("expensive", TicketType.FLIGHT, "SHA", "PEK", 300, 2, 12, 0);
+        cityCatalog.register("SHA", "Shanghai");
+        cityCatalog.register("PEK", "Beijing");
+        when(repository.findByTypeAndDepartureCityIdAndArrivalCityIdAndDepartureDateTimeGreaterThanEqualAndDepartureDateTimeLessThanOrderByDepartureDateTimeAsc(
+                eq(TicketType.FLIGHT), eq("SHA"), eq("PEK"), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of(cheap, expensive));
+        stubCity("SHA", "Shanghai");
+        stubCity("PEK", "Beijing");
+
+        List<TicketOfferDto> descendingByPrice = service.searchTicketOffers(
+                TicketType.FLIGHT, "Shanghai", "Beijing", departureDate,
+                null, null, false, false, "price", "desc"
+        );
+        List<TicketOfferDto> descendingByDeparture = service.searchTicketOffers(
+                TicketType.FLIGHT, "Shanghai", "Beijing", departureDate,
+                null, null, false, false, "departure", "desc"
+        );
+
+        assertThat(descendingByPrice).extracting(TicketOfferDto::getId)
+                .containsExactly(expensive.getId().toString(), cheap.getId().toString());
+        assertThat(descendingByDeparture).extracting(TicketOfferDto::getId)
+                .containsExactly(expensive.getId().toString(), cheap.getId().toString());
     }
 
     @Test
