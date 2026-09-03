@@ -10,6 +10,30 @@ sudo kubectl apply -k k8s/base
 sudo kubectl -n travelon get pods -w
 ```
 
+## 自动扩缩容与压测
+
+`gateway` 使用 `autoscaling/v2` HPA：CPU 平均利用率达到 60% 时在 1～4 个 Pod
+之间扩容，负载降低后等待 120 秒再按每分钟最多缩减 50%。所有 Deployment 都声明
+CPU request/limit，确保 HPA 的利用率计算有稳定基线。集群需安装 metrics-server。
+
+在能访问 Gateway 的环境运行：
+
+```bash
+kubectl -n travelon scale deployment/gateway --replicas=1
+kubectl -n travelon rollout status deployment/gateway
+kubectl -n travelon get hpa gateway
+python3 scripts/hpa-load-test.py --url http://<gateway>/hotels/destinations \
+  --duration 180 --concurrency 32 --cooldown 240 \
+  --output artifacts/hpa-load-test.json
+```
+
+脚本在开始前确认 Gateway 为 1 个副本，输出吞吐量、平均/P95 延迟、错误率，并每 10 秒
+记录 Deployment 的当前/就绪副本数以及采样错误；
+负载结束后继续观察 240 秒。只有同时观察到扩容和回落时脚本才以 0 退出。验收时应在
+`replica_samples` 中看到当前和就绪副本均从 1→2+ 并在负载结束后回落；错误率和接口依赖异常需单独标注，
+不能把失败请求误判为扩缩容成功。仅调试压测指标、不连接集群时可传
+`--skip-scaling-check --cooldown 0`。
+
 ## GitHub Actions 前置条件
 
 256 需要注册为 self-hosted runner，标签为 `travelon-256`。Production environment 需要配置：

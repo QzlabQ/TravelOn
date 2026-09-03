@@ -6,6 +6,7 @@ resources:
   - config.yaml
   - data.yaml
   - apps.yaml
+  - autoscaling.yaml
 # These labels identify objects whose lifecycle is owned by the repository CD
 # pipeline.  Do not include selectors: adding a new selector label to an
 # existing Deployment/StatefulSet would be an immutable-field change.
