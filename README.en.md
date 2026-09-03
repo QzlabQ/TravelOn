@@ -506,11 +506,11 @@ Runs the smallest single module (about 3 seconds) to confirm the whole chain wor
 | `mise run test:pre` | Preflight guards: seed data, migration scripts, classpath resources, MQ and gateway config; about 20 seconds | No |
 | `mise run test:unit` | Unit tests and the coverage gate, about 50 seconds | No |
 | `mise run test:migration` | Cross-platform PostgreSQL legacy-database migration regression test | Throwaway PostgreSQL container |
-| `mise run test:integration` | Java `*IT`, Agent integration, API tests; skips real DeepSeek; resilience cases run in their own pass | Yes |
+| `mise run test:integration` | Java `*IT`, Agent integration, API tests; skips real model calls; resilience cases run in their own pass | Yes |
 | `mise run test:e2e` | Playwright, Chromium | Yes |
 | `mise run test:all` | `pre + unit + integration + Chromium E2E + resilience` | Yes |
 | `mise run test:ci` | The same stages as CI: `pre + unit + migration + integration + Chromium E2E + resilience`, stopping at the first failure | Yes |
-| `mise run test:full` | `all` plus real DeepSeek, WebSocket, three-browser E2E; needs a valid `DEEPSEEK_API_KEY` and admin credentials | Yes |
+| `mise run test:full` | `all` plus real model calls, WebSocket, three-browser E2E; needs a valid `AI_API_KEY` and admin credentials | Yes |
 | `mise run verify` | A single minimal module, to confirm the chain works | No |
 | `mise run doctor` | Prints java/node/yarn/python/docker versions | No |
 

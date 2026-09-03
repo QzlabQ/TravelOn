@@ -29,8 +29,9 @@ test('火车票可以切换席别后下单', async ({page}) => {
     await registerThroughUi(page, uniqueAccount('train'));
 
     await page.goto('/reservations/trains');
-    await expect(page.getByRole('combobox', {name: '出发站/城市'})).toHaveValue('北京市');
-    await expect(page.getByRole('combobox', {name: '到达站/城市'})).toHaveValue('上海市');
+    // 默认值要等 /transports/tickets/options 与预订偏好取回后才写入，见 flight-booking 的同一处注释。
+    await expect(page.getByRole('combobox', {name: '出发站/城市'})).toHaveValue('北京市', {timeout: 30_000});
+    await expect(page.getByRole('combobox', {name: '到达站/城市'})).toHaveValue('上海市', {timeout: 30_000});
     await page.getByLabel('出行日期').fill(isoDate(3));
     await page.getByRole('button', {name: '查询', exact: true}).click();
     await expect(page.getByRole('heading', {name: '推荐车次'})).toBeVisible();

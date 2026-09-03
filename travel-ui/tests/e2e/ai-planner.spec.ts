@@ -30,10 +30,15 @@ test('AI 规划可以创建会话并进入带版本控制的工作台', async ({
 
     // 创建会话是一次普通的后端写入，与模型是否可用无关。
     await expect(page.getByRole('button', {name: '开始规划'})).toHaveCount(0, {timeout: 60_000});
-    await expect(page.getByText(/第 1 天/).first()).toBeVisible({timeout: 60_000});
 
-    // 版本控件必须在工作台里可见，这是 BS-08 的核心能力。
-    await expect(page.getByLabel(/第 \d+ 天版本/)).toBeVisible({timeout: 60_000});
+    // 只断言工作台骨架：Markdown 面板、版本选择器、转发入口在会话建好后必然渲染，
+    // 与模型是否产出日计划无关。
+    //
+    // 这里不能断言「第 1 天」这类日计划元素：它要等 planner 真的跑出日计划才出现，
+    // 外部模型不可用时不会有，用例就会随模型可用性时红时绿。
+    await expect(page.getByText('规划 Markdown')).toBeVisible({timeout: 60_000});
+    await expect(page.getByRole('combobox', {name: '历史版本'})).toBeVisible({timeout: 60_000});
+    await expect(page.getByRole('button', {name: '转发社区'})).toBeVisible();
 });
 
 test('未填必填项时规划表单给出明确提示', async ({page}) => {

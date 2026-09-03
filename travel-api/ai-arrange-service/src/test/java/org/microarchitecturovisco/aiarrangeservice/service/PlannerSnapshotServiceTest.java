@@ -198,7 +198,7 @@ class PlannerSnapshotServiceTest {
                 .warnings(List.of(PlannerAgentWarning.builder()
                         .code("MODEL_SLOW_RESPONSE")
                         .message("model response was slow")
-                        .source("deepseek")
+                        .source("model")
                         .build()))
                 .nextQuestion("是否确认当天？")
                 .snapshotDraft(PlannerSnapshotDraft.builder()

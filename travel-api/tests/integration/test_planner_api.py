@@ -4,7 +4,7 @@ test_api_flows.py 只覆盖了建会话、查会话、查快照列表；会话�
 快照、日计划版本列表/激活/恢复、行程组装这几个接口此前完全没有被调用过。
 
 这里刻意不依赖外部模型：只用 markdown 快照造版本，其余用 404/409 这类结构性断言，
-保证没有 DeepSeek key 时结果也是确定的。
+保证没有模型 key 时结果也是确定的。
 """
 
 from __future__ import annotations
@@ -67,6 +67,27 @@ def test_conversation_list_and_ownership(
     )
     api_client.request(
         "API-PLAN-LIST-NO-USER", "GET", "/ai-arrange/api/conversations", expected=400
+    )
+
+
+def test_message_history_is_scoped_to_the_owner(api_client: ApiClient, conversation: dict) -> None:
+    conversation_id, user_id = conversation["id"], conversation["userId"]
+    messages = api_client.request(
+        "API-PLAN-MESSAGES", "GET",
+        f"/ai-arrange/api/conversations/{conversation_id}/messages?userId={user_id}",
+    ).data
+    # 刚建的会话还没有对话记录，应返回空列表而不是报错。
+    assert messages == []
+
+    # 消息历史和会话本身一样按 userId 归属，换个人就取不到。
+    api_client.request(
+        "API-PLAN-MESSAGES-OTHER", "GET",
+        f"/ai-arrange/api/conversations/{conversation_id}/messages?userId={uuid.uuid4()}",
+        expected=404,
+    )
+    api_client.request(
+        "API-PLAN-MESSAGES-NO-USER", "GET",
+        f"/ai-arrange/api/conversations/{conversation_id}/messages", expected=400,
     )
 
 

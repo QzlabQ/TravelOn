@@ -38,11 +38,11 @@ python tests/run_tests.py full
 | `pre` | 前置守卫：种子数据、迁移脚本、classpath 资源、MQ 与网关配置，约 20 秒 | 否 | `test:pre` |
 | `unit` | 单元测试与覆盖率门禁，约 50 秒 | 否 | `test:unit` |
 | `migration` | PostgreSQL 旧数据库迁移回归测试 | 临时 PostgreSQL 容器 | `test:migration` |
-| `integration` | Java `*IT`、Agent 集成、API 测试；跳过真实 DeepSeek；resilience 用例另起一段 | 是 | `test:integration` |
+| `integration` | Java `*IT`、Agent 集成、API 测试；跳过真实模型调用；resilience 用例另起一段 | 是 | `test:integration` |
 | `e2e` | Playwright，默认 Chromium；自动 `yarn build` 后 `yarn serve` | 是 | `test:e2e` |
 | `all` | `pre + unit + integration + Chromium E2E + resilience` | 是 | `test:all` |
 | `ci` | `pre + unit + migration + integration + Chromium E2E + resilience`，前置阶段失败立即停止 | 是 | `test:ci` |
-| `full` | `all` 之外追加真实 DeepSeek、WebSocket、三浏览器 E2E | 是 | `test:full` |
+| `full` | `all` 之外追加真实模型调用、WebSocket、三浏览器 E2E | 是 | `test:full` |
 
 ## 参数
 
@@ -246,7 +246,17 @@ travel-ui/tests/
 | Jest | `Tests:  10 passed, 10 total` |
 | Playwright | list reporter 的逐条完成行 |
 
-只显示已完成数，不显示 `x/n`：Maven 和 Jest 在跑完之前都不报出用例总数（Jest 连 `--listTests` 也只列文件），分母只能拿上一轮结果去猜，猜错时反而误导。Playwright 是例外——它自己会打印 `Running N tests`，那里的 `用例 12/18` 是本次运行的实数。识别不出日志格式时不显示用例数，不影响执行。
+只显示已完成数，不显示 `x/n`：Maven 和 Jest 在跑完之前都不报出用例总数（Jest 连 `--listTests` 也只列文件），分母只能拿上一轮结果去猜，猜错时反而误导。识别不出日志格式时不显示用例数，不影响执行。
+
+**Playwright 是例外**：它自己会打印 `Running N tests`，那是本次运行的实数，所以 E2E 既显示 `用例 12/18`，进度条也按用例比例推进：
+
+```text
+[░░░░░░░░░░░░░░░░░░░░] 0/1 travel-ui-e2e 12s  准备中（构建并启动前端）…
+[████████████████░░░░] 0/1 travel-ui-e2e 254s  用例 14/18
+[████████████████████] 1/1 · 累计 18 用例 ✓ travel-ui-e2e 345.81s  18 条用例
+```
+
+E2E 只有一个任务，条子若只按任务计数就会五分钟一格不动。这里条子按用例填充，而 `0/1` 仍如实表示任务数——两种口径分别显示，不互相冒充。其它类别拿不到真实总数，条子保持按任务推进。
 
 > 注意：`target/surefire-reports/` 里可能残留已删除测试类的旧报告（Surefire 不会清理），直接扫这个目录统计会多算。上面的用例数取自本次运行的输出，不受影响；手工统计时先 `mvn clean`。
 

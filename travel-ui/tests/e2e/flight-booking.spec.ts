@@ -11,8 +11,10 @@ test('机票默认北京→上海，可以选航班、填乘客并生成待支�
     await page.goto('/reservations/flights');
     await expect(page.getByRole('heading', {name: '机票订票与比价'})).toBeVisible();
     // 业务场景文档要求机票页默认使用北京 → 上海。
-    await expect(page.getByRole('combobox', {name: '出发机场/城市'})).toHaveValue('北京市');
-    await expect(page.getByRole('combobox', {name: '到达机场/城市'})).toHaveValue('上海市');
+    // 默认值不是初始 state：TicketBooking 要先取回 /transports/tickets/options 和用户的
+    // 预订偏好，才在 .then() 里 setFrom/setTo，机器负载高时这一步会超过默认的 5 秒断言超时。
+    await expect(page.getByRole('combobox', {name: '出发机场/城市'})).toHaveValue('北京市', {timeout: 30_000});
+    await expect(page.getByRole('combobox', {name: '到达机场/城市'})).toHaveValue('上海市', {timeout: 30_000});
 
     let reservationId: string | undefined;
     try {

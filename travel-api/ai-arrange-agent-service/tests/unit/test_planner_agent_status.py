@@ -19,7 +19,7 @@ def test_degrading_warning_downgrades_agent_status() -> None:
         AgentWarning(
             code="MODEL_OUTPUT_INVALID",
             message="model output failed schema validation",
-            source="deepseek",
+            source="model",
         )
     ]
 

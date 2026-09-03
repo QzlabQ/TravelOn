@@ -505,11 +505,11 @@ mise run verify
 | `mise run test:pre` | 前置守卫：种子数据、迁移脚本、classpath 资源、MQ 与网关配置，约 20 秒 | 否 |
 | `mise run test:unit` | 单元测试与覆盖率门禁，约 50 秒 | 否 |
 | `mise run test:migration` | 跨平台 PostgreSQL 旧数据库迁移回归测试 | 临时 PostgreSQL 容器 |
-| `mise run test:integration` | Java `*IT`、Agent 集成、API 测试；跳过真实 DeepSeek；resilience 用例另起一段 | 是 |
+| `mise run test:integration` | Java `*IT`、Agent 集成、API 测试；跳过真实模型调用；resilience 用例另起一段 | 是 |
 | `mise run test:e2e` | Playwright，Chromium | 是 |
 | `mise run test:all` | `pre + unit + integration + Chromium E2E + resilience` | 是 |
 | `mise run test:ci` | 与 CI 相同的 `pre + unit + migration + integration + Chromium E2E + resilience`，失败立即停止 | 是 |
-| `mise run test:full` | `all` 之外追加真实 DeepSeek、WebSocket、三浏览器 E2E；需有效 `DEEPSEEK_API_KEY` 与管理员凭据 | 是 |
+| `mise run test:full` | `all` 之外追加真实模型调用、WebSocket、三浏览器 E2E；需有效 `AI_API_KEY` 与管理员凭据 | 是 |
 | `mise run verify` | 单个最小模块，确认链路可用 | 否 |
 | `mise run doctor` | 打印 java/node/yarn/python/docker 版本 | 否 |
 

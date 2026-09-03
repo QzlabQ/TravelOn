@@ -106,8 +106,15 @@ class Progress:
         print(paint(f"== {category} ==", BOLD), f"共 {total} 项")
         sys.stdout.flush()
 
-    def _bar(self, width: int = 20) -> str:
-        filled = round(width * self.done / self.total) if self.total else width
+    def _bar(self, width: int = 20, fraction: float | None = None) -> str:
+        """fraction 是当前任务的完成比例，只有能拿到真实用例总数时才传。
+
+        E2E 只有一个任务，跑五分钟条子一格不动；有了 fraction，条子按用例推进，
+        而 done/total 仍然如实显示任务数，不会把两种口径混为一谈。
+        """
+        progress = self.done + min(max(fraction or 0.0, 0.0), 1.0)
+        filled = round(width * progress / self.total) if self.total else width
+        filled = min(filled, width)
         # 已完成任务累计的用例数：进度条按任务走，这里让读者同时看到测试量。
         cases = f" · 累计 {self.cases} 用例" if self.cases else ""
         return f"[{BAR_FULL * filled}{BAR_EMPTY * (width - filled)}] {self.done}/{self.total}{cases}"
@@ -125,10 +132,10 @@ class Progress:
         else:
             print(f"  [{self.done + 1}/{self.total}] {name} 开始", flush=True)
 
-    def tick(self, name: str, elapsed: float, detail: str = "") -> None:
+    def tick(self, name: str, elapsed: float, detail: str = "", fraction: float | None = None) -> None:
         """任务运行期间刷新耗时，避免长任务（E2E、前端构建）中途完全静默。"""
         suffix = f"  {detail}" if detail else ""
-        text = f"{self._bar()} {name} {int(elapsed)}s{suffix}"
+        text = f"{self._bar(fraction=fraction)} {name} {int(elapsed)}s{suffix}"
         if IS_TTY:
             print(CR + text.ljust(88)[:88], end="", flush=True)
             self._line_open = True
@@ -247,6 +254,7 @@ def run_process(
     env: dict[str, str] | None = None,
     log_name: str | None = None,
     detail_fn: "Callable[[Path], str] | None" = None,
+    fraction_fn: "Callable[[Path], float | None] | None" = None,
 ) -> Result:
     log_dir = artifacts / category / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -266,7 +274,12 @@ def run_process(
             except subprocess.TimeoutExpired:
                 if progress:
                     elapsed = time.monotonic() - started
-                    progress.tick(name, elapsed, (detail_fn or case_progress)(log_path))
+                    progress.tick(
+                        name,
+                        elapsed,
+                        (detail_fn or case_progress)(log_path),
+                        fraction_fn(log_path) if fraction_fn else None,
+                    )
     cases, cases_failed = parse_case_counts(read_log_tail(log_path)) or (0, 0)
     result = Result(
         name=name,
@@ -468,19 +481,31 @@ def case_progress(log_path: Path) -> str:
     return f"用例 {done}" + (f"（{failed} 失败）" if failed else "")
 
 
-def playwright_progress(log_path: Path) -> str:
-    """Playwright 自己会打印本次运行的用例总数，这里的 x/n 是实数而非估计。
+def playwright_counts(log_path: Path) -> tuple[int, int | None]:
+    """(已完成用例数, 本次运行的用例总数)。
 
     并行执行时行首数字是用例序号而非完成数，因此统计匹配行数而不是取最大序号。
+    总数来自 Playwright 自己打印的 "Running N tests"，是本次运行的实数。
     """
     text = read_log_tail(log_path)
     done = len(PLAYWRIGHT_CASE_LINE.findall(text))
     totals = re.findall(r"Running (\d+) test", text)
-    if totals:
-        return f"用例 {done}/{totals[0]}"
+    return done, int(totals[0]) if totals else None
+
+
+def playwright_progress(log_path: Path) -> str:
+    done, total = playwright_counts(log_path)
+    if total:
+        return f"用例 {done}/{total}"
     if done:
         return f"已完成 {done} 个用例"
     return "准备中（构建并启动前端）…"
+
+
+def playwright_fraction(log_path: Path) -> float | None:
+    """E2E 只有一个任务，用用例完成比例驱动进度条，否则条子五分钟不动一格。"""
+    done, total = playwright_counts(log_path)
+    return done / total if total else None
 
 
 # Agent 服务单元测试的行覆盖率下限，与各 pom 的 jacoco 规则、travel-ui 的
@@ -724,7 +749,8 @@ def run_e2e(args: argparse.Namespace, artifacts: Path) -> list[Result]:
     return [
         run_process(
             "travel-ui-e2e", "e2e", command, UI_ROOT, artifacts, progress,
-            env=env, log_name="playwright", detail_fn=playwright_progress
+            env=env, log_name="playwright",
+            detail_fn=playwright_progress, fraction_fn=playwright_fraction
         )
     ]
 

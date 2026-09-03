@@ -207,7 +207,7 @@ def test_community_restart_deregisters_and_recovers(api_client: ApiClient) -> No
 
 
 @pytest.mark.external
-def test_real_deepseek_response_is_persisted(api_client: ApiClient) -> None:
+def test_real_model_response_is_persisted(api_client: ApiClient) -> None:
     user_id = str(uuid.uuid4())
     travel_day = (date.today() + timedelta(days=75)).isoformat()
     conversation = api_client.request(
@@ -231,8 +231,15 @@ def test_real_deepseek_response_is_persisted(api_client: ApiClient) -> None:
         },
     ).data
     trace_id = snapshot["traceId"]
-    deepseek_calls = [call for call in snapshot["agentToolCalls"] if call["tool"] == "deepseek_chat_completion"]
-    assert deepseek_calls and deepseek_calls[0]["status"] in {"SUCCESS", "PARTIAL_SUCCESS"}
+    # 工具名随「只支持 DeepSeek → OpenAI 兼容」的改造从 deepseek_chat_completion 改成了
+    # model_chat_completion，这里的过滤条件当时没跟着改，永远匹配不到；因为用例带 external
+    # 标记、只在 test:full 里跑，一直没暴露。
+    model_calls = [call for call in snapshot["agentToolCalls"] if call["tool"] == "model_chat_completion"]
+    assert model_calls, (
+        "快照里没有 model_chat_completion 调用记录；"
+        f"实际出现的工具：{sorted({call['tool'] for call in snapshot['agentToolCalls']})}"
+    )
+    assert model_calls[0]["status"] in {"SUCCESS", "PARTIAL_SUCCESS"}
     snapshots = api_client.request(
         "INT-AI-SNAPSHOTS", "GET",
         f"/ai-arrange/api/conversations/{conversation_id}/snapshots?userId={user_id}",
