@@ -41,4 +41,21 @@ while IFS=$'\t' read -r api_version kind name; do
   fi
 done < ops/cd/retired-resources.tsv
 
+# kubectl expects every prune allowlist entry as group/version/kind. Core API
+# resources therefore use the explicit "core" group instead of v1/Kind.
+for deploy_script in ops/runner/travelon-deploy-k3s scripts/deploy-k3s.sh; do
+  grep -Fq -- '--prune-allowlist=core/v1/Service' "$deploy_script" || {
+    echo "missing core/v1/Service prune allowlist in $deploy_script" >&2
+    exit 1
+  }
+  grep -Fq -- '--prune-allowlist=core/v1/ConfigMap' "$deploy_script" || {
+    echo "missing core/v1/ConfigMap prune allowlist in $deploy_script" >&2
+    exit 1
+  }
+  if grep -Eq -- '--prune-allowlist=v1/(Service|ConfigMap)' "$deploy_script"; then
+    echo "invalid two-part core resource prune allowlist in $deploy_script" >&2
+    exit 1
+  fi
+done
+
 echo "CD metadata checks passed"
