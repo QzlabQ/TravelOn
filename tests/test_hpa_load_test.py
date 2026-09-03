@@ -12,6 +12,17 @@ SPEC.loader.exec_module(MODULE)
 
 
 class HpaLoadTestTest(unittest.TestCase):
+    def test_gateway_hpa_declares_expected_cpu_policy(self):
+        manifest = (Path(__file__).parents[1] / "k8s/base/autoscaling.yaml").read_text(
+            encoding="utf-8"
+        )
+        self.assertRegex(manifest, r"(?m)^kind: HorizontalPodAutoscaler$")
+        self.assertRegex(manifest, r"(?m)^\s+name: gateway$")
+        self.assertRegex(manifest, r"(?m)^\s+minReplicas: 1$")
+        self.assertRegex(manifest, r"(?m)^\s+maxReplicas: 4$")
+        self.assertRegex(manifest, r"(?m)^\s+name: cpu$")
+        self.assertRegex(manifest, r"(?m)^\s+averageUtilization: 60$")
+
     @patch.object(MODULE.subprocess, "check_output", return_value="2:1")
     def test_replica_sample_parses_current_and_ready(self, _check_output):
         value, error = MODULE.replicas("travelon", "gateway")

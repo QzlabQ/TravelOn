@@ -148,7 +148,11 @@ def run_migration(
 def wait_for_postgres() -> None:
     for _ in range(60):
         ready = docker(
-            "exec", CONTAINER, "pg_isready", "-U", "admin", "-d", "postgres",
+            # Probe the final server over TCP.  The image briefly starts a
+            # bootstrap postgres on the Unix socket while initialising; a
+            # socket-only probe can therefore race with its shutdown.
+            "exec", CONTAINER, "pg_isready", "-h", "127.0.0.1",
+            "-U", "admin", "-d", "postgres",
             check=False,
         )
         if ready.returncode == 0:
