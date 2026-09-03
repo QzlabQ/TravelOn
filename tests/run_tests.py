@@ -565,6 +565,22 @@ def run_pre(args: argparse.Namespace, artifacts: Path) -> list[Result]:
             [sys.executable, "-m", "pytest", "-q", "tests/test_toolchain_consistency.py", f"--junitxml={junit}"],
             ROOT,
         ))
+    if not selected or "ops-scripts" in selected:
+        junit = artifacts / "pre" / "ops-scripts" / "junit.xml"
+        junit.parent.mkdir(parents=True, exist_ok=True)
+        jobs.append((
+            "ops-scripts",
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "tests/test_hpa_load_test.py",
+                "tests/test_migration_runner.py",
+                f"--junitxml={junit}",
+            ],
+            ROOT,
+        ))
     for module in modules_with_pre_tests():
         if selected and module.name not in selected:
             continue
