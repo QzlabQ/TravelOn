@@ -38,7 +38,15 @@ depends = ["setup:py", "setup:ui"]
 [tasks."ui:dev"]
 description = "启动前端开发服务器"
 dir = "travel-ui"
-run = "corepack yarn start"
+# 交互式长运行任务需要直连终端。用 Node shebang 让 mise 直接启动
+# React Scripts，避免 Windows 上默认的 `cmd /c` 再嵌套 `corepack.cmd`；否则
+# Ctrl+C 会触发 `Terminate batch job (Y/N)?` 并与 PowerShell 争抢输入。
+raw = true
+run = '''
+#!/usr/bin/env node
+process.argv.splice(2, 0, "start");
+require(require.resolve("react-scripts/bin/react-scripts.js", {paths: [process.cwd()]}));
+'''
 
 [tasks."ui:build"]
 description = "构建前端生产产物"
